@@ -149,3 +149,24 @@ test('token write/link/private cleanup failures propagate without entering',asyn
     await assert.rejects(fs.lstat(p.lockPath),{code:'ENOENT'});
   }
 });
+test('falsy callback exceptions reject and survive simultaneous cleanup failure',async t=>{
+  const p=await tempState(t);
+  for(const thrown of [null,undefined,false,0,'']) {
+    for(const cleanupFails of [false,true]) {
+      const io={...fs,unlink:async path=>{
+        if(cleanupFails&&path===p.lockPath)throw Object.assign(new Error('denied'),{code:'EACCES'});
+        return fs.unlink(path);
+      }};
+      let caught=false;
+      try { await withLock(p.lockPath,()=>{throw thrown;},{io}); }
+      catch(error) {
+        caught=true;
+        if(cleanupFails){assert.ok(error instanceof AggregateError);assert.equal(error.errors[0],thrown);assert.equal(error.errors[1].code,'LOCK_CLEANUP_FAILED');}
+        else assert.equal(error,thrown);
+      }
+      assert.equal(caught,true,'every thrown value must reject');
+      if(cleanupFails)await fs.unlink(p.lockPath);
+      else await assert.rejects(fs.lstat(p.lockPath),{code:'ENOENT'});
+    }
+  }
+});

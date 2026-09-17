@@ -72,3 +72,19 @@ test('resolvers skip self and use nearest matching terminal candidate', () => {
 test('Claude and Codex reducers preserve every explicit level including removal',()=>{
   for(const harness of ['claude-code','codex'])for(const level of ['idle','working','needs-input','needs-approval','done','error',null])assert.equal(adapterFor(harness).reduceState(level,'error'),level);
 });
+test('input rejects expired data and EOF before the timeout callback runs',async()=>{
+  for(const [deadline,expired] of [[10,10],[10000,5000]]) {
+    for(const lateData of [false,true]) {
+      let now=0;const stream=new PassThrough();
+      const pending=readNativeInput(stream,{clock:()=>now,deadline});
+      let rejected=false;pending.catch(()=>{rejected=true;});
+      if(!lateData)stream.write('{}');
+      now=expired;
+      if(lateData)stream.write('{}');else stream.end();
+      if(lateData){await Promise.resolve();assert.equal(rejected,true,'expired data must reject before the timer callback');}
+      await assert.rejects(pending,{code:'INPUT_TIMEOUT'});
+      for(const event of ['data','end','error','close'])assert.equal(stream.listenerCount(event),0);
+      stream.destroy();
+    }
+  }
+});

@@ -93,10 +93,10 @@ export async function withLock(lockPath, fn, { clock = performance.now.bind(perf
     if (cleanup) throw relayError('LOCK_CLEANUP_FAILED','cannot release reclaim guard',cleanup);
     if (error) throw error;
   }
-  let value, error;
-  try { expired(); value = await fn(); } catch (cause) { error = cause; }
+  let value, error, failed = false;
+  try { expired(); value = await fn(); } catch (cause) { failed = true; error = cause; }
   const cleanupError = await release(lockPath,token,io);
-  if (error && cleanupError) throw new AggregateError([error,cleanupError],'callback and lock cleanup failed');
-  if (error) throw error;
+  if (failed && cleanupError) throw new AggregateError([error,cleanupError],'callback and lock cleanup failed');
+  if (failed) throw error;
   return {value,cleanupError};
 }

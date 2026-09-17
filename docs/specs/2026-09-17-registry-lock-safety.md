@@ -1,7 +1,7 @@
 # Registry lock safety during extraction
 
 Status: implemented on 2026-09-17 in relay-06b1da; independent review/integration pending.
-Verification: 148 tests pass on Node 26.5.0 and Node 22.23.2, including real Linux
+Verification: 150 tests pass on Node 26.5.0 and Node 22.23.2, including real Linux
 IPC exclusion/crash recovery, live-owner/guard age immunity and cleanup failure
 semantics. Physical Darwin process verification remains a release requirement.
 Task: `relay-06b1da`.

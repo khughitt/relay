@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Execute the phases in order; checkboxes record completed work, not intentions.
 
-**Status:** R1 implementation complete on 2026-09-17; 148 tests pass through `just gate` on Node 26.5.0 and Node 22.23.2, including actual local tarball installation. Independent review/integration is pending; the locked task worktree is retained. Physical Darwin and later dispatch/install/cutover gates remain unverified.
+**Status:** R1 implementation complete on 2026-09-17; 150 tests pass through `just gate` on Node 26.5.0 and Node 22.23.2, including actual local tarball installation. Independent review/integration is pending; the locked task worktree is retained. Physical Darwin and later dispatch/install/cutover gates remain unverified.
 
 **Goal:** Complete `relay-06b1da` with a tested Node package containing normalized
 harness observation, qualified process identity, safe registry transactions,

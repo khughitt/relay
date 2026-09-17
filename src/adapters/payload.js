@@ -16,13 +16,16 @@ export function parsePayload(raw, nativeEvent) {
       || !data.tool_input || typeof data.tool_input !== 'object' || Array.isArray(data.tool_input))) throw relayError('INVALID_INPUT', 'invalid native tool fields');
   return data;
 }
-export function readNativeInput(stream, { clock = performance.now.bind(performance), deadline = clock() + 5000 } = {}) {
-  const remaining = Math.min(5000, deadline - clock());
+export function readNativeInput(stream, { clock = performance.now.bind(performance), deadline } = {}) {
+  const started = clock();
+  const effectiveDeadline = Math.min(deadline ?? Infinity, started + 5000);
+  const remaining = effectiveDeadline - started;
   if (remaining <= 0) return Promise.reject(relayError('INPUT_TIMEOUT', 'native input deadline exceeded'));
   return new Promise((resolve, reject) => {
     const chunks = []; let size = 0, finished = false;
     const done = (error) => {
       if (finished) return; finished = true;
+      if (!error && clock() >= effectiveDeadline) error = relayError('INPUT_TIMEOUT', 'native input deadline exceeded');
       clearTimeout(timer);
       stream.removeListener('data', data); stream.removeListener('end', end);
       stream.removeListener('error', failed); stream.removeListener('close', closed);
@@ -30,6 +33,7 @@ export function readNativeInput(stream, { clock = performance.now.bind(performan
       if (error) reject(error); else resolve(Buffer.concat(chunks, size));
     };
     const data = (chunk) => {
+      if (clock() >= effectiveDeadline) return done(relayError('INPUT_TIMEOUT', 'native input deadline exceeded'));
       const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       size += bytes.length;
       if (size > MAX_BYTES) return done(relayError('INPUT_TOO_LARGE', 'native input exceeds byte limit'));

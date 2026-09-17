@@ -8,9 +8,9 @@ complexity: high
 process: planned
 owner: relay-06b1da
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T07:59:51Z
+updated: 2026-09-17T08:09:44Z
 started: 2026-09-17T06:54:50Z
-completed: 2026-09-17T07:59:51Z
+completed: 2026-09-17T08:09:44Z
 depends: [relay-377bc5]
 parent: relay-1231bf
 tags: []
@@ -77,3 +77,6 @@ Prerequisites: relay-377bc5. Release goal: relay-1231bf. Bootstrap ops-998bbb cl
 - 2026-09-17T07:50:02Z (relay-06b1da): Phase 5: all OpenCode server regression suites ported; 137 tests pass including queue/fold isolation and bounded sanitized child transport; plugin remains unregistered.
 - 2026-09-17T07:59:51Z (relay-06b1da): R1 final gates: 148/148 pass on Node 26.5.0 and 22.23.2, including installed tarball exports/plugin/fixture/CLI and real Linux IPC. Physical Darwin and dispatch/install/cutover remain later gates; independent review pending, worktree retained.
 - 2026-09-17T07:59:51Z (relay-06b1da): Implemented R1 adapters, qualified process identity, safe atomic registry, OpenCode observation and registry CLI/package; 148 tests pass on Node 22 and development runtime with tarball smoke. Independent integration review pending.
+- 2026-09-17T08:08:11Z (relay-06b1da): Independent review identified late EOF accepted before timer delivery and falsy callback exceptions swallowed. Reopened for scoped regressions and fixes; architecture and remaining release gates unchanged.
+- 2026-09-17T08:09:44Z (relay-06b1da): Review round 1 fixed: effective stdin deadline checked before buffering and successful EOF; callback failure tracked independently of thrown value. Red/green regressions cover late data/EOF and all five falsy throws with/without cleanup failure. Both full gates pass 150/150 on Node 26.5.0 and 22.23.2, including tarball smoke.
+- 2026-09-17T08:09:44Z (relay-06b1da): Fixed both Important R1 review findings; 150 tests pass on Node 22 and development runtime with installed-tarball checks. Scoped re-review pending; physical Darwin release gate and retained worktree unchanged.
