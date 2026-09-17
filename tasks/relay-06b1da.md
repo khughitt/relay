@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: relay-06b1da
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T07:47:27Z
+updated: 2026-09-17T07:50:02Z
 started: 2026-09-17T06:54:50Z
 depends: [relay-377bc5]
 parent: relay-1231bf
@@ -73,3 +73,4 @@ Prerequisites: relay-377bc5. Release goal: relay-1231bf. Bootstrap ops-998bbb cl
 - 2026-09-17T07:37:32Z (relay-06b1da): Phase 2: precision red reproduced; 31 tests green including fresh Linux proof and portable Darwin/DST parsing; Git bounds and strict error classification extracted.
 - 2026-09-17T07:40:04Z (relay-06b1da): Phase 3: 53 tests green; all twenty literal mappings, measured resolver regressions and bounded stdin normalization implemented.
 - 2026-09-17T07:47:27Z (relay-06b1da): Phase 4: 90 tests green including live-owner age immunity, safe reclamation, cleanup partial success, strict null/corrupt state, and real IPC counter/registry/crash tests.
+- 2026-09-17T07:50:02Z (relay-06b1da): Phase 5: all OpenCode server regression suites ported; 137 tests pass including queue/fold isolation and bounded sanitized child transport; plugin remains unregistered.

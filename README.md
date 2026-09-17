@@ -14,3 +14,6 @@ Its [registry-lock safety addendum](docs/specs/2026-09-17-registry-lock-safety.m
 is approved.
 Familiar migration is scheduled as `fam-6e8321`; tasks identity design is
 `tasks-c9199a`. Publication and operator cutover are still pending.
+
+OpenCode server observation is extracted and tested. It is not yet installable:
+the relay hook dispatcher remains in `relay-4c4828`, and no plugin is registered.

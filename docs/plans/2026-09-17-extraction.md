@@ -606,7 +606,7 @@ plugin function, with the existing event/permission.ask/dispose hook object.
 Internal createBinding/createWindow/createQueue/spawnHook signatures retain the
 source test seams; `createBinding` gains an optional env for its diagnostic path.
 
-- [ ] Port the four source suites, preserving literal permission precedence,
+- [x] Port the four source suites, preserving literal permission precedence,
   duplicate-ask, subagent-busy, error-before-idle and queue-failure expectations.
   Change the expected plugin export from Familiar to Relay. Verify source
   processing order, including this integration test:
@@ -627,7 +627,7 @@ test('queued init precedes work and dispose follows it', async () => {
 });
 ```
 
-- [ ] Copy the modules, replace presentation-specific comments and prefixes, and
+- [x] Copy the modules, replace presentation-specific comments and prefixes, and
   validate directory as absolute. Keep scope process and its raw opencode:PID key;
   the normalized registry key starts `opencode:opencode:`. Preserve this deliberate
   double prefix: parent spec §6 projects Agent.sessionId onto familiar's existing
@@ -649,7 +649,7 @@ test('queued init precedes work and dispose follows it', async () => {
   extracted/tested but not yet installable. Do not register it, add a direct-store
   bypass, or silently fall back to familiar when the command is unavailable.
 
-- [ ] Extend npm test to `node --test test/*.test.js integrations/opencode/*.test.mjs`,
+- [x] Extend npm test to `node --test test/*.test.js integrations/opencode/*.test.mjs`,
   run `just test-fast`, `tasks check`; commit `feat: extract opencode server observation`.
 
 ### Phase 6: Expose the CLI/package and document bounded repair

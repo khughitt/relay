@@ -11,7 +11,7 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js integrations/opencode/*.test.mjs"
   },
   "files": [
     "src/",
