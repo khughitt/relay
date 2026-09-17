@@ -7,6 +7,7 @@ import { checkPrivate } from './bus/store.js';
 export const RECONCILE = 'reconcile';
 const HARNESSES = ['claude-code', 'codex', 'opencode'];
 const FIELDS = ['name', 'role', 'kinds', 'harnesses', 'tools', 'argv', 'timeoutMs'];
+const CONFIG_FIELDS = ['schema', 'subscribers'];
 const MAX_TIMEOUT_MS = 60000, MAX_PLANNED_MS = 60000, MIN_OUTER_MS = 500, INPUT_MS = 5000, REGISTRY_MS = 12000;
 const fail = (message, cause) => { throw relayError('INVALID_CONFIG', message, cause); };
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -42,6 +43,8 @@ function validateSubscriber(v, index) {
 
 export function validateSubscribers(v) {
   if (!object(v) || v.schema !== 1 || !Array.isArray(v.subscribers)) fail('subscriber config must be {"schema":1,"subscribers":[...]}');
+  const extra = Object.keys(v).find((key) => !CONFIG_FIELDS.includes(key));
+  if (extra !== undefined) fail(`subscriber config: unexpected field ${extra}`);
   const subscribers = v.subscribers.map(validateSubscriber);
   if (new Set(subscribers.map((subscriber) => subscriber.name)).size !== subscribers.length) fail('subscriber names must be unique');
   return { schema: 1, subscribers };

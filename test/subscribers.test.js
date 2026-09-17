@@ -15,7 +15,7 @@ test('validateSubscribers normalizes entries and rejects every malformed field',
   assert.deepEqual(config.subscribers[1], { ...observer(), harnesses: null, tools: null });
   assert.deepEqual(validateSubscribers({ schema: 1, subscribers: [] }), { schema: 1, subscribers: [] });
   const bad = [
-    null, [], { schema: 2, subscribers: [] }, { schema: 1 }, { schema: 1, subscribers: {} },
+    null, [], { schema: 2, subscribers: [] }, { schema: 1 }, { schema: 1, subscribers: {} }, { schema: 1, subscribers: [], typo: true },
     { schema: 1, subscribers: [guard(), guard()] },
     { schema: 1, subscribers: [guard({ name: 'Guard' })] }, { schema: 1, subscribers: [guard({ name: '-x' })] }, { schema: 1, subscribers: [guard({ name: 'a'.repeat(65) })] },
     { schema: 1, subscribers: [guard({ role: 'watcher' })] },
