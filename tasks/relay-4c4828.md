@@ -1,15 +1,16 @@
 ---
 id: relay-4c4828
 title: Dispatch bounded guards and observers with native replies
-status: doing
+status: done
 priority: 1
 size: l
 complexity: high
 process: planned
-owner: main
+owner: relay-4c4828
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T11:43:43Z
+updated: 2026-09-17T13:02:41Z
 started: 2026-09-17T11:14:45Z
+completed: 2026-09-17T13:02:41Z
 depends: [relay-06b1da]
 parent: relay-1231bf
 tags: []
@@ -50,3 +51,6 @@ Prerequisites: relay-06b1da. Release goal: relay-1231bf. Bootstrap ops-998bbb cl
 - 2026-09-17T11:29:26Z (relay-4c4828): Plan drafted at docs/plans/2026-09-17-dispatch.md for user review; decisions: --outer-ms budget flag with derived profile, subscribers.json schema, guard reply/observer envelope, exit codes; native reply/timeout facts verified against both hook references 2026-09-17
 - 2026-09-17T11:29:43Z (relay-4c4828): parked (waiting on user, review): User reviews docs/plans/2026-09-17-dispatch.md; on approval execute Task 1 (relay-ca9835) onward in .worktrees/relay-4c4828
 - 2026-09-17T11:43:43Z (relay-4c4828): Review round 1 folded into plan (dd898d0): bounded I/O + explicit exit, paths inside refusal boundary, denial before channel check, teardown subscription, test setup fixes
+- 2026-09-17T11:50:48Z (relay-4c4828): Review round 2 folded in: reclaim-guard exception documented and tested, per-harness example config validated for every event, reap-timeout and lock test fixes
+- 2026-09-17T13:02:41Z (relay-4c4828): Dispatch implemented; gate green on Node 26 and 22; live probes remain ops-c8e4d1
+- 2026-09-17T13:02:41Z (relay-4c4828): relay hook/reap dispatch guards, observers and native replies under one budget; installer and live probes follow

@@ -16,6 +16,7 @@
   ops front door; install core.hooksPath .githooks in a new clone.
 - Test the Node 22 floor as well as the development runtime. The suite includes an
   actual local tarball install/CLI smoke test and real Linux IPC/process tests.
-- R1 has no hook dispatcher, installer, subscribers or guards. Never enable the
-  extracted OpenCode plugin until the dependent dispatch/installation gates pass.
+- R2 has the hook dispatcher and subscriber configuration; there is no installer. Never
+  enable the extracted OpenCode plugin or register a live hook until the installation and
+  capability gates pass.
 - Before removing a worktree, harvest its timing logs with tt-report.
