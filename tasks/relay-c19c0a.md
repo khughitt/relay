@@ -7,7 +7,7 @@ size: l
 complexity: mid
 process: planned
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T00:50:54Z
+updated: 2026-09-17T08:15:54Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1]
 parent: relay-1231bf
 tags: []
@@ -58,3 +58,7 @@ lockfile's resolved commit, exercise the CLI and named exports, then repeat with
 local Git URL experiment only established tag-pinning semantics.
 
 Prerequisites: relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1. Release goal: relay-1231bf. Bootstrap ops-998bbb closure does not mean this deliverable has shipped.
+
+## Notes
+
+- 2026-09-17T08:15:54Z (relay-06b1da): R1 passed Node 26.5.0 and 22.23.2 full gates (150 tests including tarball and Linux IPC) and independent review. Physical Darwin process/terminal verification has not run: retain that explicit release/cutover gate; portable Darwin fixtures ran on Linux only. Registry API and repair procedure are in docs/api.md and docs/runbooks/registry-lock-repair.md.

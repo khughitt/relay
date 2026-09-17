@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: relay-06b1da
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T08:09:44Z
+updated: 2026-09-17T08:15:54Z
 started: 2026-09-17T06:54:50Z
 completed: 2026-09-17T08:09:44Z
 depends: [relay-377bc5]
@@ -80,3 +80,4 @@ Prerequisites: relay-377bc5. Release goal: relay-1231bf. Bootstrap ops-998bbb cl
 - 2026-09-17T08:08:11Z (relay-06b1da): Independent review identified late EOF accepted before timer delivery and falsy callback exceptions swallowed. Reopened for scoped regressions and fixes; architecture and remaining release gates unchanged.
 - 2026-09-17T08:09:44Z (relay-06b1da): Review round 1 fixed: effective stdin deadline checked before buffering and successful EOF; callback failure tracked independently of thrown value. Red/green regressions cover late data/EOF and all five falsy throws with/without cleanup failure. Both full gates pass 150/150 on Node 26.5.0 and 22.23.2, including tarball smoke.
 - 2026-09-17T08:09:44Z (relay-06b1da): Fixed both Important R1 review findings; 150 tests pass on Node 22 and development runtime with installed-tarball checks. Scoped re-review pending; physical Darwin release gate and retained worktree unchanged.
+- 2026-09-17T08:15:54Z (relay-06b1da): Independent task review, scoped fix review and final whole-branch review approved R1 at 3b5bf62 with no remaining findings. Both full gates pass 150/150 on Node 26.5.0 and 22.23.2, including real IPC and installed tarball. MIT license and source baseline verified; timing logs harvested. Parent ops status docs pass check and 308 tests (1 skipped). Proceeding local fast-forward integration; physical Darwin remains a release/cutover gate.

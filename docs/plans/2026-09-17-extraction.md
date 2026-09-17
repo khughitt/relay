@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Execute the phases in order; checkboxes record completed work, not intentions.
 
-**Status:** R1 implementation complete on 2026-09-17; 150 tests pass through `just gate` on Node 26.5.0 and Node 22.23.2, including actual local tarball installation. Independent review/integration is pending; the locked task worktree is retained. Physical Darwin and later dispatch/install/cutover gates remain unverified.
+**Status:** R1 implementation and independent reviews complete on 2026-09-17; 150 tests pass through `just gate` on Node 26.5.0 and Node 22.23.2, including actual local tarball installation. Physical Darwin and later dispatch/install/cutover gates remain unverified.
 
 **Goal:** Complete `relay-06b1da` with a tested Node package containing normalized
 harness observation, qualified process identity, safe registry transactions,
@@ -749,9 +749,8 @@ relay reap
   record measured tests and package smoke evidence, and complete relay-06b1da in
   the same commit as its final changes. Use `feat: expose relay registry package`.
   Run `tasks check` before committing. Implementation and local verification are
-  complete; independent review/integration and timing-log harvest before worktree
-  removal are controller follow-up. The implementation worker retains the locked
-  worktree and does not merge or remove it.
+  complete. Independent task review, scoped fix review and whole-branch review
+  passed; timing logs were harvested before local integration and worktree cleanup.
 
 ## Handoff and scope verification
 

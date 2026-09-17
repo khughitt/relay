@@ -1,6 +1,6 @@
 # Registry lock safety during extraction
 
-Status: implemented on 2026-09-17 in relay-06b1da; independent review/integration pending.
+Status: implemented and independently reviewed on 2026-09-17 in relay-06b1da.
 Verification: 150 tests pass on Node 26.5.0 and Node 22.23.2, including real Linux
 IPC exclusion/crash recovery, live-owner/guard age immunity and cleanup failure
 semantics. Physical Darwin process verification remains a release requirement.
@@ -139,6 +139,6 @@ do not silently drop these cases while claiming all source behavior is preserved
 Kill a real child while it owns the main lock and verify automatic recovery; kill
 it while owning the guard and verify the repair error without snapshot mutation.
 
-This addendum is approved. The extraction implementation plan requires separate
-user review before code changes. No familiar code, live lock files, hook settings
-or registry snapshot has been changed by this investigation.
+This addendum and the extraction plan were approved before implementation. R1 now
+implements and tests this contract. Familiar code, live lock files, hook settings
+and live registry snapshots were not changed by the extraction.

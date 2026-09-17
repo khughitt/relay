@@ -41,4 +41,4 @@ requirement; portable Darwin UTC/local-timezone fixtures do not replace it.
 
 Verified 2026-09-17: 150 tests pass through the full gate on Node 26.5.0 and
 Node 22.23.2, including installed-tarball exports, JSON fixture, plugin and CLI.
-Independent review/integration is pending; physical Darwin has not run.
+Independent task and branch reviews passed; physical Darwin has not run.
