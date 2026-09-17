@@ -1,5 +1,6 @@
 import { createProcessOps } from '../bus/proc.js';
 import { relayError } from '../protocol.js';
+import { encodeStandardReply } from './reply.js';
 
 export const events = Object.freeze({
   'init': Object.freeze({ kind: 'session-start', level: 'idle' }),
@@ -23,3 +24,7 @@ export function reduceState(level, previous) {
 export function resolveAgentPid({ startPid = process.pid, ancestors = (pid) => createProcessOps().ancestors(pid) } = {}) {
   return ancestors(startPid).find((p, i) => i > 0 && p.comm === 'opencode' && p.tty !== null)?.pid ?? null;
 }
+// The server plugin observes only; its spawnHook lifetime is five seconds.
+export const replies = Object.freeze({});
+export const outerTimeouts = Object.freeze({ default: 5000, max: Object.freeze({}) });
+export const encodeReply = (nativeEvent, reply) => encodeStandardReply(nativeEvent, reply);

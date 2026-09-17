@@ -1,5 +1,6 @@
 import { isAbsolute } from 'node:path';
 export const STATES = Object.freeze(['idle', 'working', 'needs-input', 'needs-approval', 'done', 'error']);
+export const KINDS = Object.freeze(['session-start', 'prompt', 'before-tool', 'activity', 'idle', 'needs-input', 'needs-approval', 'turn-end', 'turn-error', 'session-end']);
 export const relayError = (code, message, cause) => Object.assign(new Error(message, { cause }), { code });
 const fail = (message) => { throw relayError('INVALID_SCHEMA', message); };
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -42,8 +43,7 @@ export function validateSnapshot(v) {
     agents: Object.fromEntries(Object.entries(v.agents).map(([key, agent]) => [key, validateAgent(agent, key)])) };
 }
 export function validateEvent(v) {
-  const kinds = ['session-start', 'prompt', 'before-tool', 'activity', 'idle', 'needs-input', 'needs-approval', 'turn-end', 'turn-error', 'session-end'];
-  if (!object(v) || v.schema !== 1 || !kinds.includes(v.kind) || !text(v.nativeEvent)) fail('invalid event');
+  if (!object(v) || v.schema !== 1 || !KINDS.includes(v.kind) || !text(v.nativeEvent)) fail('invalid event');
   identity(v, v.agentId);
   if (Object.hasOwn(v, 'stopHookActive') && typeof v.stopHookActive !== 'boolean') fail('invalid stop flag');
   let tool = null;
