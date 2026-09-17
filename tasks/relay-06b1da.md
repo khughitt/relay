@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: relay-06b1da
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T07:29:12Z
+updated: 2026-09-17T07:32:53Z
 started: 2026-09-17T06:54:50Z
 depends: [relay-377bc5]
 parent: relay-1231bf
@@ -69,3 +69,4 @@ Prerequisites: relay-377bc5. Release goal: relay-1231bf. Bootstrap ops-998bbb cl
 - 2026-09-17T07:16:12Z (relay-06b1da): Focused extraction plan is ready for review: exact public exports, twenty normalized mappings, qualified process fixtures, approved safe lock recovery, atomic snapshot tests, extracted OpenCode modules, package/CLI checks and operator repair runbook. Self-review corrected the normalizer import direction and made the held-writer test complete. Verified source inputs unchanged from familiar 70ae8ed to cb7aed4; all 10 JS, 4 JSON and 1 shell snippets parse; integer examples and Darwin epoch assertion pass. Runtime is not implemented. R2 owns reap observer notification even when unchanged; R1 returns its result without a dispatcher stub.
 - 2026-09-17T07:16:12Z (relay-06b1da): parked (waiting on user, review): Review .worktrees/relay-06b1da/docs/plans/2026-09-17-extraction.md. The lock addendum is approved; this focused plan needs its own review before executing the six extraction phases.
 - 2026-09-17T07:29:12Z (relay-06b1da): User approved extraction plan with edits: publish reclaimPath; specify process-unavailable diagnostics versus Git failure; enumerate boot/deadline/cleanup lock tests and initial ENOENT race; retain OpenCode raw key for familiar projection; exclude PID 1; document private directory rejection; verify Node 22.23.2 gate. Keeping one task with phase progress in notes. Proceed with the approved implementation.
+- 2026-09-17T07:32:53Z (relay-06b1da): Phase 1: protocol missing-module red; five contract tests green; front door adopted and setup/check passed.

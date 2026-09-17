@@ -219,7 +219,7 @@ the difference rather than silently copying an obsolete revision.
 `STATES`. Validators return canonical objects containing the known fields; unknown
 optional fields are ignored, unknown schema versions are rejected.
 
-- [ ] Write the first failing protocol test, then run it with `node --test
+- [x] Write the first failing protocol test, then run it with `node --test
   test/protocol.test.js` before the front door exists. Failure must name the missing
   protocol module; no unrelated harness or dependency is involved.
 
@@ -239,7 +239,7 @@ test('unknown snapshot schema is not an empty registry', () => {
 });
 ```
 
-- [ ] Implement the integer primitive and the parent field validators. Use
+- [x] Implement the integer primitive and the parent field validators. Use
   non-null, non-array objects; require every parent field and validate PID as a
   positive u32, timestamps/revision as nonnegative safe integers, valid UUID
   generation, absolute cwd/repoRoot, enum values, ID/key/agent consistency, and
@@ -267,7 +267,7 @@ export function parseStart(text) {
   darwin:[...]}`; each case carries `name`, `input`, and either `expected` or
   `errorCode`. Test the file itself through validators; keep it free of host data.
 
-- [ ] Create package metadata and copy ops's Just/hooks/tt/ops-check templates.
+- [x] Create package metadata and copy ops's Just/hooks/tt/ops-check templates.
   Use these package fields initially; add the other exports/files in Phase 6 when
   they exist. Generate `package-lock.json` with `npm install --package-lock-only
   --ignore-scripts --offline --no-audit --no-fund`.
@@ -290,7 +290,7 @@ export function parseStart(text) {
   hook targets, install `core.hooksPath .githooks`, and mark hooks executable.
   Append ops `templates/gitignore` so timing logs remain untracked.
 
-- [ ] Run `just setup`, `just test-fast`, `tasks check`, `git diff --check`; commit
+- [x] Run `just setup`, `just test-fast`, `tasks check`, `git diff --check`; commit
   `feat: define relay snapshot and handle contracts`. All subsequent test commands
   go through `just test-fast` or `just gate`.
 
