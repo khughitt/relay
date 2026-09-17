@@ -1,12 +1,14 @@
 ---
 id: relay-fbd8dc
 title: Build JSONC hook planner and ownership classification
-status: todo
+status: doing
 priority: 2
 complexity: high
 process: direct
+owner: relay-baa816
 created: 2026-09-17T14:23:41Z
-updated: 2026-09-17T14:24:12Z
+updated: 2026-09-17T14:29:29Z
+started: 2026-09-17T14:29:29Z
 depends: []
 parent: relay-baa816
 tags: []
