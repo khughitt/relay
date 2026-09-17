@@ -440,7 +440,7 @@ source responsibilities; `pruneDead(agents, {probe})` returns
 `{agents, reaped, liveness}` without mutating its input. Public read/list/mutation
 interfaces are those defined above.
 
-- [ ] Port ordinary source store/lock/contention tests before changing behavior.
+- [x] Port ordinary source store/lock/contention tests before changing behavior.
   Add deterministic tests for the approved lock policy, using a fake clock for
   waiting and an explicit holder-release promise rather than ten-second sleeps.
   This pins the no-live-owner-expiry contract. The addendum contains the separate
@@ -492,7 +492,7 @@ test('an old live owner keeps its critical section', async (t) => {
   Verify the committed result survives the first failure and both errors survive
   the second; inject failures through io.
 
-- [ ] Change both lock files to complete JSON tokens
+- [x] Change both lock files to complete JSON tokens
   `{schema:1, nonce:<UUID>, holder:<Handle>}`. Reject old/empty/malformed tokens;
   there is no compatibility reader. Mint a fresh nonce for each acquisition and
   require the writer Handle to have usable local proof. Linux requires boot ID.
@@ -518,7 +518,7 @@ test('an old live owner keeps its critical section', async (t) => {
   throws, preserve its error and any cleanup error as an AggregateError. Guard
   cleanup failure before callback entry is a visible LOCK_CLEANUP_FAILED.
 
-- [ ] Make the state directory privately owned/0700 and new state/control files
+- [x] Make the state directory privately owned/0700 and new state/control files
   0600. Validate existing leaf directory and files with lstat: reject symlinks,
   wrong owner/type or unsafe modes with a concise IO_ERROR; never chmod unrelated
   parents. Reads do not create/chmod state. Write a unique 0600 temporary snapshot
@@ -542,7 +542,7 @@ test('an old live owner keeps its critical section', async (t) => {
   bytes. `reapRegistry` returns a result even on no change, so R2 can always request
   reconciliation. It emits no Event and invokes no guard or subscriber in R1.
 
-- [ ] Use this complete helper and transaction test as the first cross-module
+- [x] Use this complete helper and transaction test as the first cross-module
   acceptance check. The resolver override is a test seam; production never uses
   the test process as a fallback harness identity.
 
@@ -595,7 +595,7 @@ test('registry stores identity/state, never the command payload', async (t) => {
   must return repair-required without snapshot mutation. Preserve old empty-token
   and abandoned-guard cases with their newly approved error expectations.
 
-- [ ] Run `just test-fast`, `tasks check`; commit `feat: publish registry snapshots under safe locks`.
+- [x] Run `just test-fast`, `tasks check`; commit `feat: publish registry snapshots under safe locks`.
 
 ### Phase 5: Extract OpenCode server observation and its regression tests
 
