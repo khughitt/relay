@@ -1,12 +1,14 @@
 ---
 id: relay-ceaec3
 title: Define installer capability evidence and budget validation
-status: todo
+status: doing
 priority: 2
 complexity: mid
 process: direct
+owner: relay-baa816
 created: 2026-09-17T14:23:41Z
-updated: 2026-09-17T14:24:11Z
+updated: 2026-09-17T14:27:15Z
+started: 2026-09-17T14:27:15Z
 depends: []
 parent: relay-baa816
 tags: []
