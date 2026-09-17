@@ -18,7 +18,8 @@ export function bounded(thunk, { clock, deadline }, message) {
   if (remaining <= 0) return Promise.reject(relayError('DEADLINE_EXCEEDED', message));
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(relayError('DEADLINE_EXCEEDED', message)), remaining);
-    thunk().then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+    thunk().then((value) => { clearTimeout(timer); clock() >= deadline ? reject(relayError('DEADLINE_EXCEEDED', message)) : resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); });
   });
 }
 

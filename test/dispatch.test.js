@@ -249,13 +249,13 @@ test('a slow observer never delays a denial and observers run only within their 
   assert.equal(r.exitCode, 0); assert.match(r.stderr, /SUBSCRIBER_FAILED: hang timeout/);
   assert.ok(performance.now() - started < 1500);
   assert.equal(JSON.parse(await readFile(file, 'utf8')).subscriber, 'after', 'a later observer that fits still runs');
-  // When publication itself consumed the budget (a controlled clock jumps past the 1200 ms
-  // work deadline inside apply), the observer is skipped, not run.
+  // A publication that fulfills after its deadline is rejected and no observer runs.
   await writeSubscribers(p, [strip(observer('never', 'record', { file: join(p.stateDir, '..', 'never'), timeoutMs: 100 }))]);
   let now = 0;
   const published = { snapshot: { schema: 1, generation: '00000000-0000-4000-8000-000000000000', revision: 1, agents: {} }, changed: true, reaped: [], diagnostics: [] };
   r = await hook(p, { outerMs: 1500, deps: { clock: () => now, apply: async () => { now = 1300; return published; } } });
-  assert.match(r.stderr, /SUBSCRIBER_SKIPPED: never does not fit the remaining budget/);
+  assert.match(r.stderr, /registry: DEADLINE_EXCEEDED: registry publication did not finish before the deadline/);
+  assert.match(r.stderr, /SUBSCRIBER_SKIPPED: never skipped after registry failure/);
   assert.ok(await absent(join(p.stateDir, '..', 'never')));
 });
 
@@ -300,4 +300,12 @@ test('reconcile prunes, then notifies reconcile observers even when nothing chan
   await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, loadConfig: slow({ schema: 1, subscribers: [] }, 650) }), { code: 'DEADLINE_EXCEEDED' });
   await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, reap: slow(published, 650) }), { code: 'DEADLINE_EXCEEDED' });
   await new Promise((resolve) => setTimeout(resolve, 700));
+});
+
+test('reconcile rejects a reap that fulfills after its deadline without notifying observers', async (t) => {
+  const p = await tempPaths(t), file = join(p.stateDir, '..', 'late-reap.json');
+  await writeSubscribers(p, [strip(observer('late', 'record', { kinds: [RECONCILE], file, timeoutMs: 100 }))]);
+  let now = 0;
+  await assert.rejects(reconcile({ outerMs: 1500 }, { paths: p, clock: () => now, reap: async () => { now = 550; return published; } }), { code: 'DEADLINE_EXCEEDED' });
+  assert.ok(await absent(file));
 });
