@@ -18,3 +18,9 @@ test('planner rejects duplicate relay writers and recognizes quoted trailing fam
   const text = '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"\'/x/familiar\' hook SessionStart --agent codex"}]},{"hooks":[{"type":"command","command":"\'/a/relay\' hook --harness codex SessionStart"}]},{"hooks":[{"type":"command","command":"\'/b/relay\' hook --harness codex --outer-ms 1000 SessionStart"}]}]}}';
   assert.throws(() => planHooks({ text, harness: 'codex', relayBin: relay, retireFamiliar: true }), /duplicate relay/);
 });
+
+test('Claude retains both Notification matchers', () => {
+  const text = planHooks({ text: '{"hooks":{}}', harness: 'claude-code', relayBin: relay });
+  const notifications = JSON.parse(text).hooks.Notification;
+  assert.deepEqual(notifications.map(entry => entry.matcher), ['idle_prompt', 'permission_prompt']);
+});

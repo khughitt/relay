@@ -26,7 +26,7 @@ export function planHooks({ text, harness, relayBin, retireFamiliar = false }) {
   }
   let output = text;
   for (const binding of bindingsFor(harness)) {
-    const key = nativeKey(binding.event), existing = value.hooks?.[key] ?? [];
+    const key = nativeKey(binding.event), existing = parse(output).hooks?.[key] ?? [];
     if (!Array.isArray(existing)) throw new Error(`hooks.${key} must be an array`);
     const same = item => item?.matcher === binding.matcher && Array.isArray(item.hooks) && item.hooks.length === 1
       && item.hooks[0]?.type === 'command' && typeof item.hooks[0].command === 'string';
