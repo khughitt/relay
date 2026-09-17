@@ -1,14 +1,15 @@
 ---
 id: relay-9ada47
 title: Prepare OpenCode observer plugin installer
-status: doing
+status: done
 priority: 2
 complexity: mid
 process: direct
 owner: relay-baa816
 created: 2026-09-17T14:23:42Z
-updated: 2026-09-17T15:05:35Z
+updated: 2026-09-17T15:06:20Z
 started: 2026-09-17T15:05:35Z
+completed: 2026-09-17T15:06:20Z
 depends: []
 parent: relay-baa816
 tags: []
