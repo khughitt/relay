@@ -44,7 +44,11 @@ async function runGuards(guards, event, capability, { clock, workDeadline, run }
   const contexts = []; let denial = null, error = null;
   for (const guard of guards) {
     if (clock() >= workDeadline) { error ??= relayError('DEADLINE_EXCEEDED', `guard ${guard.name} did not start before the deadline`); break; }
-    const result = await run(guard.argv, JSON.stringify({ schema: 1, type: 'event', subscriber: guard.name, event }), { clock, deadline: workDeadline, timeoutMs: guard.timeoutMs });
+    let input, result;
+    try { input = JSON.stringify({ schema: 1, type: 'event', subscriber: guard.name, event }); }
+    catch (cause) { error ??= relayError('GUARD_FAILED', `guard ${guard.name} input serialization failed`, cause); continue; }
+    try { result = await run(guard.argv, input, { clock, deadline: workDeadline, timeoutMs: guard.timeoutMs }); }
+    catch (cause) { error ??= relayError('GUARD_FAILED', `guard ${guard.name} invocation failed`, cause); continue; }
     try {
       if (result.status !== 'exited') throw relayError('GUARD_FAILED', `guard ${guard.name} ${result.status}`);
       if (result.exitCode !== 0) throw relayError('GUARD_FAILED', `guard ${guard.name} exited ${result.exitCode}`);

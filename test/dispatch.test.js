@@ -88,6 +88,32 @@ test('mixed allow and deny with an erroring guard still refuses with the denial 
   assert.match((await hook(p)).stdout, /relay refused: GUARD_FAILED: guard b exited 3/);
 });
 
+test('guard envelope serialization failures refuse without invoking the guard', async (t) => {
+  const p = await tempPaths(t), file = join(p.stateDir, '..', 'guard-ran');
+  await writeSubscribers(p, [strip(guard('deep', 'record', { file }))]);
+  const nested = `${'['.repeat(10000)}0${']'.repeat(10000)}`;
+  const body = `{"session_id":"sess","cwd":"/repo","tool_name":"Bash","tool_input":{"nested":${nested}}}`;
+  const r = await hook(p, { body });
+  assert.equal(r.exitCode, 2);
+  assert.match(r.stdout, /relay refused: GUARD_FAILED: guard deep input serialization failed/);
+  assert.ok(await absent(file));
+  assert.ok(await absent(p.agentsPath));
+});
+
+test('a rejected guard invocation does not outrank a later denial', async (t) => {
+  const p = await tempPaths(t);
+  await writeSubscribers(p, [guard('broken', 'allow'), guard('deny', 'deny')].map(strip));
+  let calls = 0;
+  const run = async () => {
+    if (++calls === 1) throw new Error('runner rejected');
+    return { status: 'exited', exitCode: 0, signal: null, stdout: '{"decision":"deny","reason":"denied by fixture"}', stderr: '' };
+  };
+  const r = await hook(p, { deps: { run } });
+  assert.equal(calls, 2);
+  assert.equal(r.stdout, `${denyOut}"denied by fixture"}}\n`);
+  assert.ok(await absent(p.agentsPath));
+});
+
 test('an expired deadline refuses before running the remaining guards', async (t) => {
   const p = await tempPaths(t), never = join(p.stateDir, '..', 'never');
   await writeSubscribers(p, [strip(guard('slow', 'slow', { argv: argv('slow', '400'), timeoutMs: 150 })), strip(guard('never', 'record', { file: never, timeoutMs: 100 }))]);
