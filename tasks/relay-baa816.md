@@ -1,15 +1,16 @@
 ---
 id: relay-baa816
 title: Prepare validated hook installers and rollback artifacts
-status: doing
+status: done
 priority: 1
 size: l
 complexity: high
 process: planned
 owner: main
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T14:23:27Z
+updated: 2026-09-17T15:21:06Z
 started: 2026-09-17T13:34:45Z
+completed: 2026-09-17T15:21:06Z
 depends: [relay-4c4828]
 parent: relay-1231bf
 tags: []

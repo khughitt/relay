@@ -37,7 +37,7 @@ test('usage: help, list --json, reap [--outer-ms N], hook --harness NAME [--oute
     const r=run(p,args);assert.equal(r.status,1,args.join(' '));assert.match(r.stderr||r.stdout,/USAGE/,args.join(' '));
     if(!(args[0]==='list'&&args.includes('--json')))assert.equal(r.stdout,'',args.join(' ')); // list --json reports on stdout by design
   }
-  const r=run(p,['install']);assert.equal(r.status,1);assert.match(r.stderr,/FEATURE_UNAVAILABLE/);
+  const r=run(p,['install']);assert.equal(r.status,1);assert.match(r.stderr,/USAGE/);
 });
 const fixture=new URL('./fixtures/subscriber.js',import.meta.url).pathname;
 const hookRun=(p,args,input,opts={})=>spawnSync(process.execPath,[cli.pathname,'hook',...args],{encoding:'utf8',input,env:{...process.env,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome},...opts});

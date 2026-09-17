@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** revised draft for user review, 2026-09-17.
+**Status:** implemented and verified, 2026-09-17.
 
 **Goal:** Complete `relay-baa816` with fixture-only installers for relay-owned Claude Code, Codex, and OpenCode bindings, exact before-images, and guarded rollback artifacts.
 
