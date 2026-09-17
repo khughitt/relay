@@ -1,13 +1,15 @@
 ---
 id: relay-06b1da
 title: "Extract adapters, process identity and atomic registry"
-status: todo
+status: doing
 priority: 1
 size: l
 complexity: high
 process: planned
+owner: main
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T00:50:54Z
+updated: 2026-09-17T06:54:50Z
+started: 2026-09-17T06:54:50Z
 depends: [relay-377bc5]
 parent: relay-1231bf
 tags: []
@@ -54,3 +56,7 @@ No JS Number conversion on the Linux start path. Incompatible changes require a
 schema bump and coordinated tasks reader update once that reader exists.
 
 Prerequisites: relay-377bc5. Release goal: relay-1231bf. Bootstrap ops-998bbb closure does not mean this deliverable has shipped.
+
+## Notes
+
+- 2026-09-17T06:54:50Z (main): User requested the next step after bootstrap. Reuse approved ops relay spec; draft focused extraction implementation plan with exact exported APIs, file/test mapping, process/lock semantics and dispatcher handoff before runtime code. Planned work in .worktrees/relay-06b1da.
