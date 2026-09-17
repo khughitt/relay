@@ -40,6 +40,6 @@ is `tasks-c9199a`, live tool/denial proof is `ops-c8e4d1`, and remote/tag portab
 is `relay-c19c0a`. Physical Darwin process/terminal verification remains a release
 requirement; portable Darwin UTC/local-timezone fixtures do not replace it.
 
-Verified 2026-09-17: 186 tests pass through the full gate on Node 26.5.0 and
+Verified 2026-09-17: 187 tests pass through the full gate on Node 26.5.0 and
 Node 22.23.2, including installed-tarball exports, JSON fixture, plugin and CLI.
-Independent task and branch reviews passed; physical Darwin has not run.
+Independent task reviews and the final branch review completed; physical Darwin has not run.
