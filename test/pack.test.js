@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const exec=promisify(execFile),root=fileURLToPath(new URL('..',import.meta.url));
-const exportsExpected=['STATES','paths','adapterFor','normalizeEvent','readNativeInput','createProcessOps','readSnapshot','listAgents','applyEvent','reapRegistry'].sort();
+const exportsExpected=['STATES','paths','adapterFor','normalizeEvent','readNativeInput','createProcessOps','readSnapshot','listAgents','applyEvent','reapRegistry','parseReply','validateSubscribers','loadSubscribers','matchSubscribers','budgetFor','checkBudget','dispatchHook','reconcile'].sort();
 test('package dry run and installed tarball expose only the documented runtime',{timeout:30000},async t=>{
   const temp=await mkdtemp(join(tmpdir(),'relay-pack-'));t.after(()=>rm(temp,{recursive:true,force:true}));
   const env={...process.env,npm_config_cache:join(temp,'cache'),RELAY_STATE_DIR:join(temp,'state'),XDG_CONFIG_HOME:join(temp,'config')};
@@ -26,5 +26,5 @@ test('package dry run and installed tarball expose only the documented runtime',
   await writeFile(join(consumer,'smoke.mjs'),smoke);
   const imported=await run(process.execPath,['smoke.mjs'],consumer);assert.match(imported.stdout,/verified/);
   const cli=await run(join(consumer,'node_modules/.bin/relay'),['list','--json'],consumer);assert.equal(cli.stdout,'{"snapshot":null,"liveness":{}}\n');
-  const help=await run(join(consumer,'node_modules/.bin/relay'),['--help'],consumer);assert.match(help.stdout,/R1 registry/);
+  const help=await run(join(consumer,'node_modules/.bin/relay'),['--help'],consumer);assert.match(help.stdout,/hook --harness NAME/);
 });
