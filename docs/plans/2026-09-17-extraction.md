@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Execute the phases in order; checkboxes record completed work, not intentions.
 
-**Status:** ready for user review; no runtime implementation steps have run.
+**Status:** approved by the user on 2026-09-17 with the review edits below incorporated; runtime implementation has not started.
 
 **Goal:** Complete `relay-06b1da` with a tested Node package containing normalized
 harness observation, qualified process identity, safe registry transactions,
@@ -102,7 +102,7 @@ type Liveness = { status: 'alive' | 'dead' | 'unknown'; reason: string };
 type ClockOptions = { deadline?: number; clock?: () => number };
 // deadline is absolute performance.now() time, never Unix milliseconds.
 type Paths = {
-  stateDir: string; agentsPath: string; lockPath: string;
+  stateDir: string; agentsPath: string; lockPath: string; reclaimPath: string;
   configDir: string; subscribersPath: string;
 };
 type ProcessRow = {
@@ -174,7 +174,8 @@ while its callback is still writing.
 
 `recordOf` returns null only for confirmed absence; unreadable/malformed evidence
 throws a coded process error. `ancestors` returns a fresh, nearest-first chain
-including the caller, ending at PID 1 or confirmed absence; detect loops. No
+including the caller but stopping before PID 1 (as familiar does), or at confirmed
+absence; detect loops. No
 cross-call Darwin process cache. `handleOf` returns null for unavailable start/host;
 Linux null boot evidence remains a valid Handle value but cannot prove liveness.
 `probe` always reads fresh evidence and returns unknown for unavailable proof.
@@ -485,7 +486,11 @@ test('an old live owner keeps its critical section', async (t) => {
   This uses the actual test process's qualified Handle, never a guessed PID.
   Add injected unknown-proof coverage and cover an equally old live guard while
   reclaiming a dead main owner. The fake wait advances elapsed time only; it must
-  never change owner liveness.
+  never change owner liveness. Also require tests for boot-mismatch main-owner
+  reclamation, expiry after acquisition releasing without callback entry, and
+  cleanup failure both after successful publication and after a callback error.
+  Verify the committed result survives the first failure and both errors survive
+  the second; inject failures through io.
 
 - [ ] Change both lock files to complete JSON tokens
   `{schema:1, nonce:<UUID>, holder:<Handle>}`. Reject old/empty/malformed tokens;
@@ -495,7 +500,8 @@ test('an old live owner keeps its critical section', async (t) => {
   write, then atomically link it into the public path. Clean the private name in
   finally. EEXIST alone means contention; other errors propagate.
 
-  After a failed main acquisition, read/validate its owner. Live/unknown waits;
+  After EEXIST on main acquisition, read/validate its owner; ENOENT at this
+  initial read means retry acquisition, not malformed state. Live/unknown waits;
   confirmed dead attempts the guard. The guard uses the same atomic token
   publication, but never calls withLock recursively. If occupied, inspect its
   owner: live/unknown waits, dead/malformed throws LOCK_REPAIR_REQUIRED. Once the
@@ -523,8 +529,9 @@ test('an old live owner keeps its critical section', async (t) => {
   inside the lock read/validate, prune only dead records, reduce using the latest
   prior state, construct the incoming Agent and publish one canonical Snapshot.
   SessionEnd skips Git/process enrichment and removes only its exact agent ID.
-  Unavailable agent discovery/start/host produces `process:null` and a diagnostic;
-  unexpected code errors still throw. A missing Linux boot ID is represented as
+  Resolver/handle work returning no proof or throwing PROCESS_UNREADABLE or
+  PROCESS_UNAVAILABLE produces `process:null` and a diagnostic. GIT_ERROR throws;
+  do not fabricate a cwd-keyed identity when Git fails. Every other error throws. A missing Linux boot ID is represented as
   null and its liveness stays unknown. Timestamps come from injected now at write
   time; no creation timestamp is guessed from the process start token.
 
@@ -622,7 +629,9 @@ test('queued init precedes work and dispose follows it', async () => {
 
 - [ ] Copy the modules, replace presentation-specific comments and prefixes, and
   validate directory as absolute. Keep scope process and its raw opencode:PID key;
-  the normalized registry key consequently starts `opencode:opencode:`. Do not
+  the normalized registry key starts `opencode:opencode:`. Preserve this deliberate
+  double prefix: parent spec §6 projects Agent.sessionId onto familiar's existing
+  intent keys, which are `opencode:<pid>`. Do not
   change the session/window fold or mutate permission output. Ignore redundant
   session.idle exactly as the source does.
 
@@ -697,6 +706,8 @@ test('queued init precedes work and dispose follows it', async () => {
   Git revision after commit. Explain missing versus corrupt state, generation/
   revision, no replay/TTL, readonly listing, no raw payload persistence, and partial
   R1 CLI status. Document errors and the safe-integer case as format coverage.
+  State that an existing 0755 RELAY_STATE_DIR is rejected with IO_ERROR: callers
+  must supply a private 0700 directory; relay does not silently chmod it.
 
   Repair runbook: first prevent new hook invocations and stop all relay writers;
   perform this from an ordinary operator shell outside affected harness sessions.
@@ -710,8 +721,8 @@ test('queued init precedes work and dispose follows it', async () => {
 node --input-type=module <<'JS'
 import { unlink } from 'node:fs/promises';
 import { paths } from 'relay';
-const { lockPath } = paths();
-for (const path of [lockPath, `${lockPath}.reclaim`]) {
+const { lockPath, reclaimPath } = paths();
+for (const path of [lockPath, reclaimPath]) {
   try { await unlink(path); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
@@ -727,9 +738,10 @@ relay reap
   by pattern; clean them only under the same quiescence condition if necessary.
 
 - [ ] Run `just gate` and the tarball smoke test. Verify on Node 22 as well as the
-  development Node version; use an existing Node 22 executable if present. If no
-  Node 22 or physical Darwin runner is available, record that exact unverified
-  platform requirement for the release/cutover gate instead of claiming it ran.
+  development Node version. Node 22.23.2 is available at
+  `~/.nvm/versions/node/v22.23.2/bin/node`; run the front door with its bin directory
+  prepended to PATH. If no physical Darwin runner is available, record that exact
+  unverified platform requirement for the release/cutover gate instead of claiming it ran.
   Linux live process and IPC tests must run here. No live harness probe belongs to
   this task because no hook is enabled.
 
