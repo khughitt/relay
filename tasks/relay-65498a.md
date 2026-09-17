@@ -1,12 +1,14 @@
 ---
 id: relay-65498a
 title: Plan Claude Code and Codex hook cutovers
-status: todo
+status: doing
 priority: 2
 complexity: mid
 process: direct
+owner: relay-baa816
 created: 2026-09-17T14:23:41Z
-updated: 2026-09-17T14:24:12Z
+updated: 2026-09-17T15:00:23Z
+started: 2026-09-17T15:00:23Z
 depends: []
 parent: relay-baa816
 tags: []
