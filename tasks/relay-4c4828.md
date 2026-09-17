@@ -1,13 +1,15 @@
 ---
 id: relay-4c4828
 title: Dispatch bounded guards and observers with native replies
-status: todo
+status: doing
 priority: 1
 size: l
 complexity: high
 process: planned
+owner: main
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T00:50:54Z
+updated: 2026-09-17T11:14:45Z
+started: 2026-09-17T11:14:45Z
 depends: [relay-06b1da]
 parent: relay-1231bf
 tags: []
