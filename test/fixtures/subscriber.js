@@ -13,6 +13,7 @@ switch (mode) {
   case 'deny-context': out({ decision: 'deny', reason: 'denied by fixture', context: 'dropped' }); break;
   case 'context': out({ decision: 'allow', context: `context from ${file ?? 'fixture'}` }); break;
   case 'big-context': out({ decision: 'allow', context: 'x'.repeat(20000) }); break;
+  case 'huge-field': out({ decision: 'allow', ['x'.repeat(60000)]: 1 }); break;
   case 'big': process.stdout.write('x'.repeat(70000)); break;
   case 'garbage': process.stdout.write('not json'); break;
   case 'extra-field': out({ decision: 'allow', extra: 1 }); break;

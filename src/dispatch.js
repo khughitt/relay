@@ -9,6 +9,10 @@ import { runChild } from './child.js';
 
 const NONE = Object.freeze({ refuse: false, context: false });
 const describe = (error) => `${error.code ?? 'IO_ERROR'}: ${error.code ? error.message : 'relay failed'}`;
+const refusalReason = (error) => {
+  const prefix = 'relay refused: ', full = `${prefix}${describe(error)}`, code = String(error.code ?? 'IO_ERROR');
+  return full.length <= CONTEXT_LIMIT ? full : `${prefix}${code.length <= CONTEXT_LIMIT - prefix.length ? code : 'IO_ERROR'}`;
+};
 const lines = (list) => list.map((line) => `${line}\n`).join('');
 
 // R1's filesystem operations do not consult the deadline. This races a unit of work against
@@ -81,7 +85,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs }, dep
   const refuse = (reason) => adapter.encodeReply(nativeEvent, { decision: 'deny', reason });
   // Fail closed for configured guards: any failure relay survives becomes a native refusal
   // where one exists; elsewhere it is reported because no refusal channel can be manufactured.
-  const abort = (error) => capability.refuse ? refuse(`relay refused: ${describe(error)}`) : failure(error);
+  const abort = (error) => capability.refuse ? refuse(refusalReason(error)) : failure(error);
   const workDeadline = start + budget.totalMs - budget.reserveMs, diagnostics = [];
   let paths, event, guards, observers;
   try {

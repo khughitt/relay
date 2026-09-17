@@ -12,6 +12,7 @@ import { createProcessOps } from '../src/bus/proc.js';
 import { readSnapshot, applyEvent } from '../src/bus/transaction.js';
 import { normalizeEvent } from '../src/adapters/index.js';
 import { relayError } from '../src/protocol.js';
+import { CONTEXT_LIMIT } from '../src/adapters/reply.js';
 import { RECONCILE } from '../src/subscribers.js';
 import { tempPaths, writeSubscribers } from './helpers/fixture.js';
 
@@ -80,6 +81,24 @@ test('every guard failure relay survives is a native refusal', async (t) => {
   }
   await writeSubscribers(p, [strip(guard('g', 'deny-context'))]);
   const r = await hook(p); assert.equal(r.stdout, `${denyOut}"denied by fixture"}}\n`);
+});
+
+test('oversized dispatcher errors use bounded classified refusals before registry work', async (t) => {
+  const p = await tempPaths(t), neverApply = async () => assert.fail('a refusal never reaches the registry');
+  await writeSubscribers(p, [strip(guard('g', 'huge-field'))]);
+  let r = await hook(p, { deps: { apply: neverApply } });
+  let reason = JSON.parse(r.stdout).hookSpecificOutput.permissionDecisionReason;
+  assert.deepEqual(r, { stdout: `${denyOut}"relay refused: INVALID_REPLY"}}\n`, stderr: 'relay refused: INVALID_REPLY\n', exitCode: 2 });
+  assert.ok(reason.length <= CONTEXT_LIMIT);
+
+  for (const subscriber of [guard('x'.repeat(60000), 'allow'), { ...guard('g', 'allow'), ['x'.repeat(60000)]: true }]) {
+    await writeSubscribers(p, [strip(subscriber)]);
+    r = await hook(p, { deps: { run: async () => assert.fail('invalid configuration never runs a guard'), apply: neverApply } });
+    reason = JSON.parse(r.stdout).hookSpecificOutput.permissionDecisionReason;
+    assert.deepEqual(r, { stdout: `${denyOut}"relay refused: INVALID_CONFIG"}}\n`, stderr: 'relay refused: INVALID_CONFIG\n', exitCode: 2 });
+    assert.ok(reason.length <= CONTEXT_LIMIT);
+  }
+  assert.ok(await absent(p.agentsPath));
 });
 
 test('mixed allow and deny with an erroring guard still refuses with the denial reason', async (t) => {
