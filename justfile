@@ -37,7 +37,7 @@ check_cmd := "python3 tools/ops-check && tasks check"
 # installation: package managers can replace the directory and lose its
 # attribute. Use explicit, audited paths; never ignore source parents. Linux
 # needs attr installed. Attribute failures must fail setup, not be swallowed.
-setup_cmd := "just work-link .worktrees"
+setup_cmd := "just work-link .worktrees && npm ci && attr -s com.dropbox.ignored -V 1 node_modules"
 
 # Affected-only: the inner loop.
 test-fast:

@@ -26,5 +26,11 @@
   ],
   "bin": {
     "relay": "bin/relay.js"
-  }
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
+  },
+  "bundledDependencies": [
+    "jsonc-parser"
+  ]
 }
