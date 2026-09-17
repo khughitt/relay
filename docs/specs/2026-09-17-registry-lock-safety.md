@@ -1,6 +1,6 @@
 # Registry lock safety during extraction
 
-Status: proposed addendum for user review; not approved or implemented.
+Status: approved by the user on 2026-09-17; not implemented.
 Task: `relay-06b1da`.
 Parent design: ops `docs/specs/2026-09-16-relay-design.md`, approved after `d7e2c33`.
 Scope: the registry lock's recovery behavior; all other approved contracts remain.
@@ -62,7 +62,7 @@ JS
 Observed result: `{ expectedMaximum: 1, observedMaximum: 2 }`. The accelerated
 clock is a deterministic age-policy test; it does not measure actual hook latency.
 
-## Proposed decision
+## Approved decision
 
 Keep Node built-ins and familiar's atomic hard-link publication plus serialized
 reclamation of a confirmed-dead writer. Remove time-based ownership revocation.
@@ -136,6 +136,6 @@ do not silently drop these cases while claiming all source behavior is preserved
 Kill a real child while it owns the main lock and verify automatic recovery; kill
 it while owning the guard and verify the repair error without snapshot mutation.
 
-This addendum needs approval before the extraction implementation plan is
-finalized. No familiar code, live lock files, hook settings or registry snapshot
-has been changed by this investigation.
+This addendum is approved. The extraction implementation plan requires separate
+user review before code changes. No familiar code, live lock files, hook settings
+or registry snapshot has been changed by this investigation.
