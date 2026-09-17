@@ -2,9 +2,9 @@ import { adapterFor, normalizeEvent } from './adapters/index.js';
 import { readNativeInput } from './adapters/payload.js';
 import { parseReply, CONTEXT_LIMIT } from './adapters/reply.js';
 import { paths as defaultPaths } from './bus/paths.js';
-import { applyEvent } from './bus/transaction.js';
+import { applyEvent, reapRegistry } from './bus/transaction.js';
 import { relayError } from './protocol.js';
-import { loadSubscribers, matchSubscribers, checkBudget, budgetFor } from './subscribers.js';
+import { loadSubscribers, matchSubscribers, checkBudget, budgetFor, RECONCILE } from './subscribers.js';
 import { runChild } from './child.js';
 
 const NONE = Object.freeze({ refuse: false, context: false });
@@ -106,4 +106,19 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs }, dep
   else await runObservers(observers, (observer) => envelope('event', observer, event, result), { clock, workDeadline, run }, diagnostics);
   const reply = adapter.encodeReply(nativeEvent, context ? { decision: 'allow', context } : { decision: 'allow' });
   return { stdout: reply.stdout, stderr: lines(diagnostics), exitCode: result === null ? 1 : reply.exitCode };
+}
+
+// relay reap: prune confirmed deaths, publish if changed, then tell reconcile observers to
+// reread the snapshot. No event is fabricated and no guard runs. Loading and reaping errors
+// propagate so the CLI reports them; observer failures are diagnostics.
+export async function reconcile({ outerMs = 30000 } = {}, deps = {}) {
+  const clock = deps.clock ?? performance.now.bind(performance), start = clock();
+  const { loadConfig = loadSubscribers, run = runChild, reap = reapRegistry } = deps, paths = deps.paths ?? defaultPaths();
+  const budget = budgetFor({ outerMs }), workDeadline = start + budget.totalMs - budget.reserveMs, diagnostics = [];
+  const config = await bounded(() => loadConfig(paths), { clock, deadline: workDeadline }, 'subscriber configuration did not load before the deadline');
+  const observers = checkBudget(config, budget, { kind: RECONCILE });
+  const deadline = Math.min(workDeadline, clock() + budget.registryMs);
+  const result = await bounded(() => reap({ paths, clock, deadline }), { clock, deadline }, 'registry reap did not finish before the deadline');
+  await runObservers(observers, (observer) => envelope('reconcile', observer, null, result), { clock, workDeadline, run }, diagnostics);
+  return { result, diagnostics };
 }

@@ -6,17 +6,19 @@ import { readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { dispatchHook } from '../src/dispatch.js';
+import { dispatchHook, reconcile } from '../src/dispatch.js';
 import { withLock } from '../src/bus/lock.js';
 import { createProcessOps } from '../src/bus/proc.js';
 import { readSnapshot, applyEvent } from '../src/bus/transaction.js';
 import { normalizeEvent } from '../src/adapters/index.js';
 import { relayError } from '../src/protocol.js';
+import { RECONCILE } from '../src/subscribers.js';
 import { tempPaths, writeSubscribers } from './helpers/fixture.js';
 
 const fixture = new URL('./fixtures/subscriber.js', import.meta.url).pathname;
 const argv = (mode, ...rest) => [process.execPath, fixture, mode, ...rest];
 const guard = (name, mode, over = {}) => ({ name, role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], argv: argv(mode, ...(over.file ? [over.file] : [])), timeoutMs: 3000, ...over, file: undefined });
+const observer = (name, mode, over = {}) => ({ name, role: 'observer', kinds: ['before-tool'], argv: argv(mode, ...(over.file ? [over.file] : [])), timeoutMs: 3000, ...over, file: undefined });
 const strip = (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined));
 const payload = (over = {}) => JSON.stringify({ session_id: 'sess', cwd: '/repo', tool_name: 'Bash', tool_input: { command: 'echo PRIVATE_COMMAND' }, ...over });
 const local = { resolveAgentPid: () => process.pid, gitContext: async () => ({ remote: null, repoRoot: null }) };
@@ -219,4 +221,83 @@ test('tool filters select guards and the tool input never leaks into stderr or s
   assert.equal(r.exitCode, 0); assert.equal((r.stdout + r.stderr).includes('PRIVATE_INPUT'), false);
   assert.equal(JSON.parse(await readFile(file, 'utf8')).event.tool.input.secret, 'PRIVATE_INPUT');
   assert.equal((await readFile(p.agentsPath, 'utf8')).includes('PRIVATE_INPUT'), false);
+});
+
+test('observers get sanitized metadata after publication and cannot touch the reply', async (t) => {
+  const p = await tempPaths(t), file = join(p.stateDir, '..', 'observed.json');
+  process.env.RELAY_TEST_MARKER = 'hook-environment'; t.after(() => { delete process.env.RELAY_TEST_MARKER; });
+  await writeSubscribers(p, [strip(observer('rec', 'record', { file })), strip(observer('noisy', 'noisy')), strip(observer('env', 'env', { file: join(p.stateDir, '..', 'env') }))]);
+  const r = await hook(p);
+  assert.equal(r.stdout, ''); assert.equal(r.exitCode, 0);
+  assert.equal(r.stderr, 'noisy: observer noise\n');
+  const seen = JSON.parse(await readFile(file, 'utf8')), snapshot = await readSnapshot({ paths: p });
+  assert.deepEqual(seen, { schema: 1, type: 'event', subscriber: 'rec',
+    event: { schema: 1, kind: 'before-tool', harness: 'claude-code', nativeEvent: 'PreToolUse', agentId: 'claude-code:sess', sessionId: 'sess', cwd: '/repo', tool: { name: 'Bash' } },
+    registry: { generation: snapshot.generation, revision: 1 }, changed: true, reaped: [] });
+  assert.equal(JSON.stringify(seen).includes('PRIVATE_COMMAND'), false);
+  assert.equal(JSON.stringify(seen).includes('hook-environment'), false);
+  assert.equal(await readFile(join(p.stateDir, '..', 'env'), 'utf8'), 'hook-environment');
+});
+
+test('a slow observer never delays a denial and observers run only within their budget', async (t) => {
+  const p = await tempPaths(t), file = join(p.stateDir, '..', 'after.json');
+  await writeSubscribers(p, [strip(observer('slow', 'slow', { argv: argv('slow', '4000'), timeoutMs: 5000 })), strip(guard('g', 'deny'))]);
+  let started = performance.now(); let r = await hook(p);
+  assert.equal(r.exitCode, 2); assert.ok(performance.now() - started < 2000, 'the denial returned before the observer could run');
+  await writeSubscribers(p, [strip(observer('hang', 'hang', { timeoutMs: 150 })), strip(observer('quick', 'slow', { argv: argv('slow', '10'), timeoutMs: 150 })), strip(observer('after', 'record', { file, timeoutMs: 100 }))]);
+  started = performance.now(); r = await hook(p, { outerMs: 1500 }); // subscribersMs 400 = 150 + 150 + 100
+  assert.equal(r.exitCode, 0); assert.match(r.stderr, /SUBSCRIBER_FAILED: hang timeout/);
+  assert.ok(performance.now() - started < 1500);
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).subscriber, 'after', 'a later observer that fits still runs');
+  // When publication itself consumed the budget (a controlled clock jumps past the 1200 ms
+  // work deadline inside apply), the observer is skipped, not run.
+  await writeSubscribers(p, [strip(observer('never', 'record', { file: join(p.stateDir, '..', 'never'), timeoutMs: 100 }))]);
+  let now = 0;
+  const published = { snapshot: { schema: 1, generation: '00000000-0000-4000-8000-000000000000', revision: 1, agents: {} }, changed: true, reaped: [], diagnostics: [] };
+  r = await hook(p, { outerMs: 1500, deps: { clock: () => now, apply: async () => { now = 1300; return published; } } });
+  assert.match(r.stderr, /SUBSCRIBER_SKIPPED: never does not fit the remaining budget/);
+  assert.ok(await absent(join(p.stateDir, '..', 'never')));
+});
+
+test('observers are skipped, not run, after a registry failure', async (t) => {
+  const p = await tempPaths(t);
+  await writeSubscribers(p, [strip(observer('o', 'record', { file: join(p.stateDir, '..', 'never') }))]);
+  const r = await hook(p, { deps: { apply: async () => { throw relayError('IO_ERROR', 'no storage'); } } });
+  assert.equal(r.exitCode, 1); assert.match(r.stderr, /registry: IO_ERROR: no storage\nSUBSCRIBER_SKIPPED: o skipped after registry failure\n/);
+  assert.ok(await absent(join(p.stateDir, '..', 'never')));
+});
+
+test('Codex SessionEnd fits its one-second default and OpenCode events observe only', async (t) => {
+  const p = await tempPaths(t), file = join(p.stateDir, '..', 'end.json');
+  await writeSubscribers(p, [strip(observer('end', 'record', { kinds: ['session-end'], file, timeoutMs: 250 }))]);
+  await applyEvent(normalizeEvent('codex', 'SessionStart', JSON.stringify({ session_id: 'sess', cwd: '/repo' })), { paths: p, ...local });
+  const started = performance.now(), r = await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: JSON.stringify({ session_id: 'sess', cwd: '/repo' }) });
+  assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 }); assert.ok(performance.now() - started < 1000);
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).changed, true);
+  await writeSubscribers(p, [strip(observer('end', 'allow', { kinds: ['session-end'], timeoutMs: 300 }))]);
+  assert.match((await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: '{"session_id":"sess","cwd":"/repo"}' })).stderr, /^INVALID_CONFIG: subscribers for codex session-end need 300 ms but 267 ms fit inside 1000 ms/);
+  const oc = await hook(p, { harness: 'opencode', nativeEvent: 'session.busy', body: '{"session_id":"opencode:42","cwd":"/repo"}' });
+  assert.deepEqual(oc, { stdout: '', stderr: '', exitCode: 0 });
+  assert.equal((await readSnapshot({ paths: p })).agents['opencode:opencode:42'].state, 'working');
+});
+
+test('reconcile prunes, then notifies reconcile observers even when nothing changed', async (t) => {
+  const p = await tempPaths(t), file = join(p.stateDir, '..', 'reconcile.json');
+  await writeSubscribers(p, [strip(observer('r', 'record', { kinds: [RECONCILE], file, timeoutMs: 500 })), strip(observer('never', 'record', { kinds: ['session-end'], file: join(p.stateDir, '..', 'never') }))]);
+  let { result, diagnostics } = await reconcile({}, { paths: p });
+  assert.equal(result.snapshot, null); assert.deepEqual(diagnostics, []);
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), { schema: 1, type: 'reconcile', subscriber: 'r', event: null, registry: { generation: null, revision: null }, changed: false, reaped: [] });
+  await hook(p);
+  ({ result } = await reconcile({ outerMs: 2000 }, { paths: p }));
+  assert.equal(result.changed, false);
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).registry, { generation: result.snapshot.generation, revision: 1 });
+  assert.ok(await absent(join(p.stateDir, '..', 'never')));
+  await writeSubscribers(p, [strip(observer('r', 'allow', { kinds: [RECONCILE], timeoutMs: 60000 }))]);
+  await assert.rejects(reconcile({}, { paths: p }), { code: 'INVALID_CONFIG' });
+  await writeSubscribers(p, [], { text: 'nope' });
+  await assert.rejects(reconcile({}, { paths: p }), { code: 'INVALID_CONFIG' });
+  await writeSubscribers(p, []); // valid again, so the injected slow reap is actually reached
+  await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, loadConfig: slow({ schema: 1, subscribers: [] }, 650) }), { code: 'DEADLINE_EXCEEDED' });
+  await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, reap: slow(published, 650) }), { code: 'DEADLINE_EXCEEDED' });
+  await new Promise((resolve) => setTimeout(resolve, 700));
 });
