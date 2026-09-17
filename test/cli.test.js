@@ -33,7 +33,7 @@ test('CLI listing retains dead unknown live, reap removes only dead',async t=>{
 test('usage: help, list --json, reap [--outer-ms N], hook --harness NAME [--outer-ms N] EVENT', async t => {
   const p=await tempState(t);assert.equal(run(p,['--help']).status,0);assert.match(run(p,['--help']).stdout,/hook --harness NAME/);
   for(const args of [[],['list'],['list','--json','extra'],['reap','extra'],['reap','--outer-ms'],['reap','--outer-ms','abc'],['--help','extra'],['unknown'],
-    ['hook'],['hook','PreToolUse'],['hook','--harness','claude-code'],['hook','--harness','claude-code','PreToolUse','extra'],['hook','--harness','claude-code','--outer-ms','abc','PreToolUse'],['hook','--harness','claude-code','--outer-ms','100','PreToolUse']]) {
+    ['hook'],['hook','PreToolUse'],['hook','--harness','claude-code'],['hook','PreToolUse','--harness','codex'],['hook','--harness','codex','PreToolUse','--outer-ms','1000'],['hook','--harness','codex','--unknown'],['hook','--harness','claude-code','PreToolUse','extra'],['hook','--harness','claude-code','--outer-ms','abc','PreToolUse'],['hook','--harness','claude-code','--outer-ms','100','PreToolUse']]) {
     const r=run(p,args);assert.equal(r.status,1,args.join(' '));assert.match(r.stderr||r.stdout,/USAGE/,args.join(' '));
     if(!(args[0]==='list'&&args.includes('--json')))assert.equal(r.stdout,'',args.join(' ')); // list --json reports on stdout by design
   }

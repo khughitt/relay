@@ -8,18 +8,21 @@ const HELP = 'Usage: relay --help | list --json | reap [--outer-ms N] | hook --h
 const usage = (message) => relayError('USAGE', message);
 // Strict flag parsing: --harness NAME (hook only), --outer-ms N, then exactly one EVENT for hook.
 function parse(args, { harness }) {
-  const out = {}, rest = [];
-  for (let i = 0; i < args.length; i += 1) {
-    if (args[i] === '--outer-ms' || (harness && args[i] === '--harness')) {
-      const key = args[i] === '--harness' ? 'harness' : 'outerMs';
-      if (i + 1 >= args.length || Object.hasOwn(out, key)) throw usage(`${args[i]} needs one value`);
-      out[key] = args[i + 1]; i += 1;
-    } else rest.push(args[i]);
+  const readOuter = (value) => {
+    if (!/^[1-9][0-9]*$/.test(value ?? '')) throw usage('--outer-ms must be a positive integer');
+    return Number(value);
+  };
+  if (!harness) {
+    if (args.length === 0) return {};
+    if (args.length !== 2 || args[0] !== '--outer-ms') throw usage('reap takes only --outer-ms N');
+    return { outerMs: readOuter(args[1]) };
   }
-  if (Object.hasOwn(out, 'outerMs')) { if (!/^[1-9][0-9]*$/.test(out.outerMs)) throw usage('--outer-ms must be a positive integer'); out.outerMs = Number(out.outerMs); }
-  if (harness) { if (!out.harness) throw usage('hook requires --harness NAME'); if (rest.length !== 1) throw usage('hook requires exactly one EVENT'); out.nativeEvent = rest[0]; }
-  else if (rest.length) throw usage('reap takes only --outer-ms');
-  return out;
+  const [flag, name, ...tail] = args, nativeEvent = tail.at(-1), options = tail.slice(0, -1);
+  if (flag !== '--harness' || !name || name.startsWith('--')) throw usage('hook requires --harness NAME first');
+  if (!nativeEvent || nativeEvent.startsWith('--') || (options.length !== 0 && (options.length !== 2 || options[0] !== '--outer-ms'))) {
+    throw usage('hook requires [--outer-ms N] then exactly one EVENT');
+  }
+  return { harness: name, ...(options.length ? { outerMs: readOuter(options[1]) } : {}), nativeEvent };
 }
 // Every write is awaited so the reply is flushed before the explicit exit below; pipes are
 // asynchronous on Darwin, and a pending filesystem operation would otherwise keep the
