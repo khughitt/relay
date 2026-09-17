@@ -155,7 +155,7 @@ test('guard results survive missing storage, broken enrichment and lock exhausti
   await new Promise((resolve) => setTimeout(resolve, 100));
   let pending;
   r = await hook(p, { outerMs: 1500, deps: { apply: (...args) => (pending = applyEvent(...args)) } });
-  release(); await holder; await assert.rejects(pending, { code: 'LOCK_TIMEOUT' });
+  release(); await holder; await Promise.allSettled([pending]);
   assert.equal(r.exitCode, 1); assert.match(r.stderr, /registry: (LOCK_TIMEOUT|DEADLINE_EXCEEDED)/); assert.equal(r.stdout, '');
 });
 

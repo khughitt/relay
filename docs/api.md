@@ -323,7 +323,11 @@ Worst match = every subscriber whose `kinds` contains the event kind and whose
 **Guard protocol.** stdin: `{"schema":1,"type":"event","subscriber":"<name>","event":<Event>}`
 with the full `Event` including `tool.input`. stdout: one JSON object
 `{"decision":"allow"|"deny","reason"?,"context"?}`; `deny` requires `reason`;
-unknown fields are errors; exit code must be 0. All matching guards run in
+unknown fields are errors; exit code must be 0. When present, `reason` and `context`
+must each be nonempty and at most 10,000 characters; combined context from all
+allow replies must also be at most 10,000 characters. Oversize output is an error
+and, on refusal-capable events, a refusal; relay never truncates or spills subscriber
+reply fields. All matching guards run in
 configuration order even after a denial (the spec's literal wording; the
 alternative of stopping at the first denial was rejected because the extra cost
 is bounded by the validated budget and later guards keep seeing the attempt).
