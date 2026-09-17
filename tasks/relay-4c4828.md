@@ -8,13 +8,14 @@ complexity: high
 process: planned
 owner: main
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T11:14:45Z
+updated: 2026-09-17T11:29:26Z
 started: 2026-09-17T11:14:45Z
 depends: [relay-06b1da]
 parent: relay-1231bf
 tags: []
 source: ops-998bbb
 agent: codex
+plan: docs/plans/2026-09-17-dispatch.md
 ---
 
 Approved source: ops docs/specs/2026-09-16-relay-design.md (reviewed after d7e2c33); execution brief: ops docs/plans/2026-09-16-relay-bootstrap.md (approved after bc53c51 with review corrections).
@@ -43,3 +44,7 @@ Codex SessionEnd gets its own budget within the documented 1s default/3s cap;
 Interrupt remains unmapped. No retry queue or background daemon.
 
 Prerequisites: relay-06b1da. Release goal: relay-1231bf. Bootstrap ops-998bbb closure does not mean this deliverable has shipped.
+
+## Notes
+
+- 2026-09-17T11:29:26Z (relay-4c4828): Plan drafted at docs/plans/2026-09-17-dispatch.md for user review; decisions: --outer-ms budget flag with derived profile, subscribers.json schema, guard reply/observer envelope, exit codes; native reply/timeout facts verified against both hook references 2026-09-17
