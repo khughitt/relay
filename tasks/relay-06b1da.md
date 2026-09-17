@@ -8,13 +8,14 @@ complexity: high
 process: planned
 owner: main
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T06:54:50Z
+updated: 2026-09-17T06:58:56Z
 started: 2026-09-17T06:54:50Z
 depends: [relay-377bc5]
 parent: relay-1231bf
 tags: []
 source: ops-998bbb
 agent: codex
+spec: docs/specs/2026-09-17-registry-lock-safety.md
 ---
 
 Approved source: ops docs/specs/2026-09-16-relay-design.md (reviewed after d7e2c33); execution brief: ops docs/plans/2026-09-16-relay-bootstrap.md (approved after bc53c51 with review corrections).
@@ -60,3 +61,5 @@ Prerequisites: relay-377bc5. Release goal: relay-1231bf. Bootstrap ops-998bbb cl
 ## Notes
 
 - 2026-09-17T06:54:50Z (main): User requested the next step after bootstrap. Reuse approved ops relay spec; draft focused extraction implementation plan with exact exported APIs, file/test mapping, process/lock semantics and dispatcher handoff before runtime code. Planned work in .worktrees/relay-06b1da.
+- 2026-09-17T06:58:56Z (relay-06b1da): Extraction investigation found a parent-contract gap in familiar lock.js: a still-live writer is reclaimed after 10s; the .reclaim guard is also deleted solely by age after 5s. Isolated deterministic reproduction observed two callbacks in the critical section. Proposed addendum retains dead-writer recovery and Node built-ins, forbids revoking live/unknown owners, and makes abandoned reclaimer/corrupt token recovery an explicit operator repair. Needs design addendum review before finalizing extraction plan; no runtime or familiar changes.
+- 2026-09-17T06:58:56Z (relay-06b1da): parked (waiting on user, review): Review .worktrees/relay-06b1da/docs/specs/2026-09-17-registry-lock-safety.md: never expire live/unknown lock owners; preserve ordinary dead-writer recovery; explicit repair for abandoned reclaimer. After addendum approval finalize the focused extraction implementation plan for separate review.
