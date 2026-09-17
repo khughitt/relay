@@ -1,12 +1,14 @@
 ---
 id: relay-53159b
 title: Add durable installer artifact and guarded recovery
-status: todo
+status: doing
 priority: 2
 complexity: high
 process: direct
+owner: relay-baa816
 created: 2026-09-17T14:23:41Z
-updated: 2026-09-17T14:24:11Z
+updated: 2026-09-17T14:24:35Z
+started: 2026-09-17T14:24:35Z
 depends: []
 parent: relay-baa816
 tags: []
