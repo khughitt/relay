@@ -1,15 +1,16 @@
 ---
 id: relay-06b1da
 title: "Extract adapters, process identity and atomic registry"
-status: doing
+status: done
 priority: 1
 size: l
 complexity: high
 process: planned
 owner: relay-06b1da
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T07:50:02Z
+updated: 2026-09-17T07:59:51Z
 started: 2026-09-17T06:54:50Z
+completed: 2026-09-17T07:59:51Z
 depends: [relay-377bc5]
 parent: relay-1231bf
 tags: []
@@ -74,3 +75,5 @@ Prerequisites: relay-377bc5. Release goal: relay-1231bf. Bootstrap ops-998bbb cl
 - 2026-09-17T07:40:04Z (relay-06b1da): Phase 3: 53 tests green; all twenty literal mappings, measured resolver regressions and bounded stdin normalization implemented.
 - 2026-09-17T07:47:27Z (relay-06b1da): Phase 4: 90 tests green including live-owner age immunity, safe reclamation, cleanup partial success, strict null/corrupt state, and real IPC counter/registry/crash tests.
 - 2026-09-17T07:50:02Z (relay-06b1da): Phase 5: all OpenCode server regression suites ported; 137 tests pass including queue/fold isolation and bounded sanitized child transport; plugin remains unregistered.
+- 2026-09-17T07:59:51Z (relay-06b1da): R1 final gates: 148/148 pass on Node 26.5.0 and 22.23.2, including installed tarball exports/plugin/fixture/CLI and real Linux IPC. Physical Darwin and dispatch/install/cutover remain later gates; independent review pending, worktree retained.
+- 2026-09-17T07:59:51Z (relay-06b1da): Implemented R1 adapters, qualified process identity, safe atomic registry, OpenCode observation and registry CLI/package; 148 tests pass on Node 22 and development runtime with tarball smoke. Independent integration review pending.

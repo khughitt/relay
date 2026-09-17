@@ -82,7 +82,11 @@ export async function withLock(lockPath, fn, { clock = performance.now.bind(perf
     let error;
     try {
       const current = await readToken(lockPath,io);
-      if (current && processOps.probe(current.holder,{clock,deadline}).status === 'dead') await io.unlink(lockPath);
+      if (current) {
+        const status = processOps.probe(current.holder,{clock,deadline}).status;
+        unknown = status === 'unknown';
+        if (status === 'dead') await io.unlink(lockPath);
+      }
     } catch (cause) { error = cause.code?.startsWith('LOCK_') ? cause : relayError('IO_ERROR','cannot reclaim lock',cause); }
     const cleanup = await release(guardPath,guard,io);
     if (error && cleanup) throw new AggregateError([error,cleanup],'reclamation and cleanup failed');

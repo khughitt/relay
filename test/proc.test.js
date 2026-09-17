@@ -150,3 +150,11 @@ test('Darwin rows reject malformed identities, dates, and commands', () => {
   }
 });
 
+test('one Linux provider refreshes hostname boot and process start on every probe',()=>{
+  let row=stat(),host='host',bootId=boot;
+  const ops=createProcessOps({platform:'linux',readText:p=>p.endsWith('/hostname')?host:p.endsWith('/boot_id')?bootId:row});
+  const h=ops.handleOf(42);assert.equal(ops.probe(h).status,'alive');
+  row=stat(42,1,'987655');assert.equal(ops.probe(h).status,'dead');
+  row=stat();bootId='22345678-1234-4234-8234-123456789abc';assert.equal(ops.probe(h).reason,'boot changed');
+  host='other';assert.equal(ops.probe(h).reason,'foreign host');
+});

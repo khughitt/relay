@@ -8,7 +8,7 @@ test('RELAY_BIN resolves to the repo\'s own bin/relay, not to $PATH', () => {
   // that silently stops working because a shell profile changed is the failure mode this project
   // spends its time avoiding.
   assert.ok(RELAY_BIN.endsWith('/bin/relay.js'));
-  // CLI is introduced in Phase 6; this phase verifies resolution only.
+  assert.ok(existsSync(RELAY_BIN), `${RELAY_BIN} does not exist`);
 });
 
 test('a zero exit resolves', async () => {
@@ -93,6 +93,16 @@ test('stderr is bounded, timeout kills child, and diagnostics do not leak payloa
   for(const [args,expected] of [[['-e',"process.stderr.write('PRIVATE');process.exitCode=3"],'PROCESS_UNAVAILABLE'],[['-e',"process.stderr.write('x'.repeat(65537));setInterval(()=>{},1000)"],'INPUT_TOO_LARGE'],[['-e','setInterval(()=>{},1000)'],'INPUT_TIMEOUT']]) {
     let child;
     await assert.rejects(spawnHook('init',{}, {bin:process.execPath,args,timeoutMs:200,spawnFn:(...a)=>(child=spawn(...a))}),error=>{assert.equal(error.code,expected);assert.equal(error.message.includes('PRIVATE'),false);return true;});
+    if(child.exitCode===null&&child.signalCode===null)await new Promise(resolve=>child.once('exit',resolve));
     assert.ok(child.exitCode!==null||child.signalCode!==null);
   }
+});
+test('timeout settles even when a grandchild retains the stderr pipe',async()=>{
+  const started=performance.now();
+  await assert.rejects(spawnHook('init',{}, {bin:process.execPath,timeoutMs:150,args:['-e',`
+    const {spawn}=require('node:child_process');
+    spawn(process.execPath,['-e','setTimeout(()=>{},900)'],{stdio:['ignore','ignore',2]});
+    setInterval(()=>{},1000);
+  `]}),{code:'INPUT_TIMEOUT'});
+  assert.ok(performance.now()-started<600,'an inherited pipe must not extend the timeout');
 });

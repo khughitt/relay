@@ -8,8 +8,13 @@ export function spawnHook(event, payload, { bin = RELAY_BIN, args, spawnFn = spa
     let child;
     try { child = spawnFn(bin,argv,{shell:false,stdio:['pipe','ignore','pipe']}); }
     catch(cause) { reject(relayError('PROCESS_UNAVAILABLE','cannot spawn opencode hook',cause)); return; }
-    let failure, bytes=0;
-    const fail = (error) => { failure ??= error; child.kill('SIGKILL'); };
+    let settled=false, bytes=0;
+    const fail = (error) => {
+      if (settled) return;
+      settled=true; clearTimeout(timer);
+      child.kill('SIGKILL'); child.stdin.destroy(); child.stderr.destroy();
+      reject(error);
+    };
     const timer=setTimeout(()=>fail(relayError('INPUT_TIMEOUT','opencode hook timed out')),Math.min(5000,timeoutMs));
     child.stderr.on('data',chunk=>{
       bytes+=chunk.length;
@@ -17,9 +22,8 @@ export function spawnHook(event, payload, { bin = RELAY_BIN, args, spawnFn = spa
     });
     child.once('error',cause=>fail(relayError('PROCESS_UNAVAILABLE','cannot run opencode hook',cause)));
     child.once('close',code=>{
-      clearTimeout(timer);
-      if(failure)reject(failure);
-      else if(code!==0)reject(relayError('PROCESS_UNAVAILABLE',`opencode hook exited ${code}`));
+      if(settled)return; settled=true; clearTimeout(timer);
+      if(code!==0)reject(relayError('PROCESS_UNAVAILABLE',`opencode hook exited ${code}`));
       else resolve();
     });
     child.stdin.on('error',cause=>{

@@ -4,25 +4,20 @@ import { promisify } from 'node:util';
 import { relayError } from '../protocol.js';
 const defaultExec = promisify(execFile);
 export function normalizeRemote(url) {
-  if (typeof url !== 'string' || url.trim() === '') return null;
-  let rest = url.trim().split(/[?#]/, 1)[0];
-
-  const hadScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(rest);
-  rest = rest.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, '');   // scheme://
-  rest = rest.replace(/^[^/@]+@/, '');                        // user[:token]@
-  // A `:<digits>/` segment is only ever a port in URL form (scheme://host:port/...).
-  // In scp-style shorthand (user@host:path) there is no port syntax at all — the
-  // text after the colon is a path, so a numeric owner/org (host:1234/repo) must
-  // NOT be mistaken for host:port.
-  if (hadScheme) rest = rest.replace(/:(\d+)\//, '/');        // host:22/
-  rest = rest.replace(/:/, '/');                              // scp-style host:owner/name
-  rest = rest.replace(/\/+$/, '').replace(/\.git$/i, '');
-
-  const parts = rest.split('/').filter(Boolean);
-  if (parts.length < 2 || !parts[0].includes('.')) return null;   // not a host
+  if (typeof url !== 'string' || !url.trim()) return null;
+  let rest;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(url.trim())) {
+    // URL parses the complete authority, including credentials containing @.
+    let parsed;
+    try { parsed = new URL(url.trim()); } catch { return null; }
+    rest = `${parsed.hostname}${parsed.pathname}`;
+  } else {
+    rest = url.trim().split(/[?#]/, 1)[0].replace(/^[^/]*@/, '').replace(/:/, '/');
+  }
+  const parts = rest.replace(/\/+$/, '').replace(/\.git$/i, '').split('/').filter(Boolean);
+  if (parts.length < 2 || !parts[0].includes('.')) return null;
   return parts.join('/').toLowerCase();
 }
-
 export async function gitContext(cwd, { exec = defaultExec, clock = performance.now.bind(performance), deadline = clock() + 12000, timeoutMs = 2000 } = {}) {
   const run = async (args) => {
     const remaining = Math.min(2000, timeoutMs, deadline - clock());

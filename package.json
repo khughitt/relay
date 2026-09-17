@@ -8,14 +8,23 @@
     "node": ">=22"
   },
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./opencode": "./integrations/opencode/plugin.js",
+    "./fixtures/handles.json": "./test/fixtures/handles.json"
   },
   "scripts": {
     "test": "node --test test/*.test.js integrations/opencode/*.test.mjs"
   },
   "files": [
+    "bin/",
     "src/",
+    "integrations/opencode/*.js",
     "test/fixtures/handles.json",
+    "docs/api.md",
+    "docs/runbooks/registry-lock-repair.md",
     "LICENSE"
-  ]
+  ],
+  "bin": {
+    "relay": "bin/relay.js"
+  }
 }

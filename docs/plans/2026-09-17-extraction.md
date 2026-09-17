@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans. Execute the phases in order; checkboxes record completed work, not intentions.
 
-**Status:** approved by the user on 2026-09-17 with the review edits below incorporated; runtime implementation has not started.
+**Status:** R1 implementation complete on 2026-09-17; 148 tests pass through `just gate` on Node 26.5.0 and Node 22.23.2, including actual local tarball installation. Independent review/integration is pending; the locked task worktree is retained. Physical Darwin and later dispatch/install/cutover gates remain unverified.
 
 **Goal:** Complete `relay-06b1da` with a tested Node package containing normalized
 harness observation, qualified process identity, safe registry transactions,
@@ -657,7 +657,7 @@ test('queued init precedes work and dispose follows it', async () => {
 **Files:** `src/index.js`, `bin/relay.js`, package files, `test/{cli,pack}.test.js`,
 `docs/api.md`, `docs/runbooks/registry-lock-repair.md`, README/AGENTS.
 
-- [ ] Add CLI tests using child processes with temporary RELAY_STATE_DIR and config
+- [x] Add CLI tests using child processes with temporary RELAY_STATE_DIR and config
   roots. Cover an absent snapshot without directory creation, populated listing,
   corrupt/unknown schema, reap with dead/unknown/live entries, and command errors.
   The missing-snapshot response is exactly:
@@ -672,7 +672,7 @@ test('queued init precedes work and dispose follows it', async () => {
 {"error":{"code":"CORRUPT_STATE","message":"cannot read registry JSON"}}
 ```
 
-- [ ] Implement only `--help`, `list --json`, and `reap`. Reap success prints
+- [x] Implement only `--help`, `list --json`, and `reap`. Reap success prints
   `Reaped N agent(s).` and diagnostics go to stderr. Invalid/extra arguments exit 1;
   hook/install explicitly report FEATURE_UNAVAILABLE. List errors use the envelope
   above; non-JSON commands use concise stderr. A post-publication lock-cleanup
@@ -702,7 +702,7 @@ test('queued init precedes work and dispose follows it', async () => {
   the plugin's sole export, and run the installed CLI. This tests local packaging;
   remote/tag portability remains `relay-c19c0a`. No lifecycle/prepare install script.
 
-- [ ] Write docs/api.md from the exact Interfaces section and record the fixture's
+- [x] Write docs/api.md from the exact Interfaces section and record the fixture's
   Git revision after commit. Explain missing versus corrupt state, generation/
   revision, no replay/TTL, readonly listing, no raw payload persistence, and partial
   R1 CLI status. Document errors and the safe-integer case as format coverage.
@@ -737,7 +737,7 @@ relay reap
   terminal reconciliation work. Temporary token files are not automatically swept
   by pattern; clean them only under the same quiescence condition if necessary.
 
-- [ ] Run `just gate` and the tarball smoke test. Verify on Node 22 as well as the
+- [x] Run `just gate` and the tarball smoke test. Verify on Node 22 as well as the
   development Node version. Node 22.23.2 is available at
   `~/.nvm/versions/node/v22.23.2/bin/node`; run the front door with its bin directory
   prepended to PATH. If no physical Darwin runner is available, record that exact
@@ -745,11 +745,13 @@ relay reap
   Linux live process and IPC tests must run here. No live harness probe belongs to
   this task because no hook is enabled.
 
-- [ ] Update README and both local doc status headers from verified results,
+- [x] Update README and both local doc status headers from verified results,
   record measured tests and package smoke evidence, and complete relay-06b1da in
   the same commit as its final changes. Use `feat: expose relay registry package`.
-  Run `tasks check` before committing; integrate the reviewed local branch and
-  harvest `tt-report` before clean worktree removal.
+  Run `tasks check` before committing. Implementation and local verification are
+  complete; independent review/integration and timing-log harvest before worktree
+  removal are controller follow-up. The implementation worker retains the locked
+  worktree and does not merge or remove it.
 
 ## Handoff and scope verification
 

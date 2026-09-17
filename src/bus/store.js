@@ -7,7 +7,7 @@ export async function checkPrivate(path, directory, { io = fs } = {}) {
   try { info = await io.lstat(path); }
   catch (cause) { if (cause.code === 'ENOENT') return false; throw relayError('IO_ERROR', 'cannot inspect state path', cause); }
   if (info.isSymbolicLink() || !(directory ? info.isDirectory() : info.isFile())
-      || info.uid !== process.getuid() || (info.mode & 0o777) !== (directory ? 0o700 : 0o600)) {
+      || info.uid !== process.getuid() || (info.mode & 0o7777) !== (directory ? 0o700 : 0o600)) {
     throw relayError('IO_ERROR', 'state path must be privately owned with safe type and mode');
   }
   return true;

@@ -1,19 +1,44 @@
 # relay
 
-Harness adapters, a host-local live-agent registry, and synchronous hook dispatch.
+Normalized harness observation and a host-local live-agent registry.
 
-Status: local bootstrap complete; the runtime and release are not implemented.
-Familiar will own presentation; ohai remains the notification client.
+R1 implements qualified process identity, twenty event mappings, safe atomic
+registry publication, read-only listing and explicit reaping. Node >=22; ES
+modules and built-ins only. Familiar retains presentation; ohai remains the
+notification client.
 
-The approved design is in ops
-`docs/specs/2026-09-16-relay-design.md` (revision `d7e2c33`).
-The first release goal is `relay-1231bf`; run `tasks tree relay-1231bf`.
-Next: `relay-06b1da`, execute the approved
-[adapters/process/registry extraction plan](docs/plans/2026-09-17-extraction.md).
-Its [registry-lock safety addendum](docs/specs/2026-09-17-registry-lock-safety.md)
-is approved.
-Familiar migration is scheduled as `fam-6e8321`; tasks identity design is
-`tasks-c9199a`. Publication and operator cutover are still pending.
+```sh
+just setup
+just test-fast
+just gate
+node bin/relay.js list --json
+node bin/relay.js reap
+```
 
-OpenCode server observation is extracted and tested. It is not yet installable:
-the relay hook dispatcher remains in `relay-4c4828`, and no plugin is registered.
+The fast and full suites are intentionally identical; there is no affected-only
+selector. No dependency installation or node_modules hydration is needed.
+
+Read the [API contract](docs/api.md) and
+[operator lock-repair procedure](docs/runbooks/registry-lock-repair.md).
+State uses RELAY_STATE_DIR, otherwise XDG_STATE_HOME/relay or the home directory's
+.local/state/relay. Supply a privately owned 0700 state directory; existing 0755
+is rejected, never silently changed.
+
+The extracted OpenCode server plugin preserves process/window folding and queue
+ordering. **Do not install it as a live hook yet.** Hook dispatch/replies and
+reconciliation delivery remain in `relay-4c4828`; hook/install commands report
+FEATURE_UNAVAILABLE. No live plugin/hook registration, guard, subscriber, installer,
+remote publication or consumer migration is included in R1.
+
+The approved parent design is in ops
+`docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`).
+The [extraction plan](docs/plans/2026-09-17-extraction.md) and
+[lock-safety addendum](docs/specs/2026-09-17-registry-lock-safety.md) record local work.
+The release goal is `relay-1231bf`; familiar migration is `fam-6e8321`, tasks identity
+is `tasks-c9199a`, live tool/denial proof is `ops-c8e4d1`, and remote/tag portability
+is `relay-c19c0a`. Physical Darwin process/terminal verification remains a release
+requirement; portable Darwin UTC/local-timezone fixtures do not replace it.
+
+Verified 2026-09-17: 148 tests pass through the full gate on Node 26.5.0 and
+Node 22.23.2, including installed-tarball exports, JSON fixture, plugin and CLI.
+Independent review/integration is pending; physical Darwin has not run.

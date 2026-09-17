@@ -69,3 +69,6 @@ test('resolvers skip self and use nearest matching terminal candidate', () => {
     assert.equal(resolver({ancestors:()=>[{pid:5,comm,tty:true},{pid:4,comm,tty:null},{pid:3,comm,tty:true},{pid:2,comm,tty:true}]}),3);
   }
 });
+test('Claude and Codex reducers preserve every explicit level including removal',()=>{
+  for(const harness of ['claude-code','codex'])for(const level of ['idle','working','needs-input','needs-approval','done','error',null])assert.equal(adapterFor(harness).reduceState(level,'error'),level);
+});

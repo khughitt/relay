@@ -186,3 +186,6 @@ test('git distinguishes missing origin from errors and forwards remaining budget
   assert.deepEqual(result, { repoRoot: '/repo', remote: null }); assert.deepEqual(timeouts, [80, 50]);
   await assert.rejects(gitContext('/repo', { clock: () => 1, deadline: 1, exec: () => assert.fail('spawn after deadline') }), { code: 'GIT_ERROR' });
 });
+test('URL credentials with literal at-signs never enter remote identity',()=>{
+  assert.equal(normalizeRemote('https://user:secret@part@github.com/me/api.git'),'github.com/me/api');
+});

@@ -46,3 +46,7 @@ test('failed partial temporary write is removed and does not replace snapshot',a
   }}}),{code:'IO_ERROR'});
   assert.deepEqual(await readJson(p.agentsPath),{old:true});assert.deepEqual(await fs.readdir(p.stateDir),['agents.json']);
 });
+test('special permission bits are unsafe on existing state files',async t=>{
+  const p=await tempState(t);await fs.writeFile(p.agentsPath,'{}',{mode:0o600});await fs.chmod(p.agentsPath,0o4600);
+  await assert.rejects(readJson(p.agentsPath),{code:'IO_ERROR'});
+});
