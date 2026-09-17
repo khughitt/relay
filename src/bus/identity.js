@@ -1,0 +1,49 @@
+import { basename } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { relayError } from '../protocol.js';
+const defaultExec = promisify(execFile);
+export function normalizeRemote(url) {
+  if (typeof url !== 'string' || url.trim() === '') return null;
+  let rest = url.trim().split(/[?#]/, 1)[0];
+
+  const hadScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(rest);
+  rest = rest.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, '');   // scheme://
+  rest = rest.replace(/^[^/@]+@/, '');                        // user[:token]@
+  // A `:<digits>/` segment is only ever a port in URL form (scheme://host:port/...).
+  // In scp-style shorthand (user@host:path) there is no port syntax at all — the
+  // text after the colon is a path, so a numeric owner/org (host:1234/repo) must
+  // NOT be mistaken for host:port.
+  if (hadScheme) rest = rest.replace(/:(\d+)\//, '/');        // host:22/
+  rest = rest.replace(/:/, '/');                              // scp-style host:owner/name
+  rest = rest.replace(/\/+$/, '').replace(/\.git$/i, '');
+
+  const parts = rest.split('/').filter(Boolean);
+  if (parts.length < 2 || !parts[0].includes('.')) return null;   // not a host
+  return parts.join('/').toLowerCase();
+}
+
+export async function gitContext(cwd, { exec = defaultExec, clock = performance.now.bind(performance), deadline = clock() + 12000, timeoutMs = 2000 } = {}) {
+  const run = async (args) => {
+    const remaining = Math.min(2000, timeoutMs, deadline - clock());
+    if (remaining <= 0) throw relayError('GIT_ERROR', 'repository deadline exceeded');
+    return exec('git', ['-C', cwd, ...args], { timeout: Math.max(1, Math.floor(remaining)),
+      killSignal: 'SIGKILL', maxBuffer: 4 * 1024 * 1024, encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' } });
+  };
+  let repoRoot;
+  try { repoRoot = (await run(['rev-parse', '--show-toplevel'])).stdout.trim(); }
+  catch (cause) {
+    if (cause.code === 128 && !cause.killed && !cause.signal && /^fatal: not a git repository(?: \(|:)/.test(cause.stderr ?? '')) return { repoRoot: null, remote: null };
+    throw relayError('GIT_ERROR', 'cannot resolve repository', cause);
+  }
+  if (!repoRoot.startsWith('/')) throw relayError('GIT_ERROR', 'invalid repository root');
+  let remote;
+  try { remote = normalizeRemote((await run(['config', '--get', 'remote.origin.url'])).stdout); }
+  catch (cause) {
+    if (cause.code === 1 && !cause.killed && !cause.signal && !(cause.stderr ?? '').trim()) remote = null;
+    else throw relayError('GIT_ERROR', 'cannot resolve repository remote', cause);
+  }
+  return { repoRoot, remote };
+}
+export const projectKeyFor = ({ remote, repoRoot, cwd }) => remote ?? repoRoot ?? cwd;
+export const displayProject = ({ repoRoot, cwd }) => basename(repoRoot ?? cwd) || '/';

@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: relay-06b1da
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-17T07:32:53Z
+updated: 2026-09-17T07:37:32Z
 started: 2026-09-17T06:54:50Z
 depends: [relay-377bc5]
 parent: relay-1231bf
@@ -70,3 +70,4 @@ Prerequisites: relay-377bc5. Release goal: relay-1231bf. Bootstrap ops-998bbb cl
 - 2026-09-17T07:16:12Z (relay-06b1da): parked (waiting on user, review): Review .worktrees/relay-06b1da/docs/plans/2026-09-17-extraction.md. The lock addendum is approved; this focused plan needs its own review before executing the six extraction phases.
 - 2026-09-17T07:29:12Z (relay-06b1da): User approved extraction plan with edits: publish reclaimPath; specify process-unavailable diagnostics versus Git failure; enumerate boot/deadline/cleanup lock tests and initial ENOENT race; retain OpenCode raw key for familiar projection; exclude PID 1; document private directory rejection; verify Node 22.23.2 gate. Keeping one task with phase progress in notes. Proceed with the approved implementation.
 - 2026-09-17T07:32:53Z (relay-06b1da): Phase 1: protocol missing-module red; five contract tests green; front door adopted and setup/check passed.
+- 2026-09-17T07:37:32Z (relay-06b1da): Phase 2: precision red reproduced; 31 tests green including fresh Linux proof and portable Darwin/DST parsing; Git bounds and strict error classification extracted.

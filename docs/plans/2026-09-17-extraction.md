@@ -302,7 +302,7 @@ export function parseStart(text) {
 `normalizeDarwinTty`, `gitContext`, `normalizeRemote`, `projectKeyFor`,
 `displayProject`. No `autoSlot`, slot hashing, theme imports or global process cache.
 
-- [ ] Port familiar's process and repository tests, removing slot tests and
+- [x] Port familiar's process and repository tests, removing slot tests and
   changing numeric start expectations to strings. Add this parser regression and
   run `just test-fast` to observe the precision failure before changing parsing.
 
@@ -317,7 +317,7 @@ test('proc parsing keeps state and exact field-22 text', () => {
 });
 ```
 
-- [ ] Parse Linux after the final `)` as today, retaining state and passing field
+- [x] Parse Linux after the final `)` as today, retaining state and passing field
   22 through `parseStart`. Preserve read failures: ENOENT/ESRCH is absent;
   EACCES/EPERM/other read errors or malformed evidence is unknown, never absent.
   Use fresh kernel hostname/boot evidence and fresh start evidence for probes.
@@ -337,7 +337,7 @@ test('proc parsing keeps state and exact field-22 text', () => {
   existence check confirms ESRCH. Test the portable Darwin epoch case under UTC
   in a child process and retain familiar's local-timezone/DST validation tests.
 
-- [ ] Keep the normalized remote → repoRoot → cwd identity order. Strip credential,
+- [x] Keep the normalized remote → repoRoot → cwd identity order. Strip credential,
   query and fragment material before returning normalized remote identity; do not
   log the original URL. Retain existing SSH/HTTPS/port/numeric-owner tests and add
   credential-bearing URL coverage. Recognized not-a-repository and missing-origin
@@ -350,7 +350,7 @@ test('proc parsing keeps state and exact field-22 text', () => {
   Unset/empty XDG base variables follow the XDG fallback; an explicitly empty or
   relative `RELAY_STATE_DIR` is invalid. `paths()` performs no filesystem writes.
 
-- [ ] Test same PID/new start, changed boot, zombie, unreadable proc, foreign host,
+- [x] Test same PID/new start, changed boot, zombie, unreadable proc, foreign host,
   absent boot, unsafe tty with otherwise usable process proof, ancestor loops,
   missing/ambiguous terminal candidates and Git timeout. Use injected readText,
   runPs and kill functions; no test reads a guessed unrelated live PID. Run

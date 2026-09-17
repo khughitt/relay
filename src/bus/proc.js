@@ -1,0 +1,169 @@
+import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
+import { hostname as osHostname } from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { parseStart, validateHandle, relayError } from '../protocol.js';
+
+export function parseStat(text) {
+  if (typeof text !== 'string') throw relayError('PROCESS_UNREADABLE', 'invalid proc stat');
+  const open = text.indexOf('('), close = text.lastIndexOf(')');
+  const prefix = text.slice(0, open).trim();
+  const after = text.slice(close + 1).trim().split(/\s+/);
+  if (open < 0 || close < open || !/^[1-9][0-9]*$/.test(prefix)
+      || !/^[0-9]+$/.test(after[1]) || !/^-?[0-9]+$/.test(after[4])
+      || !/^[A-Za-z]$/.test(after[0])) throw relayError('PROCESS_UNREADABLE', 'invalid proc stat');
+  const pid = Number(prefix), ppid = Number(after[1]), ttyNr = Number(after[4]);
+  if (pid > 4294967295 || ppid > 4294967295 || !Number.isSafeInteger(ttyNr)) throw relayError('PROCESS_UNREADABLE', 'invalid proc identity');
+  let starttime;
+  try { starttime = parseStart(after[19]); }
+  catch (cause) { throw relayError('PROCESS_UNREADABLE', 'invalid proc start', cause); }
+  return { pid, ppid, comm: text.slice(open + 1, close), tty: ttyNr === 0 ? null : true, starttime, state: after[0] };
+}
+
+const DARWIN_ROW = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+(\d{4})\s+(.+)$/;
+const DARWIN_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DARWIN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export function normalizeDarwinTty(raw) {
+  if (raw === '??') return null;
+  const match = /^(?:tty)?s([0-9a-f]+)$/i.exec(raw);
+  if (!match) throw relayError('PROCESS_UNREADABLE', 'unsafe Darwin tty');
+  return `ttys${match[1]}`;
+}
+
+export function parseDarwinRow(line, { terminal = true } = {}) {
+  const match = DARWIN_ROW.exec(line);
+  if (!match) throw relayError('PROCESS_UNREADABLE', 'Darwin ps: malformed row');
+  const pid = Number(match[1]);
+  const ppid = Number(match[2]);
+  const day = Number(match[6]);
+  const hour = Number(match[7]);
+  const minute = Number(match[8]);
+  const second = Number(match[9]);
+  const year = Number(match[10]);
+  const month = DARWIN_MONTHS.indexOf(match[5]);
+  const started = new Date(0);
+  started.setFullYear(year, month, day);
+  started.setHours(hour, minute, second, 0);
+  const starttime = started.getTime() / 1000;
+  if (!Number.isInteger(pid) || pid <= 0 || pid > 4294967295 || !Number.isInteger(ppid) || ppid < 0 || ppid > 4294967295
+      || started.getFullYear() !== year || started.getMonth() !== month
+      || started.getDate() !== day || started.getHours() !== hour
+      || started.getMinutes() !== minute || started.getSeconds() !== second
+      || DARWIN_WEEKDAYS[started.getDay()] !== match[4]
+      || !Number.isInteger(starttime) || match[11].trim() === '') {
+    throw relayError('PROCESS_UNREADABLE', 'Darwin ps: malformed row');
+  }
+  return {
+    pid,
+    ppid,
+    comm: basename(match[11]),
+    tty: terminal ? normalizeDarwinTty(match[3]) : null,
+    starttime: parseStart(String(starttime)),
+    state: null,
+  };
+}
+
+export function runDarwinPs(args, { clock = performance.now.bind(performance), deadline = clock() + 2000, spawn = spawnSync } = {}) {
+  const remaining = Math.min(2000, deadline - clock());
+  if (remaining <= 0) throw relayError('DEADLINE_EXCEEDED', 'process deadline exceeded');
+  const result = spawn('/bin/ps', args, { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' },
+    timeout: Math.max(1, Math.floor(remaining)), maxBuffer: 4 * 1024 * 1024, killSignal: 'SIGKILL' });
+  if (result.error || result.signal || result.status !== 0) throw relayError('PROCESS_UNAVAILABLE', 'cannot run process lookup', result.error);
+  return result.stdout;
+}
+function walk(pid, recordOf) {
+  const seen = new Set(), chain = [];
+  while (pid > 1) {
+    if (seen.has(pid)) throw relayError('PROCESS_UNREADABLE', 'process ancestor loop');
+    seen.add(pid);
+    const row = recordOf(pid);
+    if (!row) break;
+    chain.push(row); pid = row.ppid;
+  }
+  return chain;
+}
+export function createProcessOps({ platform = process.platform, readText = (p) => readFileSync(p, 'utf8'),
+  runPs = runDarwinPs, kill = (pid, signal) => process.kill(pid, signal), hostname = osHostname } = {}) {
+  if (!['linux', 'darwin'].includes(platform)) throw relayError('PROCESS_UNAVAILABLE', 'unsupported process platform');
+  const absent = (error) => ['ENOENT', 'ESRCH'].includes(error.code);
+  const local = () => {
+    let host, bootId = null;
+    try { host = (platform === 'linux' ? readText('/proc/sys/kernel/hostname') : hostname()).trim(); }
+    catch { return null; }
+    if (!host) return null;
+    if (platform === 'linux') {
+      try { bootId = readText('/proc/sys/kernel/random/boot_id').trim();
+        validateHandle({ platform, host, bootId, pid: 1, start: '0' }); }
+      catch { bootId = null; }
+    }
+    return { platform, host, bootId };
+  };
+  const linuxRow = (pid) => {
+    let text;
+    try { text = readText(`/proc/${pid}/stat`); }
+    catch (cause) { if (absent(cause)) return null; throw relayError('PROCESS_UNREADABLE', 'cannot read process', cause); }
+    const row = parseStat(text);
+    if (row.pid !== pid) throw relayError('PROCESS_UNREADABLE', 'process identity mismatch');
+    return row;
+  };
+  const darwinRow = (pid, options, terminal) => {
+    let output;
+    try { output = runPs(['-p', String(pid), '-o', 'pid=,ppid=,tty=,lstart=,comm='], options); }
+    catch (cause) {
+      if (cause.code === 'DEADLINE_EXCEEDED') throw cause;
+      try { kill(pid, 0); } catch (error) { if (error.code === 'ESRCH') return null; }
+      throw relayError('PROCESS_UNAVAILABLE', 'cannot read process', cause);
+    }
+    if (typeof output !== 'string') throw relayError('PROCESS_UNREADABLE', 'invalid process output');
+    if (!output.trim()) return null;
+    const lines = output.trimEnd().split('\n');
+    if (lines.length !== 1) throw relayError('PROCESS_UNREADABLE', 'ambiguous process output');
+    const row = parseDarwinRow(lines[0], { terminal });
+    if (row.pid !== pid) throw relayError('PROCESS_UNREADABLE', 'process identity mismatch');
+    return row;
+  };
+  const core = (pid, options) => platform === 'linux' ? linuxRow(pid) : darwinRow(pid, options, false);
+  const recordOf = (pid, options) => platform === 'linux' ? linuxRow(pid) : darwinRow(pid, options, true);
+  const ancestors = (pid, options) => {
+    if (platform === 'linux') return walk(pid, (id) => recordOf(id, options));
+    const output = runPs(['-axo', 'pid=,ppid=,tty=,lstart=,comm='], options);
+    if (typeof output !== 'string' || !output.trim()) throw relayError('PROCESS_UNREADABLE', 'invalid process table');
+    const records = new Map();
+    for (const line of output.trimEnd().split('\n')) {
+      try { const row = parseDarwinRow(line); records.set(row.pid, row); }
+      catch (error) {
+        const id = Number(/^\s*(\d+)/.exec(line)?.[1]);
+        if (Number.isInteger(id) && id > 0 && !records.has(id)) records.set(id, error);
+      }
+    }
+    return walk(pid, (id) => { const row = records.get(id); if (row instanceof Error) throw row; return row ?? null; });
+  };
+  const handleOf = (pid, options) => {
+    const identity = local();
+    if (!identity) return null;
+    const row = core(pid, options);
+    if (!row?.starttime) return null;
+    return validateHandle({ ...identity, pid, start: row.starttime });
+  };
+  const verdict = (status, reason) => ({ status, reason });
+  const probe = (handle, options) => {
+    try { handle = validateHandle(handle); } catch { return verdict('unknown', 'missing or invalid handle'); }
+    if (handle.platform !== platform) return verdict('unknown', 'foreign platform');
+    const identity = local();
+    if (!identity) return verdict('unknown', 'local identity unavailable');
+    if (handle.host !== identity.host) return verdict('unknown', 'foreign host');
+    if (platform === 'linux') {
+      if (!handle.bootId || !identity.bootId) return verdict('unknown', 'boot identity unavailable');
+      if (handle.bootId !== identity.bootId) return verdict('dead', 'boot changed');
+    }
+    let row;
+    try { row = core(handle.pid, options); } catch { return verdict('unknown', 'process unreadable'); }
+    if (!row) return verdict('dead', 'process absent');
+    if (['Z', 'X', 'x'].includes(row.state)) return verdict('dead', 'process exited');
+    if (row.starttime !== handle.start) return verdict('dead', 'process replaced');
+    return verdict('alive', 'qualified process matches');
+  };
+  return { recordOf, ancestors, handleOf, probe };
+}
