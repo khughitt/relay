@@ -363,7 +363,7 @@ test('proc parsing keeps state and exact field-22 text', () => {
 **Produces:** adapterFor, normalizeEvent and readNativeInput. The normalizer performs
 no process, Git, filesystem or subscriber work.
 
-- [ ] Port the three adapter suites and replace familiar-theme STATES imports
+- [x] Port the three adapter suites and replace familiar-theme STATES imports
   with relay's vocabulary. Replace the adapter shape test's cosmetic-flag
   requirement with the events table. Use this normalized payload assertion first:
 
@@ -380,7 +380,7 @@ test('Bash input normalizes without persisting native extras', () => {
 });
 ```
 
-- [ ] Fill each adapter's immutable events table from the parent mapping. Expanded
+- [x] Fill each adapter's immutable events table from the parent mapping. Expanded
   rows: Claude eight, Codex six, OpenCode six. `stateForEvent` and normalized kind
   derive from the same table; an unlisted event fails. Retain OpenCode's idle
   reducer: error stays error, active becomes done, otherwise idle. Its kind stays
@@ -416,7 +416,7 @@ const common = {
   [Claude hook reference](https://code.claude.com/docs/en/hooks), checked 2026-09-17.
   These fixture shapes do not claim live guard capability.
 
-- [ ] Extract the stdin lifecycle from familiar's CLI, but reject on timeout or
+- [x] Extract the stdin lifecycle from familiar's CLI, but reject on timeout or
   stream error rather than parsing a partial body as success. Count bytes before
   buffering past 4 MiB, require EOF, remove listeners and clear the timer on every
   completion path. Test byte-boundary/multibyte input, invalid UTF-8/JSON, an open
@@ -424,7 +424,7 @@ const common = {
   non-command tools and stopHookActive preservation. Iterate every table row and
   assert its literal expected kind/level, not a value computed by the same table.
 
-- [ ] Run `just test-fast`, `tasks check`; commit `feat: normalize harness lifecycle events`.
+- [x] Run `just test-fast`, `tasks check`; commit `feat: normalize harness lifecycle events`.
 
 ### Phase 4: Implement safe locking and atomic registry transactions
 
