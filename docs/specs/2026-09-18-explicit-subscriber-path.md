@@ -53,8 +53,8 @@ shell startup may rewrite, and treats the absence of that file as "no subscriber
    `--subscribers FILE` (an absolute path) and every installer-written entry carries
    it: `'<relay>' hook --harness H --outer-ms N --subscribers '<file>' EVENT`. The
    installer already requires `--subscribers FILE`, validates it, and plans budgets
-   from it, so the path is known when the entry is written; the entry records the
-   resolved absolute path of that file. The hook process environment no longer
+   from it, so the path is known when the entry is written; the entry records that
+   absolute path. The hook process environment no longer
    decides which policy runs.
 2. **An explicitly named file must exist.** With `--subscribers`, an absent file is
    `INVALID_CONFIG`, the same class as an unreadable or malformed one. On
@@ -112,13 +112,13 @@ before this change is still relay-owned and replaced as a whole. `Artifact` and
 same validated subscribers plan the budgets.
 
 The install reads the subscriber file through the same loader the hook uses, with
-the explicit path: the resolved absolute `--subscribers` argument must exist as a
-regular file, 0600, in a 0700 directory, both owned by the invoking user, and parse
+the explicit path: the `--subscribers` argument must be absolute (as `--target`
+already must be) and must exist as a regular file, 0600, in a 0700 directory, both owned by the invoking user, and parse
 as valid configuration. Today the install only parses and validates the JSON, so a
 0644 file installs and then refuses every guard-capable invocation at runtime as
 `INVALID_CONFIG`. Any of these failures refuses the install before an artifact is
 written, naming the check that failed. The path written into the entries is the
-same resolved path that was checked.
+same path that was checked, byte for byte.
 
 **Docs.** `docs/api.md` (subscriber configuration, budget source, CLI), `README.md`
 ("subscribers come only from `~/.config/relay/subscribers.json`"), and
@@ -147,10 +147,10 @@ same resolved path that was checked.
   reply and the state failure is only a diagnostic; the flagless default is
   unchanged, including its refusal on a bad environment.
 * Installer: generated Claude and Codex documents carry `--subscribers` with the
-  quoted resolved path in every relay entry; pre-change relay entries (with and
-  without `--outer-ms`) are recognized and replaced; the CLI install writes the
-  resolved path, and refuses before writing an artifact for a 0644 file, a 0755
-  directory, a symlink, a missing file, and invalid JSON, each named.
+  quoted path in every relay entry; pre-change relay entries (with and without
+  `--outer-ms`) are recognized and replaced; the CLI install writes the checked
+  path, and refuses before writing an artifact for a relative path, a 0644 file, a
+  0755 directory, a symlink, a missing file, and invalid JSON, each named.
 * Real CLI: `relay hook --harness codex --subscribers <file> PreToolUse` run under
   `zsh -lc` with a foreign `XDG_CONFIG_HOME` still dispatches the configured guard.
   This is the regression the probe missed, reproduced without a harness.
