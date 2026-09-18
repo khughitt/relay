@@ -381,7 +381,8 @@ test('a second install recognizes its own entries when the paths contain apostro
   // or a reinstall keeps the old entry and appends a second relay writer.
   const quirky = "/tmp/team's config/subscribers.json", bin = "/opt/o'relay/bin/relay";
   const once = planHooks({ text: '{"hooks":{}}', harness: 'codex', relayBin: bin, subscribersPath: quirky });
-  assert.match(once, /--subscribers '\/tmp\/team'\\''s config\/subscribers\.json' PreToolUse/);
+  // Match the decoded command: the JSON text doubles the backslash in '\''.
+  assert.match(JSON.parse(once).hooks.PreToolUse[0].hooks[0].command, /--subscribers '\/tmp\/team'\\''s config\/subscribers\.json' PreToolUse/);
   const twice = planHooks({ text: once, harness: 'codex', relayBin: bin, subscribersPath: quirky });
   assert.equal(twice, once);
   for (const entries of Object.values(JSON.parse(twice).hooks)) assert.equal(entries.length, 1);
