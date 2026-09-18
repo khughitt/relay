@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: relay-a1510a
 created: 2026-09-18T20:19:44Z
-updated: 2026-09-18T21:28:55Z
+updated: 2026-09-18T21:29:00Z
 started: 2026-09-18T20:53:17Z
 depends: []
 tags: []
@@ -39,4 +39,6 @@ The 2026-09-18 ops relay-guard probe at relay b5fbde5 recorded Codex 0.155.0 sen
 - 2026-09-18T21:19:12Z (relay-a1510a): parked (waiting on user, review): Review the revised docs/plans/2026-09-18-explicit-subscriber-path.md; on approval execute Task 1 (relay-b22e9c) in .worktrees/relay-a1510a
   provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-18T21:28:55Z (relay-a1510a): resumed
+  provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-18T21:29:00Z (relay-a1510a): parked (waiting on user, review): Review the revised docs/plans/2026-09-18-explicit-subscriber-path.md; on approval execute Task 1 (relay-b22e9c) in .worktrees/relay-a1510a
   provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
