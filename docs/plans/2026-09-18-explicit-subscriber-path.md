@@ -103,7 +103,8 @@ async function readSubscribers(paths, { io, required }) {
 
 export const loadSubscribers = (paths, { io = fs } = {}) => readSubscribers(paths, { io, required: false });
 
-export function loadSubscribersFrom(file, { io = fs } = {}) {
+// async so that a bad path rejects like every other failure instead of throwing synchronously.
+export async function loadSubscribersFrom(file, { io = fs } = {}) {
   if (typeof file !== 'string' || !isAbsolute(file)) fail('subscriber config path must be absolute');
   return readSubscribers({ configDir: dirname(file), subscribersPath: file }, { io, required: true });
 }
@@ -354,7 +355,7 @@ git commit -m "feat: accept --subscribers FILE on relay hook"
 
 - [ ] **Step 1: Write the failing planner tests**
 
-In `test/install-hooks.test.js`, add `const subscribers = '/home/me/.config/relay/subscribers.json';` after `relay`, pass `subscribersPath: subscribers` to every existing `planHooks` call, and append:
+In `test/install-hooks.test.js`, add `const subscribers = '/home/me/.config/relay/subscribers.json';` after `relay`, pass `subscribersPath: subscribers` to every existing `planHooks` call, and update the two assertions that expect the budget and event to be adjacent: in the first test, `assert.match(text, /--outer-ms 600000 PreToolUse/);` becomes `assert.match(text, /--outer-ms 600000 --subscribers '\/home\/me\/\.config\/relay\/subscribers\.json' PreToolUse/);`, and in `planner replaces a relay entry whose timeout drifted from its command`, `assert.match(entry.hooks[0].command, /--outer-ms 600000 PreToolUse$/);` becomes `assert.match(entry.hooks[0].command, /--outer-ms 600000 --subscribers '[^']*' PreToolUse$/);`. Then append:
 
 ```js
 test('every relay entry names the subscriber file after the outer budget', () => {
@@ -374,6 +375,19 @@ test('relay entries from before the flag, and with it, are owned and replaced', 
   assert.equal(hooks.PreToolUse.length, 1); assert.match(hooks.PreToolUse[0].hooks[0].command, /--subscribers '\/home\/me\/\.config\/relay\/subscribers\.json' PreToolUse$/);
   assert.equal(hooks.Stop.length, 1); assert.match(hooks.Stop[0].hooks[0].command, /--subscribers '\/home\/me\/\.config\/relay\/subscribers\.json' Stop$/);
 });
+
+test('a second install recognizes its own entries when the paths contain apostrophes', () => {
+  // shellQuote writes an apostrophe as '\'' — ownership must read the renderer's own escaping,
+  // or a reinstall keeps the old entry and appends a second relay writer.
+  const quirky = "/tmp/team's config/subscribers.json", bin = "/opt/o'relay/bin/relay";
+  const once = planHooks({ text: '{"hooks":{}}', harness: 'codex', relayBin: bin, subscribersPath: quirky });
+  assert.match(once, /--subscribers '\/tmp\/team'\\''s config\/subscribers\.json' PreToolUse/);
+  const twice = planHooks({ text: once, harness: 'codex', relayBin: bin, subscribersPath: quirky });
+  assert.equal(twice, once);
+  for (const entries of Object.values(JSON.parse(twice).hooks)) assert.equal(entries.length, 1);
+  const moved = JSON.parse(planHooks({ text: once, harness: 'codex', relayBin: relay, subscribersPath: subscribers })).hooks;
+  assert.equal(moved.PreToolUse.length, 1); assert.match(moved.PreToolUse[0].hooks[0].command, /^'\/opt\/relay\/bin\/relay' hook/);
+});
 ```
 
 In `test/install-claude-code.test.js` and `test/install-codex.test.js`, pass `subscribersPath: '/home/me/.config/relay/subscribers.json'` to the existing calls and assert `assert.match(result.changes[0].after, /--subscribers '\/home\/me\/\.config\/relay\/subscribers\.json'/);`; add to each `assert.throws(() => plan…({ …same args without subscribersPath… }), /subscriber/);`.
@@ -388,9 +402,15 @@ Expected: the new assertions fail (no `--subscribers` in the rendered commands; 
 In `src/install/hooks.js`:
 
 ```js
+// A shell-quoted token as shellQuote writes it: single quotes, with an embedded apostrophe
+// as '\''. The bare form has no spaces or quotes. This is recognition of our own renderer's
+// output, not shell evaluation.
+const executable = "(?:'(?:[^']|'\\\\'')*'|[^\\s']+)";
 const command = (bin, harness, event, outerMs, subscribersPath) => `${shellQuote(bin)} hook --harness ${harness} --outer-ms ${outerMs} --subscribers ${shellQuote(subscribersPath)} ${event}`;
 const relay = (value, harness, event) => new RegExp(`^${executable} hook --harness ${esc(harness)}(?: --outer-ms \\d+)?(?: --subscribers ${executable})? ${esc(event)}$`).test(value);
 ```
+
+`executable` replaces the existing `(?:'[^']*'|\S+)`, which stops at the first apostrophe inside a quoted token; the same pattern serves `familiar` (unchanged shapes still match, since familiar's quoted paths without apostrophes are a subset). Check the source string produces the regex `(?:'(?:[^']|'\\'')*'|[^\s']+)` — in a JavaScript string literal each regex backslash is written twice.
 
 and in `planHooks({ text, harness, relayBin, subscribersPath, retireFamiliar = false })` add, before the JSONC parse, `if (typeof subscribersPath !== 'string' || !isAbsolute(subscribersPath)) throw new Error('subscriber path must be absolute');` (import `isAbsolute` from `node:path`), and render with `command(relayBin, harness, binding.event, binding.outerMs, subscribersPath)`.
 
