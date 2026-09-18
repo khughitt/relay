@@ -11,7 +11,13 @@ const executable = "(?:'[^']*'|\\S+)";
 const command = (bin, harness, event, outerMs) => `${shellQuote(bin)} hook --harness ${harness} --outer-ms ${outerMs} ${event}`;
 const relay = (value, harness, event) => new RegExp(`^${executable} hook --harness ${esc(harness)}(?: --outer-ms \\d+)? ${esc(event)}$`).test(value);
 const familiar = (value, event) => new RegExp(`^${executable} hook(?: --agent codex)? ${esc(event)}(?: --agent codex)?$`).test(value);
-const entry = (value, matcher) => ({ ...(matcher === undefined ? {} : { matcher }), hooks: [{ type: 'command', command: value }] });
+// Both harnesses store a hook's outer timeout in whole seconds; relay is told the same
+// budget in milliseconds. A profile that is not a positive whole second cannot be written.
+export function timeoutSeconds(outerMs) {
+  if (!Number.isInteger(outerMs) || outerMs < 1000 || outerMs % 1000 !== 0) throw new Error(`outer timeout must be positive whole seconds in milliseconds: ${outerMs}`);
+  return outerMs / 1000;
+}
+const entry = (value, matcher, outerMs) => ({ ...(matcher === undefined ? {} : { matcher }), hooks: [{ type: 'command', command: value, timeout: timeoutSeconds(outerMs) }] });
 
 export function bindingsFor(harness) {
   if (!Object.hasOwn(table, harness)) throw new Error(`unsupported hook harness: ${harness}`);
@@ -35,7 +41,7 @@ export function planHooks({ text, harness, relayBin, retireFamiliar = false }) {
     const old = matched.find(item => familiar(item.hooks[0].command, binding.event));
     if (old && !retireFamiliar) throw new Error(`familiar writer for ${binding.event} requires --retire familiar`);
     const next = existing.filter(item => item !== owned[0] && item !== old);
-    next.push(entry(command(relayBin, harness, binding.event, binding.outerMs), binding.matcher));
+    next.push(entry(command(relayBin, harness, binding.event, binding.outerMs), binding.matcher, binding.outerMs));
     const edits = modify(output, ['hooks', key], next, { formattingOptions: { insertSpaces: true, tabSize: 2 } });
     output = applyEdits(output, edits);
   }

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** implemented and verified, 2026-09-17.
+**Status:** implemented and verified, 2026-09-17; the settled `timeout` field was missing from installed entries until `relay-d79dc3`, 2026-09-18.
 
 **Goal:** Complete `relay-baa816` with fixture-only installers for relay-owned Claude Code, Codex, and OpenCode bindings, exact before-images, and guarded rollback artifacts.
 
