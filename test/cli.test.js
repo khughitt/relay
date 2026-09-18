@@ -50,7 +50,9 @@ test('hook denial through the real CLI is JSON on stdout, reason on stderr, exit
   await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code','codex'],argv:[process.execPath,fixture,'deny'],timeoutMs:2000}]);
   const r=hookRun(p,['--harness','codex','PreToolUse'],body);
   assert.equal(r.status,2);assert.equal(r.stdout,'{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"denied by fixture"}}\n');assert.equal(r.stderr,'denied by fixture\n');
-  const ok=hookRun(p,['--harness','codex','UserPromptSubmit'],JSON.stringify({session_id:'sess',cwd:process.cwd()}));assert.deepEqual([ok.status,ok.stdout,ok.stderr],[0,'','']);
+  // Identity comes from a live codex terminal ancestor; outside one the publication only reports it.
+  const ok=hookRun(p,['--harness','codex','UserPromptSubmit'],JSON.stringify({session_id:'sess',cwd:process.cwd()}));assert.deepEqual([ok.status,ok.stdout],[0,'']);
+  assert.match(ok.stderr,/^(PROCESS_UNAVAILABLE: agent process identity unavailable \(codex:sess\)\n)?$/);
   const reap=run(p,['reap']);assert.equal(reap.status,0);assert.equal(reap.stdout,'Reaped 0 agent(s).\n');
 });
 test('survival limitation: the internal deadline refuses; an outer kill, missing node or startup error cannot',async t=>{
