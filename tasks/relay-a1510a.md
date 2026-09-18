@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-09-18T20:19:44Z
-updated: 2026-09-18T20:54:55Z
+updated: 2026-09-18T20:55:01Z
 started: 2026-09-18T20:53:17Z
 depends: []
 tags: []
@@ -25,3 +25,5 @@ The 2026-09-18 ops relay-guard probe at relay b5fbde5 recorded Codex 0.155.0 sen
   provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-18T20:53:17Z (main): Diagnosis: relay's Codex encoding is correct for codex-cli 0.155.0 (checked against codex-rs/hooks/src/events/pre_tool_use.rs at rust-v0.155.0: exit 2 + stderr -> Blocked; hookSpecificOutput permissionDecision deny -> Blocked; additionalContext -> developer message). Replaying the live recorded payloads offline gives the right replies. Live, relay ran (its registry holds the live session ids) with zero subscribers: Codex spawns command hooks as $SHELL -lc, and ~/.zshenv exports XDG_CONFIG_HOME=$HOME/.config unconditionally, so the probe's XDG_CONFIG_HOME was lost, ~/.config/relay/subscribers.json was absent, and loadSubscribers silently returned no subscribers (no guard, no context, allow). Evidence: no block-log line for the live Codex deny in ~/.local/state/ops/attribution-blocks.log; XDG_CONFIG_HOME=/x zsh -lc 'echo $XDG_CONFIG_HOME' prints ~/.config.
 - 2026-09-18T20:53:17Z (main): Scope grows beyond the encoder: the fix is how an installed hook entry locates relay's subscriber configuration and whether an absent configured file may be treated as no subscribers. Writing a spec for review before implementation.
+- 2026-09-18T20:55:01Z (relay-a1510a): parked (waiting on user, review): Review docs/specs/2026-09-18-explicit-subscriber-path.md; on approval write the implementation plan, then implement in .worktrees/relay-a1510a
+  provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
