@@ -43,8 +43,8 @@ Live, relay ran with no subscribers. Evidence:
   shell startup), and the reply was an empty allow.
 
 The Claude probe passed under the same environment, so Claude Code's hook shell did
-not rewrite it. The failure is environmental, but it exposes a contract problem: a configured guard silently became no guard because relay resolves
-its policy configuration from the hook process environment, which the harness's
+not rewrite it. The failure is environmental, but it exposes a contract problem: a
+configured guard silently became no guard because relay resolves its policy configuration from the hook process environment, which the harness's
 shell startup may rewrite, and treats the absence of that file as "no subscribers".
 
 ## Decision
