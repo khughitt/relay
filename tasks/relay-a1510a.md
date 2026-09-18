@@ -36,3 +36,5 @@ The 2026-09-18 ops relay-guard probe at relay b5fbde5 recorded Codex 0.155.0 sen
 - 2026-09-18T21:18:37Z (relay-a1510a): resumed
   provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-18T21:19:12Z (relay-a1510a): Plan revised after review: ownership pattern reads shellQuote's '\'' escaping (verified against the real helper with apostrophes in both paths) plus a repeated-install test; loadSubscribersFrom is async so bad paths reject; the two existing --outer-ms 600000 PreToolUse assertions are updated in Task 4 before its passing checkpoint.
+- 2026-09-18T21:19:12Z (relay-a1510a): parked (waiting on user, review): Review the revised docs/plans/2026-09-18-explicit-subscriber-path.md; on approval execute Task 1 (relay-b22e9c) in .worktrees/relay-a1510a
+  provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
