@@ -1,6 +1,6 @@
 # Explicit subscriber configuration in installed hook entries
 
-Status: draft for review, 2026-09-18.
+Status: revised after review, 2026-09-18 (install-time privacy checks; explicit path bypasses environment resolution).
 Task: `relay-a1510a`.
 Parent design: ops `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`);
 installers plan `docs/plans/2026-09-17-installers.md`.
@@ -87,21 +87,38 @@ in that order, each at most once, `FILE` absolute. Parsing stays strict: a relat
 path, a repeated flag, or a flag after `EVENT` is `USAGE` (exit 1, no refusal, as
 today for other usage errors). `--help` text and `docs/api.md` gain the flag.
 
-**Dispatcher.** `dispatchHook` receives `subscribersPath` (absolute or `null`). It
-resolves `paths` as before and, when a path is given, overrides `configDir` and
-`subscribersPath` with the file's directory and the file. Loading with an explicit
-path fails `INVALID_CONFIG` when the file is absent; the existing privacy checks
-(0700 directory, 0600 file, owned by the invoking user) apply unchanged.
-Configuration errors already refuse on guard-capable events and report on the rest.
+**Dispatcher.** `dispatchHook` receives `subscribersPath` (absolute or `null`). With
+a path, the configuration is loaded from that file and its directory directly; the
+environment-derived `paths()` is not consulted for it, so a relative or empty
+`HOME`, `XDG_CONFIG_HOME` or `XDG_STATE_HOME` in the hook environment cannot fail
+the policy phase. Loading with an explicit path fails `INVALID_CONFIG` when the file
+is absent; the existing privacy checks (0700 directory, 0600 file, owned by the
+invoking user, no symlink) apply unchanged. Configuration errors already refuse on
+guard-capable events and report on the rest.
+
+The registry still needs the state paths. They are resolved after the guard phase,
+immediately before publication; a failure there (including an unusable state base
+in the environment) is the existing registry diagnostic — observers are skipped and
+the reply is the guard result with exit 1 — never a refusal and never a lost
+denial. Without `--subscribers`, both configuration and state paths resolve from
+the environment as today, before the guard phase, and a failure refuses as today.
 
 **Installer.** `bindingsFor` is unchanged. `planHooks` takes `subscribersPath` and
 renders it into every relay entry, shell-quoted like the executable. Ownership
 classification recognizes `relay hook --harness H [--outer-ms N] [--subscribers
 FILE] EVENT` for either the quoted or unquoted executable form, so an entry from
-before this change is still relay-owned and replaced as a whole. The CLI passes the
-resolved absolute path of the `--subscribers` argument it already read. `Artifact`
-and `Evidence` shapes are unchanged; capability validation is unchanged because the
+before this change is still relay-owned and replaced as a whole. `Artifact` and
+`Evidence` shapes are unchanged; capability validation is unchanged because the
 same validated subscribers plan the budgets.
+
+The install reads the subscriber file through the same loader the hook uses, with
+the explicit path: the resolved absolute `--subscribers` argument must exist as a
+regular file, 0600, in a 0700 directory, both owned by the invoking user, and parse
+as valid configuration. Today the install only parses and validates the JSON, so a
+0644 file installs and then refuses every guard-capable invocation at runtime as
+`INVALID_CONFIG`. Any of these failures refuses the install before an artifact is
+written, naming the check that failed. The path written into the entries is the
+same resolved path that was checked.
 
 **Docs.** `docs/api.md` (subscriber configuration, budget source, CLI), `README.md`
 ("subscribers come only from `~/.config/relay/subscribers.json`"), and
@@ -125,12 +142,15 @@ same validated subscribers plan the budgets.
 * Unit: hook parsing accepts the flag in order and rejects relative, repeated, and
   misplaced forms; `dispatchHook` with an explicit absent file refuses on
   `PreToolUse`/`UserPromptSubmit`/`Stop` and reports on `SessionStart`; an explicit
-  present file loads regardless of `XDG_CONFIG_HOME`; the flagless default is
-  unchanged.
+  present file loads and its guard denies with a relative `XDG_CONFIG_HOME`, a
+  relative `HOME`, and an unusable state base, where the denial still reaches the
+  reply and the state failure is only a diagnostic; the flagless default is
+  unchanged, including its refusal on a bad environment.
 * Installer: generated Claude and Codex documents carry `--subscribers` with the
   quoted resolved path in every relay entry; pre-change relay entries (with and
   without `--outer-ms`) are recognized and replaced; the CLI install writes the
-  resolved path.
+  resolved path, and refuses before writing an artifact for a 0644 file, a 0755
+  directory, a symlink, a missing file, and invalid JSON, each named.
 * Real CLI: `relay hook --harness codex --subscribers <file> PreToolUse` run under
   `zsh -lc` with a foreign `XDG_CONFIG_HOME` still dispatches the configured guard.
   This is the regression the probe missed, reproduced without a harness.

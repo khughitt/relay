@@ -6,9 +6,9 @@ priority: 1
 size: m
 complexity: high
 process: planned
-owner: main
+owner: relay-a1510a
 created: 2026-09-18T20:19:44Z
-updated: 2026-09-18T20:55:01Z
+updated: 2026-09-18T21:09:13Z
 started: 2026-09-18T20:53:17Z
 depends: []
 tags: []
@@ -27,3 +27,6 @@ The 2026-09-18 ops relay-guard probe at relay b5fbde5 recorded Codex 0.155.0 sen
 - 2026-09-18T20:53:17Z (main): Scope grows beyond the encoder: the fix is how an installed hook entry locates relay's subscriber configuration and whether an absent configured file may be treated as no subscribers. Writing a spec for review before implementation.
 - 2026-09-18T20:55:01Z (relay-a1510a): parked (waiting on user, review): Review docs/specs/2026-09-18-explicit-subscriber-path.md; on approval write the implementation plan, then implement in .worktrees/relay-a1510a
   provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-18T21:09:13Z (relay-a1510a): resumed
+  provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-18T21:09:13Z (relay-a1510a): Spec revised after review: install validates the subscriber file with the runtime loader (ownership, mode, type, not JSON alone); an explicit --subscribers path bypasses paths() so an unusable HOME/XDG base cannot fail the policy phase; state paths resolve after the guards and fail only as a registry diagnostic.
