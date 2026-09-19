@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod } from 'node:fs/promises';
-import { validateSubscribers, loadSubscribers, matchSubscribers, matchReconcile, budgetFor, checkBudget, RECONCILE } from '../src/subscribers.js';
+import { chmod, symlink } from 'node:fs/promises';
+import { join } from 'node:path';
+import { validateSubscribers, loadSubscribers, loadSubscribersFrom, matchSubscribers, matchReconcile, budgetFor, checkBudget, RECONCILE } from '../src/subscribers.js';
 import { normalizeEvent, adapterFor } from '../src/adapters/index.js';
 import { tempPaths, writeSubscribers } from './helpers/fixture.js';
 
@@ -50,6 +51,30 @@ test('loadSubscribers: absent is empty, unsafe or corrupt is INVALID_CONFIG', as
   await assert.rejects(loadSubscribers(p), { code: 'INVALID_CONFIG' });
   await writeSubscribers(p, [], { text: '{"schema":1,"subscribers":[{"name":"x"}]}' });
   await assert.rejects(loadSubscribers(p), { code: 'INVALID_CONFIG' });
+});
+
+test('loadSubscribersFrom reads an explicit file and treats absence as INVALID_CONFIG', async (t) => {
+  const p = await tempPaths(t);
+  await assert.rejects(loadSubscribersFrom(p.subscribersPath), { code: 'INVALID_CONFIG', message: /does not exist/ });
+  assert.deepEqual(await loadSubscribers(p), { schema: 1, subscribers: [] });
+  await writeSubscribers(p, [guard()]);
+  const config = await loadSubscribersFrom(p.subscribersPath);
+  assert.equal(config.subscribers[0].name, 'guard');
+  for (const bad of ['relative/subscribers.json', '', null, 7]) await assert.rejects(loadSubscribersFrom(bad), { code: 'INVALID_CONFIG', message: /absolute/ });
+});
+
+test('loadSubscribersFrom applies the runtime privacy checks and names them', async (t) => {
+  const p = await tempPaths(t);
+  await writeSubscribers(p, [guard()]);
+  await chmod(p.subscribersPath, 0o644);
+  await assert.rejects(loadSubscribersFrom(p.subscribersPath), { code: 'INVALID_CONFIG', message: /0600 regular file in a 0700 directory/ });
+  await chmod(p.subscribersPath, 0o600); await chmod(p.configDir, 0o755);
+  await assert.rejects(loadSubscribersFrom(p.subscribersPath), { code: 'INVALID_CONFIG' });
+  await chmod(p.configDir, 0o700);
+  const link = join(p.configDir, 'link.json'); await symlink(p.subscribersPath, link);
+  await assert.rejects(loadSubscribersFrom(link), { code: 'INVALID_CONFIG' });
+  await writeSubscribers(p, [], { text: '{broken' });
+  await assert.rejects(loadSubscribersFrom(p.subscribersPath), { code: 'INVALID_CONFIG', message: /JSON/ });
 });
 
 test('matching honors kind, harness and tool filters in configuration order', () => {

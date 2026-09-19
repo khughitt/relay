@@ -1,5 +1,5 @@
 import * as fs from 'node:fs/promises';
-import { isAbsolute } from 'node:path';
+import { dirname, isAbsolute } from 'node:path';
 import { relayError, KINDS } from './protocol.js';
 import { adapterFor } from './adapters/index.js';
 import { checkPrivate } from './bus/store.js';
@@ -50,15 +50,28 @@ export function validateSubscribers(v) {
   return { schema: 1, subscribers };
 }
 
-export async function loadSubscribers(paths, { io = fs } = {}) {
+// One reader for both loaders. The default location may be absent, which means no
+// subscribers; an explicitly named file was written by an installer and must exist.
+async function readSubscribers(paths, { io, required }) {
   let present;
   try { present = await checkPrivate(paths.configDir, true, { io }) && await checkPrivate(paths.subscribersPath, false, { io }); }
-  catch (cause) { fail('subscriber config must be a privately owned 0600 file in a 0700 directory', cause); }
-  if (!present) return { schema: 1, subscribers: [] };
+  catch (cause) { fail(`subscriber config ${paths.subscribersPath} must be a privately owned 0600 regular file in a 0700 directory`, cause); }
+  if (!present) {
+    if (required) fail(`subscriber config ${paths.subscribersPath} does not exist`);
+    return { schema: 1, subscribers: [] };
+  }
   let value;
   try { value = JSON.parse(await io.readFile(paths.subscribersPath, 'utf8')); }
   catch (cause) { fail('cannot read subscriber config JSON', cause); }
   return validateSubscribers(value);
+}
+
+export const loadSubscribers = (paths, { io = fs } = {}) => readSubscribers(paths, { io, required: false });
+
+// async so that a bad path rejects like every other failure instead of throwing synchronously.
+export async function loadSubscribersFrom(file, { io = fs } = {}) {
+  if (typeof file !== 'string' || !isAbsolute(file)) fail('subscriber config path must be absolute');
+  return readSubscribers({ configDir: dirname(file), subscribersPath: file }, { io, required: true });
 }
 
 const admits = (subscriber, harness) => harness === null || subscriber.harnesses === null || subscriber.harnesses.includes(harness);
