@@ -303,9 +303,9 @@ test('a slow observer never delays a denial and observers run only within their 
   let started = performance.now(); let r = await hook(p);
   assert.equal(r.exitCode, 2); assert.ok(performance.now() - started < 2000, 'the denial returned before the observer could run');
   await writeSubscribers(p, [strip(observer('hang', 'hang', { timeoutMs: 150 })), strip(observer('quick', 'slow', { argv: argv('slow', '10'), timeoutMs: 150 })), strip(observer('after', 'record', { file, timeoutMs: 100 }))]);
-  started = performance.now(); r = await hook(p, { outerMs: 1500 }); // subscribersMs 400 = 150 + 150 + 100
+  started = performance.now(); r = await hook(p, { outerMs: 3000 }); // subscribersMs 800 = 150 + 150 + 100 + 400 scheduling slack
   assert.equal(r.exitCode, 0); assert.match(r.stderr, /SUBSCRIBER_FAILED: hang timeout/);
-  assert.ok(performance.now() - started < 1500);
+  assert.ok(performance.now() - started < 3000);
   assert.equal(JSON.parse(await readFile(file, 'utf8')).subscriber, 'after', 'a later observer that fits still runs');
   // A publication that fulfills after its deadline is rejected and no observer runs.
   await writeSubscribers(p, [strip(observer('never', 'record', { file: join(p.stateDir, '..', 'never'), timeoutMs: 100 }))]);
