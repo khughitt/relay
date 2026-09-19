@@ -4,7 +4,7 @@ import { parseReply, CONTEXT_LIMIT } from './adapters/reply.js';
 import { paths as defaultPaths } from './bus/paths.js';
 import { applyEvent, reapRegistry } from './bus/transaction.js';
 import { relayError } from './protocol.js';
-import { loadSubscribers, matchSubscribers, checkBudget, budgetFor, RECONCILE } from './subscribers.js';
+import { loadSubscribers, loadSubscribersFrom, matchSubscribers, checkBudget, budgetFor, RECONCILE } from './subscribers.js';
 import { runChild } from './child.js';
 
 const NONE = Object.freeze({ refuse: false, context: false });
@@ -74,9 +74,9 @@ async function runGuards(guards, event, capability, { clock, workDeadline, run }
   return { denial, error, context };
 }
 
-export async function dispatchHook({ harness, nativeEvent, input, outerMs }, deps = {}) {
+export async function dispatchHook({ harness, nativeEvent, input, outerMs, subscribersPath = null }, deps = {}) {
   const clock = deps.clock ?? performance.now.bind(performance), start = clock();
-  const { loadConfig = loadSubscribers, run = runChild, apply = applyEvent, readInput = readNativeInput, applyOptions = {} } = deps;
+  const { loadConfig = loadSubscribers, loadConfigFrom = loadSubscribersFrom, run = runChild, apply = applyEvent, readInput = readNativeInput, applyOptions = {} } = deps;
   const failure = (error) => ({ stdout: '', stderr: `${describe(error)}\n`, exitCode: 1 });
   let adapter, budget;
   try { adapter = adapterFor(harness); adapter.stateForEvent(nativeEvent); budget = budgetFor({ harness, nativeEvent, outerMs }); }
@@ -87,10 +87,13 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs }, dep
   // where one exists; elsewhere it is reported because no refusal channel can be manufactured.
   const abort = (error) => capability.refuse ? refuse(refusalReason(error)) : failure(error);
   const workDeadline = start + budget.totalMs - budget.reserveMs, diagnostics = [];
-  let paths, event, guards, observers;
+  // An installed entry names its file, so the hook environment decides nothing about
+  // policy. State paths are only needed for publication, where failure is diagnostic.
+  const statePaths = () => deps.paths ?? defaultPaths(deps.env ?? process.env);
+  let paths = null, event, guards, observers;
   try {
-    paths = deps.paths ?? defaultPaths(deps.env ?? process.env);
-    const config = await bounded(() => loadConfig(paths), { clock, deadline: workDeadline }, 'subscriber configuration did not load before the deadline');
+    const load = subscribersPath === null ? () => loadConfig(paths = statePaths()) : () => loadConfigFrom(subscribersPath);
+    const config = await bounded(load, { clock, deadline: workDeadline }, 'subscriber configuration did not load before the deadline');
     checkBudget(config, budget, { harness, kind: adapter.events[nativeEvent].kind });
     const raw = await readInput(input, { clock, deadline: Math.min(workDeadline, start + budget.inputMs) });
     event = normalizeEvent(harness, nativeEvent, raw);
@@ -103,6 +106,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs }, dep
   if (error) return abort(error);
   let result = null;
   try {
+    paths ??= statePaths();
     const deadline = Math.min(workDeadline, clock() + budget.registryMs);
     result = await bounded(() => apply(event, { ...applyOptions, paths, clock, deadline }), { clock, deadline }, 'registry publication did not finish before the deadline');
     for (const diagnostic of result.diagnostics) diagnostics.push(`${diagnostic.code}: ${diagnostic.message}${diagnostic.agentId ? ` (${diagnostic.agentId})` : ''}`);

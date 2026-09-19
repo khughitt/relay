@@ -23,8 +23,8 @@ const observer = (name, mode, over = {}) => ({ name, role: 'observer', kinds: ['
 const strip = (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined));
 const payload = (over = {}) => JSON.stringify({ session_id: 'sess', cwd: '/repo', tool_name: 'Bash', tool_input: { command: 'echo PRIVATE_COMMAND' }, ...over });
 const local = { resolveAgentPid: () => process.pid, gitContext: async () => ({ remote: null, repoRoot: null }) };
-async function hook(p, { harness = 'claude-code', nativeEvent = 'PreToolUse', body = payload(), outerMs, deps = {} } = {}) {
-  return dispatchHook({ harness, nativeEvent, input: Readable.from([Buffer.from(body)]), outerMs }, { paths: p, applyOptions: local, ...deps });
+async function hook(p, { harness = 'claude-code', nativeEvent = 'PreToolUse', body = payload(), outerMs, subscribersPath, deps = {} } = {}) {
+  return dispatchHook({ harness, nativeEvent, input: Readable.from([Buffer.from(body)]), outerMs, subscribersPath }, { paths: p, applyOptions: local, ...deps });
 }
 const denyOut = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":';
 const absent = async (path) => access(path).then(() => false, () => true);
@@ -202,6 +202,30 @@ test('path resolution failures are refusals, not startup errors', async (t) => {
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /relay refused: INVALID_INPUT: expected absolute directory/);
   r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'SessionStart', input: Readable.from(['{"session_id":"s","cwd":"/repo"}']) }, { env, applyOptions: local });
   assert.deepEqual(r, { stdout: '', stderr: 'INVALID_INPUT: expected absolute directory\n', exitCode: 1 });
+});
+
+test('an explicit subscriber path is loaded from that file, not the environment', async (t) => {
+  const p = await tempPaths(t), other = await tempPaths(t);
+  await writeSubscribers(other, [guard('g', 'deny')]);
+  const r = await hook(p, { subscribersPath: other.subscribersPath });
+  assert.equal(r.exitCode, 2); assert.ok(r.stdout.startsWith(denyOut));
+  const absent = await hook(p, { subscribersPath: p.subscribersPath });
+  assert.equal(absent.exitCode, 2); assert.match(absent.stdout, /relay refused: INVALID_CONFIG: subscriber config .* does not exist/);
+  const start = await hook(p, { nativeEvent: 'SessionStart', body: JSON.stringify({ session_id: 'sess', cwd: '/repo' }), subscribersPath: p.subscribersPath });
+  assert.deepEqual([start.exitCode, start.stdout], [1, '']); assert.match(start.stderr, /INVALID_CONFIG/);
+});
+
+test('an unusable environment cannot reach the policy phase when the path is explicit', async (t) => {
+  const p = await tempPaths(t);
+  await writeSubscribers(p, [guard('g', 'deny'), guard('h', 'context')]);
+  const bad = { HOME: 'relative', XDG_CONFIG_HOME: 'relative', XDG_STATE_HOME: 'relative' };
+  const denied = await hook(p, { subscribersPath: p.subscribersPath, deps: { paths: undefined, env: bad } });
+  assert.equal(denied.exitCode, 2); assert.ok(denied.stdout.startsWith(denyOut));
+  await writeSubscribers(p, [guard('h', 'context')]);
+  const allowed = await hook(p, { subscribersPath: p.subscribersPath, deps: { paths: undefined, env: bad } });
+  assert.equal(allowed.exitCode, 1); assert.match(allowed.stdout, /additionalContext/); assert.match(allowed.stderr, /^registry: INVALID_INPUT/m);
+  const flagless = await hook(p, { deps: { paths: undefined, env: bad } });
+  assert.equal(flagless.exitCode, 2); assert.match(flagless.stdout, /relay refused: INVALID_INPUT/);
 });
 
 test('slow configuration loading and publication end at the deadline', async (t) => {
