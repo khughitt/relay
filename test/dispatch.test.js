@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import { readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -202,6 +203,19 @@ test('path resolution failures are refusals, not startup errors', async (t) => {
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /relay refused: INVALID_INPUT: expected absolute directory/);
   r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'SessionStart', input: Readable.from(['{"session_id":"s","cwd":"/repo"}']) }, { env, applyOptions: local });
   assert.deepEqual(r, { stdout: '', stderr: 'INVALID_INPUT: expected absolute directory\n', exitCode: 1 });
+});
+
+test('a flagless invalid HOME does not retain the configuration deadline timer', async () => {
+  const script = `import { dispatchHook } from ${JSON.stringify(new URL('../src/dispatch.js', import.meta.url).href)};
+import { Readable } from 'node:stream';
+const result = await dispatchHook({ harness: 'claude-code', nativeEvent: 'PreToolUse', input: Readable.from(['{}']) }, { env: { HOME: 'relative' } });
+process.exitCode = result.exitCode;`;
+  const child = spawn(process.execPath, ['--input-type=module', '--eval', script], { stdio: 'ignore' });
+  const code = await new Promise((resolve) => {
+    const timer = setTimeout(() => child.kill(), 1000);
+    child.once('exit', (status) => { clearTimeout(timer); resolve(status); });
+  });
+  assert.equal(code, 2);
 });
 
 test('an explicit subscriber path is loaded from that file, not the environment', async (t) => {

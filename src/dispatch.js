@@ -92,7 +92,8 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   const statePaths = () => deps.paths ?? defaultPaths(deps.env ?? process.env);
   let paths = null, event, guards, observers;
   try {
-    const load = subscribersPath === null ? () => loadConfig(paths = statePaths()) : () => loadConfigFrom(subscribersPath);
+    if (subscribersPath === null) paths = statePaths();
+    const load = subscribersPath === null ? () => loadConfig(paths) : () => loadConfigFrom(subscribersPath);
     const config = await bounded(load, { clock, deadline: workDeadline }, 'subscriber configuration did not load before the deadline');
     checkBudget(config, budget, { harness, kind: adapter.events[nativeEvent].kind });
     const raw = await readInput(input, { clock, deadline: Math.min(workDeadline, start + budget.inputMs) });

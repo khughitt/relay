@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** implemented and verified, 2026-09-18 (217 tests pass on Node 26.5.0 and Node 22.23.2).
+**Status:** implemented and verified, 2026-09-18 (218 tests pass on Node 26.5.0; the Node 22.23.2 gate passed before the timer-regression follow-up).
 
 **Goal:** Installed relay hook entries name their subscriber file with `--subscribers FILE`, that file is validated at install time exactly as at runtime, and an explicit path is loaded without consulting the hook process environment.
 
@@ -45,7 +45,7 @@
 - Consumes: `checkPrivate(path, directory, { io })` from `src/bus/store.js` (returns `false` on ENOENT, throws `IO_ERROR` on unsafe mode/owner/type/symlink), `validateSubscribers(value)`.
 - Produces: `loadSubscribersFrom(file, { io = fs } = {}) → Promise<{ schema: 1, subscribers: Subscriber[] }>`; throws `INVALID_CONFIG` when `file` is not an absolute string, does not exist, is unsafe, unreadable or invalid. `loadSubscribers(paths, { io })` keeps its signature and behavior.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `test/subscribers.test.js` (the file already imports `chmod`, `tempPaths`, `writeSubscribers`; add `loadSubscribersFrom` to the import from `../src/subscribers.js` and `import { join } from 'node:path'; import { symlink } from 'node:fs/promises';`):
 
@@ -75,12 +75,12 @@ test('loadSubscribersFrom applies the runtime privacy checks and names them', as
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `node --test test/subscribers.test.js`
 Expected: the two new tests fail (`loadSubscribersFrom` is not exported).
 
-- [ ] **Step 3: Implement the shared reader**
+- [x] **Step 3: Implement the shared reader**
 
 Replace `loadSubscribers` in `src/subscribers.js` (add `dirname` to the `node:path` import):
 
@@ -110,12 +110,12 @@ export async function loadSubscribersFrom(file, { io = fs } = {}) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test test/subscribers.test.js test/dispatch.test.js`
 Expected: all pass (the existing "privately owned" assertion in the dispatch suite, if any, must be updated to the new message; search for `privately owned 0600 file` and change it to `0600 regular file`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 tasks check
@@ -135,7 +135,7 @@ git commit -m "feat: load subscriber configuration from an explicit path"
 - Consumes: `loadSubscribersFrom` (Task 1).
 - Produces: `dispatchHook({ harness, nativeEvent, input, outerMs, subscribersPath = null }, deps)`; `deps.loadConfigFrom` (default `loadSubscribersFrom`) beside the existing `deps.loadConfig`. With `subscribersPath`, `deps.paths ?? defaultPaths(env)` is evaluated only at the registry phase.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `test/dispatch.test.js` (helpers `hook`, `guard`, `payload`, `denyOut`, `tempPaths`, `writeSubscribers`, `readSnapshot`, `local` already exist there; `hook` passes `deps` through, so pass `subscribersPath` inside a new `request` option — first extend the helper):
 
@@ -179,12 +179,12 @@ test('an unusable environment cannot reach the policy phase when the path is exp
 
 `guard('h', 'context')` uses the existing subscriber fixture's `context` mode (see `test/fixtures/subscriber.js`); `deps.paths: undefined` removes the helper's temp paths so `defaultPaths(env)` runs.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `node --test test/dispatch.test.js`
 Expected: the two new tests fail (`subscribersPath` is ignored; the second refuses with `INVALID_INPUT` on the denial case).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/dispatch.js`, import `loadSubscribersFrom` beside `loadSubscribers`, and change `dispatchHook`:
 
@@ -234,12 +234,12 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
 
 The only behavioral changes are the loader choice and where `statePaths()` runs; `reconcile` is untouched.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test test/dispatch.test.js`
 Expected: all pass, including the existing `path resolution failures are refusals, not startup errors` (flagless behavior is unchanged).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 tasks check
@@ -259,7 +259,7 @@ git commit -m "feat: dispatch from an explicit subscriber path without the envir
 - Consumes: `dispatchHook` with `subscribersPath` (Task 2).
 - Produces: `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`; `parse` returns `{ harness, outerMs?, subscribersPath?, nativeEvent }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `test/cli.test.js`, extend the usage matrix inside the `usage:` test with these argument lists (same loop, same assertions):
 
@@ -294,12 +294,12 @@ test('an installed entry keeps its guard when the hook environment loses the con
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `node --test test/cli.test.js`
 Expected: the usage test fails on the help pattern and on `['hook','--harness','codex','--subscribers','relative.json','PreToolUse']` (currently `USAGE` for the wrong reason is still exit 1 — the failing assertions are the help text and the new regression test, which gets exit 1 `USAGE` instead of a denial).
 
-- [ ] **Step 3: Implement the parser**
+- [x] **Step 3: Implement the parser**
 
 In `bin/relay.js`, add `isAbsolute` to the `node:path` import, set
 
@@ -328,12 +328,12 @@ and replace the hook branch of `parse`:
 
 Update the comment above `parse` to `// Strict flag parsing: --harness NAME (hook only), --outer-ms N, --subscribers FILE, then exactly one EVENT for hook.`
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test test/cli.test.js test/pack.test.js`
 Expected: all pass (`pack` proves `relay hook` still imports nothing from `node_modules`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 tasks check
@@ -353,7 +353,7 @@ git commit -m "feat: accept --subscribers FILE on relay hook"
 - Consumes: `loadSubscribersFrom` (Task 1), `shellQuote`, `timeoutSeconds` (existing).
 - Produces: `planHooks({ text, harness, relayBin, subscribersPath, retireFamiliar })`, `planClaudeCode({ ..., subscribersPath })`, `planCodex({ ..., subscribersPath })`; every relay entry command is `'<relay>' hook --harness H --outer-ms N --subscribers '<file>' EVENT`.
 
-- [ ] **Step 1: Write the failing planner tests**
+- [x] **Step 1: Write the failing planner tests**
 
 In `test/install-hooks.test.js`, add `const subscribers = '/home/me/.config/relay/subscribers.json';` after `relay`, pass `subscribersPath: subscribers` to every existing `planHooks` call, and update the two assertions that expect the budget and event to be adjacent: in the first test, `assert.match(text, /--outer-ms 600000 PreToolUse/);` becomes `assert.match(text, /--outer-ms 600000 --subscribers '\/home\/me\/\.config\/relay\/subscribers\.json' PreToolUse/);`, and in `planner replaces a relay entry whose timeout drifted from its command`, `assert.match(entry.hooks[0].command, /--outer-ms 600000 PreToolUse$/);` becomes `assert.match(entry.hooks[0].command, /--outer-ms 600000 --subscribers '[^']*' PreToolUse$/);`. Then append:
 
@@ -393,12 +393,12 @@ test('a second install recognizes its own entries when the paths contain apostro
 
 In `test/install-claude-code.test.js` and `test/install-codex.test.js`, pass `subscribersPath: '/home/me/.config/relay/subscribers.json'` to the existing calls and assert `assert.match(result.changes[0].after, /--subscribers '\/home\/me\/\.config\/relay\/subscribers\.json'/);`; add to each `assert.throws(() => plan…({ …same args without subscribersPath… }), /subscriber/);`.
 
-- [ ] **Step 2: Run the planner tests to verify they fail**
+- [x] **Step 2: Run the planner tests to verify they fail**
 
 Run: `node --test test/install-hooks.test.js test/install-claude-code.test.js test/install-codex.test.js`
 Expected: the new assertions fail (no `--subscribers` in the rendered commands; the absolute-path throws are missing).
 
-- [ ] **Step 3: Implement the planner**
+- [x] **Step 3: Implement the planner**
 
 In `src/install/hooks.js`:
 
@@ -417,12 +417,12 @@ and in `planHooks({ text, harness, relayBin, subscribersPath, retireFamiliar = f
 
 In `src/install/claude-code.js` and `src/install/codex.js`, accept `subscribersPath` in the destructured argument, add `|| !isAbsolute(subscribersPath ?? '')` to the existing guard condition with the message extended `… and subscriber path must be explicit`, and pass `subscribersPath` into `planHooks`.
 
-- [ ] **Step 4: Run the planner tests to verify they pass**
+- [x] **Step 4: Run the planner tests to verify they pass**
 
 Run: `node --test test/install-hooks.test.js test/install-claude-code.test.js test/install-codex.test.js`
 Expected: all pass.
 
-- [ ] **Step 5: Write the failing install CLI tests**
+- [x] **Step 5: Write the failing install CLI tests**
 
 Append to `test/install-cli.test.js` (add `import { mkdtemp, mkdir, writeFile, chmod, rm, symlink } from 'node:fs/promises'; import { tmpdir } from 'node:os'; import { join } from 'node:path';`):
 
@@ -464,12 +464,12 @@ test('install refuses a subscriber file the hook would refuse at runtime', async
 });
 ```
 
-- [ ] **Step 6: Run the install CLI tests to verify they fail**
+- [x] **Step 6: Run the install CLI tests to verify they fail**
 
 Run: `node --test test/install-cli.test.js`
 Expected: the first new test fails (no `--subscribers` in the artifact; relative path succeeds today); the second fails on the 0644 case (install accepts it today).
 
-- [ ] **Step 7: Implement the install branch**
+- [x] **Step 7: Implement the install branch**
 
 In `bin/relay.js`, replace line 62 with:
 
@@ -480,12 +480,12 @@ In `bin/relay.js`, replace line 62 with:
 
 A relative `--subscribers` is refused by the loader (`INVALID_CONFIG: subscriber config path must be absolute`), the same rule `--target` already follows through the planners; the path written into the entries is the path that was checked, byte for byte. Then pass `subscribersPath` into `planClaudeCode` and `planCodex`; `planOpenCode` is unchanged (its `subscribers` object still arrives from the loader).
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run: `node --test test/install-cli.test.js test/cli.test.js`
 Expected: all pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 tasks check
