@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft for review, 2026-09-18.
+**Status:** implemented and verified, 2026-09-18 (217 tests pass on Node 26.5.0 and Node 22.23.2).
 
 **Goal:** Installed relay hook entries name their subscriber file with `--subscribers FILE`, that file is validated at install time exactly as at runtime, and an explicit path is loaded without consulting the hook process environment.
 
@@ -500,7 +500,7 @@ git commit -m "feat: name the subscriber file in installed hook entries"
 **Files:**
 - Modify: `docs/api.md:257-259` (subscriber configuration), `docs/api.md:301-303` (budget source), `docs/api.md:397-398` (CLI), `README.md:28-29`, `docs/runbooks/hook-install-rollback.md`, `docs/specs/2026-09-18-explicit-subscriber-path.md` (status), this plan (status).
 
-- [ ] **Step 1: Update `docs/api.md`**
+- [x] **Step 1: Update `docs/api.md`**
 
 Subscriber configuration paragraph:
 
@@ -518,18 +518,18 @@ Budget source: `relay hook --harness NAME [--outer-ms H] [--subscribers FILE] EV
 
 CLI list: `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`.
 
-- [ ] **Step 2: Update `README.md` and the runbook**
+- [x] **Step 2: Update `README.md` and the runbook**
 
 README line 28–29: "subscribers come from `~/.config/relay/subscribers.json` for a direct `relay hook`, and from the `--subscribers FILE` an installed entry names."
 
 Runbook, after the timeout paragraph: "Every installed entry also names the subscriber file (`--subscribers '<absolute path>'`) so the harness's hook shell cannot redirect relay to another configuration; the install refuses a file that is not a 0600 regular file in a 0700 directory owned by you, or that is missing or invalid, before writing an artifact. Moving the subscriber file requires a new install."
 
-- [ ] **Step 3: Gate**
+- [x] **Step 3: Gate**
 
 Run: `just gate` and `PATH=$HOME/.nvm/versions/node/v22.23.2/bin:$PATH just gate`; then `git diff --check` and `tasks check`.
 Expected: both gates pass with zero failures; no whitespace errors; no task findings.
 
-- [ ] **Step 4: Status and closure**
+- [x] **Step 4: Status and closure**
 
 Set the spec status to `implemented and verified, <date>` with the test counts from Step 3, and this plan's status likewise. Then:
 

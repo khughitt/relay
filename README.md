@@ -25,8 +25,9 @@ State uses RELAY_STATE_DIR, otherwise XDG_STATE_HOME/relay or the home directory
 .local/state/relay. Supply a privately owned 0700 state directory; existing 0755
 is rejected, never silently changed.
 
-R2 adds `relay hook` and reconciling `relay reap`; subscribers come only from
-`~/.config/relay/subscribers.json`. **No live hook is installed by this package.**
+R2 adds `relay hook` and reconciling `relay reap`; subscribers come from
+`~/.config/relay/subscribers.json` for a direct `relay hook`, and from the
+`--subscribers FILE` an installed entry names. **No live hook is installed by this package.**
 The OpenCode plugin must still not be enabled until `relay-baa816` and the
 `ops-c8e4d1` probe pass. There is no installer, remote publication or consumer
 migration in R2.

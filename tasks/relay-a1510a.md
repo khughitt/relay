@@ -1,15 +1,16 @@
 ---
 id: relay-a1510a
 title: Honor Codex PreToolUse context and denial replies
-status: doing
+status: done
 priority: 1
 size: m
 complexity: high
 process: planned
 owner: relay-a1510a
 created: 2026-09-18T20:19:44Z
-updated: 2026-09-18T21:29:00Z
+updated: 2026-09-19T00:55:32Z
 started: 2026-09-18T20:53:17Z
+completed: 2026-09-19T00:55:32Z
 depends: []
 tags: []
 source: ops-c8e4d1
@@ -42,3 +43,5 @@ The 2026-09-18 ops relay-guard probe at relay b5fbde5 recorded Codex 0.155.0 sen
   provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-18T21:29:00Z (relay-a1510a): parked (waiting on user, review): Review the revised docs/plans/2026-09-18-explicit-subscriber-path.md; on approval execute Task 1 (relay-b22e9c) in .worktrees/relay-a1510a
   provenance: {"harness_session":"claude-code:e1c40f9a-38b2-418e-b944-3a6ae1e52124","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-19T00:55:32Z (relay-a1510a): done
+- 2026-09-19T00:55:32Z (relay-a1510a): Codex encoding verified correct against codex-cli 0.155.0; the live failure was relay resolving its subscriber file from a hook environment that Codex's login shell rewrote. Installed entries now carry --subscribers <file>, loaded without the environment; an explicit absent file refuses; install validates the file with the runtime checks.

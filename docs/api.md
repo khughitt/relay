@@ -256,7 +256,11 @@ this plan only implements and tests the encoders against these fixtures.
 
 **Subscriber configuration** (`$XDG_CONFIG_HOME/relay/subscribers.json`, 0700 dir,
 0600 file, owned by the invoking user; an absent file means no subscribers,
-anything unreadable, unsafe or invalid is `INVALID_CONFIG`):
+anything unreadable, unsafe or invalid is `INVALID_CONFIG`). An installed hook
+entry names its file with `--subscribers FILE` instead: that file is loaded
+directly, the hook environment is not consulted for it, and an absent file is
+`INVALID_CONFIG` (a native refusal on guard-capable events). The installer reads
+the file through the same loader, so a file the hook would refuse never installs.
 
 ```json
 {
@@ -298,8 +302,9 @@ errors.
 
 ### Budget
 
-**Budget source.** `relay hook --harness NAME [--outer-ms H] EVENT`; the installer
-(`relay-baa816`) passes the same `H` it writes as the harness `timeout`. Without
+**Budget source.** `relay hook --harness NAME [--outer-ms H] [--subscribers FILE] EVENT`; the installer
+(`relay-baa816`) passes the `H` it writes as the harness `timeout` and the absolute
+subscriber path it validated. Without
 the flag relay uses the documented default for that harness/event. Relay never
 plans beyond 60 s regardless of `H`, rejects `H` above a documented cap (Codex
 SessionEnd 3000, Claude SessionEnd 60000) and below 500 ms, and derives one
@@ -395,7 +400,7 @@ Callback and cleanup failures are preserved together in AggregateError.
 
 The four implemented commands are `relay --help`, `relay list --json`,
 `relay reap [--outer-ms N]`, and
-`relay hook --harness NAME [--outer-ms N] EVENT`. List emits one JSON Listing; on
+`relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`. List emits one JSON Listing; on
 failure it exits 1 with one stdout envelope:
 
 ```json

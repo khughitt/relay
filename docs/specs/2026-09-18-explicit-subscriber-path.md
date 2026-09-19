@@ -1,6 +1,6 @@
 # Explicit subscriber configuration in installed hook entries
 
-Status: revised after review, 2026-09-18 (install-time privacy checks; explicit path bypasses environment resolution).
+Status: implemented and verified, 2026-09-18 (217 tests pass on Node 26.5.0 and Node 22.23.2; install-time privacy checks; explicit path bypasses environment resolution).
 Task: `relay-a1510a`.
 Parent design: ops `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`);
 installers plan `docs/plans/2026-09-17-installers.md`.
