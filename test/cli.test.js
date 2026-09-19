@@ -30,10 +30,11 @@ test('CLI listing retains dead unknown live, reap removes only dead',async t=>{
   const reaped=run(p,['reap']);assert.equal(reaped.status,0);assert.equal(reaped.stdout,'Reaped 1 agent(s).\n');assert.match(reaped.stderr,/PROCESS_UNAVAILABLE/);
   const again=run(p,['reap']);assert.equal(again.stdout,'Reaped 0 agent(s).\n');
 });
-test('usage: help, list --json, reap [--outer-ms N], hook --harness NAME [--outer-ms N] EVENT', async t => {
-  const p=await tempState(t);assert.equal(run(p,['--help']).status,0);assert.match(run(p,['--help']).stdout,/hook --harness NAME/);
+test('usage: help, list --json, reap [--outer-ms N], hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT', async t => {
+  const p=await tempState(t);assert.equal(run(p,['--help']).status,0);assert.match(run(p,['--help']).stdout,/hook --harness NAME \[--outer-ms N\] \[--subscribers FILE\] EVENT/);
   for(const args of [[],['list'],['list','--json','extra'],['reap','extra'],['reap','--outer-ms'],['reap','--outer-ms','abc'],['--help','extra'],['unknown'],
-    ['hook'],['hook','PreToolUse'],['hook','--harness','claude-code'],['hook','PreToolUse','--harness','codex'],['hook','--harness','codex','PreToolUse','--outer-ms','1000'],['hook','--harness','codex','--unknown'],['hook','--harness','claude-code','PreToolUse','extra'],['hook','--harness','claude-code','--outer-ms','abc','PreToolUse'],['hook','--harness','claude-code','--outer-ms','100','PreToolUse']]) {
+    ['hook'],['hook','PreToolUse'],['hook','--harness','claude-code'],['hook','PreToolUse','--harness','codex'],['hook','--harness','codex','PreToolUse','--outer-ms','1000'],['hook','--harness','codex','--unknown'],['hook','--harness','claude-code','PreToolUse','extra'],['hook','--harness','claude-code','--outer-ms','abc','PreToolUse'],['hook','--harness','claude-code','--outer-ms','100','PreToolUse'],
+    ['hook','--harness','codex','--subscribers','relative.json','PreToolUse'],['hook','--harness','codex','--subscribers','PreToolUse'],['hook','--harness','codex','--subscribers','/a.json','--outer-ms','1000','PreToolUse'],['hook','--harness','codex','--subscribers','/a.json','--subscribers','/b.json','PreToolUse'],['hook','--harness','codex','PreToolUse','--subscribers','/a.json']]) {
     const r=run(p,args);assert.equal(r.status,1,args.join(' '));assert.match(r.stderr||r.stdout,/USAGE/,args.join(' '));
     if(!(args[0]==='list'&&args.includes('--json')))assert.equal(r.stdout,'',args.join(' ')); // list --json reports on stdout by design
   }
@@ -54,6 +55,22 @@ test('hook denial through the real CLI is JSON on stdout, reason on stderr, exit
   const ok=hookRun(p,['--harness','codex','UserPromptSubmit'],JSON.stringify({session_id:'sess',cwd:process.cwd()}));assert.deepEqual([ok.status,ok.stdout],[0,'']);
   assert.match(ok.stderr,/^(PROCESS_UNAVAILABLE: agent process identity unavailable \(codex:sess\)\n)?$/);
   const reap=run(p,['reap']);assert.equal(reap.status,0);assert.equal(reap.stdout,'Reaped 0 agent(s).\n');
+});
+test('an installed entry keeps its guard when the hook environment loses the config base', async t => {
+  const base=await tempState(t),p=layout(base);
+  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code','codex'],argv:[process.execPath,fixture,'deny'],timeoutMs:2000}]);
+  const file=join(p.configHome,'relay','subscribers.json');
+  // The regression the Codex probe missed: a login shell rewrote XDG_CONFIG_HOME before relay ran.
+  for(const configHome of [join(base.stateDir,'elsewhere'),'relative']) {
+    const r=hookRun({...p,configHome},['--harness','codex','--subscribers',file,'PreToolUse'],body);
+    assert.equal(r.status,2,configHome);assert.match(r.stdout,/"permissionDecision":"deny","permissionDecisionReason":"denied by fixture"/);assert.equal(r.stderr,'denied by fixture\n');
+  }
+  // Without the flag the lost base means no configuration, exactly as before.
+  const lost=hookRun({...p,configHome:join(base.stateDir,'elsewhere')},['--harness','codex','PreToolUse'],body);
+  assert.equal(lost.status,0);assert.equal(lost.stdout,'');
+  // The flag names a file that must exist.
+  const missing=hookRun(p,['--harness','codex','--subscribers',join(base.stateDir,'none.json'),'PreToolUse'],body);
+  assert.equal(missing.status,2);assert.match(missing.stdout,/INVALID_CONFIG: subscriber config .* does not exist/);
 });
 test('survival limitation: the internal deadline refuses; an outer kill, missing node or startup error cannot',async t=>{
   const base=await tempState(t),p=layout(base);

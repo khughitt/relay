@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import { realpathSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { listAgents } from '../src/index.js';
 import { dispatchHook, reconcile } from '../src/dispatch.js';
 import { relayError } from '../src/protocol.js';
-const HELP = 'Usage: relay --help | list --json | reap [--outer-ms N] | hook --harness NAME [--outer-ms N] EVENT | install --harness NAME --subscribers FILE [--target FILE|--config-dir DIR] [--evidence FILE] [--retire familiar] [--artifact FILE --apply] | rollback --artifact FILE\n';
+const HELP = 'Usage: relay --help | list --json | reap [--outer-ms N] | hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT | install --harness NAME --subscribers FILE [--target FILE|--config-dir DIR] [--evidence FILE] [--retire familiar] [--artifact FILE --apply] | rollback --artifact FILE\n';
 const usage = (message) => relayError('USAGE', message);
-// Strict flag parsing: --harness NAME (hook only), --outer-ms N, then exactly one EVENT for hook.
+// Strict flag parsing: --harness NAME (hook only), --outer-ms N, --subscribers FILE, then exactly one EVENT for hook.
 function parse(args, { harness }) {
   const readOuter = (value) => {
     if (!/^[1-9][0-9]*$/.test(value ?? '')) throw usage('--outer-ms must be a positive integer');
@@ -20,10 +20,18 @@ function parse(args, { harness }) {
   }
   const [flag, name, ...tail] = args, nativeEvent = tail.at(-1), options = tail.slice(0, -1);
   if (flag !== '--harness' || !name || name.startsWith('--')) throw usage('hook requires --harness NAME first');
-  if (!nativeEvent || nativeEvent.startsWith('--') || (options.length !== 0 && (options.length !== 2 || options[0] !== '--outer-ms'))) {
-    throw usage('hook requires [--outer-ms N] then exactly one EVENT');
+  const order = () => usage('hook requires [--outer-ms N] [--subscribers FILE] then exactly one EVENT');
+  if (!nativeEvent || nativeEvent.startsWith('--')) throw order();
+  const request = { harness: name, nativeEvent };
+  let i = 0;
+  if (options[i] === '--outer-ms') { request.outerMs = readOuter(options[i + 1]); i += 2; }
+  if (options[i] === '--subscribers') {
+    const file = options[i + 1];
+    if (!file || !isAbsolute(file)) throw usage('--subscribers requires an absolute path');
+    request.subscribersPath = file; i += 2;
   }
-  return { harness: name, ...(options.length ? { outerMs: readOuter(options[1]) } : {}), nativeEvent };
+  if (i !== options.length) throw order();
+  return request;
 }
 // Every write is awaited so the reply is flushed before the explicit exit below; pipes are
 // asynchronous on Darwin, and a pending filesystem operation would otherwise keep the
