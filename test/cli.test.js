@@ -16,9 +16,9 @@ test('list errors are a single JSON envelope on stderr; unknown and null schemas
   const p=await tempState(t);
   for(const [content,code] of [['{broken','CORRUPT_STATE'],['{"schema":2}','INVALID_SCHEMA'],['null','INVALID_SCHEMA']]) {
     await fs.writeFile(p.agentsPath,content,{mode:0o600});const r=run(p,['list','--json']);assert.equal(r.status,1);assert.equal(r.stdout,'');
-    const error=JSON.parse(r.stderr).error;assert.equal(error.kind,'relay');assert.match(error.detail,new RegExp(`^${code}: `));
+    const error=JSON.parse(r.stderr).error;assert.equal(error.kind,'list_failed');assert.match(error.detail,new RegExp(`^${code}: `));
     assert.equal(r.stderr.trim().split('\n').length,1);
-    if(code==='CORRUPT_STATE')assert.equal(r.stderr,'{"error":{"kind":"relay","detail":"CORRUPT_STATE: cannot read registry JSON"}}\n');
+    if(code==='CORRUPT_STATE')assert.equal(r.stderr,'{"error":{"kind":"list_failed","detail":"CORRUPT_STATE: cannot read registry JSON"}}\n');
   }
 });
 test('CLI listing retains dead unknown live, reap removes only dead',async t=>{

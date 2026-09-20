@@ -61,7 +61,7 @@ function flags(args, cmd) {
   return out;
 }
 export async function main(rawArgs, { list = listAgents, reap = reconcile, hook = dispatchHook, stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {
-  let mode = 'pretty';
+  let mode = 'pretty', cmdName = null;
   try {
     const { argv, mode: flagMode } = stripGlobals(rawArgs, usage);
 
@@ -79,10 +79,14 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
 
     const cmd = commandAt(argv[0]);
     if (!cmd) {
-      if (hasHelp(argv)) { await emit(stdout, rootHelp()); return 0; }
+      // --help/-h is only the root invocation when it IS the command position; an unknown
+      // command word is never rescued by a --help that happens to follow it (`bogus --help`
+      // is still an unknown command, not root help).
+      if (argv[0] === '--help' || argv[0] === '-h') { await emit(stdout, rootHelp()); return 0; }
       await emit(stderr, `relay: unknown command "${argv[0]}"\nRun 'relay --help' for help.\n`);
       return 2;
     }
+    cmdName = cmd.path[0];
     const rest = argv.slice(1);
     if (hasHelp(rest)) { await emit(stdout, helpText(cmd)); return 0; }
 
@@ -103,7 +107,10 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     }
     if (cmd.path[0] === 'reap') {
       const { result, diagnostics } = await reap(parse(rest, { harness: false }));
-      if (!silent) await emit(stdout, `Reaped ${result.reaped.length} agent(s).\n`);
+      if (!silent) {
+        if (mode === 'json') await emit(stdout, `${JSON.stringify({ reaped: result.reaped.length })}\n`);
+        else await emit(stdout, `Reaped ${result.reaped.length} agent(s).\n`);
+      }
       await emit(stderr, [...result.diagnostics.map((d) => `${d.code}: ${d.message}`), ...diagnostics].map((l) => `${l}\n`).join(''));
       return result.diagnostics.some((d) => ['LOCK_CLEANUP_FAILED', 'LOCK_OWNERSHIP_LOST'].includes(d.code)) ? 1 : 0;
     }
@@ -142,8 +149,8 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     throw usage(`unknown command "${cmd.path[0]}"`);
   } catch (error) {
     if (error.code === 'USAGE') { await emit(stderr, `relay: ${error.message}\n`); return 2; }
-    const detail = error.code ? `${error.code}: ${error.message}` : 'relay operation failed';
-    if (mode === 'json') await emit(stderr, `${JSON.stringify({ error: { kind: 'relay', detail } })}\n`);
+    const kind = `${cmdName ?? 'relay'}_failed`, detail = error.code ? `${error.code}: ${error.message}` : 'relay operation failed';
+    if (mode === 'json') await emit(stderr, `${JSON.stringify({ error: { kind, detail } })}\n`);
     else await emit(stderr, `relay: ${detail}\n`);
     return 1;
   }

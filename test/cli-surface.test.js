@@ -60,7 +60,7 @@ test('help on root and every command, protocol commands included; help routing; 
 });
 
 test('usage errors exit 2 with stderr only', () => {
-  for (const args of [['bogus'], ['reap', '--bogus'], ['install'], ['hook'], ['help', 'bogus'], ['--json', 'list', '--pretty']]) {
+  for (const args of [['bogus'], ['bogus', '--help'], ['reap', '--bogus'], ['install'], ['hook'], ['help', 'bogus'], ['--json', 'list', '--pretty']]) {
     const r = run(args);
     assert.deepEqual({ args, status: r.status, out: r.stdout }, { args, status: 2, out: '' });
     assert.ok(r.stderr.trim().split('\n').length <= 2, r.stderr);
@@ -107,4 +107,20 @@ test('global routing, output rows, precedence, json failure', () => {
   assert.equal(r.status, 1); assert.equal(r.stdout, '');
   const err = JSON.parse(r.stderr).error;
   assert.equal(typeof err.kind, 'string'); assert.equal(typeof err.detail, 'string');
+});
+
+// A command row with no `output` follows the CLI default (pretty) with the flag/RELAY_FORMAT
+// able to flip it; under --json every one of them must still emit exactly one JSON value on
+// stdout, the same as a command whose row declares `output = "json"`. Protocol rows (`hook`)
+// keep their own reply shape and are excluded, as are rows that already declare an `output`
+// (`install`, `rollback`) — those are covered by the precedence test above.
+test('every command without a declared output row emits one JSON value under --json', () => {
+  const state = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-json-'));
+  const candidates = COMMANDS.filter((cmd) => !cmd.protocol && !cmd.output);
+  assert.ok(candidates.length > 0, 'expected at least one plain command row');
+  for (const cmd of candidates) {
+    const r = run(['--json', ...cmd.path], { RELAY_STATE_DIR: state, XDG_CONFIG_HOME: state });
+    assert.equal(r.status, 0, `${cmd.path.join(' ')}: ${r.stderr}`);
+    assert.doesNotThrow(() => JSON.parse(r.stdout), `${cmd.path.join(' ')} stdout was not one JSON value: ${JSON.stringify(r.stdout)}`);
+  }
 });

@@ -48,6 +48,6 @@ test('install refuses a subscriber file the hook would refuse at runtime', async
     const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target]);
     assert.equal(r.code, 1, name); assert.equal(r.out, '', name);
     const error = JSON.parse(r.err).error; // install defaults to --json output, so its failures are the {kind, detail} envelope
-    assert.equal(error.kind, 'relay', name); assert.match(error.detail, /^INVALID_CONFIG: /, name); assert.match(error.detail, expected, name);
+    assert.equal(error.kind, 'install_failed', name); assert.match(error.detail, /^INVALID_CONFIG: /, name); assert.match(error.detail, expected, name);
   }
 });
