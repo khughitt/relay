@@ -400,14 +400,16 @@ Callback and cleanup failures are preserved together in AggregateError.
 
 The four implemented commands are `relay --help`, `relay list --json`,
 `relay reap [--outer-ms N]`, and
-`relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`. List emits one JSON Listing; on
-failure it exits 1 with one stdout envelope:
+`relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`. List emits one JSON Listing under
+`--json`; on failure any command exits 1 with one stderr envelope:
 
 ```json
-{"error":{"code":"CORRUPT_STATE","message":"cannot read registry JSON"}}
+{"error":{"kind":"relay","detail":"CORRUPT_STATE: cannot read registry JSON"}}
 ```
 
-Other command failures are concise stderr with exit 1. Reap success prints
+or, outside `--json`, `relay: <detail>` on stderr. A CLI usage error (an unknown command, a
+missing or invalid argument) exits 2 instead, with one line on stderr naming the problem.
+Reap success prints
 Reaped N agent(s). Diagnostics go to stderr. Installation reports
 FEATURE_UNAVAILABLE. The extracted OpenCode plugin therefore is not yet installable;
 it deliberately has no direct-store bypass or fallback. Its child path is relay's

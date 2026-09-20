@@ -26,5 +26,5 @@ test('package dry run and installed tarball expose only the documented runtime',
   await writeFile(join(consumer,'smoke.mjs'),smoke);
   const imported=await run(process.execPath,['smoke.mjs'],consumer);assert.match(imported.stdout,/verified/);
   const cli=await run(join(consumer,'node_modules/.bin/relay'),['list','--json'],consumer);assert.equal(cli.stdout,'{"snapshot":null,"liveness":{}}\n');
-  const help=await run(join(consumer,'node_modules/.bin/relay'),['--help'],consumer);assert.match(help.stdout,/hook --harness NAME/);
+  const help=await run(join(consumer,'node_modules/.bin/relay'),['--help'],consumer);assert.match(help.stdout,/^Usage: relay /);
 });

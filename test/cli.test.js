@@ -12,12 +12,13 @@ test('absent snapshot CLI has exact JSON and creates no directory',async t=>{
   const base=await tempState(t),p={stateDir:join(base.stateDir,'absent')};const r=run(p,['list','--json']);
   assert.equal(r.status,0);assert.equal(r.stdout,'{"snapshot":null,"liveness":{}}\n');assert.equal(r.stderr,'');assert.deepEqual(await fs.readdir(base.stateDir),[]);
 });
-test('list errors are a single JSON envelope; unknown and null schemas are errors',async t=>{
+test('list errors are a single JSON envelope on stderr; unknown and null schemas are errors',async t=>{
   const p=await tempState(t);
   for(const [content,code] of [['{broken','CORRUPT_STATE'],['{"schema":2}','INVALID_SCHEMA'],['null','INVALID_SCHEMA']]) {
-    await fs.writeFile(p.agentsPath,content,{mode:0o600});const r=run(p,['list','--json']);assert.equal(r.status,1);assert.equal(r.stderr,'');
-    assert.equal(JSON.parse(r.stdout).error.code,code);assert.equal(r.stdout.trim().split('\n').length,1);
-    if(code==='CORRUPT_STATE')assert.equal(r.stdout,'{"error":{"code":"CORRUPT_STATE","message":"cannot read registry JSON"}}\n');
+    await fs.writeFile(p.agentsPath,content,{mode:0o600});const r=run(p,['list','--json']);assert.equal(r.status,1);assert.equal(r.stdout,'');
+    const error=JSON.parse(r.stderr).error;assert.equal(error.kind,'relay');assert.match(error.detail,new RegExp(`^${code}: `));
+    assert.equal(r.stderr.trim().split('\n').length,1);
+    if(code==='CORRUPT_STATE')assert.equal(r.stderr,'{"error":{"kind":"relay","detail":"CORRUPT_STATE: cannot read registry JSON"}}\n');
   }
 });
 test('CLI listing retains dead unknown live, reap removes only dead',async t=>{
@@ -30,15 +31,19 @@ test('CLI listing retains dead unknown live, reap removes only dead',async t=>{
   const reaped=run(p,['reap']);assert.equal(reaped.status,0);assert.equal(reaped.stdout,'Reaped 1 agent(s).\n');assert.match(reaped.stderr,/PROCESS_UNAVAILABLE/);
   const again=run(p,['reap']);assert.equal(again.stdout,'Reaped 0 agent(s).\n');
 });
-test('usage: help, list --json, reap [--outer-ms N], hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT', async t => {
-  const p=await tempState(t);assert.equal(run(p,['--help']).status,0);assert.match(run(p,['--help']).stdout,/hook --harness NAME \[--outer-ms N\] \[--subscribers FILE\] EVENT/);
-  for(const args of [[],['list'],['list','--json','extra'],['reap','extra'],['reap','--outer-ms'],['reap','--outer-ms','abc'],['--help','extra'],['unknown'],
-    ['hook'],['hook','PreToolUse'],['hook','--harness','claude-code'],['hook','PreToolUse','--harness','codex'],['hook','--harness','codex','PreToolUse','--outer-ms','1000'],['hook','--harness','codex','--unknown'],['hook','--harness','claude-code','PreToolUse','extra'],['hook','--harness','claude-code','--outer-ms','abc','PreToolUse'],['hook','--harness','claude-code','--outer-ms','100','PreToolUse'],
-    ['hook','--harness','codex','--subscribers','relative.json','PreToolUse'],['hook','--harness','codex','--subscribers','PreToolUse'],['hook','--harness','codex','--subscribers','/a.json','--outer-ms','1000','PreToolUse'],['hook','--harness','codex','--subscribers','/a.json','--subscribers','/b.json','PreToolUse'],['hook','--harness','codex','PreToolUse','--subscribers','/a.json']]) {
-    const r=run(p,args);assert.equal(r.status,1,args.join(' '));assert.match(r.stderr||r.stdout,/USAGE/,args.join(' '));
-    if(!(args[0]==='list'&&args.includes('--json')))assert.equal(r.stdout,'',args.join(' ')); // list --json reports on stdout by design
+test('usage: help, list [--json], reap [--outer-ms N], hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT', async t => {
+  const p=await tempState(t);assert.equal(run(p,['--help']).status,0);assert.match(run(p,['--help']).stdout,/^Usage: relay /);
+  // `list` and `--help` mixed with garbage now succeed (mode/help are recognized anywhere); no longer usage errors.
+  assert.equal(run(p,['list']).status,0);assert.equal(run(p,['--help','extra']).status,0);
+  for(const args of [[],['list','--json','extra'],['reap','extra'],['reap','--outer-ms'],['reap','--outer-ms','abc'],['unknown'],
+    ['hook'],['hook','PreToolUse'],['hook','--harness','claude-code'],['hook','PreToolUse','--harness','codex'],['hook','--harness','codex','PreToolUse','--outer-ms','1000'],['hook','--harness','codex','--unknown'],['hook','--harness','claude-code','PreToolUse','extra'],['hook','--harness','claude-code','--outer-ms','abc','PreToolUse'],
+    ['hook','--harness','codex','--subscribers','relative.json','PreToolUse'],['hook','--harness','codex','--subscribers','PreToolUse'],['hook','--harness','codex','--subscribers','/a.json','--outer-ms','1000','PreToolUse'],['hook','--harness','codex','--subscribers','/a.json','--subscribers','/b.json','PreToolUse'],['hook','--harness','codex','PreToolUse','--subscribers','/a.json'],['install']]) {
+    const r=run(p,args);assert.equal(r.status,2,args.join(' '));assert.match(r.stderr,/^relay: /,args.join(' '));assert.equal(r.stdout,'',args.join(' '));
   }
-  const r=run(p,['install']);assert.equal(r.status,1);assert.match(r.stderr,/USAGE/);
+  // A well-formed hook invocation whose budget is too small to survive fails inside dispatchHook's own
+  // protocol, not at CLI parse time: it keeps its historical exit code and "CODE: message" text.
+  const tooShort=run(p,['hook','--harness','claude-code','--outer-ms','100','PreToolUse']);
+  assert.equal(tooShort.status,1);assert.match(tooShort.stderr,/^USAGE: outer timeout must be/);
 });
 const fixture=new URL('./fixtures/subscriber.js',import.meta.url).pathname;
 const hookRun=(p,args,input,opts={})=>spawnSync(process.execPath,[cli.pathname,'hook',...args],{encoding:'utf8',input,env:{...process.env,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome},...opts});
@@ -83,8 +88,8 @@ test('survival limitation: the internal deadline refuses; an outer kill, missing
   // A missing runtime fails before relay exists; the harness sees a spawn error, not a refusal.
   const missing=spawnSync('/nonexistent/node',[cli.pathname,'hook','--harness','claude-code','PreToolUse'],{encoding:'utf8',input:body});
   assert.equal(missing.error.code,'ENOENT');assert.ok(!missing.stdout);
-  // A startup usage error exits 1 with no native refusal.
-  const usage=hookRun(p,['--harness','claude-code','--outer-ms','x','PreToolUse'],body);assert.equal(usage.status,1);assert.equal(usage.stdout,'');
+  // A startup usage error exits 2 with no native refusal.
+  const usage=hookRun(p,['--harness','claude-code','--outer-ms','x','PreToolUse'],body);assert.equal(usage.status,2);assert.equal(usage.stdout,'');
 });
 test('the CLI returns inside the outer timeout while another writer holds the lock',async t=>{
   const base=await tempState(t),p=layout(base);

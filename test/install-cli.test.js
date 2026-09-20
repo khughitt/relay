@@ -9,8 +9,8 @@ const stream = () => ({ text: '', write(value, done) { this.text += value; done?
 test('install and rollback require their explicit inputs', async () => {
   for (const args of [['install'], ['install', '--harness', 'codex'], ['rollback'], ['rollback', '--artifact']]) {
     const out = stream(), err = stream();
-    assert.equal(await main(args, { stdout: out, stderr: err }), 1);
-    assert.match(err.text, /USAGE/);
+    assert.equal(await main(args, { stdout: out, stderr: err }), 2);
+    assert.match(err.text, /^relay: /);
   }
 });
 
@@ -46,6 +46,8 @@ test('install refuses a subscriber file the hook would refuse at runtime', async
   for (const [name, arrange, expected] of cases) {
     await arrange();
     const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target]);
-    assert.equal(r.code, 1, name); assert.equal(r.out, '', name); assert.match(r.err, /^INVALID_CONFIG: /, name); assert.match(r.err, expected, name);
+    assert.equal(r.code, 1, name); assert.equal(r.out, '', name);
+    const error = JSON.parse(r.err).error; // install defaults to --json output, so its failures are the {kind, detail} envelope
+    assert.equal(error.kind, 'relay', name); assert.match(error.detail, /^INVALID_CONFIG: /, name); assert.match(error.detail, expected, name);
   }
 });
