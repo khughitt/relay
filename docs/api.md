@@ -398,23 +398,27 @@ failure returns the committed snapshot and a cleanup diagnostic; CLI exits nonze
 and says publication completed. Do not blindly retry as if publication rolled back.
 Callback and cleanup failures are preserved together in AggregateError.
 
-The four implemented commands are `relay --help`, `relay list --json`,
-`relay reap [--outer-ms N]`, and
-`relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`. List emits one JSON Listing under
-`--json`; on failure any command exits 1 with one stderr envelope:
+The CLI's commands are `relay list`, `relay reap [--outer-ms N]`,
+`relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`,
+`relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--evidence FILE]
+[--retire familiar] [--apply --artifact FILE]`, and `relay rollback --artifact FILE`; `relay --help`,
+`relay help [<command>]`, `relay <command> --help`, and `relay --version` round it out. `--json` and
+`--pretty` are global and mutually exclusive, `RELAY_FORMAT` sets the default, and `install` is JSON
+by default (its value is the installation artifact). List emits one JSON Listing under `--json`.
+On failure any command exits 1 with one stderr envelope whose `kind` is `<command>_failed`:
 
 ```json
-{"error":{"kind":"relay","detail":"CORRUPT_STATE: cannot read registry JSON"}}
+{"error":{"kind":"list_failed","detail":"CORRUPT_STATE: cannot read registry JSON"}}
 ```
 
 or, outside `--json`, `relay: <detail>` on stderr. A CLI usage error (an unknown command, a
 missing or invalid argument) exits 2 instead, with one line on stderr naming the problem.
-Reap success prints
-Reaped N agent(s). Diagnostics go to stderr. Installation reports
-FEATURE_UNAVAILABLE. The extracted OpenCode plugin therefore is not yet installable;
-it deliberately has no direct-store bypass or fallback. Its child path is relay's
-own CLI, shell:false, inherited environment, 64 KiB stderr cap and five-second
-lifetime. It preserves permission output and awaits dispose last.
+Reap success prints `{"reaped":N}` under `--json` and `Reaped N agent(s).` otherwise.
+Diagnostics go to stderr. `rollback` prints nothing on success in either mode. The extracted
+OpenCode plugin is installed by `relay install --harness opencode --config-dir DIR`; it has no
+direct-store bypass or fallback. Its child path is relay's own CLI, shell:false, inherited
+environment, 64 KiB stderr cap and five-second lifetime. It preserves permission output and
+awaits dispose last.
 
 The CLI exits explicitly once its reply is flushed so a filesystem operation past
 the deadline is abandoned. A publication abandoned while holding the main lock
@@ -431,7 +435,8 @@ INPUT_TOO_LARGE, INPUT_TIMEOUT, UNSUPPORTED_EVENT, UNSUPPORTED_HARNESS,
 INVALID_SCHEMA, CORRUPT_STATE, PROCESS_UNREADABLE, PROCESS_UNAVAILABLE,
 DEADLINE_EXCEEDED, LOCK_TIMEOUT, LOCK_IDENTITY_UNKNOWN, LOCK_REPAIR_REQUIRED,
 LOCK_CLEANUP_FAILED, LOCK_OWNERSHIP_LOST, IO_ERROR, GIT_ERROR, USAGE,
-FEATURE_UNAVAILABLE, INVALID_REPLY, UNSUPPORTED_REPLY, INVALID_CONFIG and GUARD_FAILED.
+INVALID_REPLY, UNSUPPORTED_REPLY, INVALID_CONFIG, INVALID_EVIDENCE, UNSUPPORTED_BINDING and
+GUARD_FAILED.
 Unknown lock ownership at deadline is LOCK_IDENTITY_UNKNOWN;
 a live holder exceeding caller patience is LOCK_TIMEOUT. Causes may retain OS
 errors internally but are not serialized into diagnostics. See the
