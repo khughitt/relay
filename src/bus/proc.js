@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readlinkSync } from 'node:fs';
 import { basename } from 'node:path';
 import { hostname as osHostname } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -85,7 +85,7 @@ function walk(pid, recordOf) {
   return chain;
 }
 export function createProcessOps({ platform = process.platform, readText = (p) => readFileSync(p, 'utf8'),
-  runPs = runDarwinPs, kill = (pid, signal) => process.kill(pid, signal), hostname = osHostname } = {}) {
+  readLink = (p) => readlinkSync(p), runPs = runDarwinPs, kill = (pid, signal) => process.kill(pid, signal), hostname = osHostname } = {}) {
   if (!['linux', 'darwin'].includes(platform)) throw relayError('PROCESS_UNAVAILABLE', 'unsupported process platform');
   const absent = (error) => ['ENOENT', 'ESRCH'].includes(error.code);
   const local = () => {
@@ -165,5 +165,47 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     if (row.starttime !== handle.start) return verdict('dead', 'process replaced');
     return verdict('alive', 'qualified process matches');
   };
-  return { recordOf, ancestors, handleOf, probe };
+  // Read for one process at a time, only when an adapter's rule needs it (spec: "Recognizing a
+  // harness process" and "Non-session roles"). The kernel suffixes the exe link of a binary
+  // replaced on disk, which a Claude Code auto-update does to every running session.
+  const DELETED = ' (deleted)';
+  const executableOf = (pid, options) => {
+    if (platform === 'linux') {
+      let target;
+      try { target = readLink(`/proc/${pid}/exe`); }
+      catch (cause) { throw relayError('PROCESS_UNREADABLE', 'cannot read process executable', cause); }
+      if (typeof target !== 'string' || !target.startsWith('/')) throw relayError('PROCESS_UNREADABLE', 'invalid process executable');
+      return target.endsWith(DELETED) ? target.slice(0, -DELETED.length) : target;
+    }
+    const output = runPs(['-p', String(pid), '-o', 'comm='], options);
+    const path = typeof output === 'string' ? output.trim() : '';
+    if (!path) throw relayError('PROCESS_UNREADABLE', 'invalid process executable');
+    return path;
+  };
+  const argvOf = (pid, options) => {
+    if (platform === 'linux') {
+      let text;
+      try { text = readText(`/proc/${pid}/cmdline`); }
+      catch (cause) { throw relayError('PROCESS_UNREADABLE', 'cannot read process arguments', cause); }
+      if (typeof text !== 'string') throw relayError('PROCESS_UNREADABLE', 'invalid process arguments');
+      if (text === '') return [];
+      return (text.endsWith('\0') ? text.slice(0, -1) : text).split('\0');
+    }
+    // ps joins arguments with spaces, so boundaries cannot be recovered from args alone.
+    // argv[0] is located by the comm column, which ps reports either as argv[0] itself or as
+    // the executable path whose basename argv[0] is; if neither holds, the boundary is unknown
+    // and the read fails closed. Later arguments split on whitespace: a role is one exact word,
+    // so a split can only make a role appear (no handle), never hide one.
+    const comm = runPs(['-p', String(pid), '-o', 'comm='], options);
+    const args = runPs(['-p', String(pid), '-o', 'args='], options);
+    const first = typeof comm === 'string' ? comm.trim() : '', line = typeof args === 'string' ? args.trim() : '';
+    if (!first || !line) throw relayError('PROCESS_UNREADABLE', 'invalid process arguments');
+    const token = line.split(/\s+/)[0];
+    const argv0 = line === first || line.startsWith(`${first} `) ? first
+      : token === basename(first) ? token : null;
+    if (argv0 === null) throw relayError('PROCESS_UNREADABLE', 'argument boundaries unknown');
+    const rest = line.slice(argv0.length).trim();
+    return rest ? [argv0, ...rest.split(/\s+/)] : [argv0];
+  };
+  return { recordOf, ancestors, handleOf, probe, executableOf, argvOf };
 }
