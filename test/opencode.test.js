@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveSessionPid, resolveTerminalPid, reduceState } from '../src/adapters/opencode.js';
-import { STATES } from '../src/protocol.js';
 test('the idle that follows an error does not erase it', () => {
   assert.equal(reduceState('error', 'working'), 'error');
   assert.equal(reduceState('idle', 'error'), 'error');

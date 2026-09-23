@@ -66,13 +66,19 @@
         { "pid": 890, "ppid": 880, "comm": "codex", "tty": null, "exe": null, "argv": null },
         { "pid": 880, "ppid": 1, "comm": "timeout", "tty": null, "exe": null, "argv": null } ],
       "session": 890, "terminal": null },
-    { "name": "interactive-codex", "source": "measured 2026-09-23, codex-cli 0.156.1 native binary with a terminal", "harness": "codex",
+    { "name": "interactive-codex", "source": "earlier hand-written codex test chain (terminal shape), not re-measured", "harness": "codex",
       "rows": [
         { "pid": 10, "ppid": 9, "comm": "node", "tty": null, "exe": null, "argv": null },
         { "pid": 9, "ppid": 7, "comm": "sh", "tty": null, "exe": null, "argv": null },
         { "pid": 7, "ppid": 6, "comm": "codex", "tty": true, "exe": null, "argv": null },
         { "pid": 6, "ppid": 1, "comm": "zsh", "tty": true, "exe": null, "argv": null } ],
       "session": 7, "terminal": 7 },
+    { "name": "claude-ancestor-under-codex", "source": "replaces the codex test 'a claude ancestor is not a codex session'", "harness": "codex",
+      "rows": [
+        { "pid": 30, "ppid": 20, "comm": "node", "tty": null, "exe": null, "argv": null },
+        { "pid": 20, "ppid": 10, "comm": "claude", "tty": true, "exe": null, "argv": null },
+        { "pid": 10, "ppid": 1, "comm": "zsh", "tty": true, "exe": null, "argv": null } ],
+      "session": null, "terminal": null },
     { "name": "darwin-claude", "source": "measured on a Mac, existing claude-code fixture", "harness": "claude-code",
       "rows": [
         { "pid": 37708, "ppid": 37707, "comm": "node", "tty": null, "exe": null, "argv": null },
