@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-09-23T11:26:33Z
-updated: 2026-09-23T12:03:04Z
+updated: 2026-09-23T12:19:15Z
 started: 2026-09-23T11:38:02Z
 depends: []
 tags: [identity]
@@ -37,4 +37,7 @@ Fix direction: take the nearest ancestor whose comm is the harness; if it has no
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-23T12:03:04Z (main): Review: relay-first rollout could let old tasks claim as the outer session (version-named ancestor skipped), and contaminated schema-1 rows survive the upgrade. Spec revised: Snapshot.schema -> 2 so every version pairing fails closed; new relay supersedes a schema-1 store (empty, fresh generation, REGISTRY_SUPERSEDED), operator runs relay reap
 - 2026-09-23T12:03:04Z (main): parked (waiting on user, review): Spec re-review after rollout/recovery revision (fbee7f5); on approval, writing-plans, then file the tasks-side mirror task
+  provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T12:19:15Z (main): Second review: old tasks continues a held claim by process proof without reading the registry, so the schema gate covers fresh acquisition only. Spec now makes updated tasks a per-host precondition (where the relay opt-in is on) for activating schema-2 relay, adds the held-claim verification, and narrows the mixed-version guarantee
+- 2026-09-23T12:19:15Z (main): parked (waiting on user, review): Spec re-review after held-claim precondition (6752aa4); on approval, writing-plans, then file the tasks-side mirror task
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
