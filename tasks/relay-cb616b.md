@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-09-23T11:26:33Z
-updated: 2026-09-23T11:42:33Z
+updated: 2026-09-23T11:45:48Z
 started: 2026-09-23T11:38:02Z
 depends: []
 tags: [identity]
@@ -32,4 +32,6 @@ Fix direction: take the nearest ancestor whose comm is the harness; if it has no
 - 2026-09-23T11:40:37Z (main): parked (waiting on user, decision): Design spec: separate the session-process handle (nearest harness process, tty not required) from terminal discovery; awaiting the direction decision, then brainstorm and draft in docs/specs from worktree .worktrees/nested-headless
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-23T11:42:33Z (main): resumed
+  provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T11:45:48Z (main): parked (waiting on user, review): Spec review: docs/specs/2026-09-23-session-process-handle.md on branch fix/nested-headless (worktree .worktrees/nested-headless); on approval, writing-plans, then file the tasks-side mirror task
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
