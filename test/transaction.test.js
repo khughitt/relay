@@ -19,7 +19,7 @@ test('every observed upsert increments; exact removal no-op and generation recre
   const first=await applyEvent(event(),opts);assert.equal(first.snapshot.revision,1);assert.equal(first.snapshot.agents['codex:test'].updatedAt,123);
   const second=await applyEvent(event(),opts);assert.equal(second.snapshot.revision,2);assert.equal(second.snapshot.generation,first.snapshot.generation);
   await applyEvent(event('claude-code'),opts);
-  const removed=await applyEvent(event('codex','SessionEnd'),{paths:p,gitContext:()=>assert.fail(),resolveAgentPid:()=>assert.fail()});
+  const removed=await applyEvent(event('codex','SessionEnd'),{paths:p,gitContext:()=>assert.fail(),resolveSessionPid:()=>assert.fail()});
   assert.deepEqual(Object.keys(removed.snapshot.agents),['claude-code:test']);assert.equal(removed.snapshot.revision,4);
   const bytes=await fs.readFile(p.agentsPath,'utf8');const no=await applyEvent(event('codex','SessionEnd'),opts);assert.equal(no.changed,false);assert.equal(await fs.readFile(p.agentsPath,'utf8'),bytes);
   await fs.unlink(p.agentsPath);const recreated=await applyEvent(event(),opts);assert.equal(recreated.snapshot.revision,1);assert.notEqual(recreated.snapshot.generation,first.snapshot.generation);
@@ -32,7 +32,7 @@ test('missing listing is readonly and removal/reap never fabricate snapshots',as
 });
 test('corrupt unknown invalid and null state are never overwritten',async t=>{
   const p=await tempState(t);
-  for(const text of ['{ broken','{"schema":2}','null','[]','{}']) {
+  for(const text of ['{ broken','{"schema":3}','null','[]','{}']) {
     await fs.writeFile(p.agentsPath,text,{mode:0o600});
     await assert.rejects(applyEvent(event(),localObservation(p)));
     assert.equal(await fs.readFile(p.agentsPath,'utf8'),text);
@@ -49,23 +49,23 @@ test('unknown optional fields strip on publication; revision overflow aborts',as
 test('headless or unavailable agent proof is admitted; resumed session refreshes proof',async t=>{
   const p=await tempState(t);
   for(const resolver of [()=>null,()=>{throw Object.assign(new Error('denied'),{code:'PROCESS_UNREADABLE'});},()=>{throw Object.assign(new Error('failed'),{code:'PROCESS_UNAVAILABLE'});}]) {
-    const r=await applyEvent(event(),{...localObservation(p),resolveAgentPid:resolver});assert.equal(r.snapshot.agents['codex:test'].process,null);assert.ok(r.diagnostics.some(d=>d.code==='PROCESS_UNAVAILABLE'));
+    const r=await applyEvent(event(),{...localObservation(p),resolveSessionPid:resolver});assert.equal(r.snapshot.agents['codex:test'].process,null);assert.ok(r.diagnostics.some(d=>d.code==='PROCESS_UNAVAILABLE'));
   }
   const r=await applyEvent(event(),localObservation(p));assert.equal(r.snapshot.agents['codex:test'].process.pid,process.pid);
   const ops=createProcessOps(), real=ops.handleOf(process.pid);
   const injected={...ops,handleOf:pid=>pid===42?{...real,pid:42,bootId:null}:ops.handleOf(pid)};
-  if(real.platform==='linux'){const result=await applyEvent(event(),{...localObservation(p),resolveAgentPid:()=>42,processOps:injected});assert.equal(result.snapshot.agents['codex:test'].process.bootId,null);}
+  if(real.platform==='linux'){const result=await applyEvent(event(),{...localObservation(p),resolveSessionPid:()=>42,processOps:injected});assert.equal(result.snapshot.agents['codex:test'].process.bootId,null);}
 });
 test('Git and unexpected process errors abort before lock or state creation',async t=>{
   const p=await tempState(t);
   await assert.rejects(applyEvent(event(),{...localObservation(p),gitContext:()=>{throw Object.assign(new Error('git failed'),{code:'GIT_ERROR'});}}),{code:'GIT_ERROR'});
-  await assert.rejects(applyEvent(event(),{...localObservation(p),resolveAgentPid:()=>{throw new Error('unexpected');}}),/unexpected/);
+  await assert.rejects(applyEvent(event(),{...localObservation(p),resolveSessionPid:()=>{throw new Error('unexpected');}}),/unexpected/);
   await assert.rejects(applyEvent({...event(),kind:'turn-end'},localObservation(p)),{code:'INVALID_SCHEMA'});
   assert.deepEqual(await fs.readdir(p.stateDir),[]);
 });
 test('read/list never prune and explicit reap removes only confirmed dead',async t=>{
   const p=await tempState(t),opts=localObservation(p);
-  await applyEvent(event('codex','SessionStart','live'),opts);await applyEvent(event('codex','SessionStart','unknown'),{...opts,resolveAgentPid:()=>null});
+  await applyEvent(event('codex','SessionStart','live'),opts);await applyEvent(event('codex','SessionStart','unknown'),{...opts,resolveSessionPid:()=>null});
   const r=await applyEvent(event('codex','SessionStart','dead'),opts);r.snapshot.agents['codex:dead'].process.start=String(BigInt(r.snapshot.agents['codex:dead'].process.start)+1n);
   await fs.writeFile(p.agentsPath,JSON.stringify(r.snapshot));const bytes=await fs.readFile(p.agentsPath,'utf8');
   const listed=await listAgents({paths:p});assert.deepEqual(Object.values(listed.liveness).map(v=>v.status),['alive','unknown','dead']);assert.equal(await fs.readFile(p.agentsPath,'utf8'),bytes);
@@ -85,4 +85,73 @@ test('committed snapshot remains honestly visible after cleanup failure',async t
   }}});
   assert.equal(result.changed,true);assert.equal(result.snapshot.revision,1);assert.deepEqual(await readSnapshot({paths:p}),result.snapshot);
   assert.ok(result.diagnostics.some(d=>d.code==='LOCK_CLEANUP_FAILED'&&d.message.includes('publication completed')));
+});
+const v1=(agents)=>JSON.stringify({schema:1,generation:'12345678-1234-4234-8234-123456789abc',revision:7,agents});
+const row=(id,pid)=>({id,harness:'claude-code',sessionId:id.slice('claude-code:'.length),scope:'session',
+  process:{platform:'linux',host:'h',bootId:null,pid,start:'1'},cwd:'/repo',repoRoot:null,remote:null,projectKey:'/repo',project:'repo',state:'idle',updatedAt:0});
+test('a schema-1 registry is refused by reads and left untouched',async t=>{
+  const p=await tempState(t),text=v1({'claude-code:outer':row('claude-code:outer',42)});await fs.writeFile(p.agentsPath,text,{mode:0o600});
+  for(const read of [()=>readSnapshot({paths:p}),()=>listAgents({paths:p})])await assert.rejects(read(),{code:'REGISTRY_SUPERSEDED'});
+  assert.equal(await fs.readFile(p.agentsPath,'utf8'),text);
+});
+test('reap supersedes a contaminated schema-1 registry: empty, fresh generation, every id reported',async t=>{
+  const p=await tempState(t);
+  await fs.writeFile(p.agentsPath,v1({'claude-code:outer':row('claude-code:outer',42),'claude-code:nested':row('claude-code:nested',42)}),{mode:0o600});
+  const r=await reapRegistry({paths:p});
+  assert.equal(r.changed,true);assert.equal(r.snapshot.schema,2);assert.equal(r.snapshot.revision,1);
+  assert.notEqual(r.snapshot.generation,'12345678-1234-4234-8234-123456789abc');assert.deepEqual(r.snapshot.agents,{});
+  assert.deepEqual(r.diagnostics.filter(d=>d.code==='REGISTRY_SUPERSEDED').map(d=>d.agentId).sort(),['claude-code:nested','claude-code:outer']);
+  assert.deepEqual(await readSnapshot({paths:p}),r.snapshot);
+});
+test('an event supersedes a schema-1 registry and publishes only itself',async t=>{
+  const p=await tempState(t);await fs.writeFile(p.agentsPath,v1({'claude-code:nested':row('claude-code:nested',42)}),{mode:0o600});
+  const r=await applyEvent(event(),localObservation(p));
+  assert.deepEqual(Object.keys(r.snapshot.agents),['codex:test']);assert.equal(r.snapshot.schema,2);
+  assert.ok(r.diagnostics.some(d=>d.code==='REGISTRY_SUPERSEDED'&&d.agentId==='claude-code:nested'));
+});
+test('a SessionEnd supersedes a schema-1 registry even though it removes nothing',async t=>{
+  const p=await tempState(t);await fs.writeFile(p.agentsPath,v1({'claude-code:nested':row('claude-code:nested',42)}),{mode:0o600});
+  const r=await applyEvent(event('codex','SessionEnd'),{paths:p});
+  assert.equal(r.changed,true);assert.deepEqual(r.snapshot.agents,{});assert.equal((await readSnapshot({paths:p})).schema,2);
+});
+test('a schema-1 file with no usable agents object is still superseded',async t=>{
+  const p=await tempState(t);
+  for(const text of ['{"schema":1}','{"schema":1,"agents":[]}','{"schema":1,"agents":null}']){
+    await fs.writeFile(p.agentsPath,text,{mode:0o600});const r=await reapRegistry({paths:p});
+    assert.deepEqual(r.diagnostics.filter(d=>d.code==='REGISTRY_SUPERSEDED'),[{code:'REGISTRY_SUPERSEDED',message:'replaced a schema-1 registry with no agents'}]);
+    assert.equal((await readSnapshot({paths:p})).schema,2);
+  }
+});
+const chainOps=(chains)=>({
+  ancestors:(pid)=>chains[pid],
+  executableOf:(pid)=>{throw new Error(`exe of ${pid} must not be read`);},
+  argvOf:()=>['claude'],
+  handleOf:(pid)=>({platform:'linux',host:'h',bootId:'12345678-1234-1234-8234-123456789abc',pid,start:String(pid)}),
+  probe:()=>({status:'alive',reason:'test'}),
+  recordOf:()=>null});
+const observe=(p,ops)=>({paths:p,processOps:ops,gitContext:async()=>({remote:null,repoRoot:null})});
+const claudeEvent=(session)=>normalizeEvent('claude-code','SessionStart',JSON.stringify({session_id:session,cwd:'/repo'}));
+// outer: hook 101 under claude 100 (tty). nested: hook 201 under claude 200 (no tty) under claude 100.
+const nested={101:[{pid:101,comm:'node',tty:null},{pid:100,comm:'claude',tty:true}],
+  201:[{pid:201,comm:'node',tty:null},{pid:200,comm:'claude',tty:null},{pid:150,comm:'zsh',tty:null},{pid:100,comm:'claude',tty:true}]};
+test('a nested headless session publishes its own process, beside its parent',async t=>{
+  const p=await tempState(t),ops=chainOps(nested);
+  await applyEvent(claudeEvent('outer'),{...observe(p,ops),resolveSessionPid:(a)=>a.resolveSessionPid({startPid:101,ancestors:ops.ancestors,executableOf:ops.executableOf,argvOf:ops.argvOf})});
+  const r=await applyEvent(claudeEvent('nested'),{...observe(p,ops),resolveSessionPid:(a)=>a.resolveSessionPid({startPid:201,ancestors:ops.ancestors,executableOf:ops.executableOf,argvOf:ops.argvOf})});
+  assert.equal(r.snapshot.agents['claude-code:outer'].process.pid,100);
+  assert.equal(r.snapshot.agents['claude-code:nested'].process.pid,200);
+});
+test('a contaminated schema-1 registry recovers: reap, then the outer event, leaves one correct row',async t=>{
+  const p=await tempState(t),ops=chainOps(nested),borrowed={platform:'linux',host:'h',bootId:null,pid:100,start:'100'};
+  const agent=(session)=>({id:`claude-code:${session}`,harness:'claude-code',sessionId:session,scope:'session',process:borrowed,
+    cwd:'/repo',repoRoot:null,remote:null,projectKey:'/repo',project:'repo',state:'idle',updatedAt:0});
+  const contaminated=JSON.stringify({schema:1,generation:'12345678-1234-4234-8234-123456789abc',revision:9,
+    agents:{'claude-code:outer':agent('outer'),'claude-code:nested':agent('nested')}});
+  for(const first of ['reap','event']){
+    await fs.writeFile(p.agentsPath,contaminated,{mode:0o600});
+    if(first==='reap')await reapRegistry({paths:p,processOps:ops});
+    const r=await applyEvent(claudeEvent('outer'),{...observe(p,ops),resolveSessionPid:(a)=>a.resolveSessionPid({startPid:101,ancestors:ops.ancestors,executableOf:ops.executableOf,argvOf:ops.argvOf})});
+    assert.deepEqual(Object.keys(r.snapshot.agents),['claude-code:outer'],first);
+    assert.equal(r.snapshot.agents['claude-code:outer'].process.pid,100,first);
+  }
 });

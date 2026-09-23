@@ -10,7 +10,8 @@
   "exports": {
     ".": "./src/index.js",
     "./opencode": "./integrations/opencode/plugin.js",
-    "./fixtures/handles.json": "./test/fixtures/handles.json"
+    "./fixtures/handles.json": "./test/fixtures/handles.json",
+    "./fixtures/ancestry.json": "./test/fixtures/ancestry.json"
   },
   "scripts": {
     "test": "node --test test/*.test.js integrations/opencode/*.test.mjs"
@@ -20,6 +21,7 @@
     "src/",
     "integrations/opencode/*.js",
     "test/fixtures/handles.json",
+    "test/fixtures/ancestry.json",
     "docs/api.md",
     "docs/runbooks/registry-lock-repair.md",
     "LICENSE"

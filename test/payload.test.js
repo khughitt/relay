@@ -20,7 +20,7 @@ test('all twenty mappings have literal kind and level expectations', () => {
     const adapter = adapterFor(harness);
     assert.equal(Object.keys(adapter.events).length, expected.length);
     assert.ok(Object.isFrozen(adapter.events));
-    for (const fn of ['stateForEvent','reduceState','resolveAgentPid']) assert.equal(typeof adapter[fn], 'function');
+    for (const fn of ['stateForEvent','reduceState','resolveSessionPid','resolveTerminalPid']) assert.equal(typeof adapter[fn], 'function');
     for (const [event, kind, level] of expected) {
       const e = normalizeEvent(harness, event, raw({ tool_name: 'Bash', tool_input: {} }));
       assert.equal(e.kind, kind); assert.equal(adapter.stateForEvent(event), level);
@@ -62,11 +62,12 @@ test('stdin counts bytes, requires EOF and removes all owned listeners', async (
   await assert.rejects(incomplete,{code:'INVALID_INPUT'});
   await assert.rejects(readNativeInput(new PassThrough(),{clock:()=>1,deadline:1}),{code:'INPUT_TIMEOUT'});
 });
-test('resolvers skip self and use nearest matching terminal candidate', () => {
+test('session lookup takes the nearest harness process; terminal lookup the nearest with a terminal', () => {
   for (const [harness,comm] of [['claude-code','claude'],['codex','codex'],['opencode','opencode']]) {
-    const resolver = adapterFor(harness).resolveAgentPid;
-    assert.equal(resolver({ancestors:()=>[{pid:5,comm,tty:true}]}),null);
-    assert.equal(resolver({ancestors:()=>[{pid:5,comm,tty:true},{pid:4,comm,tty:null},{pid:3,comm,tty:true},{pid:2,comm,tty:true}]}),3);
+    const adapter = adapterFor(harness), argvOf = () => [comm];
+    const chain = () => [{pid:5,comm,tty:true},{pid:4,comm,tty:null},{pid:3,comm,tty:true},{pid:2,comm,tty:true}];
+    assert.equal(adapter.resolveSessionPid({ancestors:chain,executableOf:()=>'',argvOf}),4);
+    assert.equal(adapter.resolveTerminalPid({ancestors:chain}),3);
   }
 });
 test('Claude and Codex reducers preserve every explicit level including removal',()=>{

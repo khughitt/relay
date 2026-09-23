@@ -41,12 +41,20 @@ type Agent = {
   updatedAt: number;     // Unix milliseconds
 };
 type Snapshot = {
-  schema: 1;
+  schema: 2;
   generation: string;    // fresh UUID if the store is recreated
   revision: number;      // incremented under the writer lock
   agents: Record<string, Agent>;
 };
 ```
+
+Schema 2 publishes, as `Agent.process`, the handle of the process that is the
+session, not of the terminal that displays it (spec
+`docs/specs/2026-09-23-session-process-handle.md`). A schema-1 file is superseded,
+never read: `readSnapshot`, `listAgents` and `relay list` fail with
+`REGISTRY_SUPERSEDED`; the first `applyEvent` or `reapRegistry` replaces it with an
+empty schema-2 snapshot under a fresh generation and reports one `REGISTRY_SUPERSEDED`
+diagnostic per dropped agent. Any other unknown schema is `INVALID_SCHEMA`.
 
 ```ts
 type EventKind = 'session-start' | 'prompt' | 'before-tool' | 'activity' | 'idle'
@@ -109,15 +117,17 @@ type ProcessOps = {
   ancestors(pid: number, options?: ClockOptions): ProcessRow[];
   handleOf(pid: number, options?: ClockOptions): Handle | null;
   probe(handle: Handle | null, options?: ClockOptions): Liveness;
+  executableOf(pid: number, options?: ClockOptions): string;
+  argvOf(pid: number, options?: ClockOptions): string[];
 };
 type Adapter = {
   events: Readonly<Record<string, { kind: Event['kind']; level: State | null }>>;
   stateForEvent(nativeEvent: string): State | null;
   reduceState(level: State | null, previous: State | null): State | null;
-  resolveAgentPid(options?: {
-    startPid?: number;
-    ancestors?: (pid: number) => ProcessRow[];
-  }): number | null;
+  resolveSessionPid(options?: { startPid?: number; ancestors?: (pid: number) => ProcessRow[];
+    executableOf?: (pid: number) => string; argvOf?: (pid: number) => string[] }): number | null;
+  resolveTerminalPid(options?: { startPid?: number;
+    ancestors?: (pid: number) => ProcessRow[] }): number | null;
 };
 type ReadOptions = ClockOptions & { paths?: Paths; processOps?: ProcessOps };
 type MutationOptions = ReadOptions & {
@@ -125,7 +135,7 @@ type MutationOptions = ReadOptions & {
   gitContext?: (cwd: string, options: ClockOptions) => Promise<{
     repoRoot: string | null; remote: string | null;
   }>;
-  resolveAgentPid?: (adapter: Adapter) => number | null;
+  resolveSessionPid?: (adapter: Adapter) => number | null;
 };
 type MutationResult = {
   snapshot: Snapshot | null; changed: boolean; reaped: string[];
@@ -171,19 +181,32 @@ unreadable/malformed evidence. ancestors reads a fresh nearest-first chain inclu
 the caller, stopping before PID 1, on absence or with a loop error. Darwin takes
 one fresh table per walk; target probes read only the requested PID. Terminal
 normalization is required for ancestor resolution, independently of process proof.
-The measured comm/tty predicate skips index zero; no matching agent yields null.
+`resolveSessionPid` takes the nearest ancestor after index zero that is a process of
+the harness (Claude Code: `comm` `claude`, or a version-shaped `comm` whose executable
+ends in `/claude/versions/<comm>`), with no terminal requirement, and yields null when
+there is none or when the nearest Claude Code process has `argv[1]` `daemon` or
+`bg-pty-host`. `resolveTerminalPid` keeps the measured predicate: the nearest ancestor
+after index zero whose `comm` is the harness name and which owns a terminal.
+`executableOf` is read only for a version-shaped `comm` and `argvOf` only for the
+nearest Claude Code process; an unreadable one is `PROCESS_UNREADABLE`. The shared
+chains are `relay/fixtures/ancestry.json`.
 A hook PID or shell session ID is never substituted for a missing harness process.
 
 Missing agents.json returns snapshot:null and empty liveness, without directory
 creation. Corrupt JSON is CORRUPT_STATE; present JSON null, invalid records and
-unknown schemas are INVALID_SCHEMA. None is interpreted as an empty registry.
-Internal readJson uses undefined to distinguish absence from parsed JSON null.
-readSnapshot and listAgents do not lock, prune, create, chmod or rewrite files.
+unknown schemas are INVALID_SCHEMA. None is interpreted as an empty registry,
+except a schema-1 file: a read of one fails with REGISTRY_SUPERSEDED instead of
+being treated as absent (see the schema-2 paragraph above). Internal readJson uses
+undefined to distinguish absence from parsed JSON null. readSnapshot and
+listAgents do not lock, prune, create, chmod or rewrite files.
 
 An upsert publishes revision 1 with a fresh generation UUID if no snapshot exists.
 Every observed upsert increments revision, even repeated state. Removal and reap
-publish only when keys change; an absent/no-change result remains null/unchanged.
-Recreation starts a new generation. Revision overflow fails before publication.
+publish only when keys change, except a mutation that finds a schema-1 file: it
+replaces the file with an empty schema-2 snapshot under a fresh generation and
+always publishes (see the schema-2 paragraph above); otherwise an absent/no-change
+result remains null/unchanged. Recreation starts a new generation. Revision
+overflow fails before publication.
 Git and agent resolution occur before locking; latest-state reduction and one
 canonical atomic snapshot publication occur under the lock. SessionEnd skips
 Git/process enrichment and removes its exact ID. Confirmed-dead pruning still
@@ -435,8 +458,8 @@ INPUT_TOO_LARGE, INPUT_TIMEOUT, UNSUPPORTED_EVENT, UNSUPPORTED_HARNESS,
 INVALID_SCHEMA, CORRUPT_STATE, PROCESS_UNREADABLE, PROCESS_UNAVAILABLE,
 DEADLINE_EXCEEDED, LOCK_TIMEOUT, LOCK_IDENTITY_UNKNOWN, LOCK_REPAIR_REQUIRED,
 LOCK_CLEANUP_FAILED, LOCK_OWNERSHIP_LOST, IO_ERROR, GIT_ERROR, USAGE,
-INVALID_REPLY, UNSUPPORTED_REPLY, INVALID_CONFIG, INVALID_EVIDENCE, UNSUPPORTED_BINDING and
-GUARD_FAILED.
+INVALID_REPLY, UNSUPPORTED_REPLY, INVALID_CONFIG, INVALID_EVIDENCE, UNSUPPORTED_BINDING,
+GUARD_FAILED and REGISTRY_SUPERSEDED.
 Unknown lock ownership at deadline is LOCK_IDENTITY_UNKNOWN;
 a live holder exceeding caller patience is LOCK_TIMEOUT. Causes may retain OS
 errors internally but are not serialized into diagnostics. See the

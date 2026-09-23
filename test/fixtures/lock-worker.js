@@ -13,7 +13,7 @@ process.once('message',async()=>{
       await withLock(path,async()=>{process.send({type:'entered'});await new Promise(resolve=>process.once('message',resolve));});
     } else if(mode==='registry') {
       await applyEvent(normalizeEvent('codex','SessionStart',JSON.stringify({session_id:String(process.pid),cwd:'/repo'})),{
-        paths:p,resolveAgentPid:()=>process.pid,gitContext:async()=>({remote:null,repoRoot:null}),
+        paths:p,resolveSessionPid:()=>process.pid,gitContext:async()=>({remote:null,repoRoot:null}),
       });
       process.send({type:'written'});
       await new Promise(resolve=>process.once('message',resolve));

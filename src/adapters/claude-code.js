@@ -1,6 +1,7 @@
 import { createProcessOps } from '../bus/proc.js';
 import { relayError } from '../protocol.js';
 import { encodeStandardReply } from './reply.js';
+import { VERSION_COMM, nearestSessionPid, nearestTerminalPid } from './ancestry.js';
 
 export const events = Object.freeze({
   'SessionStart': Object.freeze({ kind: 'session-start', level: 'idle' }),
@@ -28,7 +29,17 @@ export const replies = Object.freeze({
 // per-hook timeout may raise to 60 s.
 export const outerTimeouts = Object.freeze({ default: 600000, UserPromptSubmit: 30000, SessionEnd: 1500, max: Object.freeze({ SessionEnd: 60000 }) });
 export const encodeReply = (nativeEvent, reply) => encodeStandardReply(nativeEvent, reply, replies[nativeEvent]);
-// Preserve the measured terminal ancestor predicate; the hook itself is index zero.
-export function resolveAgentPid({ startPid = process.pid, ancestors = (pid) => createProcessOps().ancestors(pid) } = {}) {
-  return ancestors(startPid).find((p, i) => i > 0 && p.comm === 'claude' && p.tty !== null)?.pid ?? null;
+// The native installer runs every version as …/claude/versions/<version>, so a background
+// session's own process is named after its version. The daemon and the pty host share that
+// executable and never fire a hook; landing on one means an unmeasured shape, so null.
+const ROLES = Object.freeze(['daemon', 'bg-pty-host']);
+const ops = () => createProcessOps();
+export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid),
+  executableOf = (pid) => ops().executableOf(pid), argvOf = (pid) => ops().argvOf(pid) } = {}) {
+  const isHarness = (row) => row.comm === 'claude'
+    || (VERSION_COMM.test(row.comm) && executableOf(row.pid).endsWith(`/claude/versions/${row.comm}`));
+  return nearestSessionPid(ancestors(startPid), { isHarness, roles: ROLES, argvOf });
+}
+export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
+  return nearestTerminalPid(ancestors(startPid), 'claude');
 }

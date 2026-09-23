@@ -12,9 +12,28 @@ function options(given) {
   return { ...given, clock, deadline:given.deadline ?? clock()+12000, paths:given.paths ?? defaultPaths(),
     processOps:given.processOps ?? createProcessOps(), now:given.now ?? Date.now, uuid:given.uuid ?? randomUUID };
 }
+// Schema 1 published the terminal owner's pid; schema 2 publishes the session's own process.
+// A schema-1 row can hold a handle borrowed from another session, and which of two rows sharing
+// a handle is rightful cannot be told, so its rows are dropped rather than migrated. Spec:
+// docs/specs/2026-09-23-session-process-handle.md, "Rollout and recovery".
+const SUPERSEDED_MESSAGE = 'registry predates session handles; run relay reap or wait for any hook event';
+const isSchemaOne = (value) => value !== null && typeof value === 'object' && !Array.isArray(value) && value.schema === 1;
 async function read(opts) {
   const value = await readJson(opts.paths.agentsPath,opts);
-  return value === undefined ? null : validateSnapshot(value);
+  if (value === undefined) return null;
+  if (isSchemaOne(value)) throw relayError('REGISTRY_SUPERSEDED',SUPERSEDED_MESSAGE);
+  return validateSnapshot(value);
+}
+async function readForMutation(opts, diagnostics) {
+  const value = await readJson(opts.paths.agentsPath,opts);
+  if (value === undefined) return {before:null,superseded:false};
+  if (!isSchemaOne(value)) return {before:validateSnapshot(value),superseded:false};
+  const agents = value.agents;
+  const ids = agents !== null && typeof agents === 'object' && !Array.isArray(agents) ? Object.keys(agents) : [];
+  diagnostics.push(...(ids.length === 0
+    ? [{code:'REGISTRY_SUPERSEDED',message:'replaced a schema-1 registry with no agents'}]
+    : ids.map(agentId=>({code:'REGISTRY_SUPERSEDED',message:`dropped ${agentId} from a superseded schema-1 registry`,agentId}))));
+  return {before:null,superseded:true};
 }
 export async function readSnapshot(given = {}) { return read(options(given)); }
 export async function listAgents(given = {}) {
@@ -26,10 +45,10 @@ const diagnosticsFor = (liveness) => Object.entries(liveness).filter(([,v])=>v.s
   .map(([agentId])=>({code:'PROCESS_UNAVAILABLE',message:'agent liveness unknown',agentId}));
 async function mutate(opts, event, context, handle, diagnostics) {
   const locked = await withLock(opts.paths.lockPath,async () => {
-    const before = await read(opts);
+    const {before,superseded} = await readForMutation(opts,diagnostics);
     const {agents,reaped,liveness} = pruneDead(before?.agents ?? {},{probe:h=>opts.processOps.probe(h,opts)});
     diagnostics.push(...diagnosticsFor(liveness));
-    let changed = reaped.length > 0;
+    let changed = superseded || reaped.length > 0;
     if (event) {
       const adapter = adapterFor(event.harness), level = adapter.stateForEvent(event.nativeEvent);
       if (level === null) { changed ||= Object.hasOwn(agents,event.agentId); delete agents[event.agentId]; }
@@ -43,7 +62,7 @@ async function mutate(opts, event, context, handle, diagnostics) {
       }
     }
     if (!changed) return {snapshot:before,changed:false,reaped,diagnostics};
-    const snapshot = validateSnapshot({schema:1,generation:before?.generation ?? opts.uuid(),revision:(before?.revision ?? 0)+1,agents});
+    const snapshot = validateSnapshot({schema:2,generation:before?.generation ?? opts.uuid(),revision:(before?.revision ?? 0)+1,agents});
     await writeJsonAtomic(opts.paths.agentsPath,snapshot,opts);
     return {snapshot,changed:true,reaped,diagnostics};
   },opts);
@@ -60,7 +79,8 @@ export async function applyEvent(value, given = {}) {
   if (event.kind !== 'session-end') {
     context = await (given.gitContext ?? defaultGitContext)(event.cwd,opts);
     try {
-      const pid = given.resolveAgentPid ? given.resolveAgentPid(adapter) : adapter.resolveAgentPid({ancestors:p=>opts.processOps.ancestors(p,opts)});
+      const pid = given.resolveSessionPid ? given.resolveSessionPid(adapter) : adapter.resolveSessionPid({
+        ancestors:p=>opts.processOps.ancestors(p,opts),executableOf:p=>opts.processOps.executableOf(p,opts),argvOf:p=>opts.processOps.argvOf(p,opts)});
       handle = pid === null ? null : opts.processOps.handleOf(pid,opts);
     } catch (cause) {
       if (!['PROCESS_UNREADABLE','PROCESS_UNAVAILABLE'].includes(cause.code)) throw cause;

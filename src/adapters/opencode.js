@@ -1,6 +1,7 @@
 import { createProcessOps } from '../bus/proc.js';
 import { relayError } from '../protocol.js';
 import { encodeStandardReply } from './reply.js';
+import { nearestSessionPid, nearestTerminalPid } from './ancestry.js';
 
 export const events = Object.freeze({
   'init': Object.freeze({ kind: 'session-start', level: 'idle' }),
@@ -20,9 +21,12 @@ export function reduceState(level, previous) {
   if (previous === 'error') return 'error';
   return ACTIVE.has(previous) ? 'done' : 'idle';
 }
-// Preserve the measured terminal ancestor predicate; the hook itself is index zero.
-export function resolveAgentPid({ startPid = process.pid, ancestors = (pid) => createProcessOps().ancestors(pid) } = {}) {
-  return ancestors(startPid).find((p, i) => i > 0 && p.comm === 'opencode' && p.tty !== null)?.pid ?? null;
+const ops = () => createProcessOps();
+export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
+  return nearestSessionPid(ancestors(startPid), { isHarness: (row) => row.comm === 'opencode' });
+}
+export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
+  return nearestTerminalPid(ancestors(startPid), 'opencode');
 }
 // The server plugin observes only; its spawnHook lifetime is five seconds.
 export const replies = Object.freeze({});

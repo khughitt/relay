@@ -38,8 +38,8 @@ function validateAgent(v, key) {
     state: v.state, updatedAt: v.updatedAt };
 }
 export function validateSnapshot(v) {
-  if (!object(v) || v.schema !== 1 || !uuid(v.generation) || !integer(v.revision) || !object(v.agents)) fail('invalid registry snapshot');
-  return { schema: 1, generation: v.generation, revision: v.revision,
+  if (!object(v) || v.schema !== 2 || !uuid(v.generation) || !integer(v.revision) || !object(v.agents)) fail('invalid registry snapshot');
+  return { schema: 2, generation: v.generation, revision: v.revision,
     agents: Object.fromEntries(Object.entries(v.agents).map(([key, agent]) => [key, validateAgent(agent, key)])) };
 }
 export function validateEvent(v) {

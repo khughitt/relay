@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-09-22T16:41:19Z
-updated: 2026-09-22T16:41:19Z
+updated: 2026-09-23T12:26:23Z
 depends: []
 tags: []
 agent: "claude-code/claude-opus-5[1m]"
@@ -20,3 +20,7 @@ Nothing links the two: a schema bump, a relaxed or tightened validator, a new ha
 Decide how to keep them in step. Options worth weighing: name the consumer in the schema's own documentation so a change knows to look; publish the fixtures (test/fixtures/handles.json and friends) as a shared contract tasks can test against; or version the schema explicitly so tasks can refuse a version it does not know rather than mis-parse one.
 
 Filed from the tasks side after the mirroring landed.
+
+## Notes
+
+- 2026-09-23T12:26:23Z (fix/nested-headless): Relay's registry moves to schema 2 under relay-cb616b; tasks-2dd094 carries the tasks-side reader change

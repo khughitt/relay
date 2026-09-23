@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createProcessOps, parseStat, parseDarwinRow, normalizeDarwinTty, runDarwinPs } from '../src/bus/proc.js';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readlinkSync } from 'node:fs';
 test('proc parsing keeps state and exact field-22 text', () => {
   const after = Array(20).fill('0');
   after[0] = 'Z'; after[1] = '1'; after[4] = '34816'; after[19] = '9007199254740993';
@@ -157,4 +157,51 @@ test('one Linux provider refreshes hostname boot and process start on every prob
   row=stat(42,1,'987655');assert.equal(ops.probe(h).status,'dead');
   row=stat();bootId='22345678-1234-4234-8234-123456789abc';assert.equal(ops.probe(h).reason,'boot changed');
   host='other';assert.equal(ops.probe(h).reason,'foreign host');
+});
+
+const linuxWith = (files, links = {}) => createProcessOps({ platform: 'linux',
+  readText: (p) => { if (!Object.hasOwn(files, p)) throw failure('ENOENT'); if (files[p] instanceof Error) throw files[p]; return files[p]; },
+  readLink: (p) => { if (!Object.hasOwn(links, p)) throw failure('ENOENT'); if (links[p] instanceof Error) throw links[p]; return links[p]; } });
+test('Linux executable path comes from the exe link, and a replaced binary keeps its path', () => {
+  const path = '/home/user/.local/share/claude/versions/2.1.280';
+  assert.equal(linuxWith({}, { '/proc/7/exe': path }).executableOf(7), path);
+  assert.equal(linuxWith({}, { '/proc/7/exe': `${path} (deleted)` }).executableOf(7), path);
+  for (const link of [failure('EACCES'), failure('ENOENT'), 'relative/path', ''])
+    assert.throws(() => linuxWith({}, { '/proc/7/exe': link }).executableOf(7), { code: 'PROCESS_UNREADABLE' });
+});
+test('Linux arguments split the NUL-separated cmdline; an empty cmdline is no arguments', () => {
+  assert.deepEqual(linuxWith({ '/proc/7/cmdline': 'claude\0daemon\0run\0' }).argvOf(7), ['claude', 'daemon', 'run']);
+  assert.deepEqual(linuxWith({ '/proc/7/cmdline': 'claude\0-p\0two words\0' }).argvOf(7), ['claude', '-p', 'two words']);
+  assert.deepEqual(linuxWith({ '/proc/7/cmdline': '' }).argvOf(7), []);
+  for (const text of [failure('EACCES'), failure('ENOENT')])
+    assert.throws(() => linuxWith({ '/proc/7/cmdline': text }).argvOf(7), { code: 'PROCESS_UNREADABLE' });
+});
+test('Darwin executable path and arguments come from one targeted ps each', () => {
+  const calls = [];
+  const ops = createProcessOps({ platform: 'darwin', runPs: (args) => { calls.push(args.join(' '));
+    return args.includes('comm=') ? '/Users/user/.local/share/claude/versions/2.1.280\n' : '/Users/user/.local/bin/claude daemon run\n'; } });
+  assert.equal(ops.executableOf(9), '/Users/user/.local/share/claude/versions/2.1.280');
+  assert.deepEqual(calls, ['-p 9 -o comm=']);
+  const empty = createProcessOps({ platform: 'darwin', runPs: () => '\n' });
+  for (const read of [() => empty.executableOf(9), () => empty.argvOf(9)]) assert.throws(read, { code: 'PROCESS_UNREADABLE' });
+});
+const darwinPs = (comm, args) => createProcessOps({ platform: 'darwin',
+  runPs: (a) => a.includes('comm=') ? `${comm}\n` : a.includes('args=') ? `${args}\n` : '' });
+test('Darwin argv[0] keeps its spaces: comm fixes where it ends, so a daemon is still a daemon', () => {
+  // Review regression: splitting args on whitespace made argv[1] "User/.local/bin/claude".
+  assert.deepEqual(darwinPs('/Users/Test User/.local/bin/claude', '/Users/Test User/.local/bin/claude daemon run').argvOf(9),
+    ['/Users/Test User/.local/bin/claude', 'daemon', 'run']);
+  assert.deepEqual(darwinPs('/Users/user/.local/bin/claude', 'claude daemon run').argvOf(9), ['claude', 'daemon', 'run']);
+  assert.deepEqual(darwinPs('claude', 'claude').argvOf(9), ['claude']);
+});
+test('Darwin argv fails closed when argv[0] cannot be located in args', () => {
+  for (const [comm, args] of [['/Users/Test User/.local/bin/claude', '/Users/Other/claude daemon run'],
+    ['/Users/Test User/.local/bin/claude', '/Users/Test User/.local/bin/claudex daemon'], ['claude', 'claude-helper daemon']])
+    assert.throws(() => darwinPs(comm, args).argvOf(9), { code: 'PROCESS_UNREADABLE' });
+});
+test('real local process exposes its own executable and arguments', () => {
+  const ops = createProcessOps();
+  if (process.platform !== 'linux') return;
+  assert.equal(ops.executableOf(process.pid), readlinkSync('/proc/self/exe'));
+  assert.equal(ops.argvOf(process.pid)[0], process.argv0);
 });

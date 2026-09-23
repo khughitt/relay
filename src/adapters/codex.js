@@ -1,6 +1,7 @@
 import { createProcessOps } from '../bus/proc.js';
 import { relayError } from '../protocol.js';
 import { encodeStandardReply } from './reply.js';
+import { nearestSessionPid, nearestTerminalPid } from './ancestry.js';
 
 export const events = Object.freeze({
   'SessionStart': Object.freeze({ kind: 'session-start', level: 'idle' }),
@@ -25,7 +26,10 @@ export const replies = Object.freeze({
 // SessionEnd and Interrupt default to one second and cap at three.
 export const outerTimeouts = Object.freeze({ default: 600000, SessionEnd: 1000, max: Object.freeze({ SessionEnd: 3000 }) });
 export const encodeReply = (nativeEvent, reply) => encodeStandardReply(nativeEvent, reply, replies[nativeEvent]);
-// Preserve the measured terminal ancestor predicate; the hook itself is index zero.
-export function resolveAgentPid({ startPid = process.pid, ancestors = (pid) => createProcessOps().ancestors(pid) } = {}) {
-  return ancestors(startPid).find((p, i) => i > 0 && p.comm === 'codex' && p.tty !== null)?.pid ?? null;
+const ops = () => createProcessOps();
+export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
+  return nearestSessionPid(ancestors(startPid), { isHarness: (row) => row.comm === 'codex' });
+}
+export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
+  return nearestTerminalPid(ancestors(startPid), 'codex');
 }

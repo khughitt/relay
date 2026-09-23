@@ -1,18 +1,21 @@
 ---
 id: relay-cb616b
 title: "resolveAgentPid climbs past a tty-less harness to an outer one, publishing a nested headless session with its parent's handle"
-status: doing
+status: done
 priority: 1
 size: s
 complexity: high
 process: planned
-owner: main
+owner: fix/nested-headless
 created: 2026-09-23T11:26:33Z
-updated: 2026-09-23T12:19:48Z
+updated: 2026-09-23T16:32:25Z
 started: 2026-09-23T11:38:02Z
+completed: 2026-09-23T16:32:25Z
 depends: []
 tags: [identity]
 agent: "claude-code/claude-opus-5-5[1m]"
+spec: docs/specs/2026-09-23-session-process-handle.md
+plan: docs/plans/2026-09-23-session-process-handle.md
 ---
 
 Observed live 2026-09-23 (tasks-1cfbad): a headless 'claude -p' (setsid, no controlling terminal) run from inside an interactive Claude Code session. Its SessionStart hook published claude-code:<nested session> with process = the OUTER claude's pid/start, because every adapter's resolveAgentPid does ancestors.find(comm === <harness> && tty !== null), skipping the nearest harness when it has no tty and adopting the next one up.
@@ -43,3 +46,21 @@ Fix direction: take the nearest ancestor whose comm is the harness; if it has no
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-23T12:19:48Z (main): resumed
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T12:26:37Z (fix/nested-headless): parked (waiting on user, review): Plan review and execution choice: docs/plans/2026-09-23-session-process-handle.md (5eae79d); then execute steps relay-21ed8f..relay-be0d6e in this worktree
+  provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T12:45:30Z (fix/nested-headless): Plan review: Darwin args splitting could publish a daemon under a home with a space (argv[0] now located by comm, else PROCESS_UNREADABLE; regression tests in Tasks 2-3); live probes now isolate subscribers via a wrapper setting XDG_CONFIG_HOME and --subscribers; spec status moves to Task 6 after the checks pass; background step walks from a child process instead of prompting via attach
+- 2026-09-23T12:45:30Z (fix/nested-headless): parked (waiting on user, review): Plan re-review and execution choice after the Darwin argv, probe isolation and status-timing revisions
+  provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T12:55:36Z (fix/nested-headless): Plan review 3: probe now calls hook --harness NAME --subscribers FILE EVENT (order verified against the real CLI in a scratch dir); background step is a bg-probe script that records the session id and only a new daemon ancestral to it, with EXIT/INT/TERM cleanup and a bg.owned record for Step 7
+- 2026-09-23T12:55:36Z (fix/nested-headless): parked (waiting on user, review): Plan re-review and execution choice after the hook argument order and background-probe ownership fixes
+  provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T13:05:22Z (fix/nested-headless): Plan approved by user (execute subagent-driven)
+- 2026-09-23T13:05:22Z (fix/nested-headless): resumed
+  provenance: {"harness_session":"claude-code:be3ceb58-71ac-4edf-ad48-2caead5c2411","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T13:44:22Z (fix/nested-headless): Final review fixes: runbook precondition names tasks-2dd094 with behavioural fallback; docs/api.md documents REGISTRY_SUPERSEDED code and the schema-1 supersede exceptions; ancestry.json corrects interactive-codex source and adds claude-ancestor-under-codex chain; removed unused reduceState/STATES imports in claude-code.test.js and opencode.test.js
+- 2026-09-23T13:50:22Z (fix/nested-headless): Step 6 live verification (task 6-brief): Step1 PASS (paths under $S, usage-ok). Step2 PASS: interactive session pid=3810957 checked against /proc/3810957/comm=claude and /proc/3810957/stat field7 tty_nr=34831 (nonzero, pts/15). Step3 FAIL: nested 'claude -p --model haiku' (exact brief command, retried once) refused to run the probe, citing 'variable expansion restrictions' on $CLAUDE_CODE_SESSION_ID inside its own Bash tool; relay list --json showed no second row -- no nested-session pid to check. Step4 PASS: bg session pid=475564 checked against claude agents --json (id 90a42baf, comm=2.1.280, --session-id 90a42baf-... in /proc/475564/cmdline); child pid=475706 resolved via adapterFor('claude-code').resolveSessionPid == 475564; owned daemon pid=475535 (claude daemon run --origin transient, ancestor of 475564) cleaned up by trap, confirmed absent from /proc afterward; $S/bg.owned removed; session 90a42baf no longer in claude agents --json. od -c evidence: bg-pty-host pid 475551 and claude-daemon-run pid 475535 cmdlines are NUL-separated ('claude\0bg-pty-host\0...' and '/home/keith/.local/bin/claude\0daemon\0run\0--origin\0transient\0...'), not space-joined. Step5 PASS: codex pid=477260 checked against relay list --json row codex:01a0ce86-c364-7c30-8024-fa9c6a5c9886 with process.pid=477260 (non-null), matching the 'session id' printed by codex exec output. Step6 PASS: after bumping agents.json schema to 1, first list failed with REGISTRY_SUPERSEDED; reap named both prior ids (claude-code:be3ceb58... and codex:01a0ce86...) on stderr; final list showed exactly one fresh schema-2 row for claude-code:be3ceb58-71ac-4edf-92d890fa... (this session). Overall: Step 3 missed its expectation; per brief Step 7 failure path, spec Status left unchanged, no Step 8 commit.
+- 2026-09-23T13:52:37Z (fix/nested-headless): Live Step 3 rerun: nested claude -p published claude-code:9b459a13 with pid 488890 start 96498667, beside the outer claude-code:be3ceb58 at pid 3810957 (comm claude, tty_nr 34831); distinct handles. First attempt failed only because the nested session's permission check refused $CLAUDE_CODE_SESSION_ID expansion in the prompt; rerun used a probe-self wrapper that reads the id itself. Steps 2-6 all met expectations; daemon and bg-pty-host cmdlines confirmed NUL-separated (od -c)
+- 2026-09-23T16:32:25Z (fix/nested-headless): done
+  provenance: {"harness_session":"claude-code:be3ceb58-71ac-4edf-ad48-2caead5c2411","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T16:32:25Z (fix/nested-headless): Session process handle: registry schema 2 with schema-1 supersession, resolveSessionPid/resolveTerminalPid replace resolveAgentPid, ProcessOps exe/argv reads, docs and runbook precondition; verified live on Linux
+  provenance: {"harness_session":"claude-code:be3ceb58-71ac-4edf-ad48-2caead5c2411","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

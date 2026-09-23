@@ -8,7 +8,7 @@ test('Linux start text does not round through a Number', () => {
   }
 });
 test('unknown snapshot schema is not an empty registry', () => {
-  assert.throws(() => validateSnapshot({ schema: 2 }), { code: 'INVALID_SCHEMA' });
+  for (const schema of [1, 3]) assert.throws(() => validateSnapshot({ ...snapshot, schema }), { code: 'INVALID_SCHEMA' });
 });
 import { readFileSync } from 'node:fs';
 import { validateHandle, validateEvent } from '../src/protocol.js';
@@ -24,7 +24,7 @@ test('portable corpus validates its own values', () => {
 });
 const agent = { id: 'codex:s:1', harness: 'codex', sessionId: 's:1', scope: 'session', process: null,
   cwd: '/repo', repoRoot: null, remote: null, projectKey: '/repo', project: 'repo', state: 'idle', updatedAt: 0 };
-const snapshot = { schema: 1, generation: '12345678-1234-4234-8234-123456789abc', revision: 0, agents: { [agent.id]: agent } };
+const snapshot = { schema: 2, generation: '12345678-1234-4234-8234-123456789abc', revision: 0, agents: { [agent.id]: agent } };
 test('snapshot requires every field and strips unknown fields at every level', () => {
   assert.deepEqual(validateSnapshot({ ...snapshot, extra: true, agents: { [agent.id]: { ...agent, prompt: 'private' } } }), snapshot);
   for (const key of Object.keys(agent)) {
