@@ -8,11 +8,12 @@ complexity: high
 process: planned
 owner: main
 created: 2026-09-23T11:26:33Z
-updated: 2026-09-23T11:42:33Z
+updated: 2026-09-23T11:45:42Z
 started: 2026-09-23T11:38:02Z
 depends: []
 tags: [identity]
 agent: "claude-code/claude-opus-5-5[1m]"
+spec: docs/specs/2026-09-23-session-process-handle.md
 ---
 
 Observed live 2026-09-23 (tasks-1cfbad): a headless 'claude -p' (setsid, no controlling terminal) run from inside an interactive Claude Code session. Its SessionStart hook published claude-code:<nested session> with process = the OUTER claude's pid/start, because every adapter's resolveAgentPid does ancestors.find(comm === <harness> && tty !== null), skipping the nearest harness when it has no tty and adopting the next one up.
