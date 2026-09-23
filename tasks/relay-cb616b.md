@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-09-23T11:26:33Z
-updated: 2026-09-23T12:45:30Z
+updated: 2026-09-23T12:55:36Z
 started: 2026-09-23T11:38:02Z
 depends: []
 tags: [identity]
@@ -49,4 +49,7 @@ Fix direction: take the nearest ancestor whose comm is the harness; if it has no
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-23T12:45:30Z (fix/nested-headless): Plan review: Darwin args splitting could publish a daemon under a home with a space (argv[0] now located by comm, else PROCESS_UNREADABLE; regression tests in Tasks 2-3); live probes now isolate subscribers via a wrapper setting XDG_CONFIG_HOME and --subscribers; spec status moves to Task 6 after the checks pass; background step walks from a child process instead of prompting via attach
 - 2026-09-23T12:45:30Z (fix/nested-headless): parked (waiting on user, review): Plan re-review and execution choice after the Darwin argv, probe isolation and status-timing revisions
+  provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T12:55:36Z (fix/nested-headless): Plan review 3: probe now calls hook --harness NAME --subscribers FILE EVENT (order verified against the real CLI in a scratch dir); background step is a bg-probe script that records the session id and only a new daemon ancestral to it, with EXIT/INT/TERM cleanup and a bg.owned record for Step 7
+- 2026-09-23T12:55:36Z (fix/nested-headless): parked (waiting on user, review): Plan re-review and execution choice after the hook argument order and background-probe ownership fixes
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

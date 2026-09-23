@@ -808,7 +808,7 @@ git commit -m "docs(api): document session handles, schema 2 and the activation 
 - Consumes: the built worktree, run by explicit path.
 - Produces: evidence recorded with `tasks note relay-cb616b`; the spec's implemented status.
 
-Every command runs relay by explicit path (`.worktrees/nested-headless/bin/relay.js`, relative to the relay checkout) with **both** its state and its configuration in a scratch directory. `RELAY_STATE_DIR` alone isolates only the registry: `hook` and `reap` would still load `~/.config/relay/subscribers.json` and run live observers against the scratch registry. Every invocation, including those inside the nested and Codex sessions, goes through one wrapper that sets `RELAY_STATE_DIR` and `XDG_CONFIG_HOME` and hands `hook` an explicit empty subscriber file. Nothing is installed and no host pointer changes.
+Every command runs relay by explicit path (`.worktrees/nested-headless/bin/relay.js`, relative to the relay checkout) with **both** its state and its configuration in a scratch directory. `RELAY_STATE_DIR` alone isolates only the registry: `hook` and `reap` would still load `~/.config/relay/subscribers.json` and run live observers against the scratch registry. Every invocation, including those inside the nested and Codex sessions, goes through one wrapper that sets `RELAY_STATE_DIR` and `XDG_CONFIG_HOME`, and every hook passes an explicit empty subscriber file in the order the CLI requires (`hook --harness NAME --subscribers FILE EVENT`). Nothing is installed and no host pointer changes.
 
 - [ ] **Step 1: Prepare the scratch directory, the wrapper and the probe**
 
@@ -819,25 +819,25 @@ S=$(mktemp -d); mkdir -m 700 "$S/state" "$S/config" "$S/config/relay"
 printf '{"schema":1,"subscribers":[]}\n' > "$S/config/relay/subscribers.json"; chmod 600 "$S/config/relay/subscribers.json"
 cat > "$S/relay" <<EOF
 #!/bin/sh
-# Scratch-only relay: private registry, private empty subscribers, worktree code.
+# Scratch-only relay: private registry, private configuration, worktree code.
 export RELAY_STATE_DIR="$S/state" XDG_CONFIG_HOME="$S/config"
-case "\$1" in
-  hook) shift; exec node "$PWD/bin/relay.js" hook --subscribers "$S/config/relay/subscribers.json" "\$@" ;;
-  *) exec node "$PWD/bin/relay.js" "\$@" ;;
-esac
+exec node "$PWD/bin/relay.js" "\$@"
 EOF
 chmod 700 "$S/relay"
 cat > "$S/probe" <<EOF
 #!/bin/sh
-# Fire one SessionStart for the calling session through the scratch wrapper.
+# Fire one SessionStart for the calling session through the scratch wrapper, with the
+# explicit empty subscriber file. The CLI requires --harness NAME directly after hook.
 # \$1: harness; \$2: that harness's own session id.
-printf '{"session_id":"%s","cwd":"%s","hook_event_name":"SessionStart"}' "\$2" "\$PWD" | "$S/relay" hook --harness "\$1" SessionStart
+printf '{"session_id":"%s","cwd":"%s","hook_event_name":"SessionStart"}' "\$2" "\$PWD" \\
+  | "$S/relay" hook --harness "\$1" --subscribers "$S/config/relay/subscribers.json" SessionStart
 EOF
 chmod 700 "$S/probe"
 RELAY_STATE_DIR="$S/state" XDG_CONFIG_HOME="$S/config" node --input-type=module -e "import {paths} from './src/index.js'; console.log(JSON.stringify(paths()))"
+"$S/relay" hook --help >/dev/null && echo usage-ok
 ```
 
-Expected: the printed `stateDir`, `configDir` and `subscribersPath` all lie under `$S`. If `hook --subscribers` refuses the file for its mode or owner, fix the file; never drop the flag.
+Expected: the printed `stateDir`, `configDir` and `subscribersPath` all lie under `$S`, and `usage-ok`. If `hook --subscribers` refuses the file for its mode or owner, fix the file; never drop the flag.
 
 - [ ] **Step 2: Interactive session**
 
@@ -860,16 +860,54 @@ Expected: a second row whose `process.pid` is the nested `claude` process, not t
 
 A `claude --bg` session starts idle and cannot be prompted without `claude attach`, which is interactive. Instead of firing a hook in it, walk from one of its child processes with the real `ProcessOps`: that is the chain a hook there would see.
 
+The probe owns what it creates and nothing else. Before launching, it records the background session ids and `claude daemon run` pids that already exist. After launching, it claims exactly the one new session id, and claims a daemon only if that daemon is both new and an ancestor of the session process, recording its start time. The ownership record goes to `$S/bg.owned` before anything else runs, so even an untrappable kill leaves Step 7 something to clean up. An `EXIT` trap, reached from `INT` and `TERM` too, stops and removes only the owned session. It then waits up to 60 s for the owned daemon to exit, and kills it only if the same process, with the same start time, is still there. A daemon that predates the probe is never touched.
+
 ```bash
-claude --bg --model haiku < /dev/null          # note the printed short id, below <id>
-P=$(claude agents --json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).find(a=>a.sessionId.startsWith('<id>')).pid))")
-C=$(ps --ppid "$P" -o pid= | head -1 | tr -d ' ')
-node --input-type=module -e "import {adapterFor} from './src/index.js'; console.log(adapterFor('claude-code').resolveSessionPid({startPid: $C}))"
-cat /proc/$P/comm; tr '\0' ' ' < /proc/$P/cmdline; echo
-claude stop <id>; claude rm <id>
+cat > "$S/bg-probe" <<'EOF'
+#!/usr/bin/env bash
+# Usage: bg-probe <scratch dir> <worktree root>
+set -euo pipefail
+S=$1 W=$2
+bg_ids() { claude agents --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{for(const a of JSON.parse(d))if(a.id)console.log(a.id)})'; }
+pid_of() { claude agents --json | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).find(a=>a.id===process.argv[1]).pid))' "$1"; }
+daemons() { pgrep -f '^([^ ]*/)?claude daemon run' || true; }
+start_of() { awk '{print $22}' "/proc/$1/stat" 2>/dev/null || true; }   # comm "claude" has no spaces
+parent_of() { awk '{print $4}' "/proc/$1/stat" 2>/dev/null || echo 1; }
+is_ancestor() { local p=$2; while [ "$p" -gt 1 ]; do p=$(parent_of "$p"); [ "$p" = "$1" ] && return 0; done; return 1; }
+OWNED_ID="" OWNED_DAEMON="" DAEMON_START=""
+record() { printf 'id=%s\ndaemon=%s\ndaemon_start=%s\n' "$OWNED_ID" "$OWNED_DAEMON" "$DAEMON_START" > "$S/bg.owned"; }
+cleanup() {
+  if [ -n "$OWNED_ID" ]; then claude stop "$OWNED_ID" >/dev/null 2>&1 || true; claude rm "$OWNED_ID" >/dev/null 2>&1 || true; fi
+  if [ -n "$OWNED_DAEMON" ]; then
+    for _ in $(seq 60); do [ "$(start_of "$OWNED_DAEMON")" = "$DAEMON_START" ] || break; sleep 1; done
+    if [ "$(start_of "$OWNED_DAEMON")" = "$DAEMON_START" ]; then kill "$OWNED_DAEMON"; echo "stopped owned daemon $OWNED_DAEMON" >&2; fi
+  fi
+  rm -f "$S/bg.owned"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+before_ids=$(bg_ids); before_daemons=$(daemons)
+claude --bg --model haiku < /dev/null > /dev/null
+new_ids=$(comm -13 <(sort <<<"$before_ids") <(bg_ids | sort))
+[ "$(grep -c . <<<"$new_ids" || true)" = 1 ] || { echo "expected one new background session, found: $new_ids" >&2; exit 1; }
+OWNED_ID=$new_ids; record
+P=$(pid_of "$OWNED_ID")
+for d in $(daemons); do
+  grep -qx "$d" <<<"$before_daemons" && continue
+  is_ancestor "$d" "$P" && { OWNED_DAEMON=$d; DAEMON_START=$(start_of "$d"); record; }
+done
+C=""; for _ in $(seq 10); do C=$(ps --ppid "$P" -o pid= | head -1 | tr -d ' '); [ -n "$C" ] && break; sleep 1; done
+[ -n "$C" ] || { echo "session $P has no child process to walk from" >&2; exit 1; }
+R=$(cd "$W" && node --input-type=module -e "import {adapterFor} from './src/index.js'; console.log(adapterFor('claude-code').resolveSessionPid({startPid: $C}))")
+echo "session=$OWNED_ID pid=$P child=$C resolved=$R comm=$(cat /proc/$P/comm) daemon=${OWNED_DAEMON:-none}"
+tr '\0' ' ' < "/proc/$P/cmdline"; echo
+[ "$R" = "$P" ] || { echo "resolved $R, expected the session process $P" >&2; exit 1; }
+EOF
+chmod 700 "$S/bg-probe"
+"$S/bg-probe" "$S" "$PWD"
 ```
 
-Expected: the printed pid equals `$P`, whose `comm` is the `2.1.x` version and whose cmdline carries `--session-id` with the session's full id. If `$C` is empty (the session has no child yet), rerun the `ps` line after a few seconds. After `rm`, `pgrep -af "daemon run"` shows the transient daemon gone within a minute; if it stays, record its pid in the task note and stop it with `kill <pid>`.
+Expected: exit 0; `resolved` equals `pid`; `comm` is the `2.1.x` version; the printed cmdline carries `--session-id` with the session's full id; afterwards `claude agents --json` no longer lists the session and `$S/bg.owned` is gone. `daemon=none` means an existing daemon hosted the session and was left alone.
 
 - [ ] **Step 5: Headless Codex**
 
@@ -891,7 +929,7 @@ Expected: the first `list` fails with `REGISTRY_SUPERSEDED`; `reap` names every 
 
 - [ ] **Step 7: Record the evidence and clean up**
 
-`tasks note relay-cb616b "<each pid and what it was checked against>"`, confirm `host-load --section session` reports nothing left running, and `rm -rf "$S"`. If any of Steps 2–6 missed its expectation, stop here: note what was observed, leave the spec's status alone, and park the task with the failing step as the next action.
+If `$S/bg.owned` still exists, the background probe was killed before its trap ran: run `claude stop <id>` and `claude rm <id>` for the `id` it names, and stop the `daemon` it names only if field 22 of `/proc/<daemon>/stat` still equals its `daemon_start`. Then `tasks note relay-cb616b "<each pid and what it was checked against>"`, confirm `host-load --section session` reports nothing left running, and `rm -rf "$S"`. If any of Steps 2–6 missed its expectation, stop here: note what was observed, leave the spec's status alone, and park the task with the failing step as the next action.
 
 - [ ] **Step 8: Mark the spec implemented**
 
