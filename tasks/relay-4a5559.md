@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-09-22T16:41:19Z
-updated: 2026-09-23T12:26:23Z
+updated: 2026-09-23T20:55:42Z
 depends: []
 tags: []
 agent: "claude-code/claude-opus-5[1m]"
@@ -24,3 +24,4 @@ Filed from the tasks side after the mirroring landed.
 ## Notes
 
 - 2026-09-23T12:26:23Z (fix/nested-headless): Relay's registry moves to schema 2 under relay-cb616b; tasks-2dd094 carries the tasks-side reader change
+- 2026-09-23T20:55:42Z (main): tasks-2dd094 (tasks 88bd28d) vendors ancestry.json byte for byte at a pinned relay revision and refuses any registry schema but 2, so a process-selection or schema change now fails a tasks test or refuses loudly after a refresh. handles.json is still copied inline; tasks-a3e44f in tasks covers vendoring it.
