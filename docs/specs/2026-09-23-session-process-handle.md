@@ -1,6 +1,6 @@
 # The session's own process as the agent handle
 
-Status: draft for review, 2026-09-23; revised after two reviews (rollout safety, recovery, held-claim precondition).
+Status: implemented and verified live on Linux, 2026-09-23 (Darwin unmeasured, see Out of scope).
 Task: `relay-cb616b`.
 Parent design: ops `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`),
 section "Process discovery must be separated from terminal discovery".
