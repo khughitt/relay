@@ -32,7 +32,7 @@ test('missing listing is readonly and removal/reap never fabricate snapshots',as
 });
 test('corrupt unknown invalid and null state are never overwritten',async t=>{
   const p=await tempState(t);
-  for(const text of ['{ broken','{"schema":2}','null','[]','{}']) {
+  for(const text of ['{ broken','{"schema":3}','null','[]','{}']) {
     await fs.writeFile(p.agentsPath,text,{mode:0o600});
     await assert.rejects(applyEvent(event(),localObservation(p)));
     assert.equal(await fs.readFile(p.agentsPath,'utf8'),text);
@@ -85,4 +85,40 @@ test('committed snapshot remains honestly visible after cleanup failure',async t
   }}});
   assert.equal(result.changed,true);assert.equal(result.snapshot.revision,1);assert.deepEqual(await readSnapshot({paths:p}),result.snapshot);
   assert.ok(result.diagnostics.some(d=>d.code==='LOCK_CLEANUP_FAILED'&&d.message.includes('publication completed')));
+});
+const v1=(agents)=>JSON.stringify({schema:1,generation:'12345678-1234-4234-8234-123456789abc',revision:7,agents});
+const row=(id,pid)=>({id,harness:'claude-code',sessionId:id.slice('claude-code:'.length),scope:'session',
+  process:{platform:'linux',host:'h',bootId:null,pid,start:'1'},cwd:'/repo',repoRoot:null,remote:null,projectKey:'/repo',project:'repo',state:'idle',updatedAt:0});
+test('a schema-1 registry is refused by reads and left untouched',async t=>{
+  const p=await tempState(t),text=v1({'claude-code:outer':row('claude-code:outer',42)});await fs.writeFile(p.agentsPath,text,{mode:0o600});
+  for(const read of [()=>readSnapshot({paths:p}),()=>listAgents({paths:p})])await assert.rejects(read(),{code:'REGISTRY_SUPERSEDED'});
+  assert.equal(await fs.readFile(p.agentsPath,'utf8'),text);
+});
+test('reap supersedes a contaminated schema-1 registry: empty, fresh generation, every id reported',async t=>{
+  const p=await tempState(t);
+  await fs.writeFile(p.agentsPath,v1({'claude-code:outer':row('claude-code:outer',42),'claude-code:nested':row('claude-code:nested',42)}),{mode:0o600});
+  const r=await reapRegistry({paths:p});
+  assert.equal(r.changed,true);assert.equal(r.snapshot.schema,2);assert.equal(r.snapshot.revision,1);
+  assert.notEqual(r.snapshot.generation,'12345678-1234-4234-8234-123456789abc');assert.deepEqual(r.snapshot.agents,{});
+  assert.deepEqual(r.diagnostics.filter(d=>d.code==='REGISTRY_SUPERSEDED').map(d=>d.agentId).sort(),['claude-code:nested','claude-code:outer']);
+  assert.deepEqual(await readSnapshot({paths:p}),r.snapshot);
+});
+test('an event supersedes a schema-1 registry and publishes only itself',async t=>{
+  const p=await tempState(t);await fs.writeFile(p.agentsPath,v1({'claude-code:nested':row('claude-code:nested',42)}),{mode:0o600});
+  const r=await applyEvent(event(),localObservation(p));
+  assert.deepEqual(Object.keys(r.snapshot.agents),['codex:test']);assert.equal(r.snapshot.schema,2);
+  assert.ok(r.diagnostics.some(d=>d.code==='REGISTRY_SUPERSEDED'&&d.agentId==='claude-code:nested'));
+});
+test('a SessionEnd supersedes a schema-1 registry even though it removes nothing',async t=>{
+  const p=await tempState(t);await fs.writeFile(p.agentsPath,v1({'claude-code:nested':row('claude-code:nested',42)}),{mode:0o600});
+  const r=await applyEvent(event('codex','SessionEnd'),{paths:p});
+  assert.equal(r.changed,true);assert.deepEqual(r.snapshot.agents,{});assert.equal((await readSnapshot({paths:p})).schema,2);
+});
+test('a schema-1 file with no usable agents object is still superseded',async t=>{
+  const p=await tempState(t);
+  for(const text of ['{"schema":1}','{"schema":1,"agents":[]}','{"schema":1,"agents":null}']){
+    await fs.writeFile(p.agentsPath,text,{mode:0o600});const r=await reapRegistry({paths:p});
+    assert.deepEqual(r.diagnostics.filter(d=>d.code==='REGISTRY_SUPERSEDED'),[{code:'REGISTRY_SUPERSEDED',message:'replaced a schema-1 registry with no agents'}]);
+    assert.equal((await readSnapshot({paths:p})).schema,2);
+  }
 });

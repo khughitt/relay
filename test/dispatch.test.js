@@ -29,7 +29,7 @@ async function hook(p, { harness = 'claude-code', nativeEvent = 'PreToolUse', bo
 }
 const denyOut = '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":';
 const absent = async (path) => access(path).then(() => false, () => true);
-const published = { snapshot: { schema: 1, generation: '00000000-0000-4000-8000-000000000000', revision: 1, agents: {} }, changed: true, reaped: [], diagnostics: [] };
+const published = { snapshot: { schema: 2, generation: '00000000-0000-4000-8000-000000000000', revision: 1, agents: {} }, changed: true, reaped: [], diagnostics: [] };
 const slow = (value, ms) => () => new Promise((resolve) => setTimeout(() => resolve(value), ms));
 
 test('no subscribers: the event publishes and the reply is an empty allow', async (t) => {
@@ -310,7 +310,7 @@ test('a slow observer never delays a denial and observers run only within their 
   // A publication that fulfills after its deadline is rejected and no observer runs.
   await writeSubscribers(p, [strip(observer('never', 'record', { file: join(p.stateDir, '..', 'never'), timeoutMs: 100 }))]);
   let now = 0;
-  const published = { snapshot: { schema: 1, generation: '00000000-0000-4000-8000-000000000000', revision: 1, agents: {} }, changed: true, reaped: [], diagnostics: [] };
+  const published = { snapshot: { schema: 2, generation: '00000000-0000-4000-8000-000000000000', revision: 1, agents: {} }, changed: true, reaped: [], diagnostics: [] };
   r = await hook(p, { outerMs: 1500, deps: { clock: () => now, apply: async () => { now = 1300; return published; } } });
   assert.match(r.stderr, /registry: DEADLINE_EXCEEDED: registry publication did not finish before the deadline/);
   assert.match(r.stderr, /SUBSCRIBER_SKIPPED: never skipped after registry failure/);

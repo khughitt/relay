@@ -14,7 +14,7 @@ test('absent snapshot CLI has exact JSON and creates no directory',async t=>{
 });
 test('list errors are a single JSON envelope on stderr; unknown and null schemas are errors',async t=>{
   const p=await tempState(t);
-  for(const [content,code] of [['{broken','CORRUPT_STATE'],['{"schema":2}','INVALID_SCHEMA'],['null','INVALID_SCHEMA']]) {
+  for(const [content,code] of [['{broken','CORRUPT_STATE'],['{"schema":1}','REGISTRY_SUPERSEDED'],['{"schema":3}','INVALID_SCHEMA'],['null','INVALID_SCHEMA']]) {
     await fs.writeFile(p.agentsPath,content,{mode:0o600});const r=run(p,['list','--json']);assert.equal(r.status,1);assert.equal(r.stdout,'');
     const error=JSON.parse(r.stderr).error;assert.equal(error.kind,'list_failed');assert.match(error.detail,new RegExp(`^${code}: `));
     assert.equal(r.stderr.trim().split('\n').length,1);
@@ -105,4 +105,11 @@ import { main } from '../bin/relay.js';
 test('post-publication cleanup failure exits nonzero and states publication completed',async()=>{
   let out='',err='';const code=await main(['reap'],{stdout:{write:(s,cb)=>{out+=s;cb?.();}},stderr:{write:(s,cb)=>{err+=s;cb?.();}},reap:async()=>({result:{reaped:['codex:dead'],changed:true,diagnostics:[{code:'LOCK_CLEANUP_FAILED',message:'publication completed; lock cleanup failed'}]},diagnostics:[]})});
   assert.equal(code,1);assert.equal(out,'Reaped 1 agent(s).\n');assert.match(err,/publication completed/);assert.equal(err.includes('rolled back'),false);
+});
+test('relay reap supersedes a schema-1 registry and names each dropped agent on stderr',async t=>{
+  const p=await tempState(t);
+  await fs.writeFile(p.agentsPath,JSON.stringify({schema:1,generation:'12345678-1234-4234-8234-123456789abc',revision:3,agents:{'codex:old':{}}}),{mode:0o600});
+  const r=run(p,['reap']);assert.equal(r.status,0);assert.equal(r.stdout,'Reaped 0 agent(s).\n');
+  assert.match(r.stderr,/^REGISTRY_SUPERSEDED: dropped codex:old from a superseded schema-1 registry$/m);
+  const listed=run(p,['list','--json']);assert.equal(listed.status,0);assert.equal(JSON.parse(listed.stdout).snapshot.schema,2);
 });
