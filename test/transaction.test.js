@@ -122,3 +122,36 @@ test('a schema-1 file with no usable agents object is still superseded',async t=
     assert.equal((await readSnapshot({paths:p})).schema,2);
   }
 });
+const chainOps=(chains)=>({
+  ancestors:(pid)=>chains[pid],
+  executableOf:(pid)=>{throw new Error(`exe of ${pid} must not be read`);},
+  argvOf:()=>['claude'],
+  handleOf:(pid)=>({platform:'linux',host:'h',bootId:'12345678-1234-1234-8234-123456789abc',pid,start:String(pid)}),
+  probe:()=>({status:'alive',reason:'test'}),
+  recordOf:()=>null});
+const observe=(p,ops)=>({paths:p,processOps:ops,gitContext:async()=>({remote:null,repoRoot:null})});
+const claudeEvent=(session)=>normalizeEvent('claude-code','SessionStart',JSON.stringify({session_id:session,cwd:'/repo'}));
+// outer: hook 101 under claude 100 (tty). nested: hook 201 under claude 200 (no tty) under claude 100.
+const nested={101:[{pid:101,comm:'node',tty:null},{pid:100,comm:'claude',tty:true}],
+  201:[{pid:201,comm:'node',tty:null},{pid:200,comm:'claude',tty:null},{pid:150,comm:'zsh',tty:null},{pid:100,comm:'claude',tty:true}]};
+test('a nested headless session publishes its own process, beside its parent',async t=>{
+  const p=await tempState(t),ops=chainOps(nested);
+  await applyEvent(claudeEvent('outer'),{...observe(p,ops),resolveSessionPid:(a)=>a.resolveSessionPid({startPid:101,ancestors:ops.ancestors,executableOf:ops.executableOf,argvOf:ops.argvOf})});
+  const r=await applyEvent(claudeEvent('nested'),{...observe(p,ops),resolveSessionPid:(a)=>a.resolveSessionPid({startPid:201,ancestors:ops.ancestors,executableOf:ops.executableOf,argvOf:ops.argvOf})});
+  assert.equal(r.snapshot.agents['claude-code:outer'].process.pid,100);
+  assert.equal(r.snapshot.agents['claude-code:nested'].process.pid,200);
+});
+test('a contaminated schema-1 registry recovers: reap, then the outer event, leaves one correct row',async t=>{
+  const p=await tempState(t),ops=chainOps(nested),borrowed={platform:'linux',host:'h',bootId:null,pid:100,start:'100'};
+  const agent=(session)=>({id:`claude-code:${session}`,harness:'claude-code',sessionId:session,scope:'session',process:borrowed,
+    cwd:'/repo',repoRoot:null,remote:null,projectKey:'/repo',project:'repo',state:'idle',updatedAt:0});
+  const contaminated=JSON.stringify({schema:1,generation:'12345678-1234-4234-8234-123456789abc',revision:9,
+    agents:{'claude-code:outer':agent('outer'),'claude-code:nested':agent('nested')}});
+  for(const first of ['reap','event']){
+    await fs.writeFile(p.agentsPath,contaminated,{mode:0o600});
+    if(first==='reap')await reapRegistry({paths:p,processOps:ops});
+    const r=await applyEvent(claudeEvent('outer'),{...observe(p,ops),resolveSessionPid:(a)=>a.resolveSessionPid({startPid:101,ancestors:ops.ancestors,executableOf:ops.executableOf,argvOf:ops.argvOf})});
+    assert.deepEqual(Object.keys(r.snapshot.agents),['claude-code:outer'],first);
+    assert.equal(r.snapshot.agents['claude-code:outer'].process.pid,100,first);
+  }
+});
