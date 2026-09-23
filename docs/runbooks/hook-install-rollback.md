@@ -11,3 +11,17 @@ After a Codex apply, re-trust the changed hooks in Codex. The installer never wr
 Rollback uses only the artifact: `relay rollback --artifact FILE`. For each change, `after` restores `before`, `before` is skipped, and any other bytes refuse. A partial cutover can therefore be completed with install or recovered with rollback. OpenCode modifies only its server plugin entry; it never touches `tui.json`.
 
 Guard/context bindings require the real evidence record produced by `ops-c8e4d1`; fixture artifacts are not live capability proof.
+
+## Activating session handles (registry schema 2)
+
+Before a schema-2 relay publishes on a host where tasks' relay identity is on
+(`[identity] relay = true` in tasks' host config), every `tasks` binary that can run
+there must carry the session-process walk: check each `tasks` that each harness's
+environment resolves on `PATH`, not only the main checkout's. An older tasks refuses
+a schema-2 registry for new claims, but can still continue a claim it already holds
+from process proof alone, and its older walk can prove a nested session to be its
+parent. A host with the opt-in off is not exposed.
+
+After upgrading relay, run `relay reap` once. It replaces a schema-1 registry with an
+empty schema-2 one and names every dropped agent on stderr; each live session
+reappears with its own handle at its next hook event. No session restart is needed.

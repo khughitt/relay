@@ -23,7 +23,10 @@ Read the [API contract](docs/api.md) and
 [operator lock-repair procedure](docs/runbooks/registry-lock-repair.md).
 State uses RELAY_STATE_DIR, otherwise XDG_STATE_HOME/relay or the home directory's
 .local/state/relay. Supply a privately owned 0700 state directory; existing 0755
-is rejected, never silently changed.
+is rejected, never silently changed. The registry is schema 2: each agent's handle
+names the session's own process. Upgrading from schema 1 is `relay reap`, and on a
+host using tasks' relay identity, tasks is upgraded first; see the
+[hook install runbook](docs/runbooks/hook-install-rollback.md#activating-session-handles-registry-schema-2).
 
 R2 adds `relay hook` and reconciling `relay reap`; subscribers come from
 `~/.config/relay/subscribers.json` for a direct `relay hook`, and from the
