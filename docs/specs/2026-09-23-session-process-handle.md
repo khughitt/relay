@@ -1,6 +1,6 @@
 # The session's own process as the agent handle
 
-Status: draft for review, 2026-09-23; revised after review (rollout safety, recovery).
+Status: draft for review, 2026-09-23; revised after two reviews (rollout safety, recovery, held-claim precondition).
 Task: `relay-cb616b`.
 Parent design: ops `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`),
 section "Process discovery must be separated from terminal discovery".
@@ -164,10 +164,29 @@ answers both.
 version-named ancestors. Given new relay rows and the chain tasks → `2.1.280` → `claude`,
 an old tasks lands on the outer `claude`, finds the outer session's correct row, and,
 with no session hint or an inherited outer one, claims as the outer session. This was
-reproduced with process shims in review. Ordering the rollouts cannot prevent it,
-because relay and tasks are installed separately on each host. The schema can: every
-consumer validates `schema`, and tasks rejects anything but `1`. A schema-2 registry is
-therefore a refusal for an old tasks, never an identity.
+reproduced with process shims in review. The hazard has two paths, and the schema
+closes only one:
+
+- *Fresh acquisition* reads the registry. tasks validates `schema` and rejects anything
+  but `1`, so against a schema-2 registry an old tasks refuses instead of matching.
+- *Continuing a held claim* does not read the registry. With relay identity on, tasks
+  establishes ownership from the process proof the claim recorded and the caller's
+  nearest harness ancestor (tasks `ownership` and `proves_ownership`). An old tasks
+  still walks past `2.1.280` to the outer `claude`, so a nested session can `start`,
+  `park` and `done` the outer session's claimed tasks as `claude-code:<outer>`. Review
+  reproduced this against a schema-2 registry: the nested process's fresh acquisition
+  was refused, while `start` and then `done` on the outer session's existing claim both
+  succeeded.
+
+No binary can refuse on behalf of an older one, so the second path is closed by a
+rollout precondition, not by the format: **on a host where tasks' relay identity is on
+(`[identity] relay = true`), every `tasks` binary that can run there is the updated one
+before a schema-2 relay publishes on that host.** A host with the opt-in off is not
+exposed, because tasks consults proof only in relay mode. Today no host has both relay
+hooks installed and the opt-in on, so the precondition holds trivially; it becomes an
+activation step in relay's installer runbook and in tasks' README section on the
+opt-in, which names the first tasks release carrying the new walk. The operator checks
+every `tasks` on `PATH` for each harness's environment, not only the main checkout's.
 
 **Rows written under the old rule.** A registry written by old relay can hold a row
 that borrowed another session's handle, such as an exited nested session carrying its
@@ -204,10 +223,11 @@ supersession message above, not read. The refusal text from `tasks-962300` and t
 README paragraph about headless sessions become wrong once a headless session carries a
 handle; both change with it. tasks keeps refusing on a null handle; only the reasons it
 can meet change. This is a tasks task with its own review, filed when this spec is
-approved. Either side may ship first, because each version pairing fails closed: old
-tasks refuses a schema-2 registry, and new tasks refuses a schema-1 one. The tasks task
-lands before relay's resolver is released, so that relay identity keeps working across
-the upgrade rather than refusing until tasks catches up.
+approved, and it lands before relay's resolver is released. Only fresh acquisition
+fails closed in both version pairings (old tasks refuses a schema-2 registry, new tasks
+refuses a schema-1 one). Held-claim continuation by an old tasks under a new relay does
+not, which is why **Rollout and recovery** makes the updated tasks a per-host
+precondition for activating schema-2 relay.
 
 **familiar** (`fam-6e8321`, not yet migrated) calls `resolveTerminalPid` wherever it
 used the old function for emission, niri window lookup or statusline, and reads
@@ -249,9 +269,15 @@ in familiar changes now.
   session's next event publishes one row with its own handle; tasks then claims as the
   outer session. The same starting file, handed to an `applyEvent` instead of a reap,
   ends in the same state.
-- Mixed versions, fail closed in both directions: the tasks schema-1 reader against a
-  schema-2 registry refuses, and the new tasks reader against a schema-1 registry
-  refuses with the supersession message.
+- Mixed versions, fresh acquisition: the tasks schema-1 reader against a schema-2
+  registry refuses, and the new tasks reader against a schema-1 registry refuses with
+  the supersession message.
+- Held claim, the case the schema cannot cover: the outer session holds a claim
+  recorded with its own proof, and a nested process runs `2.1.280` under it with no
+  session hint or with the outer one inherited. New tasks refuses `start`, `park` and
+  `done` there, because its nearest harness is the `2.1.280` process, whose pid is not
+  the claim's. The same scenario against the current tasks is recorded as the hazard
+  the precondition exists for, not as a guarantee.
 - The review's chain, tasks → `2.1.280` → `claude`, with a correct outer row present and
   no session hint: new tasks resolves its nearest harness to the `2.1.280` process and
   refuses when that process has no row. It never claims as the outer session.
