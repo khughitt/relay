@@ -6,9 +6,9 @@ priority: 1
 size: s
 complexity: high
 process: planned
-owner: main
+owner: fix/nested-headless
 created: 2026-09-23T11:26:33Z
-updated: 2026-09-23T12:55:36Z
+updated: 2026-09-23T13:05:22Z
 started: 2026-09-23T11:38:02Z
 depends: []
 tags: [identity]
@@ -53,3 +53,6 @@ Fix direction: take the nearest ancestor whose comm is the harness; if it has no
 - 2026-09-23T12:55:36Z (fix/nested-headless): Plan review 3: probe now calls hook --harness NAME --subscribers FILE EVENT (order verified against the real CLI in a scratch dir); background step is a bg-probe script that records the session id and only a new daemon ancestral to it, with EXIT/INT/TERM cleanup and a bg.owned record for Step 7
 - 2026-09-23T12:55:36Z (fix/nested-headless): parked (waiting on user, review): Plan re-review and execution choice after the hook argument order and background-probe ownership fixes
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T13:05:22Z (fix/nested-headless): Plan approved by user (execute subagent-driven)
+- 2026-09-23T13:05:22Z (fix/nested-headless): resumed
+  provenance: {"harness_session":"claude-code:be3ceb58-71ac-4edf-ad48-2caead5c2411","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
