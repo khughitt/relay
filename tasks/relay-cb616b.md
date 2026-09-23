@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-09-23T11:26:33Z
-updated: 2026-09-23T12:26:06Z
+updated: 2026-09-23T12:26:37Z
 started: 2026-09-23T11:38:02Z
 depends: []
 tags: [identity]
@@ -44,4 +44,6 @@ Fix direction: take the nearest ancestor whose comm is the harness; if it has no
 - 2026-09-23T12:19:15Z (main): parked (waiting on user, review): Spec re-review after held-claim precondition (6752aa4); on approval, writing-plans, then file the tasks-side mirror task
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-23T12:19:48Z (main): resumed
+  provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T12:26:37Z (fix/nested-headless): parked (waiting on user, review): Plan review and execution choice: docs/plans/2026-09-23-session-process-handle.md (5eae79d); then execute steps relay-21ed8f..relay-be0d6e in this worktree
   provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
