@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-09-23T11:26:33Z
-updated: 2026-09-23T11:40:26Z
+updated: 2026-09-23T11:40:37Z
 started: 2026-09-23T11:38:02Z
 depends: []
 tags: [identity]
@@ -29,3 +29,5 @@ Fix direction: take the nearest ancestor whose comm is the harness; if it has no
 - 2026-09-23T11:39:26Z (main): Reassessed to planned/high: needs a design for separating session-process identity from terminal discovery; measuring the claude --bg shape (session ids, cmdlines) first
 - 2026-09-23T11:40:26Z (main): Measured claude 2.1.280 --bg (session 9a2732d5): session process comm '2.1.280' (.../claude/versions/2.1.280 --session-id <id>) owns its own pty (tty 34836); parents are bg-pty-host (comm 2.1.280, no tty) -> 'claude daemon run --origin transient' (no tty) -> systemd --user. comm==='claude' never matches the session process itself
 - 2026-09-23T11:40:26Z (main): Consequence: in the spike's shape (daemon parented by an interactive claude) the tty predicate attributes a background session to the interactive terminal's session, the same misattribution as nested claude -p; under systemd it yields null and discards a provable handle. The handle's two readers want different processes: familiar wants the terminal to paint, identity wants the session's own process
+- 2026-09-23T11:40:37Z (main): parked (waiting on user, decision): Design spec: separate the session-process handle (nearest harness process, tty not required) from terminal discovery; awaiting the direction decision, then brainstorm and draft in docs/specs from worktree .worktrees/nested-headless
+  provenance: {"harness_session":"claude-code:22eb583d-5fc2-4364-a75c-e302907e2e4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
