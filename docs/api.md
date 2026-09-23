@@ -194,14 +194,19 @@ A hook PID or shell session ID is never substituted for a missing harness proces
 
 Missing agents.json returns snapshot:null and empty liveness, without directory
 creation. Corrupt JSON is CORRUPT_STATE; present JSON null, invalid records and
-unknown schemas are INVALID_SCHEMA. None is interpreted as an empty registry.
-Internal readJson uses undefined to distinguish absence from parsed JSON null.
-readSnapshot and listAgents do not lock, prune, create, chmod or rewrite files.
+unknown schemas are INVALID_SCHEMA. None is interpreted as an empty registry,
+except a schema-1 file: a read of one fails with REGISTRY_SUPERSEDED instead of
+being treated as absent (see the schema-2 paragraph above). Internal readJson uses
+undefined to distinguish absence from parsed JSON null. readSnapshot and
+listAgents do not lock, prune, create, chmod or rewrite files.
 
 An upsert publishes revision 1 with a fresh generation UUID if no snapshot exists.
 Every observed upsert increments revision, even repeated state. Removal and reap
-publish only when keys change; an absent/no-change result remains null/unchanged.
-Recreation starts a new generation. Revision overflow fails before publication.
+publish only when keys change, except a mutation that finds a schema-1 file: it
+replaces the file with an empty schema-2 snapshot under a fresh generation and
+always publishes (see the schema-2 paragraph above); otherwise an absent/no-change
+result remains null/unchanged. Recreation starts a new generation. Revision
+overflow fails before publication.
 Git and agent resolution occur before locking; latest-state reduction and one
 canonical atomic snapshot publication occur under the lock. SessionEnd skips
 Git/process enrichment and removes its exact ID. Confirmed-dead pruning still
@@ -453,8 +458,8 @@ INPUT_TOO_LARGE, INPUT_TIMEOUT, UNSUPPORTED_EVENT, UNSUPPORTED_HARNESS,
 INVALID_SCHEMA, CORRUPT_STATE, PROCESS_UNREADABLE, PROCESS_UNAVAILABLE,
 DEADLINE_EXCEEDED, LOCK_TIMEOUT, LOCK_IDENTITY_UNKNOWN, LOCK_REPAIR_REQUIRED,
 LOCK_CLEANUP_FAILED, LOCK_OWNERSHIP_LOST, IO_ERROR, GIT_ERROR, USAGE,
-INVALID_REPLY, UNSUPPORTED_REPLY, INVALID_CONFIG, INVALID_EVIDENCE, UNSUPPORTED_BINDING and
-GUARD_FAILED.
+INVALID_REPLY, UNSUPPORTED_REPLY, INVALID_CONFIG, INVALID_EVIDENCE, UNSUPPORTED_BINDING,
+GUARD_FAILED and REGISTRY_SUPERSEDED.
 Unknown lock ownership at deadline is LOCK_IDENTITY_UNKNOWN;
 a live holder exceeding caller patience is LOCK_TIMEOUT. Causes may retain OS
 errors internally but are not serialized into diagnostics. See the

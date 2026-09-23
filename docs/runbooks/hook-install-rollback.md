@@ -16,11 +16,15 @@ Guard/context bindings require the real evidence record produced by `ops-c8e4d1`
 
 Before a schema-2 relay publishes on a host where tasks' relay identity is on
 (`[identity] relay = true` in tasks' host config), every `tasks` binary that can run
-there must carry the session-process walk: check each `tasks` that each harness's
-environment resolves on `PATH`, not only the main checkout's. An older tasks refuses
-a schema-2 registry for new claims, but can still continue a claim it already holds
-from process proof alone, and its older walk can prove a nested session to be its
-parent. A host with the opt-in off is not exposed.
+there must carry the session-process walk landed by tasks-2dd094 (the tasks project
+task "relay schema 2 and the session-process walk"): check each `tasks` that each
+harness's environment resolves on `PATH`, not only the main checkout's. The
+precondition is met only by a `tasks` built from tasks-2dd094's landing commit or
+later. Until tasks-2dd094 lands there is no such binary, so treat every `tasks`
+binary as old and leave the opt-in off. An older tasks refuses a schema-2 registry
+for new claims, but can still continue a claim it already holds from process proof
+alone, and its older walk can prove a nested session to be its parent. A host with
+the opt-in off is not exposed.
 
 After upgrading relay, run `relay reap` once. It replaces a schema-1 registry with an
 empty schema-2 one and names every dropped agent on stderr; each live session

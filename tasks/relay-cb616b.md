@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: fix/nested-headless
 created: 2026-09-23T11:26:33Z
-updated: 2026-09-23T13:05:22Z
+updated: 2026-09-23T13:44:22Z
 started: 2026-09-23T11:38:02Z
 depends: []
 tags: [identity]
@@ -56,3 +56,4 @@ Fix direction: take the nearest ancestor whose comm is the harness; if it has no
 - 2026-09-23T13:05:22Z (fix/nested-headless): Plan approved by user (execute subagent-driven)
 - 2026-09-23T13:05:22Z (fix/nested-headless): resumed
   provenance: {"harness_session":"claude-code:be3ceb58-71ac-4edf-ad48-2caead5c2411","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-23T13:44:22Z (fix/nested-headless): Final review fixes: runbook precondition names tasks-2dd094 with behavioural fallback; docs/api.md documents REGISTRY_SUPERSEDED code and the schema-1 supersede exceptions; ancestry.json corrects interactive-codex source and adds claude-ancestor-under-codex chain; removed unused reduceState/STATES imports in claude-code.test.js and opencode.test.js
