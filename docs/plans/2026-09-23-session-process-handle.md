@@ -220,7 +220,7 @@ git commit -m "feat(registry): move to schema 2 and supersede schema-1 registrie
 
 **Interfaces:**
 - Consumes: nothing from Task 1.
-- Produces: `createProcessOps({ ..., readLink })` returns `{ recordOf, ancestors, handleOf, probe, executableOf, argvOf }`. `executableOf(pid, options?) → string` (absolute on Linux, with a trailing ` (deleted)` removed). `argvOf(pid, options?) → string[]`. Both throw `{code:'PROCESS_UNREADABLE'}` for unreadable or malformed evidence; Darwin `ps` failures keep their existing codes.
+- Produces: `createProcessOps({ ..., readLink })` returns `{ recordOf, ancestors, handleOf, probe, executableOf, argvOf }`. `executableOf(pid, options?) → string` (absolute on Linux, with a trailing ` (deleted)` removed). `argvOf(pid, options?) → string[]`: exact on Linux; on Darwin argv[0] is exact and later arguments are whitespace-split, and an argv[0] that `comm` cannot locate is `PROCESS_UNREADABLE`. Both throw `{code:'PROCESS_UNREADABLE'}` for unreadable or malformed evidence; Darwin `ps` failures keep their existing codes.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -249,10 +249,23 @@ test('Darwin executable path and arguments come from one targeted ps each', () =
   const ops = createProcessOps({ platform: 'darwin', runPs: (args) => { calls.push(args.join(' '));
     return args.includes('comm=') ? '/Users/user/.local/share/claude/versions/2.1.280\n' : '/Users/user/.local/bin/claude daemon run\n'; } });
   assert.equal(ops.executableOf(9), '/Users/user/.local/share/claude/versions/2.1.280');
-  assert.deepEqual(ops.argvOf(9), ['/Users/user/.local/bin/claude', 'daemon', 'run']);
-  assert.deepEqual(calls, ['-p 9 -o comm=', '-p 9 -o args=']);
+  assert.deepEqual(calls, ['-p 9 -o comm=']);
   const empty = createProcessOps({ platform: 'darwin', runPs: () => '\n' });
   for (const read of [() => empty.executableOf(9), () => empty.argvOf(9)]) assert.throws(read, { code: 'PROCESS_UNREADABLE' });
+});
+const darwinPs = (comm, args) => createProcessOps({ platform: 'darwin',
+  runPs: (a) => a.includes('comm=') ? `${comm}\n` : a.includes('args=') ? `${args}\n` : '' });
+test('Darwin argv[0] keeps its spaces: comm fixes where it ends, so a daemon is still a daemon', () => {
+  // Review regression: splitting args on whitespace made argv[1] "User/.local/bin/claude".
+  assert.deepEqual(darwinPs('/Users/Test User/.local/bin/claude', '/Users/Test User/.local/bin/claude daemon run').argvOf(9),
+    ['/Users/Test User/.local/bin/claude', 'daemon', 'run']);
+  assert.deepEqual(darwinPs('/Users/user/.local/bin/claude', 'claude daemon run').argvOf(9), ['claude', 'daemon', 'run']);
+  assert.deepEqual(darwinPs('claude', 'claude').argvOf(9), ['claude']);
+});
+test('Darwin argv fails closed when argv[0] cannot be located in args', () => {
+  for (const [comm, args] of [['/Users/Test User/.local/bin/claude', '/Users/Other/claude daemon run'],
+    ['/Users/Test User/.local/bin/claude', '/Users/Test User/.local/bin/claudex daemon'], ['claude', 'claude-helper daemon']])
+    assert.throws(() => darwinPs(comm, args).argvOf(9), { code: 'PROCESS_UNREADABLE' });
 });
 test('real local process exposes its own executable and arguments', () => {
   const ops = createProcessOps();
@@ -300,11 +313,21 @@ In `src/bus/proc.js`, import `readlinkSync` beside `readFileSync`, add `readLink
       if (text === '') return [];
       return (text.endsWith('\0') ? text.slice(0, -1) : text).split('\0');
     }
-    // ps joins arguments with spaces, so an argument containing one splits wrongly. Only
-    // argv[1] of a Claude Code process is read, and Darwin roles are unmeasured (spec, Out of scope).
-    const output = runPs(['-p', String(pid), '-o', 'args='], options);
-    if (typeof output !== 'string' || !output.trim()) throw relayError('PROCESS_UNREADABLE', 'invalid process arguments');
-    return output.trim().split(/\s+/);
+    // ps joins arguments with spaces, so boundaries cannot be recovered from args alone.
+    // argv[0] is located by the comm column, which ps reports either as argv[0] itself or as
+    // the executable path whose basename argv[0] is; if neither holds, the boundary is unknown
+    // and the read fails closed. Later arguments split on whitespace: a role is one exact word,
+    // so a split can only make a role appear (no handle), never hide one.
+    const comm = runPs(['-p', String(pid), '-o', 'comm='], options);
+    const args = runPs(['-p', String(pid), '-o', 'args='], options);
+    const first = typeof comm === 'string' ? comm.trim() : '', line = typeof args === 'string' ? args.trim() : '';
+    if (!first || !line) throw relayError('PROCESS_UNREADABLE', 'invalid process arguments');
+    const token = line.split(/\s+/)[0];
+    const argv0 = line === first || line.startsWith(`${first} `) ? first
+      : token === basename(first) ? token : null;
+    if (argv0 === null) throw relayError('PROCESS_UNREADABLE', 'argument boundaries unknown');
+    const rest = line.slice(argv0.length).trim();
+    return rest ? [argv0, ...rest.split(/\s+/)] : [argv0];
   };
   return { recordOf, ancestors, handleOf, probe, executableOf, argvOf };
 ```
@@ -452,6 +475,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { adapterFor } from '../src/adapters/index.js';
+import { createProcessOps } from '../src/bus/proc.js';
 const corpus = JSON.parse(readFileSync(new URL('./fixtures/ancestry.json', import.meta.url)));
 test('ancestry corpus is versioned and names every harness', () => {
   assert.equal(corpus.schema, 1);
@@ -482,6 +506,14 @@ test('unreadable executable or arguments of the process under test is an error, 
 test('an empty cmdline on the nearest Claude process is no role, so its pid is published', () => {
   const chain = () => [{ pid: 5, comm: 'node', tty: null }, { pid: 3, comm: 'claude', tty: null }];
   assert.equal(adapterFor('claude-code').resolveSessionPid({ ancestors: chain, executableOf: () => { throw new Error('not read'); }, argvOf: () => [] }), 3);
+});
+// Review regression: with args split on whitespace, argv[1] of this daemon was "User/.local/bin/claude".
+const darwinPs = (comm, args) => createProcessOps({ platform: 'darwin',
+  runPs: (a) => a.includes('comm=') ? `${comm}\n` : a.includes('args=') ? `${args}\n` : '' });
+test('a Darwin daemon under a home with a space is never published as a session', () => {
+  const ops = darwinPs('/Users/Test User/.local/bin/claude', '/Users/Test User/.local/bin/claude daemon run --origin transient');
+  const chain = () => [{ pid: 5, comm: 'node', tty: null }, { pid: 9, comm: 'claude', tty: null }, { pid: 3, comm: 'claude', tty: 'ttys000' }];
+  assert.equal(adapterFor('claude-code').resolveSessionPid({ ancestors: chain, executableOf: (p) => ops.executableOf(p), argvOf: (p) => ops.argvOf(p) }), null);
 });
 test('the hook itself is never the session, even when it is a harness process', () => {
   for (const [harness, comm] of [['claude-code', 'claude'], ['codex', 'codex'], ['opencode', 'opencode']]) {
@@ -698,8 +730,6 @@ git commit -m "test(registry): nested sessions keep distinct handles; contaminat
 - Modify: `test/pack.test.js:16,24`
 - Modify: `docs/runbooks/hook-install-rollback.md`
 - Modify: `README.md`
-- Modify: `docs/specs/2026-09-23-session-process-handle.md` (Status line)
-
 **Interfaces:**
 - Consumes: the names from Tasks 1–3.
 - Produces: `relay/fixtures/ancestry.json` as a package export.
@@ -753,19 +783,17 @@ reappears with its own handle at its next hook event. No session restart is need
 
 After the paragraph beginning "State uses RELAY_STATE_DIR", add: "The registry is schema 2: each agent's handle names the session's own process. Upgrading from schema 1 is `relay reap`, and on a host using tasks' relay identity, tasks is upgraded first; see the [hook install runbook](docs/runbooks/hook-install-rollback.md#activating-session-handles-registry-schema-2)."
 
-- [ ] **Step 7: Mark the spec implemented**
-
-Replace the spec's `Status:` line with: `Status: implemented, 2026-09-23 (Linux verified live; Darwin unmeasured, see Out of scope).` Update the date if the work lands later.
-
-- [ ] **Step 8: Run the gate**
+- [ ] **Step 7: Run the gate**
 
 Run: `just gate`
 Expected: PASS on the development runtime. Then run the gate on the Node 22 floor, the release the README records (22.23.2, installed under nvm): `PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH" just gate`, and confirm PASS.
 
-- [ ] **Step 9: Commit**
+The spec's `Status:` line is not touched here: it changes only in Task 6, after the live checks pass.
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add docs/api.md package.json test/pack.test.js docs/runbooks/hook-install-rollback.md README.md docs/specs/2026-09-23-session-process-handle.md
+git add docs/api.md package.json test/pack.test.js docs/runbooks/hook-install-rollback.md README.md
 git commit -m "docs(api): document session handles, schema 2 and the activation precondition"
 ```
 
@@ -774,48 +802,102 @@ git commit -m "docs(api): document session handles, schema 2 and the activation 
 ### Task 6: Live verification on Linux
 
 **Files:**
-- None changed. Results go in a task note.
+- Modify: `docs/specs/2026-09-23-session-process-handle.md` (Status line, last step only, and only if every check passed)
 
 **Interfaces:**
 - Consumes: the built worktree, run by explicit path.
-- Produces: evidence recorded with `tasks note relay-cb616b`.
+- Produces: evidence recorded with `tasks note relay-cb616b`; the spec's implemented status.
 
-Every command runs relay by explicit path (`.worktrees/nested-headless/bin/relay.js`, relative to the relay checkout) into a private state directory. Nothing is installed and no host pointer changes.
+Every command runs relay by explicit path (`.worktrees/nested-headless/bin/relay.js`, relative to the relay checkout) with **both** its state and its configuration in a scratch directory. `RELAY_STATE_DIR` alone isolates only the registry: `hook` and `reap` would still load `~/.config/relay/subscribers.json` and run live observers against the scratch registry. Every invocation, including those inside the nested and Codex sessions, goes through one wrapper that sets `RELAY_STATE_DIR` and `XDG_CONFIG_HOME` and hands `hook` an explicit empty subscriber file. Nothing is installed and no host pointer changes.
 
-- [ ] **Step 1: Prepare a private state directory**
+- [ ] **Step 1: Prepare the scratch directory, the wrapper and the probe**
+
+Run from the worktree root:
 
 ```bash
-S=$(mktemp -d) && mkdir -m 700 "$S/state" && export RELAY_STATE_DIR="$S/state"
-R="$PWD/bin/relay.js"   # run from the worktree root
+S=$(mktemp -d); mkdir -m 700 "$S/state" "$S/config" "$S/config/relay"
+printf '{"schema":1,"subscribers":[]}\n' > "$S/config/relay/subscribers.json"; chmod 600 "$S/config/relay/subscribers.json"
+cat > "$S/relay" <<EOF
+#!/bin/sh
+# Scratch-only relay: private registry, private empty subscribers, worktree code.
+export RELAY_STATE_DIR="$S/state" XDG_CONFIG_HOME="$S/config"
+case "\$1" in
+  hook) shift; exec node "$PWD/bin/relay.js" hook --subscribers "$S/config/relay/subscribers.json" "\$@" ;;
+  *) exec node "$PWD/bin/relay.js" "\$@" ;;
+esac
+EOF
+chmod 700 "$S/relay"
+cat > "$S/probe" <<EOF
+#!/bin/sh
+# Fire one SessionStart for the calling session through the scratch wrapper.
+# \$1: harness; \$2: that harness's own session id.
+printf '{"session_id":"%s","cwd":"%s","hook_event_name":"SessionStart"}' "\$2" "\$PWD" | "$S/relay" hook --harness "\$1" SessionStart
+EOF
+chmod 700 "$S/probe"
+RELAY_STATE_DIR="$S/state" XDG_CONFIG_HOME="$S/config" node --input-type=module -e "import {paths} from './src/index.js'; console.log(JSON.stringify(paths()))"
 ```
+
+Expected: the printed `stateDir`, `configDir` and `subscribersPath` all lie under `$S`. If `hook --subscribers` refuses the file for its mode or owner, fix the file; never drop the flag.
 
 - [ ] **Step 2: Interactive session**
 
-From the interactive Claude Code session running this plan:
-
 ```bash
-printf '{"session_id":"%s","cwd":"%s","hook_event_name":"SessionStart"}' "$CLAUDE_CODE_SESSION_ID" "$PWD" | node "$R" hook --harness claude-code SessionStart
-node "$R" list --json
+"$S/probe" claude-code "$CLAUDE_CODE_SESSION_ID"; "$S/relay" list --json
 ```
 
-Expected: one row whose `process.pid` is the `claude` process that owns this terminal (check `/proc/<pid>/comm` and `tty_nr`).
+Expected: one row whose `process.pid` is the `claude` process that owns this terminal (check `/proc/<pid>/comm`, and that field 7 of `/proc/<pid>/stat`, `tty_nr`, is nonzero).
 
 - [ ] **Step 3: Nested headless session**
 
-Write a probe that runs the same hook with the nested session's own id, and run it inside `claude -p` with the cheapest model and a 180 s timeout. Expected: a second row whose `process.pid` is the nested `claude` process, not the outer one; `relay list` shows two rows with different handles.
+```bash
+setsid timeout 180 claude -p "Run this exact command with the Bash tool and reply with its output verbatim: $S/probe claude-code \"\$CLAUDE_CODE_SESSION_ID\"" --model haiku --allowedTools "Bash($S/probe:*)" < /dev/null
+"$S/relay" list --json
+```
 
-- [ ] **Step 4: Background session**
+Expected: a second row whose `process.pid` is the nested `claude` process, not the outer one; the two rows carry different handles.
 
-Start `claude --bg` with the probe as its prompt (send it with `claude attach` if it starts idle), read the row, then `claude stop <id>` and `claude rm <id>`, and confirm the transient daemon exits. Expected: `process.pid` is the `2.1.x` session process, whose `/proc/<pid>/cmdline` carries `--session-id <that id>`.
+- [ ] **Step 4: Background session, walked from inside its process tree**
+
+A `claude --bg` session starts idle and cannot be prompted without `claude attach`, which is interactive. Instead of firing a hook in it, walk from one of its child processes with the real `ProcessOps`: that is the chain a hook there would see.
+
+```bash
+claude --bg --model haiku < /dev/null          # note the printed short id, below <id>
+P=$(claude agents --json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).find(a=>a.sessionId.startsWith('<id>')).pid))")
+C=$(ps --ppid "$P" -o pid= | head -1 | tr -d ' ')
+node --input-type=module -e "import {adapterFor} from './src/index.js'; console.log(adapterFor('claude-code').resolveSessionPid({startPid: $C}))"
+cat /proc/$P/comm; tr '\0' ' ' < /proc/$P/cmdline; echo
+claude stop <id>; claude rm <id>
+```
+
+Expected: the printed pid equals `$P`, whose `comm` is the `2.1.x` version and whose cmdline carries `--session-id` with the session's full id. If `$C` is empty (the session has no child yet), rerun the `ps` line after a few seconds. After `rm`, `pgrep -af "daemon run"` shows the transient daemon gone within a minute; if it stays, record its pid in the task note and stop it with `kill <pid>`.
 
 - [ ] **Step 5: Headless Codex**
 
-Run the probe under `codex exec` (with `CODEX_SESSION_ID`/`CODEX_THREAD_ID` as the session id). Expected: `process.pid` is the `codex` process that fired the hook.
+```bash
+setsid timeout 240 codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox "Run this exact shell command and reply with its output verbatim: $S/probe codex \"\${CODEX_SESSION_ID:-\$CODEX_THREAD_ID}\"" < /dev/null
+"$S/relay" list --json
+```
+
+Expected: a `codex:` row whose `process.pid` is the `codex` process that fired the hook, not null.
 
 - [ ] **Step 6: Supersession on a real file**
 
-Rewrite the private registry as schema 1 (set `"schema": 1` in `agents.json`), run `node "$R" list --json` (expect `REGISTRY_SUPERSEDED`), then `node "$R" reap` (expect every id named on stderr), then rerun Step 2 and confirm one fresh row.
+```bash
+node -e "const fs=require('fs'),f=process.argv[1],d=JSON.parse(fs.readFileSync(f));d.schema=1;fs.writeFileSync(f,JSON.stringify(d))" "$S/state/agents.json"
+"$S/relay" list --json; "$S/relay" reap; "$S/probe" claude-code "$CLAUDE_CODE_SESSION_ID"; "$S/relay" list --json
+```
 
-- [ ] **Step 7: Record and clean up**
+Expected: the first `list` fails with `REGISTRY_SUPERSEDED`; `reap` names every earlier id on stderr; the final `list` shows exactly one fresh schema-2 row, for this session.
 
-`tasks note relay-cb616b "<the four pids and what each was checked against>"`, confirm `host-load --section session` reports nothing left, and remove `$S`.
+- [ ] **Step 7: Record the evidence and clean up**
+
+`tasks note relay-cb616b "<each pid and what it was checked against>"`, confirm `host-load --section session` reports nothing left running, and `rm -rf "$S"`. If any of Steps 2–6 missed its expectation, stop here: note what was observed, leave the spec's status alone, and park the task with the failing step as the next action.
+
+- [ ] **Step 8: Mark the spec implemented**
+
+Only after Steps 2–6 all met their expectations, replace the spec's `Status:` line with `Status: implemented and verified live on Linux, <date> (Darwin unmeasured, see Out of scope).` and commit:
+
+```bash
+git add docs/specs/2026-09-23-session-process-handle.md tasks
+git commit -m "docs(spec): mark the session process handle implemented and verified"
+```

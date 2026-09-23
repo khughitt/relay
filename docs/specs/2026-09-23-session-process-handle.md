@@ -113,7 +113,12 @@ the walk would otherwise land on them:
 
 When the nearest Claude Code process has one of these roles, the result is null with the
 existing `PROCESS_UNAVAILABLE` diagnostic. The arguments are read for that one process
-only: Linux `/proc/<pid>/cmdline`, Darwin `ps -p <pid> -o args=`. Codex and OpenCode have
+only: Linux `/proc/<pid>/cmdline`, which keeps argument boundaries; Darwin `ps -p <pid>
+-o args=`, which joins arguments with spaces and so cannot. On Darwin, argv[0] is located
+by the `comm` column (argv[0] itself, or an executable path whose basename argv[0] is), so
+a home directory with a space in it cannot shift `argv[1]`; when `comm` locates no argv[0]
+in `args`, the read is `PROCESS_UNREADABLE` and the handle null. Later arguments are split
+on whitespace, which can make a role appear but never hide one. Codex and OpenCode have
 no measured non-session roles and get no list; one is added only with a measured chain.
 
 ## Contract changes
