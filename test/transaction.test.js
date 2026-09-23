@@ -19,7 +19,7 @@ test('every observed upsert increments; exact removal no-op and generation recre
   const first=await applyEvent(event(),opts);assert.equal(first.snapshot.revision,1);assert.equal(first.snapshot.agents['codex:test'].updatedAt,123);
   const second=await applyEvent(event(),opts);assert.equal(second.snapshot.revision,2);assert.equal(second.snapshot.generation,first.snapshot.generation);
   await applyEvent(event('claude-code'),opts);
-  const removed=await applyEvent(event('codex','SessionEnd'),{paths:p,gitContext:()=>assert.fail(),resolveAgentPid:()=>assert.fail()});
+  const removed=await applyEvent(event('codex','SessionEnd'),{paths:p,gitContext:()=>assert.fail(),resolveSessionPid:()=>assert.fail()});
   assert.deepEqual(Object.keys(removed.snapshot.agents),['claude-code:test']);assert.equal(removed.snapshot.revision,4);
   const bytes=await fs.readFile(p.agentsPath,'utf8');const no=await applyEvent(event('codex','SessionEnd'),opts);assert.equal(no.changed,false);assert.equal(await fs.readFile(p.agentsPath,'utf8'),bytes);
   await fs.unlink(p.agentsPath);const recreated=await applyEvent(event(),opts);assert.equal(recreated.snapshot.revision,1);assert.notEqual(recreated.snapshot.generation,first.snapshot.generation);
@@ -49,23 +49,23 @@ test('unknown optional fields strip on publication; revision overflow aborts',as
 test('headless or unavailable agent proof is admitted; resumed session refreshes proof',async t=>{
   const p=await tempState(t);
   for(const resolver of [()=>null,()=>{throw Object.assign(new Error('denied'),{code:'PROCESS_UNREADABLE'});},()=>{throw Object.assign(new Error('failed'),{code:'PROCESS_UNAVAILABLE'});}]) {
-    const r=await applyEvent(event(),{...localObservation(p),resolveAgentPid:resolver});assert.equal(r.snapshot.agents['codex:test'].process,null);assert.ok(r.diagnostics.some(d=>d.code==='PROCESS_UNAVAILABLE'));
+    const r=await applyEvent(event(),{...localObservation(p),resolveSessionPid:resolver});assert.equal(r.snapshot.agents['codex:test'].process,null);assert.ok(r.diagnostics.some(d=>d.code==='PROCESS_UNAVAILABLE'));
   }
   const r=await applyEvent(event(),localObservation(p));assert.equal(r.snapshot.agents['codex:test'].process.pid,process.pid);
   const ops=createProcessOps(), real=ops.handleOf(process.pid);
   const injected={...ops,handleOf:pid=>pid===42?{...real,pid:42,bootId:null}:ops.handleOf(pid)};
-  if(real.platform==='linux'){const result=await applyEvent(event(),{...localObservation(p),resolveAgentPid:()=>42,processOps:injected});assert.equal(result.snapshot.agents['codex:test'].process.bootId,null);}
+  if(real.platform==='linux'){const result=await applyEvent(event(),{...localObservation(p),resolveSessionPid:()=>42,processOps:injected});assert.equal(result.snapshot.agents['codex:test'].process.bootId,null);}
 });
 test('Git and unexpected process errors abort before lock or state creation',async t=>{
   const p=await tempState(t);
   await assert.rejects(applyEvent(event(),{...localObservation(p),gitContext:()=>{throw Object.assign(new Error('git failed'),{code:'GIT_ERROR'});}}),{code:'GIT_ERROR'});
-  await assert.rejects(applyEvent(event(),{...localObservation(p),resolveAgentPid:()=>{throw new Error('unexpected');}}),/unexpected/);
+  await assert.rejects(applyEvent(event(),{...localObservation(p),resolveSessionPid:()=>{throw new Error('unexpected');}}),/unexpected/);
   await assert.rejects(applyEvent({...event(),kind:'turn-end'},localObservation(p)),{code:'INVALID_SCHEMA'});
   assert.deepEqual(await fs.readdir(p.stateDir),[]);
 });
 test('read/list never prune and explicit reap removes only confirmed dead',async t=>{
   const p=await tempState(t),opts=localObservation(p);
-  await applyEvent(event('codex','SessionStart','live'),opts);await applyEvent(event('codex','SessionStart','unknown'),{...opts,resolveAgentPid:()=>null});
+  await applyEvent(event('codex','SessionStart','live'),opts);await applyEvent(event('codex','SessionStart','unknown'),{...opts,resolveSessionPid:()=>null});
   const r=await applyEvent(event('codex','SessionStart','dead'),opts);r.snapshot.agents['codex:dead'].process.start=String(BigInt(r.snapshot.agents['codex:dead'].process.start)+1n);
   await fs.writeFile(p.agentsPath,JSON.stringify(r.snapshot));const bytes=await fs.readFile(p.agentsPath,'utf8');
   const listed=await listAgents({paths:p});assert.deepEqual(Object.values(listed.liveness).map(v=>v.status),['alive','unknown','dead']);assert.equal(await fs.readFile(p.agentsPath,'utf8'),bytes);

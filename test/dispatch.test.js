@@ -23,7 +23,7 @@ const guard = (name, mode, over = {}) => ({ name, role: 'guard', kinds: ['before
 const observer = (name, mode, over = {}) => ({ name, role: 'observer', kinds: ['before-tool'], argv: argv(mode, ...(over.file ? [over.file] : [])), timeoutMs: 3000, ...over, file: undefined });
 const strip = (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined));
 const payload = (over = {}) => JSON.stringify({ session_id: 'sess', cwd: '/repo', tool_name: 'Bash', tool_input: { command: 'echo PRIVATE_COMMAND' }, ...over });
-const local = { resolveAgentPid: () => process.pid, gitContext: async () => ({ remote: null, repoRoot: null }) };
+const local = { resolveSessionPid: () => process.pid, gitContext: async () => ({ remote: null, repoRoot: null }) };
 async function hook(p, { harness = 'claude-code', nativeEvent = 'PreToolUse', body = payload(), outerMs, subscribersPath, deps = {} } = {}) {
   return dispatchHook({ harness, nativeEvent, input: Readable.from([Buffer.from(body)]), outerMs, subscribersPath }, { paths: p, applyOptions: local, ...deps });
 }

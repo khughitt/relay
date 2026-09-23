@@ -24,7 +24,7 @@ test('list errors are a single JSON envelope on stderr; unknown and null schemas
 test('CLI listing retains dead unknown live, reap removes only dead',async t=>{
   const p=await tempState(t),opts=localObservation(p);
   const e=id=>normalizeEvent('codex','SessionStart',JSON.stringify({session_id:id,cwd:'/repo'}));
-  await applyEvent(e('live'),opts);await applyEvent(e('unknown'),{...opts,resolveAgentPid:()=>null});const result=await applyEvent(e('dead'),opts);
+  await applyEvent(e('live'),opts);await applyEvent(e('unknown'),{...opts,resolveSessionPid:()=>null});const result=await applyEvent(e('dead'),opts);
   const h=result.snapshot.agents['codex:dead'].process;h.start=String(BigInt(h.start)+1n);await fs.writeFile(p.agentsPath,JSON.stringify(result.snapshot));
   const before=await fs.readFile(p.agentsPath,'utf8'),listed=run(p,['list','--json']);assert.equal(listed.status,0);
   assert.deepEqual(Object.values(JSON.parse(listed.stdout).liveness).map(v=>v.status),['alive','unknown','dead']);assert.equal(await fs.readFile(p.agentsPath,'utf8'),before);

@@ -79,7 +79,8 @@ export async function applyEvent(value, given = {}) {
   if (event.kind !== 'session-end') {
     context = await (given.gitContext ?? defaultGitContext)(event.cwd,opts);
     try {
-      const pid = given.resolveAgentPid ? given.resolveAgentPid(adapter) : adapter.resolveAgentPid({ancestors:p=>opts.processOps.ancestors(p,opts)});
+      const pid = given.resolveSessionPid ? given.resolveSessionPid(adapter) : adapter.resolveSessionPid({
+        ancestors:p=>opts.processOps.ancestors(p,opts),executableOf:p=>opts.processOps.executableOf(p,opts),argvOf:p=>opts.processOps.argvOf(p,opts)});
       handle = pid === null ? null : opts.processOps.handleOf(pid,opts);
     } catch (cause) {
       if (!['PROCESS_UNREADABLE','PROCESS_UNAVAILABLE'].includes(cause.code)) throw cause;
