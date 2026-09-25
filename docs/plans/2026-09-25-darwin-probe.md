@@ -705,7 +705,7 @@ Expected: FAIL, modules missing.
 
 ```js
 import { spawn } from 'node:child_process';
-import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, writeFileSync, appendFileSync as log } from 'node:fs';
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync as log } from 'node:fs';
 import { join } from 'node:path';
 
 const SESSION_VARS = ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_ENTRYPOINT', 'CODEX_SESSION_ID', 'CODEX_THREAD_ID'];
@@ -723,9 +723,11 @@ export function prepareRoot(root) {
 }
 export function tracker(root) {
   const live = new Set(), pids = join(root, 'pids');
+  // A detached child leads its own process group and is recorded as -pid, so both killAll and
+  // run's trap (`kill -9 -- -pid`) reach the processes it forks. OpenCode forks its server.
   const spawnTracked = (cmd, args, options = {}) => {
     const child = spawn(cmd, args, options);
-    if (child.pid) { appendFileSync(pids, `${child.pid}\n`); live.add(child); child.once('exit', () => live.delete(child)); }
+    if (child.pid) { appendFileSync(pids, `${options.detached ? -child.pid : child.pid}\n`); live.add(child); child.once('exit', () => live.delete(child)); }
     return child;
   };
   const run = (cmd, args, { env, cwd, input, timeoutMs = 600000, argv0 } = {}) => new Promise((resolve) => {
@@ -737,7 +739,11 @@ export function tracker(root) {
     child.once('close', (exit, signal) => { clearTimeout(timer); resolve({ exit, signal, stdout, stderr, ms: performance.now() - started }); });
     child.stdin.end(input ?? '');
   });
-  return { spawn: spawnTracked, run, killAll: () => { for (const child of live) child.kill('SIGKILL'); } };
+  const killAll = () => {
+    for (const line of existsSync(pids) ? readFileSync(pids, 'utf8').split('\n').filter(Boolean) : []) { try { process.kill(Number(line), 'SIGKILL'); } catch {} }
+    for (const child of live) child.kill('SIGKILL');
+  };
+  return { spawn: spawnTracked, run, killAll };
 }
 // Live sessions the user keeps open (D9) write transcripts under ~/.claude and ~/.codex, so
 // those two are watched by their configuration and credential files only.
@@ -1666,7 +1672,10 @@ export async function run(ctx) {
     '--config-dir', configDir, '--artifact', join(ctx.root, 'd7b-artifact.json'), '--apply'], { env: ctx.env });
   const project = join(ctx.root, 'd7b-project'); mkdirSync(project); execFileSync('git', ['init', '-q', project]);
   const password = randomBytes(18).toString('base64url'), port = await freePort(), base = `http://127.0.0.1:${port}`;
-  const server = ctx.t.spawn('opencode', ['serve', '--hostname', '127.0.0.1', '--port', String(port)], { cwd: ctx.root, env: { ...ctx.env, OPENCODE_SERVER_PASSWORD: password }, stdio: 'ignore' });
+  // Detached: the server leads its own process group, because `opencode` forks the process that
+  // keeps serving, and a signal to the spawned pid alone leaves that child running (observed
+  // on the Linux host with v2.0.15).
+  const server = ctx.t.spawn('opencode', ['serve', '--hostname', '127.0.0.1', '--port', String(port)], { cwd: ctx.root, env: { ...ctx.env, OPENCODE_SERVER_PASSWORD: password }, stdio: 'ignore', detached: true });
   const auth = { Authorization: `Basic ${Buffer.from(`opencode:${password}`).toString('base64')}` };
   for (let i = 0; i < 60; i++) { try { await fetch(`${base}/`); break; } catch { await new Promise((r) => setTimeout(r, 250)); } }
   // v2.0.15 creates no project instance at startup; this request names the project, and the
@@ -1681,7 +1690,10 @@ export async function run(ctx) {
   while (performance.now() - started < 10000) { agents = Object.entries((await readSnapshot({ env }))?.agents ?? {}).filter(([id]) => id.startsWith('opencode:')); if (agents.length) break; await new Promise((r) => setTimeout(r, 200)); }
   const serverPids = [server.pid, ...execFileSync('/bin/ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' }).trim().split('\n').map((l) => l.trim().split(/\s+/).map(Number)).filter(([, pp]) => pp === server.pid).map(([p]) => p)];
   const agent = { count: agents.length, scope: agents[0]?.[1]?.scope ?? null, matches_server: agents.length === 1 && serverPids.includes(agents[0][1].process?.pid) };
-  server.kill('SIGTERM'); await new Promise((r) => { const t = setTimeout(() => { server.kill('SIGKILL'); r(); }, 10000); server.once('exit', () => { clearTimeout(t); r(); }); });
+  const group = (signal) => { try { process.kill(-server.pid, signal); } catch {} };
+  group('SIGTERM');
+  await new Promise((r) => { const t = setTimeout(() => { group('SIGKILL'); r(); }, 10000); server.once('exit', () => { clearTimeout(t); r(); }); });
+  await new Promise((r) => setTimeout(r, 500)); group('SIGKILL');
   let gone = !Object.keys((await readSnapshot({ env }))?.agents ?? {}).some((id) => id.startsWith('opencode:')), via = gone && agents.length ? 'dispose' : null;
   if (!gone) { await reapRegistry({ env }); gone = !Object.keys((await readSnapshot({ env }))?.agents ?? {}).some((id) => id.startsWith('opencode:')); via = gone ? 'reap' : null; }
   const logDir = join(ctx.root, 'data/opencode/log');
@@ -1917,7 +1929,7 @@ major=$(node -p 'process.versions.node.split(".")[0]')
 [ "$major" -ge 22 ] || { echo "node $major is older than 22 (brew install node)"; exit 2; }
 ROOT=$(mktemp -d "${TMPDIR:-/tmp}/relay-darwin-probe.XXXXXX")
 cleanup() {
-  if [ -f "$ROOT/pids" ]; then while read -r pid; do kill -9 "$pid" 2>/dev/null || true; done < "$ROOT/pids"; fi
+  if [ -f "$ROOT/pids" ]; then while read -r pid; do kill -9 -- "$pid" 2>/dev/null || true; done < "$ROOT/pids"; fi
   rm -rf "$ROOT"
 }
 trap cleanup EXIT INT TERM
@@ -2245,7 +2257,8 @@ Expected:
 - D7b is recorded with `plugin_log: "rejected-file"`, `request.status: 200` and
   `directory_match: true` (the pinned v2.0.15 behaviour).
 - The CLI's cross-check passes.
-- `host-load --section session` shows nothing left running.
+- `host-load --section session` shows nothing left running, including no `opencode serve`
+  child from D7b.
 
 If any stage errors, read its `logs/<ID>.log` inside the results tarball before changing
 anything.
