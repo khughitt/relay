@@ -14,8 +14,14 @@ export function shallowBundle(repo, dest) {
   const head = git(['rev-parse', 'HEAD'], repo), branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], repo);
   const tmp = mkdtempSync(join(tmpdir(), 'dpb-shallow-'));
   try {
-    execFileSync('git', ['clone', '-q', '--depth', '1', '--no-local', '--branch', branch, `file://${resolve(repo)}`, join(tmp, 's')]);
-    if (git(['rev-parse', 'HEAD'], join(tmp, 's')) !== head) throw new Error(`${repo}: shallow clone is not at HEAD ${head}`);
+    // Full clone, not `--depth 1`: gitformat-bundle(5) documents that "the Git bundle v2
+    // format cannot represent a shallow clone repository" — `git bundle create` from a
+    // shallow clone reports "complete history" but omits the truncated parent, and a
+    // fresh `git clone` of that bundle then fails with "Could not read <parent>". The
+    // detached temp clone still isolates the bundle from the source checkout's refs/locks
+    // and lets us assert it landed exactly on HEAD before bundling.
+    execFileSync('git', ['clone', '-q', '--no-local', '--branch', branch, `file://${resolve(repo)}`, join(tmp, 's')]);
+    if (git(['rev-parse', 'HEAD'], join(tmp, 's')) !== head) throw new Error(`${repo}: clone is not at HEAD ${head}`);
     execFileSync('git', ['-C', join(tmp, 's'), 'bundle', 'create', dest, 'HEAD', branch], { stdio: 'ignore' });
     git(['bundle', 'verify', dest], join(tmp, 's'));
     return head;
