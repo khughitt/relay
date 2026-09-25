@@ -77,7 +77,11 @@ test('capture comparison flags a cut row and a clean row', () => {
   assert.equal(rowFor('  7 1 x\n 12 1 y\n', 12), '12 1 y');
 });
 test('a constructed codex parent publishes its own qualified handle and stays alive', async (t) => {
-  const r = root(t); prepareRoot(r); const tr = tracker(r); t.after(() => tr.killAll());
+  // Not the generic root(t) helper: its rmSync must run only after every owned group is
+  // killed, so this test's own t.after does both, in that order, instead of two independently
+  // ordered hooks (node:test runs t.after in registration order, not kill-then-remove order).
+  const r = mkdtempSync(join(tmpdir(), 'dp-')); prepareRoot(r); const tr = tracker(r);
+  t.after(async () => { await tr.killAll(); rmSync(r, { recursive: true, force: true }); });
   const env = isolatedEnv(r); writeFileSync(join(r, 'xdg/relay/subscribers.json'), '{"schema":1,"subscribers":[]}\n', { mode: 0o600 });
   const repo = join(r, 'repo'); mkdirSync(repo); execFileSync('git', ['init', '-q', repo]);
   const shell = installShell(join(r, 'p'), 'codex');

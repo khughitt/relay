@@ -27,10 +27,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function tracker(root) {
   const file = join(root, 'pids'), groups = new Map();
   let stopping = false, sweeper = null;
-  // `root` is the caller's directory, not the tracker's: a caller that removes it once its
-  // own cleanup (e.g. `killAll`) has run must not crash a bookkeeping write racing that
-  // removal — the groups are already reaped by then, only the on-disk record is moot.
-  const save = () => { try { writeFileSync(file, [...groups.keys()].map((g) => `-${g}\n`).join('')); } catch (error) { if (error.code !== 'ENOENT') throw error; } };
+  const save = () => writeFileSync(file, [...groups.keys()].map((g) => `-${g}\n`).join(''));
   const alive = (pgid) => { try { process.kill(-pgid, 0); return true; } catch (error) { return error.code === 'EPERM'; } };
   // Retire a group once it is empty, whichever member exits last; only owned, non-empty groups
   // are ever signalled, which bounds the window in which a reused pgid could be hit.
