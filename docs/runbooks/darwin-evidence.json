@@ -1,0 +1,401 @@
+{
+  "manifest": {
+    "schema": 1,
+    "relay_commit": "b7fc410a71e40d691b4282a89bb8550a3d505eef",
+    "ops_commit": "ff9bfb036512e970e849f7bcf85e4a23925bb662",
+    "opencode_pinned": "2.0.15",
+    "allow_linux": false,
+    "platform": "darwin",
+    "started": "2026-09-25T17:01:37.126Z",
+    "requested_stages": null,
+    "stages": [
+      "D0",
+      "D1",
+      "D2",
+      "D3",
+      "D4",
+      "D5",
+      "D6",
+      "D7",
+      "D7b",
+      "D8",
+      "D9"
+    ],
+    "isolation": {
+      "before": {
+        ".claude/settings.json": {
+          "exists": true,
+          "files": 1,
+          "size": 95,
+          "mtimeMs": 1787507028152.718
+        },
+        ".claude/settings.local.json": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".claude/.credentials.json": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".codex/hooks.json": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".codex/config.toml": {
+          "exists": true,
+          "files": 1,
+          "size": 1333,
+          "mtimeMs": 1787693175929.9397
+        },
+        ".codex/auth.json": {
+          "exists": true,
+          "files": 1,
+          "size": 3993,
+          "mtimeMs": 1787507133508.0557
+        },
+        ".config/relay": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".local/state/relay": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".config/opencode": {
+          "exists": true,
+          "files": 3656,
+          "size": 54784126,
+          "mtimeMs": 1787954259420.4446
+        },
+        ".local/share/opencode": {
+          "exists": true,
+          "files": 64,
+          "size": 4158957,
+          "mtimeMs": 1787953857566.1338
+        },
+        ".cache/opencode": {
+          "exists": true,
+          "files": 2,
+          "size": 8477386,
+          "mtimeMs": 1787953627416.594
+        }
+      },
+      "after": {
+        ".claude/settings.json": {
+          "exists": true,
+          "files": 1,
+          "size": 95,
+          "mtimeMs": 1787507028152.718
+        },
+        ".claude/settings.local.json": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".claude/.credentials.json": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".codex/hooks.json": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".codex/config.toml": {
+          "exists": true,
+          "files": 1,
+          "size": 1333,
+          "mtimeMs": 1787693175929.9397
+        },
+        ".codex/auth.json": {
+          "exists": true,
+          "files": 1,
+          "size": 3993,
+          "mtimeMs": 1787507133508.0557
+        },
+        ".config/relay": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".local/state/relay": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".config/opencode": {
+          "exists": true,
+          "files": 3656,
+          "size": 54784126,
+          "mtimeMs": 1787954259420.4446
+        },
+        ".local/share/opencode": {
+          "exists": true,
+          "files": 64,
+          "size": 4158957,
+          "mtimeMs": 1787953857566.1338
+        },
+        ".cache/opencode": {
+          "exists": true,
+          "files": 2,
+          "size": 8477386,
+          "mtimeMs": 1787953627416.594
+        }
+      },
+      "after_taken": "before D9",
+      "changed": [],
+      "final": {
+        ".claude/settings.json": {
+          "exists": true,
+          "files": 1,
+          "size": 95,
+          "mtimeMs": 1787507028152.718
+        },
+        ".claude/settings.local.json": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".claude/.credentials.json": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".codex/hooks.json": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".codex/config.toml": {
+          "exists": true,
+          "files": 1,
+          "size": 1333,
+          "mtimeMs": 1787693175929.9397
+        },
+        ".codex/auth.json": {
+          "exists": true,
+          "files": 1,
+          "size": 3993,
+          "mtimeMs": 1787507133508.0557
+        },
+        ".config/relay": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".local/state/relay": {
+          "exists": false,
+          "files": 0,
+          "size": 0,
+          "mtimeMs": 0
+        },
+        ".config/opencode": {
+          "exists": true,
+          "files": 3656,
+          "size": 54784126,
+          "mtimeMs": 1787954259420.4446
+        },
+        ".local/share/opencode": {
+          "exists": true,
+          "files": 64,
+          "size": 4158957,
+          "mtimeMs": 1787953857566.1338
+        },
+        ".cache/opencode": {
+          "exists": true,
+          "files": 2,
+          "size": 8477386,
+          "mtimeMs": 1787953627416.594
+        }
+      },
+      "changed_during_d9": []
+    },
+    "cleanup": {
+      "survivors": []
+    },
+    "finished": "2026-09-25T17:25:07.929Z",
+    "interrupted": null,
+    "redaction": {
+      "files": {
+        "logs/D1.log": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "logs/D2.log": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "logs/D7.log": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "logs/D7b.log": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "manifest.json": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "stages/D0.json": {
+          "host": 6,
+          "user": 0,
+          "home": 6
+        },
+        "stages/D1.json": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "stages/D2.json": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "stages/D3.json": {
+          "host": 1,
+          "user": 0,
+          "home": 0
+        },
+        "stages/D4.json": {
+          "host": 0,
+          "user": 0,
+          "home": 4
+        },
+        "stages/D5.json": {
+          "host": 0,
+          "user": 0,
+          "home": 5
+        },
+        "stages/D6.json": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "stages/D7.json": {
+          "host": 0,
+          "user": 0,
+          "home": 24
+        },
+        "stages/D7b.json": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "stages/D8.json": {
+          "host": 0,
+          "user": 0,
+          "home": 5
+        },
+        "stages/D9.json": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        }
+      }
+    }
+  },
+  "verdict": {
+    "schema": 1,
+    "release": "incomplete",
+    "checks": {
+      "D0": {
+        "class": "release",
+        "verdict": "pass",
+        "detail": "environment recorded",
+        "findings": [
+          "HostName is not set: the host name can change with the network (spec item 4)"
+        ]
+      },
+      "D1": {
+        "class": "release",
+        "verdict": "pass",
+        "detail": "package installs offline and loads",
+        "findings": []
+      },
+      "D2": {
+        "class": "release",
+        "verdict": "fail",
+        "detail": "248/249 passed, 0 skipped",
+        "findings": [
+          "failed test: eight real processes retain all counter updates, including dead main reclamation"
+        ]
+      },
+      "D3": {
+        "class": "release",
+        "verdict": "pass",
+        "detail": "identity agrees across readers and zones",
+        "findings": [
+          "zombie child reads alive (qualified process matches) (spec item 5)"
+        ]
+      },
+      "D4": {
+        "class": "release",
+        "verdict": "error",
+        "detail": "stage error",
+        "findings": []
+      },
+      "D5": {
+        "class": "release",
+        "verdict": "error",
+        "detail": "stage error",
+        "findings": []
+      },
+      "D6": {
+        "class": "release",
+        "verdict": "pass",
+        "detail": "replies match the Linux replay; hung guards refused and gone",
+        "findings": []
+      },
+      "D8": {
+        "class": "release",
+        "verdict": "error",
+        "detail": "stage error",
+        "findings": []
+      },
+      "ISO": {
+        "class": "release",
+        "verdict": "pass",
+        "detail": "no live path changed",
+        "findings": []
+      },
+      "D7w": {
+        "class": "release",
+        "verdict": "pass",
+        "detail": "live hook ancestry read in full",
+        "findings": []
+      }
+    },
+    "cutover": {
+      "claude-code": "pass",
+      "codex": "pass",
+      "opencode": "fail",
+      "launchd-path": "error"
+    }
+  }
+}
