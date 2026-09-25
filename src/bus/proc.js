@@ -65,13 +65,24 @@ export function parseDarwinRow(line, { terminal = true } = {}) {
   };
 }
 
-export function runDarwinPs(args, { clock = performance.now.bind(performance), deadline = clock() + 2000, spawn = spawnSync } = {}) {
+function runDarwinTool(tool, args, { clock = performance.now.bind(performance), deadline = clock() + 2000, spawn = spawnSync } = {}) {
   const remaining = Math.min(2000, deadline - clock());
   if (remaining <= 0) throw relayError('DEADLINE_EXCEEDED', 'process deadline exceeded');
-  const result = spawn('/bin/ps', args, { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' },
+  const result = spawn(tool, args, { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' },
     timeout: Math.max(1, Math.floor(remaining)), maxBuffer: 4 * 1024 * 1024, killSignal: 'SIGKILL' });
   if (result.error || result.signal || result.status !== 0) throw relayError('PROCESS_UNAVAILABLE', 'cannot run process lookup', result.error);
   return result.stdout;
+}
+export const runDarwinPs = (args, options) => runDarwinTool('/bin/ps', args, options);
+export const runDarwinLsof = (args, options) => runDarwinTool('/usr/sbin/lsof', args, options);
+// lsof -F prints the process as `p<pid>`, then each text file as `n<path>`, some versions
+// preceding it with `ftxt`. The executable is the first; the Darwin probe's D4 checks that
+// order on a Mac.
+export function parseDarwinExecutable(output, pid) {
+  const lines = typeof output === 'string' ? output.split('\n') : [];
+  const name = lines[1] === 'ftxt' ? lines[2] : lines[1];
+  if (lines[0] !== `p${pid}` || !name?.startsWith('n/')) throw relayError('PROCESS_UNREADABLE', 'invalid process executable');
+  return name.slice(1);
 }
 function walk(pid, recordOf) {
   const seen = new Set(), chain = [];
@@ -85,7 +96,7 @@ function walk(pid, recordOf) {
   return chain;
 }
 export function createProcessOps({ platform = process.platform, readText = (p) => readFileSync(p, 'utf8'),
-  readLink = (p) => readlinkSync(p), runPs = runDarwinPs, kill = (pid, signal) => process.kill(pid, signal), hostname = osHostname } = {}) {
+  readLink = (p) => readlinkSync(p), runPs = runDarwinPs, runLsof = runDarwinLsof, kill = (pid, signal) => process.kill(pid, signal), hostname = osHostname } = {}) {
   if (!['linux', 'darwin'].includes(platform)) throw relayError('PROCESS_UNAVAILABLE', 'unsupported process platform');
   const absent = (error) => ['ENOENT', 'ESRCH'].includes(error.code);
   const local = () => {
@@ -177,10 +188,8 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
       if (typeof target !== 'string' || !target.startsWith('/')) throw relayError('PROCESS_UNREADABLE', 'invalid process executable');
       return target.endsWith(DELETED) ? target.slice(0, -DELETED.length) : target;
     }
-    const output = runPs(['-p', String(pid), '-o', 'comm='], options);
-    const path = typeof output === 'string' ? output.trim() : '';
-    if (!path) throw relayError('PROCESS_UNREADABLE', 'invalid process executable');
-    return path;
+    // Darwin's ps comm column is argv[0], which the process chooses, so it names no file.
+    return parseDarwinExecutable(runLsof(['-w', '-a', '-p', String(pid), '-d', 'txt', '-Fn'], options), pid);
   };
   const argvOf = (pid, options) => {
     if (platform === 'linux') {
@@ -192,17 +201,15 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
       return (text.endsWith('\0') ? text.slice(0, -1) : text).split('\0');
     }
     // ps joins arguments with spaces, so boundaries cannot be recovered from args alone.
-    // argv[0] is located by the comm column, which ps reports either as argv[0] itself or as
-    // the executable path whose basename argv[0] is; if neither holds, the boundary is unknown
-    // and the read fails closed. Later arguments split on whitespace: a role is one exact word,
-    // so a split can only make a role appear (no handle), never hide one.
+    // argv[0] is located by the comm column, which Darwin's ps reports as argv[0] itself; when
+    // args does not start with it, the boundary is unknown and the read fails closed. Later
+    // arguments split on whitespace: a role is one exact word, so a split can only make a role
+    // appear (no handle), never hide one.
     const comm = runPs(['-p', String(pid), '-o', 'comm='], options);
     const args = runPs(['-p', String(pid), '-o', 'args='], options);
     const first = typeof comm === 'string' ? comm.trim() : '', line = typeof args === 'string' ? args.trim() : '';
     if (!first || !line) throw relayError('PROCESS_UNREADABLE', 'invalid process arguments');
-    const token = line.split(/\s+/)[0];
-    const argv0 = line === first || line.startsWith(`${first} `) ? first
-      : token === basename(first) ? token : null;
+    const argv0 = line === first || line.startsWith(`${first} `) ? first : null;
     if (argv0 === null) throw relayError('PROCESS_UNREADABLE', 'argument boundaries unknown');
     const rest = line.slice(argv0.length).trim();
     return rest ? [argv0, ...rest.split(/\s+/)] : [argv0];

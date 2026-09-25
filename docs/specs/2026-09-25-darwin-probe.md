@@ -240,7 +240,9 @@ Gate:
 - relay's own variant of every capture is complete, or the judge names the truncation.
 
 **Finding:** whether Darwin `comm` is the executable path or argv[0] (item 2). The
-evidence corrects the session-process spec's line 98 either way.
+evidence corrects the session-process spec's line 98 either way. Answered by the second
+Mac run: `comm` is argv[0], so relay now reads the executable from `lsof` (relay-7eef39),
+and D4's native case is recognized only when `lsof` lists the executable first.
 
 ### D5 Registry, lock and cost — release gate
 

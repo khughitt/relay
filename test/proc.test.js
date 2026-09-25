@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createProcessOps, parseStat, parseDarwinRow, normalizeDarwinTty, runDarwinPs } from '../src/bus/proc.js';
-import { execFileSync } from 'node:child_process';
-import { readFileSync, readlinkSync } from 'node:fs';
+import { createProcessOps, parseStat, parseDarwinRow, normalizeDarwinTty, runDarwinPs, parseDarwinExecutable } from '../src/bus/proc.js';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
 test('proc parsing keeps state and exact field-22 text', () => {
   const after = Array(20).fill('0');
   after[0] = 'Z'; after[1] = '1'; after[4] = '34816'; after[19] = '9007199254740993';
@@ -176,14 +176,29 @@ test('Linux arguments split the NUL-separated cmdline; an empty cmdline is no ar
   for (const text of [failure('EACCES'), failure('ENOENT')])
     assert.throws(() => linuxWith({ '/proc/7/cmdline': text }).argvOf(7), { code: 'PROCESS_UNREADABLE' });
 });
-test('Darwin executable path and arguments come from one targeted ps each', () => {
+test('Darwin executable path is the first text file lsof lists, never ps comm', () => {
+  // Mac regression (Darwin probe D4): comm is argv[0], so a native install started as
+  // `9.9.9` read as "9.9.9" and was never recognized.
+  const exe = '/Users/Test User/.local/share/claude/versions/2.1.280';
   const calls = [];
-  const ops = createProcessOps({ platform: 'darwin', runPs: (args) => { calls.push(args.join(' '));
-    return args.includes('comm=') ? '/Users/user/.local/share/claude/versions/2.1.280\n' : '/Users/user/.local/bin/claude daemon run\n'; } });
-  assert.equal(ops.executableOf(9), '/Users/user/.local/share/claude/versions/2.1.280');
-  assert.deepEqual(calls, ['-p 9 -o comm=']);
-  const empty = createProcessOps({ platform: 'darwin', runPs: () => '\n' });
+  const ops = createProcessOps({ platform: 'darwin', runPs: () => { throw new Error('ps must not be read'); },
+    runLsof: (args) => { calls.push(args.join(' ')); return `p9\nftxt\nn${exe}\nftxt\nn/usr/lib/dyld\n`; } });
+  assert.equal(ops.executableOf(9), exe);
+  assert.deepEqual(calls, ['-w -a -p 9 -d txt -Fn']);
+  assert.equal(parseDarwinExecutable(`p9\nn${exe}\nn/usr/lib/dyld\n`, 9), exe);
+  for (const output of ['', '\n', 'p8\nftxt\nn/bin/x\n', 'p9\n', 'p9\nftxt\nn9.9.9\n', 'p9\nfcwd\nn/Users\n', null])
+    assert.throws(() => parseDarwinExecutable(output, 9), { code: 'PROCESS_UNREADABLE' });
+  const empty = createProcessOps({ platform: 'darwin', runPs: () => '\n', runLsof: () => '' });
   for (const read of [() => empty.executableOf(9), () => empty.argvOf(9)]) assert.throws(read, { code: 'PROCESS_UNREADABLE' });
+});
+test('Darwin executable lookup failures propagate as unavailable', () => {
+  const ops = createProcessOps({ platform: 'darwin', runLsof: () => { throw Object.assign(new Error('gone'), { code: 'PROCESS_UNAVAILABLE' }); } });
+  assert.throws(() => ops.executableOf(9), { code: 'PROCESS_UNAVAILABLE' });
+});
+test('real lsof output parses to the executable', { skip: !existsSync('/usr/bin/lsof') && !existsSync('/usr/sbin/lsof') }, () => {
+  const lsof = existsSync('/usr/sbin/lsof') ? '/usr/sbin/lsof' : '/usr/bin/lsof';
+  const out = spawnSync(lsof, ['-w', '-a', '-p', String(process.pid), '-d', 'txt', '-Fn'], { encoding: 'utf8' });
+  assert.equal(realpathSync(parseDarwinExecutable(out.stdout, process.pid)), realpathSync(process.execPath));
 });
 const darwinPs = (comm, args) => createProcessOps({ platform: 'darwin',
   runPs: (a) => a.includes('comm=') ? `${comm}\n` : a.includes('args=') ? `${args}\n` : '' });
@@ -191,12 +206,13 @@ test('Darwin argv[0] keeps its spaces: comm fixes where it ends, so a daemon is 
   // Review regression: splitting args on whitespace made argv[1] "User/.local/bin/claude".
   assert.deepEqual(darwinPs('/Users/Test User/.local/bin/claude', '/Users/Test User/.local/bin/claude daemon run').argvOf(9),
     ['/Users/Test User/.local/bin/claude', 'daemon', 'run']);
-  assert.deepEqual(darwinPs('/Users/user/.local/bin/claude', 'claude daemon run').argvOf(9), ['claude', 'daemon', 'run']);
   assert.deepEqual(darwinPs('claude', 'claude').argvOf(9), ['claude']);
 });
 test('Darwin argv fails closed when argv[0] cannot be located in args', () => {
   for (const [comm, args] of [['/Users/Test User/.local/bin/claude', '/Users/Other/claude daemon run'],
-    ['/Users/Test User/.local/bin/claude', '/Users/Test User/.local/bin/claudex daemon'], ['claude', 'claude-helper daemon']])
+    ['/Users/Test User/.local/bin/claude', '/Users/Test User/.local/bin/claudex daemon'], ['claude', 'claude-helper daemon'],
+    // comm is argv[0] on Darwin, never an executable path standing in for it.
+    ['/Users/user/.local/bin/claude', 'claude daemon run']])
     assert.throws(() => darwinPs(comm, args).argvOf(9), { code: 'PROCESS_UNREADABLE' });
 });
 test('real local process exposes its own executable and arguments', () => {

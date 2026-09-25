@@ -95,8 +95,10 @@ symlink has the same executable, so both branches agree on it. The executable pa
 read only for an ancestor whose `comm` is version-shaped (digits separated by dots,
 `^[0-9]+(\.[0-9]+)+$`): the shape gates the read, and the path decides. Other ancestors,
 a root-owned `sudo` among them, are never read. On Linux the path is
-`readlink /proc/<pid>/exe`; on Darwin it is the unabbreviated `comm` column of
-`ps -p <pid>`, which relay today reduces to its basename. An unreadable path for a
+`readlink /proc/<pid>/exe`; on Darwin it is the first text file
+`lsof -a -p <pid> -d txt -Fn` lists. Darwin's `comm` column is argv[0], which the process
+chooses (the Darwin probe measured a native install started as `9.9.9` reading `9.9.9`), so
+it cannot name the executable. An unreadable or non-absolute path for a
 version-shaped ancestor is a `PROCESS_UNREADABLE` error, exactly as an unreadable `stat`
 is now; it is never treated as "not a harness".
 
@@ -115,9 +117,9 @@ When the nearest Claude Code process has one of these roles, the result is null 
 existing `PROCESS_UNAVAILABLE` diagnostic. The arguments are read for that one process
 only: Linux `/proc/<pid>/cmdline`, which keeps argument boundaries; Darwin `ps -p <pid>
 -o args=`, which joins arguments with spaces and so cannot. On Darwin, argv[0] is located
-by the `comm` column (argv[0] itself, or an executable path whose basename argv[0] is), so
-a home directory with a space in it cannot shift `argv[1]`; when `comm` locates no argv[0]
-in `args`, the read is `PROCESS_UNREADABLE` and the handle null. Later arguments are split
+by the `comm` column, which is argv[0] itself, so a home directory with a space in it
+cannot shift `argv[1]`; when `args` does not start with `comm`, the read is
+`PROCESS_UNREADABLE` and the handle null. Later arguments are split
 on whitespace, which can make a role appear but never hide one. Codex and OpenCode have
 no measured non-session roles and get no list; one is added only with a measured chain.
 

@@ -1,19 +1,21 @@
 ---
 id: relay-7eef39
 title: "Darwin executableOf returns argv[0], so native Claude installs are not recognized"
-status: doing
+status: done
 priority: 1
 size: s
 complexity: mid
 process: direct
 owner: main
 created: 2026-09-25T18:48:36Z
-updated: 2026-09-25T19:08:42Z
+updated: 2026-09-25T19:10:49Z
 started: 2026-09-25T19:08:42Z
+completed: 2026-09-25T19:10:49Z
 depends: []
 parent: relay-1231bf
 tags: []
 source: relay-b12132
+model: "claude-opus-5-5[1m]"
 agent: claude-code/claude-opus-5-5
 ---
 
@@ -22,4 +24,8 @@ Mac attempt 2 of the Darwin probe (runbook, 2026-09-25T18:02; macOS 26.7 arm64) 
 ## Notes
 
 - 2026-09-25T19:08:42Z (main): started
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T19:10:49Z (relay-7eef39): done
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T19:10:49Z (relay-7eef39): Darwin executableOf reads the first text file lsof lists (absolute or PROCESS_UNREADABLE) instead of ps comm, which is argv[0]; argvOf drops the unmeasured basename branch; specs corrected. Proved on Linux by unit tests and a real-lsof parse; the Mac proof is D4 in relay-c19c0a's probe rerun
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
