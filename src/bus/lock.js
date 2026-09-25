@@ -81,7 +81,12 @@ export async function withLock(lockPath, fn, { clock = performance.now.bind(perf
     if (!await acquire(guardPath,guard,io)) {
       const current = await readToken(guardPath,io);
       if (!current) continue;
-      if (observe(current.holder) === 'dead') throw relayError('LOCK_REPAIR_REQUIRED','abandoned reclaim guard; operator repair required');
+      if (observe(current.holder) === 'dead') {
+        // Only a holder that died holding the guard leaves its token behind; a changed or missing
+        // token was released during the probe.
+        if (isDeepStrictEqual(await readToken(guardPath,io),current)) throw relayError('LOCK_REPAIR_REQUIRED','abandoned reclaim guard; operator repair required');
+        continue;
+      }
       await pause(); continue;
     }
     let error;

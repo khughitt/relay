@@ -1,18 +1,20 @@
 ---
 id: relay-5e4d93
 title: "Lock reclamation can delete a successor's live lock: a released-then-exited owner reads as dead"
-status: doing
+status: done
 priority: 1
 size: m
 complexity: high
 process: planned
 owner: relay-5e4d93
 created: 2026-09-25T20:04:03Z
-updated: 2026-09-25T21:21:21Z
+updated: 2026-09-25T21:23:00Z
 started: 2026-09-25T21:02:11Z
+completed: 2026-09-25T21:23:00Z
 depends: []
 tags: [lock]
 source: relay-6e9410
+model: "claude-opus-5-5[1m]"
 agent: claude-code/claude-opus-5-5
 spec: docs/specs/2026-09-25-lock-reclamation-order.md
 plan: docs/plans/2026-09-25-lock-reclamation-order.md
@@ -33,4 +35,8 @@ Found by the Mac session for relay-6e9410 (docs/runbooks/darwin-mac-handback-202
 - 2026-09-25T21:12:30Z (relay-5e4d93): parked (waiting on user, review): User reviews docs/plans/2026-09-25-lock-reclamation-order.md in .worktrees/relay-5e4d93 and picks the execution method; then the agent executes Task 1 (relay-11c1a5) and Task 2 (relay-cc98a1)
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T21:21:21Z (relay-5e4d93): resumed
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T21:23:00Z (relay-5e4d93): done
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T21:23:00Z (relay-5e4d93): Reclamation probes, then rereads, and unlinks only an identical main token; an abandoned-guard verdict needs an identical guard token after the probe. Deterministic tests for both races; parent spec rows amended. Mac load confirmation rides relay-c19c0a's probe iteration.
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

@@ -1,6 +1,7 @@
 # Lock reclamation order
 
-Status: approved 2026-09-25, after correcting the zombie bullet to Linux only.
+Status: approved 2026-09-25, after correcting the zombie bullet to Linux only; implemented
+in relay-5e4d93. The Mac load confirmation is part of relay-c19c0a's probe iteration.
 Task: `relay-5e4d93`.
 Amends: [Registry lock safety during extraction](2026-09-17-registry-lock-safety.md), the
 "Main owner confirmed dead" and "Reclamation guard owned by a confirmed-dead process" rows.
