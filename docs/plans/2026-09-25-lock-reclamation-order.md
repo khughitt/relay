@@ -16,7 +16,7 @@
 - No new file operations on the uncontended acquire/release path.
 - Owner and guard table outcomes and error codes are unchanged: `LOCK_TIMEOUT`, `LOCK_IDENTITY_UNKNOWN`, `LOCK_REPAIR_REQUIRED`, `IO_ERROR` keep their meanings.
 - An unlink that finds no file after the unchanged-token check stays `IO_ERROR` (outside the protocol).
-- Conventional commits, no AI attribution. `tasks done relay-5e4d93` lands in the same commit as the last code change. `just gate` passes before integration.
+- Conventional commits, no AI attribution. Each task closes its step task (relay-11c1a5, relay-cc98a1) in its own commit; `tasks done relay-5e4d93` lands with Task 2. `just gate` passes before integration.
 
 ## Review Focus
 
@@ -114,10 +114,11 @@ with:
 Run: `node --test test/lock.test.js test/lock-multiprocess.test.js`
 Expected: PASS, including the new test and the unchanged Review Focus tests 1, 4 and 5.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Close the step and commit**
 
 ```bash
-git add src/bus/lock.js test/lock.test.js
+tasks done relay-11c1a5 "Reclamation probes, then rereads, and unlinks only an identical main token; deterministic test for both interleavings"
+git add src/bus/lock.js test/lock.test.js tasks/relay-11c1a5.md
 git commit -m "fix(lock): reclaim only a main token unchanged after its holder is confirmed dead"
 ```
 
@@ -239,8 +240,9 @@ Expected: exit 0. The suite leaks one `test/fixtures/subscriber.js hang` process
 - [ ] **Step 7: Close the task and commit**
 
 ```bash
+tasks done relay-cc98a1 "An abandoned-guard verdict needs an identical guard token after the probe; deterministic test; parent spec rows amended"
 tasks done relay-5e4d93 "Reclamation probes, then rereads, and unlinks only an identical main token; an abandoned-guard verdict needs an identical guard token after the probe. Deterministic tests for both races; parent spec rows amended. Mac load confirmation rides relay-c19c0a's probe iteration."
-git add src/bus/lock.js test/lock.test.js docs/specs/ tasks/relay-5e4d93.md
+git add src/bus/lock.js test/lock.test.js docs/specs/ tasks/relay-cc98a1.md tasks/relay-5e4d93.md
 git commit -m "fix(lock): an abandoned-guard verdict requires an unchanged guard token"
 ```
 
