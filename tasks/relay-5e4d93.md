@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: relay-5e4d93
 created: 2026-09-25T20:04:03Z
-updated: 2026-09-25T21:12:30Z
+updated: 2026-09-25T21:21:21Z
 started: 2026-09-25T21:02:11Z
 depends: []
 tags: [lock]
@@ -31,4 +31,6 @@ Found by the Mac session for relay-6e9410 (docs/runbooks/darwin-mac-handback-202
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T21:10:02Z (relay-5e4d93): Spec approved by the user after correcting the zombie bullet to Linux only (Darwin's probe reads no process state). Next: implementation plan for review.
 - 2026-09-25T21:12:30Z (relay-5e4d93): parked (waiting on user, review): User reviews docs/plans/2026-09-25-lock-reclamation-order.md in .worktrees/relay-5e4d93 and picks the execution method; then the agent executes Task 1 (relay-11c1a5) and Task 2 (relay-cc98a1)
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T21:21:21Z (relay-5e4d93): resumed
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

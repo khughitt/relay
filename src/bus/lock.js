@@ -86,10 +86,12 @@ export async function withLock(lockPath, fn, { clock = performance.now.bind(perf
     }
     let error;
     try {
+      // Probe, then confirm the token is unchanged: its holder may have released it, and a new
+      // writer taken the lock, while the probe ran. Once the holder is dead, only a guard holder
+      // can change a file that still holds its token (docs/specs/2026-09-25-lock-reclamation-order.md).
       const current = await readToken(lockPath,io);
-      if (current) {
-        if (observe(current.holder) === 'dead') await io.unlink(lockPath);
-      }
+      if (current && observe(current.holder) === 'dead'
+          && isDeepStrictEqual(await readToken(lockPath,io),current)) await io.unlink(lockPath);
     } catch (cause) { error = cause.code?.startsWith('LOCK_') ? cause : relayError('IO_ERROR','cannot reclaim lock',cause); }
     const cleanup = await release(guardPath,guard,io);
     if (error && cleanup) throw new AggregateError([error,cleanup],'reclamation and cleanup failed');
