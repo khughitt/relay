@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import { cloneBundle, credentialHits, loadResults, packResults, stableVerdict, verifyManifest } from '../tools/darwin-probe/probe.mjs';
+import { CRASHED, cloneBundle, credentialHits, loadResults, packResults, packingHits, requestedStages, stableVerdict, verifyManifest } from '../tools/darwin-probe/probe.mjs';
 import { isolationOf } from '../tools/darwin-probe/lib/context.mjs';
 
 test('a tampered bundle file fails manifest verification', (t) => {
@@ -91,6 +91,21 @@ test('a credential file or the token anywhere in the results is found', (t) => {
   writeFileSync(join(d, 'logs/D7.log'), `preflight: ${token}\n`); writeFileSync(join(d, 'auth.json'), '{}'); writeFileSync(join(d, 'stages/.credentials.json'), '{}');
   assert.deepEqual(credentialHits(d, token).sort(), ['auth.json', 'logs/D7.log', 'stages/.credentials.json']);
   assert.deepEqual(credentialHits(d, null).sort(), ['auth.json', 'stages/.credentials.json']);
+});
+test('credential material in the raw results alone still refuses packing', (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  const raw = join(d, 'results'), out = join(d, 'out'), token = 'sk-ant-oat01-' + 'x'.repeat(40);
+  for (const dir of [raw, out]) { mkdirSync(join(dir, 'logs'), { recursive: true }); writeFileSync(join(dir, 'logs/D7.log'), 'clean'); }
+  assert.deepEqual(packingHits(raw, out, token), []);
+  writeFileSync(join(raw, 'logs/D7.log'), `preflight: ${token}\n`); mkdirSync(join(raw, 'd7')); writeFileSync(join(raw, 'd7/auth.json'), '{}');
+  writeFileSync(join(out, 'auth.json'), '{}');
+  assert.deepEqual(packingHits(raw, out, token), ['auth.json', 'd7/auth.json', 'logs/D7.log']);
+});
+test('requested stages run in canonical order, once each, and an unknown id is refused', () => {
+  assert.deepEqual(requestedStages('D9,D7,D0'), ['D0', 'D7', 'D9']);
+  assert.deepEqual(requestedStages('D7b,D7,D7'), ['D7', 'D7b']);
+  assert.equal(requestedStages(undefined).join(','), 'D0,D1,D2,D3,D4,D5,D6,D7,D7b,D8,D9');
+  assert.throws(() => requestedStages('D7,D10,x'), { message: 'unknown stage id(s): D10, x' });
 });
 test('the isolation reading is taken before D9 and later changes are only a finding', () => {
   const a = { '.codex/config.toml': { exists: true, size: 1 } }, b = { '.codex/config.toml': { exists: true, size: 2 } };
@@ -184,4 +199,48 @@ test('run keeps its root and names it when the probe dies abnormally, and remove
     assert.equal(existsSync(root), kept);
     if (kept) { assert.ok(r.stderr.includes(root), r.stderr); rmSync(root, { recursive: true, force: true }); }
   }
+});
+test('a probe crash exits CRASHED; run keeps the root, without credential copies, and says it is unredacted', { timeout: 90000 }, async (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  bundleLayout(d);
+  // Once the self-test's hanging stage starts, plant a guard probe's credential copies (as a
+  // SIGKILLed ops relay-guard-probe leaves them) and crash outside any stage.
+  const crash = join(d, 'crash.mjs');
+  writeFileSync(crash, `import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+// NODE_OPTIONS reaches the probe's own node children too; only the probe carries --root.
+const at = process.argv.indexOf('--root'), root = process.argv[at + 1];
+const timer = at > 0 && setInterval(() => {
+  if (!existsSync(root + '/results/stages/D0.json')) return;
+  clearInterval(timer);
+  mkdirSync(root + '/d7/home/.codex', { recursive: true }); mkdirSync(root + '/d7/home/.claude', { recursive: true });
+  writeFileSync(root + '/d7/home/.codex/auth.json', '{}'); writeFileSync(root + '/d7/home/.claude/.credentials.json', '{}');
+  writeFileSync(root + '/d7/home/.codex/config.toml', '');
+  throw new Error('injected crash');
+}, 100);
+`);
+  const r = spawnSync('/bin/sh', [join(d, 'run'), '--self-test-hang'], { encoding: 'utf8', timeout: 80000, env: { ...process.env, NODE_OPTIONS: `--import=${crash}` } });
+  const root = r.stderr.match(/\/tmp\/rdp\.[A-Za-z0-9]{6}/)?.[0];
+  t.after(() => { if (root) rmSync(root, { recursive: true, force: true }); });
+  assert.equal(r.status, CRASHED, r.stderr);
+  assert.match(r.stderr, /injected crash/);
+  assert.ok(root && existsSync(root), r.stderr);
+  assert.match(r.stderr, /unredacted/);
+  assert.equal(existsSync(join(root, 'd7/home/.codex/auth.json')), false);
+  assert.equal(existsSync(join(root, 'd7/home/.claude/.credentials.json')), false);
+  assert.equal(existsSync(join(root, 'd7/home/.codex/config.toml')), true);
+  assert.equal(existsSync(join(root, 'results/stages/D0.json')), true);
+  assert.equal(psArgs().includes('sleep 600.654'), false);
+});
+test('a failure while packing exits CRASHED, not the signal code, so run keeps the root', { timeout: 90000 }, async (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => { chmodSync(d, 0o755); rmSync(d, { recursive: true, force: true }); });
+  const root = join(d, 'root'); mkdirSync(root);
+  chmodSync(d, 0o555); // the tarball cannot be moved into the bundle directory
+  const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', root, '--bundle', d], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = ''; child.stderr.on('data', (x) => { stderr += x; });
+  const exited = new Promise((r) => child.once('exit', r));
+  assert.ok(await waitFor('sleep 600.654', child), 'the probe never reached its hanging stage');
+  child.kill('SIGINT');
+  assert.equal(await exited, CRASHED, stderr);
+  assert.match(stderr, /finalize failed/);
+  assert.equal(psArgs().includes('sleep 600.654'), false);
 });

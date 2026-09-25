@@ -133,10 +133,13 @@ user's own live sessions; what changes from there to the end is recorded as a fi
 not gated. The probe handles `INT`, `TERM` and `HUP` itself (a closed terminal included):
 it kills every pid it spawned (listed in `pids`) and packs the results. `run`'s `EXIT`
 trap kills anything still listed and removes the root, keeping only the results tarball,
-unless node ended abnormally (a crash or a kill), in which case it keeps the root and
-names it. On macOS `run` holds `caffeinate -i` for its lifetime. Before packing, the
-results are scanned for a `.credentials.json` or `auth.json` file and for the Claude
-token; a hit names the files and nothing is packed.
+unless node ended abnormally (a kill, or the probe's own crash, which it reports as exit
+70), in which case it keeps the root, deletes any `.credentials.json` or `auth.json` copy
+from it, and names it as unredacted. On macOS `run` holds `caffeinate -i` for its
+lifetime. `--stages` selects stages but never reorders them: they run in the order of
+this document. Before packing, the raw and the redacted results are scanned for a
+`.credentials.json` or `auth.json` file and for the Claude token; a hit names the files
+and nothing is packed.
 
 ## Checks
 

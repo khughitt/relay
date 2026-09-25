@@ -14,11 +14,19 @@ import { collectHosts, redactFile, redactionMap, redactValue } from './redact.mj
 
 const STAGES = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D7b', 'D8', 'D9'];
 const MODULES = { D0: 'd0-env', D1: 'd1-package', D2: 'd2-suite', D3: 'd3-identity', D4: 'd4-table', D5: 'd5-registry', D6: 'd6-dispatch', D7: 'd7-guard', D7b: 'd7b-opencode', D8: 'd8-launchd', D9: 'd9-ambient' };
-const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
-export const verifyManifest = (dir, manifest) => Object.entries(manifest.files).filter(([f, h]) => !existsSync(join(dir, f)) || sha256(join(dir, f)) !== h).map(([f]) => f);
 // A validation failure the user should see as one line, not a stack trace.
 class ProbeError extends Error {}
 const die = (message) => { throw new ProbeError(message); };
+// The run order is STAGES's, whatever order --stages names them in: D9 takes the gating
+// isolation reading, so it must come after every stage that could change a live path.
+export function requestedStages(arg) {
+  if (!arg) return STAGES;
+  const ids = arg.split(','), unknown = ids.filter((id) => !(id in MODULES));
+  if (unknown.length) die(`unknown stage id(s): ${unknown.join(', ')}`);
+  return STAGES.filter((id) => ids.includes(id));
+}
+const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
+export const verifyManifest = (dir, manifest) => Object.entries(manifest.files).filter(([f, h]) => !existsSync(join(dir, f)) || sha256(join(dir, f)) !== h).map(([f]) => f);
 const firstLine = (s) => String(s).split('\n')[0];
 // Every git call the probe makes is hermetic: no global or system config leaks in from the
 // Mac's own git setup (a signing key, a credential helper, an unrelated alias).
@@ -69,6 +77,12 @@ export function credentialHits(dir, token) {
   return walkFiles(dir).filter((file) => CREDENTIAL_FILES.includes(basename(file)) || (!!token && readFileSync(file).includes(token)))
     .map((file) => relative(dir, file));
 }
+// The scan covers the raw results as well as the redacted copy that is packed.
+export const packingHits = (raw, out, token) => [...new Set([...credentialHits(raw, token), ...credentialHits(out, token)])].sort();
+// The probe's own crash (an uncaught exception, or a failure while packing): run keeps the root,
+// which may hold unpacked results. Node's default for an uncaught exception is 1, which run
+// reads as a normal refusal and removes the root.
+export const CRASHED = 70;
 const onPath = (name) => (process.env.PATH ?? '').split(delimiter).some((dir) => { try { accessSync(join(dir, name), constants.X_OK); return true; } catch { return false; } });
 // A real `claude setup-token` token is ~100 characters. Anything much shorter is a stray key
 // press, and scanning the results for it would refuse to pack an otherwise good run.
@@ -79,10 +93,7 @@ async function main() {
   const platform = process.platform, root = values.root, bundle = values.bundle, selfTest = values['self-test-hang'];
   if (platform !== 'darwin' && !values['allow-linux'] && !selfTest) throw new Error('this probe runs on macOS; pass --allow-linux for the smoke run');
   // Before anything runs: an unknown stage id is a typo, not a run worth starting.
-  if (values.stages) {
-    const unknown = values.stages.split(',').filter((id) => !(id in MODULES));
-    if (unknown.length) die(`unknown stage id(s): ${unknown.join(', ')}`);
-  }
+  const wanted = requestedStages(values.stages);
   mkdirSync(root, { recursive: true }); prepareRoot(root);
   // Isolate this process too, so any relay default that reads the ambient environment lands in the root.
   const ambient = { columns_exported: process.env.COLUMNS !== undefined };
@@ -100,7 +111,6 @@ async function main() {
   const py = spawnSync('python3', ['--version'], { encoding: 'utf8', timeout: 10000 });
   const pyVersion = py.error ? '' : `${py.stdout ?? ''}${py.stderr ?? ''}`.trim().split('\n')[0];
   if (!pythonAtLeast(pyVersion, [3, 11])) die(`python3 >= 3.11 is required (found ${pyVersion || 'none'}); install one, e.g. brew install python`);
-  const wanted = values.stages ? values.stages.split(',') : STAGES;
   const home = homedir();
   // Asked once, before any stage, so the user is not interrupted mid-run. The token lives in
   // ctx.token only: never ctx.env, a log, an observation or the results (scanned before packing).
@@ -161,7 +171,7 @@ async function main() {
     // Build under the root and rename into the bundle directory last, so an interrupt during
     // packing never leaves a truncated tarball where the user would find it. `--numeric-owner`
     // keeps the Mac account's user and group name out of every archive header.
-    const hits = credentialHits(out, ctx.token);
+    const hits = packingHits(raw, out, ctx.token);
     if (hits.length) {
       process.stderr.write(`refusing to pack: credential material in ${hits.join(', ')}\n`);
       refused = true; process.exitCode = 1; return;
@@ -182,7 +192,8 @@ async function main() {
       if (signalling) return;
       signalling = true;
       process.stderr.write('stopping: killing children and packing results…\n');
-      finalize(signal).catch((error) => { process.stderr.write(`finalize failed: ${error.stack ?? error}\n`); }).finally(() => process.exit(refused ? 1 : code));
+      let crashed = false;
+      finalize(signal).catch((error) => { crashed = true; process.stderr.write(`finalize failed: ${error.stack ?? error}\n`); }).finally(() => process.exit(crashed ? CRASHED : refused ? 1 : code));
     });
   }
   const stageRun = async (id, fn) => {
@@ -207,13 +218,15 @@ async function main() {
       }
     }
   } finally {
-    if (!t.stopping) await finalize(null).catch((error) => { process.stderr.write(`finalize failed: ${error.stack ?? error}\n`); process.exitCode ||= 2; });
+    if (!t.stopping) await finalize(null).catch((error) => { process.stderr.write(`finalize failed: ${error.stack ?? error}\n`); process.exitCode = CRASHED; });
   }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   // A closed terminal turns every write to it into EIO. Without a listener that stream 'error'
   // is uncaught and kills the probe mid-cleanup, losing every result; the writes are lost anyway.
   for (const stream of [process.stdout, process.stderr]) stream.on('error', () => {});
+  const crash = (error) => { process.stderr.write(`probe crashed: ${error?.stack ?? error}\n`); process.exit(CRASHED); };
+  process.on('uncaughtException', crash); process.on('unhandledRejection', crash);
   main().catch((error) => {
     process.stderr.write(error instanceof ProbeError ? `${error.message}\n` : `${error.stack ?? error}\n`);
     process.exit(2);
