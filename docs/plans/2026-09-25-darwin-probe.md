@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft for review, 2026-09-25; revised after the second plan review (stop-first cleanup, owned-group signalling with a sweeper and survivor report, verdicts free of stage text and exported redacted, session-bound D7 identity) and the first (registry paths, process-group cleanup, D9 argument stripping, tolerant finalization, a stricter judge, bundle verification, `planHooks` for D8, hook-ancestry identity in D7, structural JSON redaction).
+**Status:** draft for review, 2026-09-25; revised after the third plan review (stdin only when there is input, EPIPE handled; the interrupt test observes an early exit) and the second (stop-first cleanup, owned-group signalling with a sweeper and survivor report, verdicts free of stage text and exported redacted, session-bound D7 identity) and the first (registry paths, process-group cleanup, D9 argument stripping, tolerant finalization, a stricter judge, bundle verification, `planHooks` for D8, hook-ancestry identity in D7, structural JSON redaction).
 
 **Goal:** Build the bundle, live probe and judge that `docs/specs/2026-09-25-darwin-probe.md`
 specifies, prove it end to end on the Linux host, and hand the user a bundle to run on
@@ -800,6 +800,12 @@ test('after stop, spawning is refused and a resumed stage cannot outlive cleanup
   assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes('sleep 600.777'), false);
   assert.throws(() => tr.spawn('/bin/true', []), /stopping/);
 });
+test('run survives a child that exits without reading its stdin', async (t) => {
+  const r = root(t); const tr = tracker(r);
+  assert.equal((await tr.run(process.execPath, ['--version'])).exit, 0);
+  assert.equal((await tr.run('/bin/sh', ['-c', 'exit 0'], { input: 'x'.repeat(4 * 1024 * 1024) })).exit, 0);
+  assert.equal((await tr.run('/bin/sh', ['-c', 'head -c 1 >/dev/null'], { input: 'y'.repeat(4 * 1024 * 1024) })).exit, 0);
+});
 test('kill is idempotent and a group is retired when its last member exits', async (t) => {
   const r = root(t); const tr = tracker(r);
   const c = tr.spawn('/bin/sh', ['-c', 'sleep 0.3 & exit 0'], { stdio: 'ignore' });
@@ -900,15 +906,21 @@ export function tracker(root) {
     sweep();
   };
   const fork = (module, args, options = {}) => spawnTracked(process.execPath, [module, ...args], { ...options, stdio: options.stdio ?? ['ignore', 'ignore', 'inherit', 'ipc'] });
+  // stdin is a pipe only when there is input to send. A child may exit without reading it
+  // (`python3 --version`), so EPIPE on stdin is expected; any other stdin error is reported in
+  // the result's stderr rather than escaping as an unhandled stream error.
   const run = (cmd, args, { env, cwd, input, timeoutMs = 600000, argv0 } = {}) => new Promise((resolve, reject) => {
-    let child; try { child = spawnTracked(cmd, args, { env, cwd, argv0, stdio: ['pipe', 'pipe', 'pipe'] }); } catch (error) { reject(error); return; }
+    let child; try { child = spawnTracked(cmd, args, { env, cwd, argv0, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] }); } catch (error) { reject(error); return; }
     const started = performance.now();
-    let stdout = '', stderr = '';
+    let stdout = '', stderr = '', stdinError = '';
     child.stdout.on('data', (d) => { stdout += d; }); child.stderr.on('data', (d) => { stderr += d; });
     const timer = setTimeout(() => { kill(child.pid); }, timeoutMs);
     child.once('error', (error) => { clearTimeout(timer); resolve({ exit: null, signal: null, stdout, stderr: `${stderr}${error.message}\n`, ms: performance.now() - started }); });
-    child.once('close', (exit, signal) => { clearTimeout(timer); resolve({ exit, signal, stdout, stderr, ms: performance.now() - started }); });
-    child.stdin.end(input ?? '');
+    child.once('close', (exit, signal) => { clearTimeout(timer); resolve({ exit, signal, stdout, stderr: stderr + stdinError, ms: performance.now() - started }); });
+    if (input !== undefined) {
+      child.stdin.on('error', (error) => { if (error.code !== 'EPIPE') stdinError = `stdin: ${error.message}\n`; });
+      child.stdin.end(input);
+    }
   });
   const killAll = async () => {
     for (const until = Date.now() + 10000; groups.size && Date.now() < until;) { await Promise.all([...groups.keys()].map(kill)); sweep(); }
@@ -1056,7 +1068,7 @@ writeFileSync(join(dirname(planPath), 'done'), '');
 - [ ] **Step 6: Run to see it pass**
 
 Run: `node --test test/darwin-probe-runtime.test.js`
-Expected: PASS (9 tests). The parent test proves on Linux that the constructed-parent path
+Expected: PASS (10 tests). The parent test proves on Linux that the constructed-parent path
 publishes a qualified handle; D5 relies on the same path on Darwin.
 
 - [ ] **Step 7: Commit**
@@ -2111,10 +2123,12 @@ test('SIGINT after a normal D0 packs results, fills D0, and leaves no grandchild
   // --self-test-hang runs the real D0, then a stage that respawns `sh` (with two sleeps)
   // whenever it dies, which is the race between cleanup and a resuming stage.
   const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', join(d, 'root'), '--bundle', d], { stdio: 'ignore' });
+  const exited = new Promise((r) => child.once('exit', r)); // registered now, so an early exit is not missed
   const ps = () => execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' });
-  for (let i = 0; i < 100 && !ps().includes('sleep 600.654'); i++) await new Promise((r) => setTimeout(r, 200));
+  for (let i = 0; i < 100 && child.exitCode === null && !ps().includes('sleep 600.654'); i++) await new Promise((r) => setTimeout(r, 200));
+  assert.equal(child.exitCode, null, 'the probe exited before the interrupt');
   child.kill('SIGINT');
-  assert.equal(await new Promise((r) => child.once('exit', r)), 130);
+  assert.equal(await exited, 130);
   const tarball = readdirSync(d).find((f) => f.startsWith('relay-darwin-results-'));
   assert.ok(tarball);
   const x = join(d, 'x'); mkdirSync(x); execFileSync('tar', ['xzf', join(d, tarball), '-C', x]);
