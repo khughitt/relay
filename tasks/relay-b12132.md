@@ -6,9 +6,9 @@ priority: 1
 size: m
 complexity: mid
 process: planned
-owner: darwin-probe
+owner: darwin-parent
 created: 2026-09-25T10:57:49Z
-updated: 2026-09-25T16:33:32Z
+updated: 2026-09-25T17:34:43Z
 started: 2026-09-25T10:57:57Z
 depends: []
 parent: relay-1231bf
@@ -69,4 +69,6 @@ The release gate relay-c19c0a carries: physical Darwin process/terminal verifica
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T16:33:32Z (main): Landed on main at b7fc410 (fast-forward); just gate 322/322 on main; handoff bundle dist/relay-darwin-probe-b7fc410.tar.gz (relay b7fc410, ops ff9bfb0 ⊇ a54e408), darwin-bundle-check preflight ok for claude-code and codex
 - 2026-09-25T16:33:32Z (main): parked (waiting on user, environment): User copies dist/relay-darwin-probe-b7fc410.tar.gz to the Mac, runs tar xzf … && cd relay-darwin-probe-b7fc410 && ./run, and returns relay-darwin-results-<stamp>.tar.gz; agent then runs just darwin-judge <tarball> <ops checkout>, commits the runbook section, and files any failed gate
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T17:34:43Z (darwin-parent): resumed
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
