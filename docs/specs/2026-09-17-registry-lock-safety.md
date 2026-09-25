@@ -78,9 +78,9 @@ adding another automatic lock-recovery layer.
 | Main owner alive | Wait within the caller's monotonic acquisition deadline; never steal because of age. |
 | Main owner unknown | Wait within the deadline, then report unavailable identity; never treat unknown as dead. |
 | Owner probe cut short by the deadline | It decides nothing: the last completed verdict stands, so a live owner at the deadline is `LOCK_TIMEOUT`. (Darwin's probe spawns `ps`, which the last probe before a deadline may not have time for.) |
-| Main owner confirmed dead | Acquire the reclamation guard atomically, reread the current main token under that guard, and remove it only if its current owner is still confirmed dead. Then release the guard and compete for the main lock normally. |
+| Main owner confirmed dead | Acquire the reclamation guard atomically, read the current main token under that guard, probe its owner, and remove it only if the owner is confirmed dead and a reread after the probe finds the identical token ([reclamation order](2026-09-25-lock-reclamation-order.md)). Then release the guard and compete for the main lock normally. |
 | Reclamation guard owned by a live or unknown process | Wait within the deadline; do not delete it by age. |
-| Reclamation guard owned by a confirmed-dead process | Return `LOCK_REPAIR_REQUIRED`; do not race other reclaimers to delete or replace it. |
+| Reclamation guard owned by a confirmed-dead process | Return `LOCK_REPAIR_REQUIRED` if a reread after the probe finds the identical guard token; a changed or missing token was released, so compete again. Do not race other reclaimers to delete or replace it. |
 | Malformed/empty main token or reclamation token | Return `LOCK_REPAIR_REQUIRED`; do not guess ownership. |
 | Read, permission or filesystem error | Report the error; it is not evidence that a lock is free. |
 

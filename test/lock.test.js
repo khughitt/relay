@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
+import { unlinkSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { withLock } from '../src/bus/lock.js';
 import { DEADLINE_CUT, createProcessOps } from '../src/bus/proc.js';
@@ -152,6 +153,66 @@ test('under guard reread leaves changed live owner alone and missing main is alr
     }}});
     if(replacement){await assert.rejects(attempt,{code:'LOCK_TIMEOUT'});assert.deepEqual(JSON.parse(await fs.readFile(p.lockPath)),replacement);}
     else assert.equal((await attempt).cleanupError,null);
+  }
+});
+test('a reclaimer never removes a lock its dead owner released during the probe', async t => {
+  // relay-5e4d93: owner A releases and exits, and in one case writer C acquires, while contender
+  // B probes A under the reclaim guard. Rereading before the probe made B unlink C's live lock
+  // (two writers inside) or fail on the vanished file (IO_ERROR).
+  for (const reacquired of [true, false]) {
+    const p = await tempState(t), real = ops(), self = real.handleOf(process.pid);
+    const A = token({ ...self, pid: 999991 }), C = token({ ...self, pid: 999992 });
+    await writeToken(p.lockPath, A);
+    let probesOfA = 0, entered = false;
+    const probe = (h, o) => {
+      if (h.pid === C.holder.pid) return { status: 'alive', reason: 'qualified process matches' };
+      if (h.pid !== A.holder.pid) return real.probe(h, o);
+      if (++probesOfA === 2) {
+        // B's probe under the guard: A releases and exits; C may acquire.
+        unlinkSync(p.lockPath);
+        if (reacquired) writeFileSync(p.lockPath, JSON.stringify(C), { mode: 0o600 });
+      }
+      return { status: 'dead', reason: 'process absent' };
+    };
+    const attempt = withLock(p.lockPath, () => { entered = true; }, { ...fakeWait(), processOps: { ...real, probe } });
+    if (reacquired) {
+      await assert.rejects(attempt, { code: 'LOCK_TIMEOUT' });
+      assert.equal(entered, false);
+      assert.deepEqual(JSON.parse(await fs.readFile(p.lockPath)), C);
+    } else {
+      assert.equal((await attempt).cleanupError, null);
+      assert.equal(entered, true);
+      await assert.rejects(fs.stat(p.lockPath), { code: 'ENOENT' });
+    }
+    assert.equal(probesOfA, 2);
+    await assert.rejects(fs.stat(p.reclaimPath), { code: 'ENOENT' });
+  }
+});
+test('a guard released during its holder probe is not an abandoned guard', async t => {
+  // relay-5e4d93: reading the guard, then probing its holder dead, raised LOCK_REPAIR_REQUIRED
+  // although the holder had released the guard and exited first. A guard retaken by a live
+  // reclaimer meanwhile is waited on.
+  for (const retaken of [false, true]) {
+    const p = await tempState(t), real = ops(), self = real.handleOf(process.pid);
+    const G = token({ ...self, pid: 999993 }), G2 = token({ ...self, pid: 999994 });
+    await writeToken(p.lockPath, deadToken());
+    await writeToken(p.reclaimPath, G);
+    const probe = (h, o) => {
+      if (h.pid === G2.holder.pid) return { status: 'alive', reason: 'qualified process matches' };
+      if (h.pid !== G.holder.pid) return real.probe(h, o);
+      // G releases the guard and exits while the contender probes it; another reclaimer may retake it.
+      unlinkSync(p.reclaimPath);
+      if (retaken) writeFileSync(p.reclaimPath, JSON.stringify(G2), { mode: 0o600 });
+      return { status: 'dead', reason: 'process absent' };
+    };
+    const attempt = withLock(p.lockPath, () => 'entered', { ...fakeWait(), processOps: { ...real, probe } });
+    if (retaken) {
+      await assert.rejects(attempt, { code: 'LOCK_TIMEOUT' });
+      assert.deepEqual(JSON.parse(await fs.readFile(p.reclaimPath)), G2);
+    } else {
+      assert.equal((await attempt).value, 'entered');
+      await assert.rejects(fs.stat(p.reclaimPath), { code: 'ENOENT' });
+    }
   }
 });
 test('token write/link/private cleanup failures propagate without entering',async t=>{
