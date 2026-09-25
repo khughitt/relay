@@ -7,7 +7,7 @@ size: l
 complexity: mid
 process: planned
 created: 2026-09-17T00:50:54Z
-updated: 2026-09-25T20:04:10Z
+updated: 2026-09-25T21:47:24Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
 tags: []
@@ -62,3 +62,6 @@ Prerequisites: relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1. Release goa
 ## Notes
 
 - 2026-09-17T08:15:54Z (relay-06b1da): R1 passed Node 26.5.0 and 22.23.2 full gates (150 tests including tarball and Linux IPC) and independent review. Physical Darwin process/terminal verification has not run: retain that explicit release/cutover gate; portable Darwin fixtures ran on Linux only. Registry API and repair procedure are in docs/api.md and docs/runbooks/registry-lock-repair.md.
+- 2026-09-25T21:47:24Z (main): Probe attempt 3 is built: dist/relay-darwin-probe-df6f741.tar.gz (relay df6f741, ops 1169107 with the token write-back); just darwin-bundle-check passed (claude-code and codex preflight ok). Mac Claude brief: dist/relay-mac-handoff-3.md (baseline npm test, lock load acceptance for relay-5e4d93, relay-ba3153 test premises). The user runs ./run after that session, with the Mac idle.
+- 2026-09-25T21:47:24Z (main): parked (waiting on user, environment): User: (1) give a Mac Claude session dist/relay-mac-handoff-3.md plus the probe tarball and return ~/Downloads/relay-mac-report-3.md and relay-mac-3.bundle; (2) on the idle Mac run tar xzf relay-darwin-probe-df6f741.tar.gz && cd relay-darwin-probe-df6f741 && ./run and return the results tarball. Agent then merges mac/relay-ba3153, runs just darwin-judge on the tarball in a worktree, commits attempt 3, and writes the v0.1.0 publication plan
+  provenance: {"harness_session":"claude-code:3c606fb5-d94a-4c2d-b41f-4c120db27c0d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
