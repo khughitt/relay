@@ -126,17 +126,24 @@ gives relay). For every process it launches, it sets
 cache variables matter for D7b: OpenCode keeps its logs and data under
 `~/.local/share/opencode` and its cache under `~/.cache/opencode`. The probe never writes
 `~/.claude`, `~/.codex`, `~/.config/relay`, `~/.local/state/relay`, `~/.config/opencode`,
-`~/.local/share/opencode`, `~/.cache/opencode` or any live hook configuration. `run`
+`~/.local/share/opencode`, `~/.cache/opencode` or any live hook configuration, apart from
+the guard probe's login write-back below. `run`
 records the recursive mtimes and file counts of those paths before and after, and a
 change fails the attempt. The "after" reading is taken just before D9, which invites the
 user's own live sessions; what changes from there to the end is recorded as a finding,
-not gated. The probe handles `INT`, `TERM` and `HUP` itself (a closed terminal included):
+not gated. One change is expected: the ops guard probe writes a harness's refreshed login
+back to `~/.codex/auth.json` or `~/.claude/.credentials.json` (ops-4130ea). D7 reads that
+file just before and after the live run it drives, and a change whose run-wide readings
+equal D7's own is recorded as written back, a finding; any other change to it still fails. The probe handles `INT`, `TERM` and `HUP` itself (a closed terminal included):
 it kills every pid it spawned (listed in `pids`) and packs the results. `run`'s `EXIT`
 trap kills anything still listed and removes the root, keeping only the results tarball,
-unless node ended abnormally (a crash or a kill), in which case it keeps the root and
-names it. On macOS `run` holds `caffeinate -i` for its lifetime. Before packing, the
-results are scanned for a `.credentials.json` or `auth.json` file and for the Claude
-token; a hit names the files and nothing is packed.
+unless node ended abnormally (a kill, or the probe's own crash, which it reports as exit
+70), in which case it keeps the root, deletes any `.credentials.json` or `auth.json` copy
+from it, and names it as unredacted. On macOS `run` holds `caffeinate -i` for its
+lifetime. `--stages` selects stages but never reorders them: they run in the order of
+this document. Before packing, the raw and the redacted results are scanned for a
+`.credentials.json` or `auth.json` file, for the Claude token and for a JWT-shaped token
+(Codex's login); a hit names the files and nothing is packed.
 
 ## Checks
 
@@ -240,7 +247,10 @@ Gate:
 - relay's own variant of every capture is complete, or the judge names the truncation.
 
 **Finding:** whether Darwin `comm` is the executable path or argv[0] (item 2). The
-evidence corrects the session-process spec's line 98 either way. Answered by the second
+evidence corrects the session-process spec's line 98 either way. It takes both parents:
+the native one (argv[0] `9.9.9`, not its path) separates the path from argv[0], and the
+chain one (argv[0] is its path, not its file name `claude`) separates argv[0] from the
+file name. The second Mac run read the chain parent alone and reported "path". Answered by the second
 Mac run: `comm` is argv[0], so relay now reads the executable from `lsof` (relay-7eef39),
 and D4's native case is recognized only when `lsof` lists the executable first.
 
@@ -305,6 +315,9 @@ adds two things:
 - after each run it reads the disposable registry and checks that the published
   `Agent.process` handle names the harness process that ran the hook: an ancestor of the
   recorded hook pid whose executable is the harness.
+- after the live runs it copies each run's exit, duration and the head of its stderr and
+  stdout (the ops probe's `runs/<attempt>/<name>/`, which stay outside the results) into
+  `logs/D7.log`, so a failed harness run is diagnosable from the tarball.
 
 Of these two harnesses, one that is not installed is recorded as absent. Gate: for each
 installed one, the preflight replies match, the ops predicate `proven(summary, record)` holds (with the Linux host's `PENDING` entry for
@@ -313,7 +326,9 @@ Codex's nested route) and the handle check passes. A handle check that fails bec
 release too.
 
 Credentials: the ops probe copies `~/.claude/.credentials.json` and `~/.codex/auth.json`
-into the disposable config. Claude Code on macOS keeps its login in the Keychain, so the
+into the disposable config, and afterwards writes a login the harness refreshed there back
+to the live file, if the live file is unchanged (ops-4130ea): a refresh rotates the token,
+so the live copy would otherwise stop working. Claude Code on macOS keeps its login in the Keychain, so the
 file may not exist. When it is missing (and `claude` is on `PATH`), `run` asks at startup, before
 any stage, for the user to run `claude setup-token` and paste the token, or press Enter to
 skip Claude. It passes the token to the Claude

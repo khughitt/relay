@@ -1,13 +1,16 @@
 ---
 id: relay-cd176c
 title: "Darwin probe: derive comm_kind from the argv0 case and record harness stderr in D7"
-status: todo
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
+owner: relay-dc2b03
 created: 2026-09-25T18:48:36Z
-updated: 2026-09-25T18:50:33Z
+updated: 2026-09-25T21:35:15Z
+started: 2026-09-25T21:35:15Z
+completed: 2026-09-25T21:35:15Z
 depends: []
 parent: relay-1231bf
 tags: []
@@ -20,3 +23,9 @@ From Mac attempt 2: (1) D4's comm_kind compares the chain parent's comm with its
 ## Notes
 
 - 2026-09-25T18:50:33Z (main): Item (3) resolved as a cause, not a banner: the user confirmed codex required a fresh login after attempt 2. The ops guard probe deletes its disposable auth.json copy after codex refreshed (rotated) the token in it; filed as ops-4130ea. Attempt 2's codex allow failure is that stale token. Items (1) and (2) stand.
+- 2026-09-25T21:35:15Z (relay-dc2b03): started
+  provenance: {"harness_session":"claude-code:3c606fb5-d94a-4c2d-b41f-4c120db27c0d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T21:35:15Z (relay-dc2b03): done
+  provenance: {"harness_session":"claude-code:3c606fb5-d94a-4c2d-b41f-4c120db27c0d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T21:35:15Z (relay-dc2b03): D4's comm_kind now reads the native and chain parents together (path / argv0 / basename / other) and the judge names each; D7 logs each live run's exit, duration and the head of its stderr and stdout into logs/D7.log. Item 3 was resolved by ops-4130ea.
+  provenance: {"harness_session":"claude-code:3c606fb5-d94a-4c2d-b41f-4c120db27c0d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

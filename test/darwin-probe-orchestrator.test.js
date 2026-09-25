@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import { cloneBundle, credentialHits, loadResults, packResults, stableVerdict, verifyManifest } from '../tools/darwin-probe/probe.mjs';
-import { isolationOf } from '../tools/darwin-probe/lib/context.mjs';
+import { CRASHED, cloneBundle, credentialHits, loadResults, packResults, packingHits, requestedStages, stableVerdict, verifyManifest } from '../tools/darwin-probe/probe.mjs';
+import { credentialWrites, isolationOf } from '../tools/darwin-probe/lib/context.mjs';
 
 test('a tampered bundle file fails manifest verification', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
@@ -92,11 +92,56 @@ test('a credential file or the token anywhere in the results is found', (t) => {
   assert.deepEqual(credentialHits(d, token).sort(), ['auth.json', 'logs/D7.log', 'stages/.credentials.json']);
   assert.deepEqual(credentialHits(d, null).sort(), ['auth.json', 'stages/.credentials.json']);
 });
+test('a JWT-shaped token (Codex\'s login) anywhere in the results is found', (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const jwt = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({ sub: 'user-123456', exp: 1900000000 })}.${'s'.repeat(43)}`;
+  writeFileSync(join(d, 'D7.log'), 'run a/allow: exit 0 after 12.0 s\n--- stdout\n{"note":"eyJ is a prefix","v":"a.b.c"}\n');
+  assert.deepEqual(credentialHits(d, null), []);
+  writeFileSync(join(d, 'D7.log'), `--- stderr\nAuthorization: Bearer ${jwt}\n`);
+  assert.deepEqual(credentialHits(d, null), ['D7.log']);
+});
+test('credential material in the raw results alone still refuses packing', (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  const raw = join(d, 'results'), out = join(d, 'out'), token = 'sk-ant-oat01-' + 'x'.repeat(40);
+  for (const dir of [raw, out]) { mkdirSync(join(dir, 'logs'), { recursive: true }); writeFileSync(join(dir, 'logs/D7.log'), 'clean'); }
+  assert.deepEqual(packingHits(raw, out, token), []);
+  writeFileSync(join(raw, 'logs/D7.log'), `preflight: ${token}\n`); mkdirSync(join(raw, 'd7')); writeFileSync(join(raw, 'd7/auth.json'), '{}');
+  writeFileSync(join(out, 'auth.json'), '{}');
+  assert.deepEqual(packingHits(raw, out, token), ['auth.json', 'd7/auth.json', 'logs/D7.log']);
+});
+test('requested stages run in canonical order, once each, and an unknown id is refused', () => {
+  assert.deepEqual(requestedStages('D9,D7,D0'), ['D0', 'D7', 'D9']);
+  assert.deepEqual(requestedStages('D7b,D7,D7'), ['D7', 'D7b']);
+  assert.equal(requestedStages(undefined).join(','), 'D0,D1,D2,D3,D4,D5,D6,D7,D7b,D8,D9');
+  assert.throws(() => requestedStages('D7,D10,x'), { message: 'unknown stage id(s): D10, x' });
+});
 test('the isolation reading is taken before D9 and later changes are only a finding', () => {
   const a = { '.codex/config.toml': { exists: true, size: 1 } }, b = { '.codex/config.toml': { exists: true, size: 2 } };
-  assert.deepEqual(isolationOf(a, null, a), { before: a, after: a, after_taken: 'finalize', changed: [], changed_during_d9: [] });
-  assert.deepEqual(isolationOf(a, a, b), { before: a, after: a, after_taken: 'before D9', changed: [], final: b, changed_during_d9: ['.codex/config.toml'] });
+  assert.deepEqual(isolationOf(a, null, a), { before: a, after: a, after_taken: 'finalize', changed: [], written_back: [], changed_during_d9: [] });
+  assert.deepEqual(isolationOf(a, a, b), { before: a, after: a, after_taken: 'before D9', changed: [], written_back: [], final: b, changed_during_d9: ['.codex/config.toml'] });
   assert.deepEqual(isolationOf(a, b, b).changed, ['.codex/config.toml']);
+});
+test('a login the guard probe wrote back is a finding, not a live-path change', () => {
+  // ops relay-guard-probe writes a harness's refreshed token back to the live file (ops-4130ea).
+  const f = (size, mtimeMs) => ({ exists: true, files: 1, size, mtimeMs });
+  const before = { '.codex/auth.json': f(10, 1), '.codex/config.toml': f(1, 1) };
+  const after = { '.codex/auth.json': f(12, 2), '.codex/config.toml': f(1, 1) };
+  const write = { path: '.codex/auth.json', before: f(10, 1), after: f(12, 2) };
+  const iso = isolationOf(before, null, after, [write]);
+  assert.deepEqual([iso.changed, iso.written_back], [[], ['.codex/auth.json']]);
+  assert.deepEqual(isolationOf(before, after, after, [write]).written_back, ['.codex/auth.json']);
+  // Any other change to that file, before or after D7's own readings, still gates.
+  assert.deepEqual(isolationOf(before, null, { ...after, '.codex/auth.json': f(13, 3) }, [write]).changed, ['.codex/auth.json']);
+  assert.deepEqual(isolationOf(before, null, after, [{ ...write, before: f(11, 1) }]).changed, ['.codex/auth.json']);
+  // A write D7 recorded for another path excuses nothing here.
+  assert.deepEqual(isolationOf(before, null, after, [{ ...write, path: '.claude/.credentials.json' }]).changed, ['.codex/auth.json']);
+});
+test('credential writes are read from each D7 harness observation', () => {
+  const w = { path: '.codex/auth.json', before: {}, after: {} };
+  assert.deepEqual(credentialWrites({ status: 'ran', observations: { 'claude-code': { status: 'absent' }, codex: { status: 'ran', credential_write: w } } }), [w]);
+  assert.deepEqual(credentialWrites(undefined), []);
+  assert.deepEqual(credentialWrites({ status: 'skipped', observations: {} }), []);
 });
 test('python3 older than 3.11, or none, stops the probe with one line (exit 2)', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
@@ -184,4 +229,75 @@ test('run keeps its root and names it when the probe dies abnormally, and remove
     assert.equal(existsSync(root), kept);
     if (kept) { assert.ok(r.stderr.includes(root), r.stderr); rmSync(root, { recursive: true, force: true }); }
   }
+});
+test('a probe crash exits CRASHED; run keeps the root, without credential copies, and says it is unredacted', { timeout: 90000 }, async (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  bundleLayout(d);
+  // Once the self-test's hanging stage starts, plant a guard probe's credential copies (as a
+  // SIGKILLed ops relay-guard-probe leaves them) and crash outside any stage.
+  const crash = join(d, 'crash.mjs');
+  writeFileSync(crash, `import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+// NODE_OPTIONS reaches the probe's own node children too; only the probe carries --root.
+const at = process.argv.indexOf('--root'), root = process.argv[at + 1];
+const timer = at > 0 && setInterval(() => {
+  if (!existsSync(root + '/results/stages/D0.json')) return;
+  clearInterval(timer);
+  mkdirSync(root + '/d7/home/.codex', { recursive: true }); mkdirSync(root + '/d7/home/.claude', { recursive: true });
+  writeFileSync(root + '/d7/home/.codex/auth.json', '{}'); writeFileSync(root + '/d7/home/.claude/.credentials.json', '{}');
+  writeFileSync(root + '/d7/home/.codex/config.toml', '');
+  throw new Error('injected crash');
+}, 100);
+`);
+  const r = spawnSync('/bin/sh', [join(d, 'run'), '--self-test-hang'], { encoding: 'utf8', timeout: 80000, env: { ...process.env, NODE_OPTIONS: `--import=${crash}` } });
+  const root = r.stderr.match(/\/tmp\/rdp\.[A-Za-z0-9]{6}/)?.[0];
+  t.after(() => { if (root) rmSync(root, { recursive: true, force: true }); });
+  assert.equal(r.status, CRASHED, r.stderr);
+  assert.match(r.stderr, /injected crash/);
+  assert.ok(root && existsSync(root), r.stderr);
+  assert.match(r.stderr, /unredacted/);
+  assert.equal(existsSync(join(root, 'd7/home/.codex/auth.json')), false);
+  assert.equal(existsSync(join(root, 'd7/home/.claude/.credentials.json')), false);
+  assert.equal(existsSync(join(root, 'd7/home/.codex/config.toml')), true);
+  assert.equal(existsSync(join(root, 'results/stages/D0.json')), true);
+  assert.equal(psArgs().includes('sleep 600.654'), false);
+});
+const asRoot = process.getuid?.() === 0; // chmod does not stop root from writing
+test('a failure while packing exits CRASHED, not the signal code, so run keeps the root', { timeout: 90000, skip: asRoot }, async (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => { chmodSync(d, 0o755); rmSync(d, { recursive: true, force: true }); });
+  const root = join(d, 'root'); mkdirSync(root);
+  chmodSync(d, 0o555); // the tarball cannot be moved into the bundle directory
+  const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', root, '--bundle', d], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = ''; child.stderr.on('data', (x) => { stderr += x; });
+  const exited = new Promise((r) => child.once('exit', r));
+  assert.ok(await waitFor('sleep 600.654', child), 'the probe never reached its hanging stage');
+  child.kill('SIGINT');
+  assert.equal(await exited, CRASHED, stderr);
+  assert.match(stderr, /finalize failed/);
+  assert.equal(psArgs().includes('sleep 600.654'), false);
+});
+test('a throw outside a stage whose finalize also fails exits CRASHED, not 2', { timeout: 60000, skip: asRoot }, async (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')), root = join(d, 'root'), results = join(root, 'results');
+  t.after(() => { chmodSync(results, 0o755); rmSync(d, { recursive: true, force: true }); });
+  // An unwritable results directory: the first stage's log cannot be opened (outside the
+  // stage's own try), and finalize cannot write the manifest either.
+  mkdirSync(results, { recursive: true }); chmodSync(results, 0o555);
+  const r = spawnSync(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', root, '--bundle', d], { encoding: 'utf8', timeout: 50000 });
+  assert.equal(r.status, CRASHED, r.stderr);
+  assert.match(r.stderr, /finalize failed/);
+});
+test('a kept root whose credential copy cannot be removed says so', { skip: asRoot }, (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  execFileSync('cp', ['tools/darwin-probe/run', join(d, 'run')]); mkdirSync(join(d, 'probe'));
+  writeFileSync(join(d, 'probe/probe.mjs'), `import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+const a = process.argv, root = a[a.indexOf('--root') + 1];
+writeFileSync(${JSON.stringify(join(d, 'root.txt'))}, root);
+mkdirSync(root + '/d7/locked', { recursive: true }); writeFileSync(root + '/d7/locked/auth.json', '{}'); chmodSync(root + '/d7/locked', 0o555);
+process.kill(process.pid, 'SIGKILL');
+`);
+  const r = spawnSync('/bin/sh', [join(d, 'run')], { encoding: 'utf8' });
+  const root = readFileSync(join(d, 'root.txt'), 'utf8');
+  t.after(() => { chmodSync(join(root, 'd7/locked'), 0o755); rmSync(root, { recursive: true, force: true }); });
+  assert.equal(r.status, 137, r.stderr);
+  assert.match(r.stderr, /could not remove every credential copy/);
+  assert.doesNotMatch(r.stderr, /credential copies removed/);
 });

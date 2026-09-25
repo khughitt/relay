@@ -14,7 +14,15 @@ KEEP=
 # shellcheck disable=SC2329 # invoked by the EXIT trap (shellcheck 0.11 misses it before a final `exit`)
 cleanup() {
   if [ -f "$ROOT/pids" ]; then while read -r pid; do kill -s KILL -- "$pid" 2>/dev/null || true; done < "$ROOT/pids"; fi
-  if [ -n "$KEEP" ]; then echo "the probe's working directory is kept at $ROOT" >&2 || true; else rm -rf "$ROOT"; fi
+  if [ -n "$KEEP" ]; then
+    # A killed guard probe (D7) leaves its 0600 copy of a harness login under the root.
+    if find "$ROOT" -type f \( -name auth.json -o -name .credentials.json \) -exec rm -f -- {} +; then
+      scrub="credential copies removed"
+    else
+      scrub="could not remove every credential copy: find $ROOT -name auth.json -o -name .credentials.json"
+    fi
+    echo "the probe's working directory is kept at $ROOT; it is unredacted ($scrub), so do not send it" >&2 || true
+  else rm -rf "$ROOT"; fi
 }
 trap cleanup EXIT
 # The probe itself handles INT, TERM and HUP: it kills its children and packs the results.
@@ -29,8 +37,8 @@ if [ "$(uname -s)" = Darwin ]; then caffeinate -i -w $$ & fi
 code=0
 node "$BUNDLE/probe/probe.mjs" --bundle "$BUNDLE" --root "$ROOT" "$@" || code=$?
 # 0: done; 1: results refused or live paths changed; 2: a prerequisite or usage error;
-# 129/130/143: interrupted, results packed. Anything else (a crash, a SIGKILL) may have left
-# unpacked results in the root, so it is kept for the user.
+# 129/130/143: interrupted, results packed. Anything else (70, the probe's own crash; a
+# SIGKILL) may have left unpacked results in the root, so it is kept for the user.
 case $code in
   0|1|2|129|130|143) ;;
   *) KEEP=1; echo "the probe exited with status $code" >&2 || true ;;

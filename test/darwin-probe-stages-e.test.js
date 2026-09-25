@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { identityProof } from '../tools/darwin-probe/stages/d7-guard.mjs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { credentialWrite, identityProof, runHeads } from '../tools/darwin-probe/stages/d7-guard.mjs';
 import { pluginOutcome, PINNED } from '../tools/darwin-probe/stages/d7b-opencode.mjs';
 import { argSummary, stripCapture } from '../tools/darwin-probe/stages/d9-ambient.mjs';
 
@@ -30,4 +33,37 @@ test('ambient arguments keep only what recognition needs', () => {
   const c = stripCapture({ pid: 1, label: 'x', truncated: false, forms: { args: { relay: 'claude -p secret project details', columns: 'claude -p secret project details', ww: 'claude -p secret project details', relay_len: 31, ww_len: 31, truncated: false, relay_is_prefix: true }, comm: { relay: 'claude', ww: 'claude' } } });
   assert.equal(JSON.stringify(c).includes('secret'), false);
   assert.deepEqual(c.forms.args, { relay_len: 31, ww_len: 31, truncated: false, relay_is_prefix: true });
+});
+test('each live harness run is logged with its exit and the head of its output', (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  assert.deepEqual(runHeads(d), []);
+  const put = (rel, text) => { mkdirSync(join(d, rel, '..'), { recursive: true }); writeFileSync(join(d, rel), text); };
+  put('runs/preflight/replay.stderr', 'replay noise');
+  put('runs/20260925T120000/results.json', '{}');
+  put('runs/20260925T120000/allow/exit', '1\n'); put('runs/20260925T120000/allow/seconds', '38.2\n');
+  put('runs/20260925T120000/allow/stderr', Array.from({ length: 100 }, (_, i) => `err ${i}`).join('\n'));
+  put('runs/20260925T120000/allow/transcript.jsonl', '{"type":"x"}\n');
+  mkdirSync(join(d, 'runs/20260925T120000/allow/workspace'));
+  put('runs/20260925T120000/deny/exit', 'timeout\n');
+  const [allow, deny, ...rest] = runHeads(d);
+  assert.equal(rest.length, 0);
+  assert.match(allow, /^run 20260925T120000\/allow: exit 1 after 38\.2 s\n/);
+  assert.match(allow, /--- stderr\nerr 0\n/);
+  assert.ok(allow.includes('err 39') && !allow.includes('err 40'), allow);
+  assert.match(allow, /--- stdout\n\{"type":"x"\}/);
+  assert.match(deny, /^run 20260925T120000\/deny: exit timeout after \? s\n--- stderr\n\n--- stdout\n$/);
+  assert.equal(runHeads(d).join('').includes('replay noise'), false);
+});
+test('an output head is also cut to a byte budget', () => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-'));
+  try {
+    mkdirSync(join(d, 'runs/a/allow'), { recursive: true }); writeFileSync(join(d, 'runs/a/allow/stderr'), 'x'.repeat(10000));
+    const [entry] = runHeads(d);
+    assert.ok(entry.length < 4200, String(entry.length));
+  } finally { rmSync(d, { recursive: true, force: true }); }
+});
+test('a credential file is recorded as written only when its reading changed across the live run', () => {
+  const r = (size) => ({ exists: true, files: 1, size, mtimeMs: 5 });
+  assert.equal(credentialWrite('.codex/auth.json', r(1), r(1)), undefined);
+  assert.deepEqual(credentialWrite('.codex/auth.json', r(1), r(2)), { path: '.codex/auth.json', before: r(1), after: r(2) });
 });

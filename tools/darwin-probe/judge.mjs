@@ -3,6 +3,7 @@
 export const RELEASE = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D8'];
 const SESSIONEND_BUDGET_MS = 3000;
 const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+const COMM_KINDS = { path: 'the executable path', argv0: 'argv[0]', basename: 'the executable file name' };
 const result = (ok, detail, findings = []) => ({ verdict: ok ? 'pass' : 'fail', detail, findings });
 
 const rules = {
@@ -37,7 +38,7 @@ const rules = {
     const ok = o.captures.length >= 3 && o.chain.ancestors_match && o.chain.tty_match && o.chain.resolved === o.chain.expected
       && o.native.recognized && o.native.executable_absolute && o.argv.ok && truncated.length === 0;
     return result(ok, truncated.length ? `ps truncated relay's capture of ${truncated.join(', ')} (spec item 1)` : ok ? 'table, ancestry and arguments agree' : 'ancestry, recognition or argument mismatch',
-      [`Darwin comm holds the ${o.comm_kind === 'path' ? 'executable path' : o.comm_kind === 'argv0' ? 'argv[0]' : 'unexpected value'} (spec item 2)`,
+      [`Darwin comm holds ${COMM_KINDS[o.comm_kind] ?? 'an unexpected value'} (spec item 2)`,
        `process table: ${o.table.rows} rows, ${o.table.over_cut} past the cut, ${o.table.truncated} truncated as relay reads it`]);
   },
   D5(o) {
@@ -105,7 +106,9 @@ export function judge(results) {
   const changed = results.manifest.isolation?.changed, duringD9 = results.manifest.isolation?.changed_during_d9 ?? [];
   // D9 invites the user's own live sessions, which may write their config; the gating reading
   // is taken before it, and what changed afterwards is reported only.
-  const d9Findings = duringD9.length ? [`changed while D9 sampled live sessions (not gated): ${duringD9.join(', ')}`] : [];
+  const writtenBack = results.manifest.isolation?.written_back ?? [];
+  const d9Findings = [...(duringD9.length ? [`changed while D9 sampled live sessions (not gated): ${duringD9.join(', ')}`] : []),
+    ...(writtenBack.length ? [`the guard probe wrote back a refreshed login (ops-4130ea; not gated): ${writtenBack.join(', ')}`] : [])];
   checks.ISO = { class: 'release', ...(Array.isArray(changed) ? result(changed.length === 0, changed.length ? `live paths changed: ${changed.join(', ')}` : 'no live path changed', d9Findings)
     : { verdict: 'error', detail: 'isolation fingerprints missing', findings: [] }) };
   checks.D7w = { class: 'release', ...liveWidth(results.stages.D7) };
