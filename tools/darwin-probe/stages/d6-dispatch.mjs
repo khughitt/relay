@@ -8,6 +8,16 @@ const GUARDS = {
   deny: (dir) => { const p = join(dir, 'deny.sh'); writeFileSync(p, '#!/bin/sh\nprintf \'{"decision":"deny","reason":"d6 probe"}\'\n', { mode: 0o755 }); return [p]; },
   hang: () => ['/bin/sleep', HANG],
 };
+const scanSurvivors = () => ps(['-ww', '-axo', 'pid=,args=']).stdout.split('\n').filter((l) => l.includes(`sleep ${HANG}`)).map((l) => Number(l.trim().split(/\s+/)[0]));
+// relay's dispatcher resolves a guard call once it has sent SIGKILL, not once the kernel has
+// reaped the process; under load the reap can lag a fixed-delay scan. Poll instead of waiting
+// once: re-scan every 100ms until nothing matches or 3s pass, and report whatever remains then.
+async function pollSurvivors({ intervalMs = 100, timeoutMs = 3000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let survivors = scanSurvivors();
+  while (survivors.length && Date.now() < deadline) { await new Promise((res) => setTimeout(res, intervalMs)); survivors = scanSurvivors(); }
+  return survivors;
+}
 export async function replay(ctx) {
   const dir = join(ctx.root, 'd6'); mkdirSync(dir, { recursive: true });
   const repo = join(dir, 'repo'); mkdirSync(repo); execFileSync('git', ['init', '-q', repo]);
@@ -17,8 +27,7 @@ export async function replay(ctx) {
     writeFileSync(subs, JSON.stringify({ schema: 1, subscribers: [{ name: `d6-${guard}`, role: 'guard', kinds: ['before-tool'], harnesses: [harness], argv: argv(dir), timeoutMs: 2000 }] }), { mode: 0o600 });
     const payload = JSON.stringify({ session_id: `d6-${harness}-${guard}`, cwd: repo, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'true' } });
     const r = await ctx.t.run(process.execPath, [join(ctx.clone, 'bin/relay.js'), 'hook', '--harness', harness, '--subscribers', subs, 'PreToolUse'], { env: ctx.env, input: payload });
-    await new Promise((res) => setTimeout(res, 300));
-    const survivors = ps(['-ww', '-axo', 'pid=,args=']).stdout.split('\n').filter((l) => l.includes(`sleep ${HANG}`)).map((l) => Number(l.trim().split(/\s+/)[0]));
+    const survivors = guard === 'hang' ? await pollSurvivors() : [];
     rows.push({ harness, guard, exit: r.exit, stdout: r.stdout, ms: r.ms, budget_ms: 2000, survivors });
   }
   return rows;
