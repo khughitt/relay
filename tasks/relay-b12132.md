@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: darwin-probe
 created: 2026-09-25T10:57:49Z
-updated: 2026-09-25T11:48:49Z
+updated: 2026-09-25T12:25:49Z
 started: 2026-09-25T10:57:57Z
 depends: []
 parent: relay-1231bf
@@ -40,4 +40,9 @@ The release gate relay-c19c0a carries: physical Darwin process/terminal verifica
 - 2026-09-25T11:48:41Z (darwin-probe): resumed
   provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T11:48:49Z (darwin-probe): parked (waiting on user, review): User reviews docs/plans/2026-09-25-darwin-probe.md on branch darwin-probe (.worktrees/relay-b12132) and picks the execution method; agent then executes Task 1 (relay-db8ca9, ops token mode) onward
+  provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T12:25:48Z (darwin-probe): resumed
+  provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T12:25:49Z (darwin-probe): Plan revised after first plan review (0924604): registryFor with explicit paths plus an isolated probe env; process-group ownership with kill-and-wait and live-only pids; D9 keeps argv0 name, role word and count only; finalization fills D0 end and tolerates partial runs; judge requires D4 recognition, ISO and D7w release checks, exact D6 counts, error vs absent cutovers; bundle verify inside a scratch repo and bundle-check creates out/; D8 renders via planHooks; D7 proves identity through a relay wrapper recording each hook's ancestry and three-variant captures; JSON redacted structurally.
+- 2026-09-25T12:25:49Z (darwin-probe): parked (waiting on user, review): User re-reviews docs/plans/2026-09-25-darwin-probe.md at 0924604 on branch darwin-probe (.worktrees/relay-b12132) and picks the execution method; agent then executes Task 1 (relay-db8ca9) onward
   provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
