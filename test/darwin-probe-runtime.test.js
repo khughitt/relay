@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { isolatedEnv, prepareRoot, registryFor, tracker, fingerprint, changedPaths, WATCHED_FILES, WATCHED_TREES } from '../tools/darwin-probe/lib/context.mjs';
 import { compareCapture, rowFor } from '../tools/darwin-probe/lib/ps.mjs';
 import { installShell, startParent } from '../tools/darwin-probe/lib/parents.mjs';
+import { fleetTimeoutMs } from '../tools/darwin-probe/lib/fleet.mjs';
 import { createProcessOps } from '../src/index.js';
 
 const root = (t) => { const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true })); return d; };
@@ -92,4 +93,7 @@ test('a constructed codex parent publishes its own qualified handle and stays al
   assert.equal(step.exit, 0);
   assert.deepEqual(step.after.agents['codex:k0'].process, expected);
   assert.equal(createProcessOps().probe(expected).status, 'alive');
+});
+test('a fleet waits longer the more agents are live', () => {
+  assert.equal(fleetTimeoutMs(1, 0), 32000); assert.equal(fleetTimeoutMs(50, 0), 130000); assert.equal(fleetTimeoutMs(1, 50), 132000);
 });

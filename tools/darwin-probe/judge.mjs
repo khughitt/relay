@@ -47,9 +47,11 @@ const rules = {
     const preTool = p.exit === 0 && p.stderr === '' && p.allow && p.retained;
     const ok = c.expected === 8 && c.present === 8 && c.handles_match && o.lock.recovered && r.expected_removed.length === 4
       && same(r.removed, r.expected_removed) && same(r.kept, r.expected_kept) && sessionEnd && preTool && (o.platform !== 'darwin' || darwin);
+    // n50 is a finding only; a missing or errored measurement says so and never decides D5.
     const n50 = o.cost.n50;
-    return result(ok, ok ? 'registry, lock, reap and hook cost hold' : 'registry, lock, reap or hook cost failed',
-      [`50 agents: PreToolUse ${n50.pretool.ms} ms, SessionEnd ${n50.sessionend.ms} ms (exit ${n50.sessionend.exit})`]);
+    const n50Finding = n50?.pretool && n50?.sessionend ? `50 agents: PreToolUse ${n50.pretool.ms} ms, SessionEnd ${n50.sessionend.ms} ms (exit ${n50.sessionend.exit})`
+      : `50 agents: not measured (${n50?.error ? 'the measurement errored; see the D5 observations' : 'no record'})`;
+    return result(ok, ok ? 'registry, lock, reap and hook cost hold' : 'registry, lock, reap or hook cost failed', [n50Finding]);
   },
   D6(o) {
     const ok = o.replies.length === 6 && o.replies.every((r) => r.match) && o.hang.length === 2

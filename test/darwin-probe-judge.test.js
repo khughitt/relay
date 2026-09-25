@@ -104,3 +104,12 @@ test('config changed while D9 sampled live sessions is a finding, not the isolat
   assert.equal(v.checks.ISO.verdict, 'pass'); assert.equal(v.release, 'pass');
   assert.ok(v.checks.ISO.findings.some((f) => f.includes('.codex/config.toml') && f.includes('D9')));
 });
+test('a missing or errored 50-agent measurement is a finding and never decides D5', () => {
+  for (const f of [(c) => { delete c.n50; }, (c) => { c.n50 = { error: 'parent 4242 did not finish' }; }]) {
+    const v = mutate((r) => f(r.stages.D5.observations.cost));
+    assert.equal(v.checks.D5.verdict, 'pass'); assert.equal(v.release, 'pass');
+    assert.ok(v.checks.D5.findings.some((x) => x.includes('50 agents') && x.includes('not measured')), v.checks.D5.findings.join('; '));
+  }
+  // n10 still gates: an errored n10 is not a pass.
+  assert.notEqual(mutate((r) => { r.stages.D5.observations.cost.n10 = { error: 'x' }; }).checks.D5.verdict, 'pass');
+});

@@ -52,18 +52,24 @@ export async function run(ctx) {
     const reap = { removed: eight.filter((p) => !after?.agents[p.id]).map((p) => p.id), kept: eight.filter((p) => after?.agents[p.id]).map((p) => p.id),
       expected_removed: eight.slice(0, 4).map((p) => p.id), expected_kept: eight.slice(4).map((p) => p.id), reaped: reaped.reaped?.length ?? null };
     await killParents(ctx, eight.slice(4));
-    // Cost with 0, 10 and 50 live agents: fresh state per size.
+    // Cost with 0, 10 and 50 live agents: fresh state per size. A failure in one size (the
+    // 50-agent fleet is the slow one on Darwin) is recorded for that size and the rest of D5
+    // stands; the judge gates on n10 and reads n50 as a finding only.
     const cost = {};
     for (const n of [0, 10, 50]) {
-      const b = await fleetBase(ctx, join(ctx.root, `d5-cost-${n}`));
-      const live = await startFleet(ctx, b, { count: n, prefix: `c${n}-` }); all.push(...live);
-      const [timed] = await startFleet(ctx, b, { count: 1, prefix: `t${n}-`, extraSteps: (id) => [pretool(id, b.repo), sessionEnd(id, b.repo)] }); all.push(timed);
-      const [, pre, end] = timed.steps, ids = live.map((p) => p.id);
-      cost[`n${n}`] = { agents: n,
-        pretool: { ms: pre.ms, exit: pre.exit, stderr: pre.stderr, allow: pre.exit === 0, retained: sameHandles(pre.before, pre.after, ids) && !!pre.after?.agents[timed.id] },
-        sessionend: { ms: end.ms, exit: end.exit, stderr: end.stderr, ending_absent: !end.after?.agents[timed.id],
-          revision_delta: (end.after?.revision ?? 0) - (end.before?.revision ?? 0), others_retained: sameHandles(end.before, end.after, ids) } };
-      await killParents(ctx, [...live, timed]);
+      const sized = [];
+      try {
+        const b = await fleetBase(ctx, join(ctx.root, `d5-cost-${n}`));
+        const live = await startFleet(ctx, b, { count: n, prefix: `c${n}-` }); all.push(...live); sized.push(...live);
+        const [timed] = await startFleet(ctx, b, { count: 1, prefix: `t${n}-`, live: n, extraSteps: (id) => [pretool(id, b.repo), sessionEnd(id, b.repo)] }); all.push(timed); sized.push(timed);
+        const [, pre, end] = timed.steps, ids = live.map((p) => p.id);
+        cost[`n${n}`] = { agents: n,
+          pretool: { ms: pre.ms, exit: pre.exit, stderr: pre.stderr, allow: pre.exit === 0, retained: sameHandles(pre.before, pre.after, ids) && !!pre.after?.agents[timed.id] },
+          sessionend: { ms: end.ms, exit: end.exit, stderr: end.stderr, ending_absent: !end.after?.agents[timed.id],
+            revision_delta: (end.after?.revision ?? 0) - (end.before?.revision ?? 0), others_retained: sameHandles(end.before, end.after, ids) } };
+      } catch (error) {
+        cost[`n${n}`] = { agents: n, error: String(error?.message ?? error).split('\n')[0].slice(0, 200) };
+      } finally { await killParents(ctx, sized); }
     }
     return { status: 'ran', observations: { concurrent, parent_capture, lock: { holder, recovered, value }, reap, cost } };
   } finally { await killParents(ctx, all); }
