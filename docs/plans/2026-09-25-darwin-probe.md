@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft for review, 2026-09-25.
+**Status:** draft for review, 2026-09-25; revised after the first plan review (registry paths, process-group cleanup, D9 argument stripping, tolerant finalization, a stricter judge, bundle verification, `planHooks` for D8, hook-ancestry identity in D7, structural JSON redaction).
 
 **Goal:** Build the bundle, live probe and judge that `docs/specs/2026-09-25-darwin-probe.md`
 specifies, prove it end to end on the Linux host, and hand the user a bundle to run on
@@ -38,8 +38,14 @@ procps `ps`, Git bundles, ops `bin/relay-guard-probe` (Python >= 3.11).
 - Every file the probe writes lives under one root, `$TMPDIR/relay-darwin-probe.XXXXXX`.
   Every child process gets `RELAY_STATE_DIR`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`,
   `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` inside it.
-- Every spawned pid is appended to `<root>/pids`; `run`'s trap on `EXIT`, `INT` and
-  `TERM` kills every listed pid and removes the root, keeping only the results tarball.
+- Every child the probe starts leads its own process group, owned by the tracker.
+  `<root>/pids` lists only the groups still owned, as `-pgid`. Cleanup sends `SIGKILL` to
+  each group and waits until it is empty. `run`'s trap on `EXIT`, `INT` and `TERM` repeats
+  that for anything listed, then removes the root, keeping only the results tarball.
+- Every registry read, list or reap goes through `registryFor(clone, env)`, which passes
+  `paths(env)`. Relay's registry functions ignore an `env` option and fall back to the
+  ambient default. The probe process also replaces its own `process.env` with the isolated
+  environment at startup.
 - The Mac prerequisites are macOS, Node >= 22, the Xcode Command Line Tools
   (`xcode-select -p`), and `python3` >= 3.11.
 - Checks fall into three classes. A **release gate** blocks `relay-c19c0a`. **Cutover
@@ -87,16 +93,20 @@ probe fingerprints:
 
 ## Review Focus
 
-1. A live Claude session the user opened for D9 writes under `~/.claude` during the run.
-   The isolation guard must not fail the attempt for that. Task 4 pins the watched set.
-2. The user presses Ctrl-C during D7. The probe must still pack the completed stages and
-   leave no harness or parent process behind. Task 10 pins it with a SIGINT test.
-3. `scutil --get HostName` exits 1 with "not set" on many Macs. D0 must record `null`, not
-   crash or record the error text as a host. Task 5 pins it.
-4. A Mac with neither Codex nor OpenCode installed. D7 and D7b must record `absent` and the
-   release verdict must still be computed. Task 3 pins it.
-5. A short user name that also occurs inside ordinary text (for example `sh`) must not
-   change a verdict when redaction over-matches. Task 2 pins it through verdict
+1. **Live state reached through an ambient default.** A registry call without explicit
+   `paths` would read or reap the user's live registry. Task 4 pins `registryFor` against
+   an ambient `RELAY_STATE_DIR`, and Task 10 isolates the probe's own environment.
+2. **Ctrl-C while descendants run.** The user presses Ctrl-C during D7 while Python, a
+   harness and hook processes are running, after a normally completed D0. The probe must
+   pack results with D0's end reading and leave no descendant. Task 4 pins group cleanup
+   with grandchildren, and Task 10 pins interruption after a real D0.
+3. **A live Claude session writing during the run.** A session the user opened for D9
+   writes under `~/.claude`. The isolation guard must not fail the attempt for that. Task 4
+   pins the watched set.
+4. **A user's prompt in ambient process arguments.** No argument text from the user's
+   sessions may leave the Mac. Task 9 pins `argSummary` and `stripCapture`.
+5. **A user name that collides with JSON or common text** (`true`, `sh`). Packed JSON must
+   stay valid and verdicts unchanged. Task 2 pins structural redaction and verdict
    invariance.
 
 ---
@@ -233,8 +243,11 @@ convention. Record the ops commit in a note on `relay-b12132`.
     order. `null` is skipped.
   - `redactionMap({hosts, user, home}) -> {hosts: Map<string,string>, user, home}`.
   - `redactText(text, map) -> {text, counts: {host, user, home}}`.
-  - `redactValue(value, map, counts)`: a deep copy in which strings are redacted, while
-    numbers, booleans and `null` are untouched.
+  - `redactValue(value, map, counts)`: a deep copy in which string *values* are redacted.
+    Object keys, numbers, booleans and `null` are untouched.
+  - `redactFile(path, map) -> {text, counts}`: a `.json` file is parsed, redacted with
+    `redactValue`, and re-serialized. Any other file is redacted as text. Packing uses
+    this, so a user name such as `true` can never rewrite a JSON literal.
 - `passingResults({platform='darwin'})` returns an in-memory results object
   `{manifest, stages: {D0..D9}}` whose every check passes. Task 3 and Task 10 use it.
 
@@ -275,7 +288,7 @@ export function passingResults({ platform = 'darwin' } = {}) {
         chain: { ancestors_match: true, tty_match: true, resolved: 4101, expected: 4101 },
         native: { recognized: true, executable: '/private/var/folders/x/relay-darwin-probe.1/n/claude/versions/9.9.9', executable_absolute: true },
         argv: { expected_argv0: '/private/var/folders/x/relay-darwin-probe.1/sp ace/s h', result: null, error: 'PROCESS_UNREADABLE', ok: true },
-        captures: [{ pid: 4101, label: 'chain-claude', truncated: false }], comm_kind: 'path',
+        captures: [{ pid: 4101, label: 'chain-claude', truncated: false }, { pid: 4102, label: 'native-claude', truncated: false }, { pid: 4103, label: 'argv-spaces', truncated: false }], comm_kind: 'path',
         table: { rows: 512, over_cut: 40, truncated: 0 } } },
       D5: { id: 'D5', status: 'ran', observations: {
         concurrent: { expected: 8, present: 8, handles_match: true, platforms: ['darwin'], boot_ids_null: true },
@@ -287,7 +300,8 @@ export function passingResults({ platform = 'darwin' } = {}) {
         replies: ['claude-code','codex'].flatMap((h) => ['allow','deny','hang'].map((g) => ({ harness: h, guard: g, exit: g === 'allow' ? 0 : 2, stdout: '{}', expected_exit: g === 'allow' ? 0 : 2, expected_stdout: '{}', match: true }))),
         hang: [{ harness: 'claude-code', ms: 2110, budget_ms: 2000, survivors: [] }, { harness: 'codex', ms: 2105, budget_ms: 2000, survivors: [] }] } },
       D7: { id: 'D7', status: 'ran', observations: {
-        'claude-code': { status: 'ran', credentials: 'token', preflight: { allow: true, deny: true }, proven: true, handle: { agents: 3, matched: 3, ok: true } },
+        'claude-code': { status: 'ran', credentials: 'token', preflight: { allow: true, deny: true }, proven: true,
+          hook: { invocations: 3, truncated: false }, handle: { agents: 3, matched: 3, ok: true } },
         codex: { status: 'absent', reason: 'codex not installed' } } },
       D7b: { id: 'D7b', status: 'absent', reason: 'opencode not installed', observations: {} },
       D8: { id: 'D8', status: 'ran', observations: {
@@ -304,7 +318,10 @@ export function passingResults({ platform = 'darwin' } = {}) {
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { collectHosts, redactionMap, redactText, redactValue } from '../tools/darwin-probe/redact.mjs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { collectHosts, redactFile, redactionMap, redactText, redactValue } from '../tools/darwin-probe/redact.mjs';
 import { judge } from '../tools/darwin-probe/judge.mjs';
 import { passingResults } from './helpers/darwin-results.js';
 
@@ -331,6 +348,13 @@ test('a longer host is replaced before a host it contains', () => {
   const map = redactionMap({ hosts: ['Mac-A', 'Mac-A.local'], user: 'kh', home: '/Users/kh' });
   assert.equal(redactText('Mac-A.local Mac-A', map).text, '<host-2> <host-1>');
 });
+test('JSON files are redacted structurally: a user named true leaves literals and keys intact', (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dpr-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  const file = join(d, 'D5.json');
+  writeFileSync(file, JSON.stringify({ true: true, ok: false, n: 3, who: 'true', home: '/Users/true/x' }));
+  const out = JSON.parse(redactFile(file, redactionMap({ hosts: [], user: 'true', home: '/Users/true' })).text);
+  assert.deepEqual(out, { true: true, ok: false, n: 3, who: '<user>', home: '/Users/<user>/x' });
+});
 test('an over-matching user name never changes a verdict', () => {
   const r = passingResults();
   const map = redactionMap({ hosts: collectHosts(r), user: 'sh', home: '/Users/sh' });
@@ -346,6 +370,7 @@ Expected: FAIL, `Cannot find module '../tools/darwin-probe/redact.mjs'` (and `ju
 - [ ] **Step 4: Implement** (`tools/darwin-probe/redact.mjs`)
 
 ```js
+import { readFileSync } from 'node:fs';
 // Redaction for results that leave the Mac. Numbers, booleans and null are never altered:
 // every fact that depends on a raw string (lengths, absoluteness, equality) is recorded as
 // one of those at capture time, so a verdict never depends on redacted text.
@@ -381,8 +406,15 @@ export function redactValue(value, map, counts) {
     return r.text;
   }
   if (Array.isArray(value)) return value.map((v) => redactValue(v, map, counts));
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [redactValue(k, map, counts), redactValue(v, map, counts)]));
+  // Keys are schema (check ids, agent ids, field names), never host or user text.
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, redactValue(v, map, counts)]));
   return value;
+}
+export function redactFile(path, map) {
+  const text = readFileSync(path, 'utf8');
+  if (!path.endsWith('.json')) return redactText(text, map);
+  const counts = { host: 0, user: 0, home: 0 };
+  return { text: `${JSON.stringify(redactValue(JSON.parse(text), map, counts), null, 2)}\n`, counts };
 }
 ```
 
@@ -409,7 +441,13 @@ git commit -m "feat(tools): redact Darwin probe results without touching facts"
 **Interfaces:**
 - Consumes: the results contract; `passingResults()` from Task 2.
 - Produces: `judge(results) -> verdict` (shape in "Results contract");
-  `RELEASE = ['D0','D1','D2','D3','D4','D5','D6','D8']`.
+  `RELEASE = ['D0','D1','D2','D3','D4','D5','D6','D8']`. There are two derived release
+  checks. `ISO` requires `manifest.isolation.changed` to be an empty array. `D7w` fails
+  when live-harness hook ancestry was truncated as relay reads it.
+- A rule that meets missing or malformed observations returns verdict `error`, and never
+  throws. `error`, `missing` and `skipped` release checks make the release `incomplete`.
+- Cutover values are `pass`, `fail`, `absent` (the harness is not installed), `skipped`
+  (installed but not run, for example no credentials), and `error` (the stage failed).
 
 - [ ] **Step 1: Write the failing tests** (`test/darwin-probe-judge.test.js`)
 
@@ -473,8 +511,25 @@ test('findings are reported: host drift, unset HostName, zombie, comm kind', () 
   assert.ok(v.checks.D3.findings.some((f) => f.includes('zombie')));
   assert.ok(v.checks.D4.findings.some((f) => f.includes('comm')));
 });
+test('requirements the first draft missed each fail on their own', () => {
+  assert.equal(mutate((r) => { r.stages.D4.observations.native.recognized = false; }).checks.D4.verdict, 'fail');
+  const iso = mutate((r) => { r.manifest.isolation.changed = ['.config/relay']; });
+  assert.equal(iso.checks.ISO.verdict, 'fail'); assert.equal(iso.release, 'fail');
+  assert.equal(mutate((r) => { r.stages.D6.observations = { replies: [], hang: [] }; }).checks.D6.verdict, 'fail');
+  const trunc = mutate((r) => { r.stages.D7.observations['claude-code'].hook.truncated = true; });
+  assert.equal(trunc.checks.D7w.verdict, 'fail'); assert.equal(trunc.release, 'fail');
+});
+test('partial observations are an error verdict, never a throw', () => {
+  const v = mutate((r) => { r.stages.D0.observations.hosts.end = null; delete r.stages.D6.observations.hang; });
+  assert.equal(v.checks.D0.verdict, 'error'); assert.equal(v.checks.D6.verdict, 'error'); assert.equal(v.release, 'incomplete');
+});
+test('execution failures are distinct from absent harnesses', () => {
+  assert.equal(mutate((r) => { r.stages.D7b = { id: 'D7b', status: 'error', reason: 'boom', observations: {} }; }).cutover.opencode, 'error');
+  assert.equal(mutate((r) => { r.stages.D7.observations.codex = { status: 'skipped', reason: 'no credentials' }; }).cutover.codex, 'skipped');
+  assert.equal(mutate((r) => { r.stages.D7 = { id: 'D7', status: 'error', reason: 'boom', observations: {} }; }).cutover['claude-code'], 'error');
+});
 test('D7b fails its cutover when the plugin is rejected or the version is not the pinned one', () => {
-  const ran = (o) => mutate((r) => { r.stages.D7b = { id: 'D7b', status: 'ran', observations: { version: '2.0.15', version_match: true,
+  const ran = (o) => mutate((r) => { r.stages.D7b = { id: 'D7b', status: 'ran', observations: { version: '2.0.15', version_match: true, install: { exit: 0 },
     request: { status: 200, directory_match: true }, plugin_log: 'loaded', appeared: true, agent: { count: 1, scope: 'process', matches_server: true },
     after: { gone: true, via: 'dispose' }, ...o } }; }).cutover.opencode;
   assert.equal(ran({}), 'pass');
@@ -510,57 +565,74 @@ const rules = {
   D1(o) {
     const bad = [['install', o.install.exit], ['help', o.help.exit], ['list', o.list.exit]].filter(([, e]) => e !== 0).map(([n]) => n)
       .concat(Object.entries({ ...o.exports, ...o.subpaths }).filter(([, v]) => v !== true).map(([n]) => `export ${n}`));
-    return result(bad.length === 0, bad.length ? `failed: ${bad.join(', ')}` : 'package installs offline and loads');
+    return result(bad.length === 0 && Object.keys(o.exports).length > 0, bad.length ? `failed: ${bad.join(', ')}` : 'package installs offline and loads');
   },
   D2(o) {
-    return result(o.exit === 0 && o.summary.fail === 0, `${o.summary.pass}/${o.summary.tests} passed, ${o.summary.skipped} skipped`,
+    return result(o.exit === 0 && o.summary.fail === 0 && o.summary.tests > 0, `${o.summary.pass}/${o.summary.tests} passed, ${o.summary.skipped} skipped`,
       o.failures.map((f) => `failed test: ${f}`));
   },
   D3(o) {
     const expect = [[o.alive, 'alive'], [o.dead, 'dead'], [o.replaced, 'dead'], [o.foreign_host, 'unknown'], [o.foreign_platform, 'unknown']];
-    const ok = o.independent.relay === o.independent.date && o.tz_pairs.every((p) => p.status === 'alive')
+    const ok = o.independent.relay === o.independent.date && o.tz_pairs.length === 4 && o.tz_pairs.every((p) => p.status === 'alive')
       && expect.every(([v, s]) => v.status === s) && o.launchd.valid && o.launchd.boot_id_null;
     return result(ok, ok ? 'identity agrees across readers and zones' : 'identity mismatch (see observations)',
       [`zombie child reads ${o.zombie.status} (${o.zombie.reason}) (spec item 5)`]);
   },
   D4(o) {
     const truncated = o.captures.filter((c) => c.truncated).map((c) => c.label);
-    const ok = o.chain.ancestors_match && o.chain.tty_match && o.chain.resolved === o.chain.expected
-      && o.native.executable_absolute && o.argv.ok && truncated.length === 0;
-    return result(ok, truncated.length ? `ps truncated relay's capture of ${truncated.join(', ')} (spec item 1)` : ok ? 'table, ancestry and arguments agree' : 'ancestry or argument mismatch',
+    const ok = o.captures.length >= 3 && o.chain.ancestors_match && o.chain.tty_match && o.chain.resolved === o.chain.expected
+      && o.native.recognized && o.native.executable_absolute && o.argv.ok && truncated.length === 0;
+    return result(ok, truncated.length ? `ps truncated relay's capture of ${truncated.join(', ')} (spec item 1)` : ok ? 'table, ancestry and arguments agree' : 'ancestry, recognition or argument mismatch',
       [`Darwin comm holds the ${o.comm_kind === 'path' ? 'executable path' : o.comm_kind === 'argv0' ? 'argv[0]' : 'unexpected value'} (spec item 2)`,
        `process table: ${o.table.rows} rows, ${o.table.over_cut} past the cut, ${o.table.truncated} truncated as relay reads it`]);
   },
   D5(o) {
     const c = o.concurrent, r = o.reap, s = o.cost.n10.sessionend, p = o.cost.n10.pretool;
-    const darwin = c.platforms.every((x) => x === 'darwin') && c.boot_ids_null;
+    const darwin = c.platforms.length === 1 && c.platforms[0] === 'darwin' && c.boot_ids_null;
     const sessionEnd = s.exit === 0 && s.stderr === '' && s.ms <= SESSIONEND_BUDGET_MS && s.ending_absent && s.revision_delta === 1 && s.others_retained;
     const preTool = p.exit === 0 && p.stderr === '' && p.allow && p.retained;
-    const ok = c.present === c.expected && c.handles_match && o.lock.recovered && same(r.removed, r.expected_removed) && same(r.kept, r.expected_kept)
-      && sessionEnd && preTool && (o.platform === 'linux' || darwin);
+    const ok = c.expected === 8 && c.present === 8 && c.handles_match && o.lock.recovered && r.expected_removed.length === 4
+      && same(r.removed, r.expected_removed) && same(r.kept, r.expected_kept) && sessionEnd && preTool && (o.platform !== 'darwin' || darwin);
     const n50 = o.cost.n50;
     return result(ok, ok ? 'registry, lock, reap and hook cost hold' : 'registry, lock, reap or hook cost failed',
       [`50 agents: PreToolUse ${n50.pretool.ms} ms, SessionEnd ${n50.sessionend.ms} ms (exit ${n50.sessionend.exit})`]);
   },
   D6(o) {
-    const ok = o.replies.every((r) => r.match) && o.hang.every((h) => h.survivors.length === 0 && h.ms < h.budget_ms + 3000);
-    return result(ok, ok ? 'replies match the Linux replay; hung guards refused and gone' : 'dispatch replay mismatch or a surviving guard');
+    const ok = o.replies.length === 6 && o.replies.every((r) => r.match) && o.hang.length === 2
+      && o.hang.every((h) => h.survivors.length === 0 && h.ms < h.budget_ms + 3000);
+    return result(ok, ok ? 'replies match the Linux replay; hung guards refused and gone' : 'dispatch replay incomplete, mismatched, or a guard survived');
   },
   D8(o) {
-    const ok = o.reap.exit === 0 && same(o.reap.kept, o.reap.expected_kept) && o.reap.handles_unchanged;
+    const ok = o.reap.exit === 0 && o.reap.expected_kept.length === 2 && same(o.reap.kept, o.reap.expected_kept) && o.reap.handles_unchanged;
     return result(ok, ok ? 'reap in a launchd-like environment keeps exactly the live agents' : 'reap in a minimal environment failed');
   },
 };
+const guarded = (fn, o) => { try { return fn(o); } catch (error) { return { verdict: 'error', detail: `malformed observations: ${error.message}`, findings: [] }; } };
 
-function cutoverHarness(o) {
-  if (!o || o.status !== 'ran') return 'absent';
-  return o.preflight.allow && o.preflight.deny && o.proven && o.handle.ok ? 'pass' : 'fail';
+function cutoverHarness(stage, name) {
+  if (!stage) return 'missing';
+  if (stage.status !== 'ran') return stage.status === 'absent' ? 'absent' : stage.status === 'skipped' ? 'skipped' : 'error';
+  const o = stage.observations[name];
+  if (!o) return 'error';
+  if (o.status !== 'ran') return o.status === 'absent' ? 'absent' : o.status === 'skipped' ? 'skipped' : 'error';
+  try { return o.preflight.allow && o.preflight.deny && o.proven === true && o.handle.ok === true ? 'pass' : 'fail'; } catch { return 'error'; }
 }
 function cutoverOpencode(stage) {
-  if (!stage || stage.status !== 'ran') return 'absent';
-  const o = stage.observations;
-  return o.version_match && o.request.status === 200 && o.request.directory_match && o.plugin_log === 'loaded' && o.appeared
-    && o.agent.count === 1 && o.agent.scope === 'process' && o.agent.matches_server && o.after.gone ? 'pass' : 'fail';
+  if (!stage) return 'missing';
+  if (stage.status !== 'ran') return stage.status === 'absent' ? 'absent' : stage.status === 'skipped' ? 'skipped' : 'error';
+  try {
+    const o = stage.observations;
+    return o.version_match && o.install.exit === 0 && o.request.status === 200 && o.request.directory_match && o.plugin_log === 'loaded' && o.appeared
+      && o.agent.count === 1 && o.agent.scope === 'process' && o.agent.matches_server && o.after.gone ? 'pass' : 'fail';
+  } catch { return 'error'; }
+}
+// Confirmed truncation in a live hook's own ancestry is the spec's item-1 defect and blocks
+// the release like D4's constructed chain; no live evidence leaves D4 as the width check.
+function liveWidth(stage) {
+  const ran = stage?.status === 'ran' ? Object.entries(stage.observations).filter(([, o]) => o?.status === 'ran' && o.hook) : [];
+  const cut = ran.filter(([, o]) => o.hook.truncated === true).map(([h]) => h);
+  if (!ran.length) return { verdict: 'pass', detail: 'no live hook ancestry recorded; D4 carries the width check', findings: [] };
+  return result(cut.length === 0, cut.length ? `ps truncated live hook ancestry for ${cut.join(', ')} (spec item 1)` : 'live hook ancestry read in full');
 }
 
 export function judge(results) {
@@ -569,15 +641,18 @@ export function judge(results) {
   for (const id of RELEASE) {
     const stage = results.stages[id];
     if (!stage) { checks[id] = { class: 'release', verdict: 'missing', detail: 'stage did not run', findings: [] }; continue; }
-    if (stage.status !== 'ran') { checks[id] = { class: 'release', verdict: stage.status, detail: stage.reason ?? '', findings: [] }; continue; }
+    if (stage.status !== 'ran') { checks[id] = { class: 'release', verdict: stage.status === 'skipped' ? 'skipped' : 'error', detail: stage.reason ?? '', findings: [] }; continue; }
     const observations = id === 'D5' ? { ...stage.observations, platform } : stage.observations;
-    checks[id] = { class: 'release', ...rules[id](observations) };
+    checks[id] = { class: 'release', ...guarded(rules[id], observations) };
   }
-  const d7 = results.stages.D7?.observations ?? {};
+  const changed = results.manifest.isolation?.changed;
+  checks.ISO = { class: 'release', ...(Array.isArray(changed) ? result(changed.length === 0, changed.length ? `live paths changed: ${changed.join(', ')}` : 'no live path changed')
+    : { verdict: 'error', detail: 'isolation fingerprints missing', findings: [] }) };
+  checks.D7w = { class: 'release', ...liveWidth(results.stages.D7) };
   const d8 = results.stages.D8?.status === 'ran' ? results.stages.D8.observations.hook_path : null;
-  const cutover = { 'claude-code': cutoverHarness(d7['claude-code']), codex: cutoverHarness(d7.codex),
-    opencode: cutoverOpencode(results.stages.D7b), 'launchd-path': d8 ? (d8.denied ? 'pass' : 'fail') : 'absent' };
-  const verdicts = RELEASE.map((id) => checks[id].verdict);
+  const cutover = { 'claude-code': cutoverHarness(results.stages.D7, 'claude-code'), codex: cutoverHarness(results.stages.D7, 'codex'),
+    opencode: cutoverOpencode(results.stages.D7b), 'launchd-path': d8 ? (d8.denied === true ? 'pass' : 'fail') : 'error' };
+  const verdicts = Object.values(checks).map((c) => c.verdict);
   const release = results.manifest.allow_linux ? 'smoke'
     : verdicts.some((v) => !['pass', 'fail'].includes(v)) ? 'incomplete'
     : verdicts.every((v) => v === 'pass') ? 'pass' : 'fail';
@@ -618,8 +693,17 @@ git commit -m "feat(tools): judge Darwin probe results into release and cutover 
     session variables, and sets the seven isolation variables.
   - `prepareRoot(root)`: creates `xdg/relay` (0700), `relay-state` (0700), and `state`,
     `data`, `cache`, `claude`, `codex`.
-  - `tracker(root) -> {spawn(cmd,args,opts), run(cmd,args,{env,cwd,input,timeoutMs}) -> Promise<{exit,signal,stdout,stderr,ms}>, killAll()}`.
-    Every pid is appended to `<root>/pids`.
+  - `tracker(root) -> {spawn(cmd,args,opts), fork(module,args,opts), run(cmd,args,{env,cwd,input,timeoutMs,argv0}) -> Promise<{exit,signal,stdout,stderr,ms}>, kill(pgid) -> Promise<void>, killAll() -> Promise<void>}`.
+    Every child is spawned `detached`, so it leads its own process group and a signal to
+    `-pgid` reaches everything it forks: a harness under Python, a `sleep` under `sh`, or
+    OpenCode's forked server. `<root>/pids` lists only the groups still owned, one `-pgid`
+    per line, rewritten on every change. A group leaves the list only once
+    `kill(-pgid, 0)` reports `ESRCH`, so neither `killAll` nor `run`'s trap ever signals a
+    reused pid. `kill` and `killAll` send `SIGKILL`, then wait up to 5 s for each group to
+    empty. `run`'s timeout kills the whole group.
+  - `registryFor(clone, env) -> Promise<{paths, read(), list(), reap()}>`: relay's registry
+    functions bound to `paths(env)`. They take `paths`, not `env`, and without it fall back
+    to the ambient default, so every probe registry call goes through this helper.
   - `WATCHED_FILES`, `WATCHED_TREES`, `fingerprint(home) -> {[relpath]: {exists, files, size, mtimeMs}}`,
     `changedPaths(before, after) -> string[]`.
   - `writeStage(resultsDir, id, record)`, `stageLog(resultsDir, id) -> (line) => void`.
@@ -637,7 +721,8 @@ git commit -m "feat(tools): judge Darwin probe results into release and cutover 
   - `startParent(t, {shell, clone, plan, workdir, env}) -> {child, pid, workdir, done(): Promise<object[]>}`.
     It writes `plan.json` and runs `timed-hook.mjs plan.json` as a non-final command, then
     blocks on `read` from a FIFO until killed.
-- Produces (`timed-hook.mjs`): a CLI, `node timed-hook.mjs <plan.json>`. The plan is
+- Produces (`timed-hook.mjs`): a CLI, `node timed-hook.mjs <plan.json>`. It reads the
+  registry through `paths(process.env)` explicitly. The plan is
   `{clone, harness, subscribers, steps: [{event, outerMs, payload, out}]}`. For each step it
   writes `out` as `{ms, exit, stdout, stderr, before, after}`, where `before` and `after`
   are `readSnapshot()` results. Then it writes `<plan dir>/done`.
@@ -647,11 +732,11 @@ git commit -m "feat(tools): judge Darwin probe results into release and cutover 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { isolatedEnv, prepareRoot, tracker, fingerprint, changedPaths, WATCHED_FILES, WATCHED_TREES } from '../tools/darwin-probe/lib/context.mjs';
+import { isolatedEnv, prepareRoot, registryFor, tracker, fingerprint, changedPaths, WATCHED_FILES, WATCHED_TREES } from '../tools/darwin-probe/lib/context.mjs';
 import { compareCapture, rowFor } from '../tools/darwin-probe/lib/ps.mjs';
 import { installShell, startParent } from '../tools/darwin-probe/lib/parents.mjs';
 import { createProcessOps } from '../src/index.js';
@@ -674,6 +759,23 @@ test('fingerprints report a new file inside a watched tree and ignore unwatched 
   assert.deepEqual(changedPaths(before, fingerprint(home)), []);
   writeFileSync(join(home, '.config/relay/new.json'), '{}');
   assert.deepEqual(changedPaths(before, fingerprint(home)), ['.config/relay']);
+});
+test('registry access follows the given env, never the ambient one', async (t) => {
+  const r = root(t); prepareRoot(r);
+  const saved = process.env.RELAY_STATE_DIR; process.env.RELAY_STATE_DIR = join(r, 'ambient');
+  t.after(() => { if (saved === undefined) delete process.env.RELAY_STATE_DIR; else process.env.RELAY_STATE_DIR = saved; });
+  const reg = await registryFor(process.cwd(), isolatedEnv(r));
+  assert.equal(reg.paths.stateDir, join(r, 'relay-state'));
+});
+test('killAll reaches grandchildren and forgets only emptied groups', async (t) => {
+  const r = root(t); const tr = tracker(r);
+  const child = tr.spawn('/bin/sh', ['-c', 'sleep 600.321 & sleep 600.654; true'], { stdio: 'ignore' });
+  await new Promise((x) => setTimeout(x, 300));
+  assert.match(readFileSync(join(r, 'pids'), 'utf8'), new RegExp(`^-${child.pid}$`, 'm'));
+  await tr.killAll();
+  assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes('sleep 600.321'), false);
+  assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes('sleep 600.654'), false);
+  assert.equal(readFileSync(join(r, 'pids'), 'utf8'), '');
 });
 test('capture comparison flags a cut row and a clean row', () => {
   assert.deepEqual(compareCapture('12 1 ?? Thu Sep 25 07:31:02 2026 /Users/u/.local/share/cl', '12 1 ?? Thu Sep 25 07:31:02 2026 /Users/u/.local/share/claude/versions/2.1.282'),
@@ -705,8 +807,9 @@ Expected: FAIL, modules missing.
 
 ```js
 import { spawn } from 'node:child_process';
-import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync as log } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, writeFileSync, appendFileSync as log } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const SESSION_VARS = ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_ENTRYPOINT', 'CODEX_SESSION_ID', 'CODEX_THREAD_ID'];
 export function isolatedEnv(root, base = process.env) {
@@ -721,29 +824,41 @@ export function prepareRoot(root) {
   mkdirSync(join(root, 'xdg/relay'), { recursive: true, mode: 0o700 });
   mkdirSync(join(root, 'relay-state'), { mode: 0o700 });
 }
+// relay's registry functions take `paths`; without it they use the ambient default, which on
+// the Mac is the user's live registry.
+export async function registryFor(clone, env) {
+  const relay = await import(pathToFileURL(join(clone, 'src/index.js')).href);
+  const paths = relay.paths(env);
+  return { paths, read: () => relay.readSnapshot({ paths }), list: () => relay.listAgents({ paths }), reap: () => relay.reapRegistry({ paths }) };
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function tracker(root) {
-  const live = new Set(), pids = join(root, 'pids');
-  // A detached child leads its own process group and is recorded as -pid, so both killAll and
-  // run's trap (`kill -9 -- -pid`) reach the processes it forks. OpenCode forks its server.
+  const file = join(root, 'pids'), groups = new Map();
+  const save = () => writeFileSync(file, [...groups.keys()].map((g) => `-${g}\n`).join(''));
+  const alive = (pgid) => { try { process.kill(-pgid, 0); return true; } catch (error) { return error.code === 'EPERM'; } };
+  const forget = (pgid) => { if (!alive(pgid)) { groups.delete(pgid); save(); } };
+  // Every child leads its own process group, so one signal reaches everything it forks.
   const spawnTracked = (cmd, args, options = {}) => {
-    const child = spawn(cmd, args, options);
-    if (child.pid) { appendFileSync(pids, `${options.detached ? -child.pid : child.pid}\n`); live.add(child); child.once('exit', () => live.delete(child)); }
+    const child = spawn(cmd, args, { ...options, detached: true });
+    if (child.pid) { groups.set(child.pid, child); save(); child.once('exit', () => setTimeout(() => forget(child.pid), 100)); }
     return child;
   };
+  const kill = async (pgid) => {
+    try { process.kill(-pgid, 'SIGKILL'); } catch {}
+    for (const until = Date.now() + 5000; alive(pgid) && Date.now() < until;) await sleep(50);
+    forget(pgid);
+  };
+  const fork = (module, args, options = {}) => spawnTracked(process.execPath, [module, ...args], { ...options, stdio: options.stdio ?? ['ignore', 'ignore', 'inherit', 'ipc'] });
   const run = (cmd, args, { env, cwd, input, timeoutMs = 600000, argv0 } = {}) => new Promise((resolve) => {
     const started = performance.now(), child = spawnTracked(cmd, args, { env, cwd, argv0, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
     child.stdout.on('data', (d) => { stdout += d; }); child.stderr.on('data', (d) => { stderr += d; });
-    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    const timer = setTimeout(() => { kill(child.pid); }, timeoutMs);
     child.once('error', (error) => { clearTimeout(timer); resolve({ exit: null, signal: null, stdout, stderr: `${stderr}${error.message}\n`, ms: performance.now() - started }); });
     child.once('close', (exit, signal) => { clearTimeout(timer); resolve({ exit, signal, stdout, stderr, ms: performance.now() - started }); });
     child.stdin.end(input ?? '');
   });
-  const killAll = () => {
-    for (const line of existsSync(pids) ? readFileSync(pids, 'utf8').split('\n').filter(Boolean) : []) { try { process.kill(Number(line), 'SIGKILL'); } catch {} }
-    for (const child of live) child.kill('SIGKILL');
-  };
-  return { spawn: spawnTracked, run, killAll };
+  return { spawn: spawnTracked, fork, run, kill, killAll: () => Promise.all([...groups.keys()].map(kill)) };
 }
 // Live sessions the user keeps open (D9) write transcripts under ~/.claude and ~/.codex, so
 // those two are watched by their configuration and credential files only.
@@ -864,7 +979,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 const planPath = process.argv[2], plan = JSON.parse(readFileSync(planPath, 'utf8'));
-const { readSnapshot } = await import(pathToFileURL(join(plan.clone, 'src/index.js')).href);
+const relay = await import(pathToFileURL(join(plan.clone, 'src/index.js')).href);
+const paths = relay.paths(process.env), readSnapshot = () => relay.readSnapshot({ paths });
 for (const step of plan.steps) {
   const before = await readSnapshot(), started = performance.now();
   const r = await new Promise((resolve) => {
@@ -884,7 +1000,7 @@ writeFileSync(join(dirname(planPath), 'done'), '');
 - [ ] **Step 6: Run to see it pass**
 
 Run: `node --test test/darwin-probe-runtime.test.js`
-Expected: PASS (5 tests). The parent test proves on Linux that the constructed-parent path
+Expected: PASS (7 tests). The parent test proves on Linux that the constructed-parent path
 publishes a qualified handle; D5 relies on the same path on Darwin.
 
 - [ ] **Step 7: Commit**
@@ -972,7 +1088,7 @@ export async function run(ctx) {
     sw_vers: ctx.platform === 'darwin' ? { ProductVersion: await v('sw_vers', ['-productVersion']), BuildVersion: await v('sw_vers', ['-buildVersion']) } : null,
     arch: await v('uname', ['-m']),
     versions: { node: `v${node}`, npm: await v('npm', ['--version']), git: await v('git', ['--version']), python3 },
-    clt, tz: process.env.TZ ?? null, zone, columns_exported: process.env.COLUMNS !== undefined,
+    clt, tz: process.env.TZ ?? null, zone, columns_exported: ctx.ambient?.columns_exported ?? process.env.COLUMNS !== undefined,
     harnesses: { claude: await harness('claude'), codex: await harness('codex'), opencode: await harness('opencode') },
     hosts: { start: await hosts(ctx), end: null },
     prerequisites: { macos: ctx.platform === 'darwin', node22: +node.split('.')[0] >= 22, clt: ctx.platform !== 'darwin' || clt !== null, python311: pythonAtLeast(python3, [3, 11]) },
@@ -1134,7 +1250,7 @@ export async function run(ctx) {
   const foreign_host = { ...(await probeUnder('', { ...h, host: `${h.host}-other` })), host: `${h.host}-other` };
   const foreign_platform = await probeUnder('', { ...h, platform: 'linux', bootId: null });
   const l = await handleUnder('', 1);
-  sleeper.kill('SIGKILL'); await new Promise((r) => sleeper.once('exit', r));
+  await ctx.t.kill(sleeper.pid);
   const dead = await probeUnder('', h);
   // A zombie: perl forks a child that exits at once and never reaps it.
   const z = ctx.t.spawn('perl', ['-e', '$|=1; my $p=fork(); if($p==0){exit 0} print "$p\\n"; sleep 30'], { stdio: ['ignore', 'pipe', 'ignore'] });
@@ -1142,7 +1258,7 @@ export async function run(ctx) {
   await new Promise((r) => setTimeout(r, 300));
   const zh = await handleUnder('', zpid);
   const zombie = zh ? await probeUnder('', zh) : { status: 'no-handle', reason: 'handleOf returned null' };
-  z.kill('SIGKILL');
+  await ctx.t.kill(z.pid);
   return { status: 'ran', observations: { independent, tz_pairs, alive, dead, replaced, foreign_host, foreign_platform,
     launchd: { valid: !!l && l.pid === 1, boot_id_null: l?.bootId === null }, zombie } };
 }
@@ -1190,7 +1306,7 @@ export async function run(ctx) {
   const script = ctx.t.spawn('script', ['-q', '/dev/null', claude, '-c', `"${process.execPath}" "${REPORT}" "${ctx.clone}" "${chainOut}" claude-code; true`], { env: ctx.env, stdio: 'ignore' });
   await wait(chainOut);
   const chain = JSON.parse(readFileSync(chainOut, 'utf8'));
-  script.kill('SIGKILL');
+  await ctx.t.kill(script.pid);
   // 2. A Claude-shaped native install: …/claude/versions/9.9.9 started as `9.9.9`.
   const versioned = installShell(join(ctx.root, 'n/claude/versions'), '9.9.9');
   const nativeOut = join(ctx.root, 'd4-native.json');
@@ -1198,7 +1314,7 @@ export async function run(ctx) {
   await wait(nativeOut);
   const nat = JSON.parse(readFileSync(nativeOut, 'utf8'));
   let executable = null; try { executable = ops.executableOf(native.pid); } catch (e) { executable = `error:${e.code}`; }
-  native.kill('SIGKILL');
+  await ctx.t.kill(native.pid);
   // 3. argvOf on an executable path and arguments with spaces.
   const spaced = installShell(join(ctx.root, 'sp ace'), 's h');
   // `; true` keeps the shell itself alive: sh may exec a final simple command in its place.
@@ -1206,7 +1322,7 @@ export async function run(ctx) {
   await new Promise((r) => setTimeout(r, 300));
   let argv = null, argvError = null; try { argv = ops.argvOf(sp.pid); } catch (e) { argvError = e.code; }
   const spCapture = capture(sp.pid, 'argv-spaces');
-  sp.kill('SIGKILL');
+  await ctx.t.kill(sp.pid);
   const commWw = chain.capture.forms.comm.ww;
   const comm_kind = commWw === claude ? 'path' : commWw === 'claude' || commWw === claude.split('/').pop() ? 'argv0' : 'other';
   return { status: 'ran', observations: {
@@ -1243,9 +1359,13 @@ git commit -m "feat(tools): probe Darwin process identity, ps width, ancestry an
 - Test: `test/darwin-probe-stages-c.test.js` (live on Linux: D5 and D8's reap with constructed parents)
 
 **Interfaces:**
-- `fleet.mjs` exports `startFleet(ctx, {count, prefix, stateDir}) -> Promise<{parents: [{id, pid, handle, child}], env, subscribers, repo}>`.
-  Each parent publishes `codex:<prefix><i>` through a `SessionStart` step.
-  `killParents(parents) -> Promise<void>` sends `SIGKILL` and waits for exit.
+- `fleet.mjs` exports:
+  - `fleetBase(ctx, stateDir) -> Promise<{env, subscribers, repo, shell, ops, registry}>`,
+    where `registry` comes from `registryFor(ctx.clone, env)`;
+  - `startFleet(ctx, base, {count, prefix, extraSteps}) -> Promise<[{id, pid, handle, steps}]>`.
+    Each parent publishes `codex:<prefix><i>` through a `SessionStart` step.
+  - `killParents(ctx, parents) -> Promise<void>`: `ctx.t.kill` on each parent's group, which
+    waits until the group is empty.
 - D5's observations match the contract. `cost.nN` is
   `{agents, pretool: {ms, exit, stderr, allow, retained}, sessionend: {ms, exit, stderr, ending_absent, revision_delta, others_retained}}`.
 - D8's `hook_path` is `{exit, denied, stderr_head, command}`, with `command` redacted like
@@ -1265,7 +1385,7 @@ import { run as d8 } from '../tools/darwin-probe/stages/d8-launchd.mjs';
 
 const ctxFor = (t) => {
   const root = mkdtempSync(join(tmpdir(), 'dp-')); prepareRoot(root);
-  const tr = tracker(root); t.after(() => { tr.killAll(); rmSync(root, { recursive: true, force: true }); });
+  const tr = tracker(root); t.after(async () => { await tr.killAll(); rmSync(root, { recursive: true, force: true }); });
   return { root, env: isolatedEnv(root), t: tr, clone: process.cwd(), platform: process.platform, log: () => {} };
 };
 test('D5 on this host: eight publishers, lock recovery, exact reap, SessionEnd mutation', { timeout: 180000 }, async (t) => {
@@ -1291,6 +1411,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { registryFor } from './context.mjs';
 import { installShell, startParent } from './parents.mjs';
 export async function fleetBase(ctx, stateDir) {
   mkdirSync(stateDir, { mode: 0o700, recursive: true });
@@ -1301,61 +1422,57 @@ export async function fleetBase(ctx, stateDir) {
   // A short path keeps D5 independent of the ps width question D4 owns.
   const shell = installShell(join(ctx.root, 'p'), 'codex');
   const { createProcessOps } = await import(pathToFileURL(join(ctx.clone, 'src/index.js')).href);
-  return { env, subscribers, repo, shell, ops: createProcessOps() };
+  return { env, subscribers, repo, shell, ops: createProcessOps(), registry: await registryFor(ctx.clone, env) };
 }
 export async function startFleet(ctx, base, { count, prefix, extraSteps = () => [] }) {
   const parents = Array.from({ length: count }, (_, i) => {
     const id = `${prefix}${i}`;
     const p = startParent(ctx.t, { shell: base.shell, clone: ctx.clone, workdir: join(ctx.root, 'fleet', id), env: base.env,
       plan: { harness: 'codex', subscribers: base.subscribers, steps: [{ event: 'SessionStart', outerMs: 600000, payload: { session_id: id, cwd: base.repo } }, ...extraSteps(id)] } });
-    return { id: `codex:${id}`, pid: p.pid, child: p.child, handle: base.ops.handleOf(p.pid), done: p.done };
+    return { id: `codex:${id}`, pid: p.pid, handle: base.ops.handleOf(p.pid), done: p.done };
   });
   const steps = await Promise.all(parents.map((p) => p.done()));
   return parents.map((p, i) => ({ ...p, steps: steps[i] }));
 }
-export async function killParents(parents) {
-  await Promise.all(parents.map((p) => new Promise((r) => { if (p.child.exitCode !== null || p.child.signalCode) return r(); p.child.once('exit', r); p.child.kill('SIGKILL'); })));
-}
+export const killParents = (ctx, parents) => Promise.all(parents.map((p) => ctx.t.kill(p.pid)));
 ```
 
 - [ ] **Step 4: Implement D5**
 
 ```js
-import { fork } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fleetBase, killParents, startFleet } from '../lib/fleet.mjs';
 const pretool = (id, repo) => ({ event: 'PreToolUse', outerMs: 600000, payload: { session_id: id, cwd: repo, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'true' } } });
 const sessionEnd = (id, repo) => ({ event: 'SessionEnd', outerMs: 3000, payload: { session_id: id, cwd: repo } });
-const sameHandles = (before, after, ids) => ids.every((id) => JSON.stringify(before.agents[id]?.process) === JSON.stringify(after.agents[id]?.process) && after.agents[id]);
+const sameHandles = (before, after, ids) => ids.every((id) => after.agents[id] && JSON.stringify(before.agents[id]?.process) === JSON.stringify(after.agents[id].process));
 export async function run(ctx) {
   const all = [];
   try {
     // Concurrent writers.
     const base = await fleetBase(ctx, join(ctx.root, 'd5-state'));
     const eight = await startFleet(ctx, base, { count: 8, prefix: 'p' }); all.push(...eight);
-    const { readSnapshot, reapRegistry } = await import(pathToFileURL(join(ctx.clone, 'src/index.js')).href);
-    const env = { RELAY_STATE_DIR: base.env.RELAY_STATE_DIR };
-    const snap = await readSnapshot({ env });
+    const snap = await base.registry.read();
     const concurrent = { expected: 8, present: eight.filter((p) => snap?.agents[p.id]).length,
-      handles_match: eight.every((p) => JSON.stringify(snap.agents[p.id]?.process) === JSON.stringify(p.handle)),
-      platforms: [...new Set(eight.map((p) => snap.agents[p.id]?.process?.platform))], boot_ids_null: eight.every((p) => snap.agents[p.id]?.process?.bootId === null) };
-    // Lock recovery through relay's own worker fixture.
-    const worker = fork(join(ctx.clone, 'test/fixtures/lock-worker.js'), ['hold-main', base.env.RELAY_STATE_DIR], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
+      handles_match: eight.every((p) => JSON.stringify(snap?.agents[p.id]?.process) === JSON.stringify(p.handle)),
+      platforms: [...new Set(eight.map((p) => snap?.agents[p.id]?.process?.platform))], boot_ids_null: eight.every((p) => snap?.agents[p.id]?.process?.bootId === null) };
+    // Lock recovery through relay's own worker fixture, forked under the tracker.
+    const lockPath = base.registry.paths.lockPath;
+    const worker = ctx.t.fork(join(ctx.clone, 'test/fixtures/lock-worker.js'), ['hold-main', base.env.RELAY_STATE_DIR]);
     const next = () => new Promise((r) => worker.once('message', r));
     await next(); worker.send('start'); await next();
+    let holder = null; try { holder = JSON.parse(readFileSync(lockPath, 'utf8')).holder ?? null; } catch (e) { holder = `unreadable: ${e.code ?? e.message}`; }
+    await ctx.t.kill(worker.pid);
     const { withLock } = await import(pathToFileURL(join(ctx.clone, 'src/bus/lock.js')).href);
-    const { readFile } = await import('node:fs/promises');
-    const holder = JSON.parse(await readFile(join(base.env.RELAY_STATE_DIR, 'lock'), 'utf8').catch(() => 'null'))?.holder ?? null;
-    worker.kill('SIGKILL'); await new Promise((r) => worker.once('exit', r));
-    let recovered = false, value = null; try { value = (await withLock(join(base.env.RELAY_STATE_DIR, 'lock'), () => 42)).value; recovered = value === 42; } catch (e) { value = e.code; }
+    let recovered = false, value = null; try { value = (await withLock(lockPath, () => 42)).value; recovered = value === 42; } catch (e) { value = e.code ?? e.message; }
     // Reap: kill four, keep four.
-    await killParents(eight.slice(0, 4));
-    const reaped = await reapRegistry({ env });
-    const after = await readSnapshot({ env });
-    const reap = { removed: eight.filter((p) => !after.agents[p.id]).map((p) => p.id), kept: eight.filter((p) => after.agents[p.id]).map((p) => p.id),
+    await killParents(ctx, eight.slice(0, 4));
+    const reaped = await base.registry.reap();
+    const after = await base.registry.read();
+    const reap = { removed: eight.filter((p) => !after?.agents[p.id]).map((p) => p.id), kept: eight.filter((p) => after?.agents[p.id]).map((p) => p.id),
       expected_removed: eight.slice(0, 4).map((p) => p.id), expected_kept: eight.slice(4).map((p) => p.id), reaped: reaped.reaped?.length ?? null };
-    await killParents(eight.slice(4));
+    await killParents(ctx, eight.slice(4));
     // Cost with 0, 10 and 50 live agents: fresh state per size.
     const cost = {};
     for (const n of [0, 10, 50]) {
@@ -1364,25 +1481,23 @@ export async function run(ctx) {
       const [timed] = await startFleet(ctx, b, { count: 1, prefix: `t${n}-`, extraSteps: (id) => [pretool(id, b.repo), sessionEnd(id, b.repo)] }); all.push(timed);
       const [, pre, end] = timed.steps, ids = live.map((p) => p.id);
       cost[`n${n}`] = { agents: n,
-        pretool: { ms: pre.ms, exit: pre.exit, stderr: pre.stderr, allow: pre.exit === 0, retained: sameHandles(pre.before, pre.after, ids) && !!pre.after.agents[timed.id] },
-        sessionend: { ms: end.ms, exit: end.exit, stderr: end.stderr, ending_absent: !end.after.agents[timed.id],
-          revision_delta: end.after.revision - end.before.revision, others_retained: sameHandles(end.before, end.after, ids) } };
-      await killParents([...live, timed]);
+        pretool: { ms: pre.ms, exit: pre.exit, stderr: pre.stderr, allow: pre.exit === 0, retained: sameHandles(pre.before, pre.after, ids) && !!pre.after?.agents[timed.id] },
+        sessionend: { ms: end.ms, exit: end.exit, stderr: end.stderr, ending_absent: !end.after?.agents[timed.id],
+          revision_delta: (end.after?.revision ?? 0) - (end.before?.revision ?? 0), others_retained: sameHandles(end.before, end.after, ids) } };
+      await killParents(ctx, [...live, timed]);
     }
     return { status: 'ran', observations: { concurrent, lock: { holder, recovered, value }, reap, cost } };
-  } finally { await killParents(all); }
+  } finally { await killParents(ctx, all); }
 }
 ```
 
-The lock file name `lock` and the token's `holder` field follow `src/bus/paths.js`
-(`lockPath`) and `src/bus/lock.js`. Before writing this code, confirm both names with
-`grep -n lockPath src/bus/paths.js` and `grep -n holder src/bus/lock.js`, and use
-`paths({RELAY_STATE_DIR}).lockPath` in place of `join(…, 'lock')`.
+The token's `holder` field follows `src/bus/lock.js`. Before writing this code, confirm it
+with `grep -n holder src/bus/lock.js`.
 
 - [ ] **Step 5: Implement D8**
 
 ```js
-import { writeFileSync, readFileSync, realpathSync } from 'node:fs';
+import { writeFileSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fleetBase, killParents, startFleet } from '../lib/fleet.mjs';
@@ -1390,35 +1505,36 @@ export async function run(ctx) {
   // Reap in a minimal environment, on a fleet of its own (D5's parents are gone by now).
   const base = await fleetBase(ctx, join(ctx.root, 'd8-state'));
   const fleet = await startFleet(ctx, base, { count: 4, prefix: 'q' });
-  const { readSnapshot } = await import(pathToFileURL(join(ctx.clone, 'src/index.js')).href);
-  const env = { RELAY_STATE_DIR: base.env.RELAY_STATE_DIR };
-  const before = await readSnapshot({ env });
-  await killParents(fleet.slice(0, 2));
-  const minimal = { HOME: ctx.root, PATH: `/usr/bin:/bin:${dirname(process.execPath)}`, RELAY_STATE_DIR: base.env.RELAY_STATE_DIR };
-  const r = await ctx.t.run('/usr/bin/env', ['-i', ...Object.entries(minimal).map(([k, v]) => `${k}=${v}`), process.execPath, join(ctx.clone, 'bin/relay.js'), 'reap', '--json'], {});
-  const after = await readSnapshot({ env });
-  const live = fleet.slice(2).map((p) => p.id);
-  const reap = { exit: r.exit, kept: Object.keys(after?.agents ?? {}), expected_kept: live,
-    handles_unchanged: live.every((id) => JSON.stringify(after.agents[id]?.process) === JSON.stringify(before.agents[id]?.process)) };
-  await killParents(fleet);
-  // The exact hook command relay install would write, run under launchd's PATH with a denying guard.
-  const deny = join(ctx.root, 'd8-deny.sh');
-  writeFileSync(deny, '#!/bin/sh\nprintf \'{"decision":"deny","reason":"d8 probe"}\'\n', { mode: 0o755 });
-  const subs = join(ctx.root, 'xdg/relay/d8-subscribers.json');
-  writeFileSync(subs, JSON.stringify({ schema: 1, subscribers: [{ name: 'd8-deny', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: [deny], timeoutMs: 5000 }] }), { mode: 0o600 });
-  const target = join(ctx.root, 'd8-settings.json'); writeFileSync(target, '{}\n');
-  const plan = await ctx.t.run(process.execPath, [join(ctx.clone, 'bin/relay.js'), '--json', 'install', '--harness', 'claude-code', '--target', target, '--subscribers', subs], { env: ctx.env });
-  const artifact = JSON.parse(plan.stdout);
-  const command = JSON.parse(artifact.changes[0].after).hooks.PreToolUse.flatMap((e) => e.hooks).find((h) => h.command.includes(' hook ')).command;
-  const payload = JSON.stringify({ session_id: 'd8', cwd: base.repo, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'true' } });
-  const h = await ctx.t.run('/bin/sh', ['-c', command], { env: { ...ctx.env, PATH: '/usr/bin:/bin:/usr/sbin:/sbin' }, input: payload });
-  return { status: 'ran', observations: { reap, hook_path: { exit: h.exit, denied: h.stdout.includes('"permissionDecision":"deny"'), stderr_head: h.stderr.slice(0, 400), command } } };
+  try {
+    const before = await base.registry.read();
+    await killParents(ctx, fleet.slice(0, 2));
+    const minimal = { HOME: ctx.root, PATH: `/usr/bin:/bin:${dirname(process.execPath)}`, RELAY_STATE_DIR: base.env.RELAY_STATE_DIR };
+    const r = await ctx.t.run('/usr/bin/env', ['-i', ...Object.entries(minimal).map(([k, v]) => `${k}=${v}`), process.execPath, join(ctx.clone, 'bin/relay.js'), '--json', 'reap']);
+    ctx.log(`reap: exit ${r.exit}\n${r.stdout}${r.stderr}`);
+    const after = await base.registry.read();
+    const live = fleet.slice(2).map((p) => p.id);
+    const reap = { exit: r.exit, kept: Object.keys(after?.agents ?? {}), expected_kept: live,
+      handles_unchanged: live.every((id) => after?.agents[id] && JSON.stringify(after.agents[id].process) === JSON.stringify(before?.agents[id]?.process)) };
+    // The command relay's installer renders for PreToolUse, from its own hook planner. The
+    // installer CLI would demand capability evidence first; rendering needs none.
+    const deny = join(ctx.root, 'd8-deny.sh');
+    writeFileSync(deny, '#!/bin/sh\nprintf \'{"decision":"deny","reason":"d8 probe"}\'\n', { mode: 0o755 });
+    const subs = join(ctx.root, 'xdg/relay/d8-subscribers.json');
+    writeFileSync(subs, JSON.stringify({ schema: 1, subscribers: [{ name: 'd8-deny', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: [deny], timeoutMs: 5000 }] }), { mode: 0o600 });
+    const { planHooks } = await import(pathToFileURL(join(ctx.clone, 'src/install/hooks.js')).href);
+    const rendered = JSON.parse(planHooks({ text: '{}', harness: 'claude-code', relayBin: realpathSync(join(ctx.clone, 'bin/relay.js')), subscribersPath: subs }));
+    const command = rendered.hooks.PreToolUse.flatMap((e) => e.hooks).find((h) => / hook /.test(h.command))?.command;
+    if (!command) return { status: 'error', reason: 'planHooks rendered no PreToolUse relay command', observations: { reap } };
+    const payload = JSON.stringify({ session_id: 'd8', cwd: base.repo, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'true' } });
+    const h = await ctx.t.run('/bin/sh', ['-c', command], { env: { ...base.env, PATH: '/usr/bin:/bin:/usr/sbin:/sbin' }, input: payload });
+    return { status: 'ran', observations: { reap, hook_path: { exit: h.exit, denied: h.stdout.includes('"permissionDecision":"deny"'), stderr_head: h.stderr.slice(0, 400), command } } };
+  } finally { await killParents(ctx, fleet); }
 }
 ```
 
-Before writing this code, confirm the global `--json` placement for `install` and the
-`artifact.changes[0].after` shape with `node bin/relay.js install --help` and
-`test/install-cli.test.js`.
+`planHooks` is exported by `src/install/hooks.js` and is what `relay install` uses to
+write the command. It renders without reading capability evidence, which only the
+installer's CLI path (`src/install/capabilities.js`) enforces.
 
 - [ ] **Step 6: Run to see it pass**
 
@@ -1458,7 +1574,7 @@ import { isolatedEnv, prepareRoot, tracker } from '../tools/darwin-probe/lib/con
 import { replay } from '../tools/darwin-probe/stages/d6-dispatch.mjs';
 test('replay: allow, deny and a hung guard for both harnesses; the hung guard is killed', { timeout: 60000 }, async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'dp-')); prepareRoot(root); const tr = tracker(root);
-  t.after(() => { tr.killAll(); rmSync(root, { recursive: true, force: true }); });
+  t.after(async () => { await tr.killAll(); rmSync(root, { recursive: true, force: true }); });
   const rows = await replay({ root, env: isolatedEnv(root), t: tr, clone: process.cwd() });
   assert.equal(rows.length, 6);
   for (const r of rows.filter((x) => x.guard === 'hang')) { assert.deepEqual(r.survivors, []); assert.ok(r.ms < 5000); }
@@ -1519,6 +1635,7 @@ git commit -m "feat(tools): replay guard dispatch against the Linux host's recor
 ### Task 9: Stages D7, D7b, D9: live guard sessions, OpenCode observation, ambient sessions
 
 **Files:**
+- Create: `tools/darwin-probe/lib/relay-wrapper.mjs` (a hook entry that records the hook's own ancestry, then runs the committed relay in the same process)
 - Create: `tools/darwin-probe/stages/d7-guard.mjs`
 - Create: `tools/darwin-probe/stages/d7b-opencode.mjs`
 - Create: `tools/darwin-probe/stages/d9-ambient.mjs`
@@ -1528,30 +1645,63 @@ git commit -m "feat(tools): replay guard dispatch against the Linux host's recor
 **Interfaces:**
 - `tty.mjs`: `ask(question, {hidden}) -> Promise<string|null>`, which returns `null` when
   `/dev/tty` cannot be opened.
-- D7 exports `handleMatches(agents, samples, parseRow) -> {agents, matched, ok}`. It is
-  pure: `samples` are `sampleHarnessRows` results and `parseRow` is relay's
-  `parseDarwinRow`.
+- `relay-wrapper.mjs` is installed by D7 at `<clone>/node_modules/.darwin-probe/relay.js`,
+  which is gitignored, so the clone stays clean for the ops probe's `relay_snapshot()`. D7
+  passes that path to the ops probe as `--relay`. The ops probe then writes it into the
+  hook command, and every live `PreToolUse` hook runs as the wrapper process. Before
+  calling relay's exported `main`, the wrapper appends one JSON line to
+  `$DARWIN_PROBE_HOOKS`:
+  `{pid, resolved, ancestors: [{pid, ppid, comm, tty, starttime}], captures: [capture(ancestor)]}`.
+  - `resolved` is the harness adapter's `resolveSessionPid()`.
+  - `captures` are the Task 4 three-variant captures of every ancestor up to and
+    including the resolved one.
+
+  Relay's code runs unchanged, in the same process, so its ancestry is the real hook's
+  ancestry.
+- D7 exports `identityProof(agents, invocations, parseRow, harness) -> {agents, matched, ok}`.
+  It is pure. An agent is proven when three things hold:
+  - one hook invocation resolved exactly the agent's `process.pid`;
+  - that pid is in the invocation's recorded ancestry;
+  - the ancestor's `-ww` row, parsed by relay's `parseDarwinRow`, has the agent's `start`
+    and a `comm` naming the harness (`claude` or `codex` by basename, or Claude's
+    version-shaped native name).
+
+  `ok` requires at least one agent and every agent proven. D7 also records
+  `hook: {invocations, truncated}`, where `truncated` means any captured ancestor was
+  truncated as relay reads it.
 - D7b exports `pluginOutcome(logText, pluginPath) -> 'loaded'|'rejected-file'|'load-failed'|'none'`,
   and `PINNED = '2.0.15'`.
-- D9 exports `redactArgs(argsText) -> string`. It replaces the value after `-p`, `--print`
-  or `--prompt` with `<prompt>`.
+- D9 exports `argSummary(argv) -> {argv0_name, role, count}` and
+  `stripCapture(capture) -> capture`. `ps` does not preserve argument boundaries, so a
+  prompt cannot be reliably separated from other arguments. D9 therefore keeps only what
+  recognition needs:
+  - `argv0_name`: argv[0]'s basename;
+  - `role`: the first argument when it is exactly one of relay's role words (`daemon`,
+    `bg-pty-host`) and `other` otherwise;
+  - `count`: the number of arguments.
+
+  `stripCapture` drops the text of every `args` variant, keeping only the length and
+  truncation properties, so no argument text of a user's session leaves the Mac.
 
 - [ ] **Step 1: Write the failing tests**
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleMatches } from '../tools/darwin-probe/stages/d7-guard.mjs';
+import { identityProof } from '../tools/darwin-probe/stages/d7-guard.mjs';
 import { pluginOutcome, PINNED } from '../tools/darwin-probe/stages/d7b-opencode.mjs';
-import { redactArgs } from '../tools/darwin-probe/stages/d9-ambient.mjs';
+import { argSummary, stripCapture } from '../tools/darwin-probe/stages/d9-ambient.mjs';
 
-test('a published handle matches a sampled harness row by pid and start', () => {
-  const parse = (line) => ({ pid: Number(line.split(' ')[0]), starttime: line.split(' ')[1] });
-  const samples = [{ pid: 10, row_ww: '10 111' }, { pid: 11, row_ww: '11 222' }];
-  assert.deepEqual(handleMatches({ a: { process: { pid: 10, start: '111' } } }, samples, parse), { agents: 1, matched: 1, ok: true });
-  assert.deepEqual(handleMatches({ a: { process: { pid: 10, start: '999' } } }, samples, parse), { agents: 1, matched: 0, ok: false });
-  assert.deepEqual(handleMatches({ a: { process: null } }, samples, parse), { agents: 1, matched: 0, ok: false });
-  assert.deepEqual(handleMatches({}, samples, parse), { agents: 0, matched: 0, ok: false });
+test('an agent is proven only through the hook that resolved it', () => {
+  const parse = (line) => { const [pid, start, comm] = line.split(' '); return { pid: Number(pid), starttime: start, comm }; };
+  const inv = { resolved: 10, ancestors: [{ pid: 20 }, { pid: 10 }], captures: [{ pid: 10, forms: { row: { ww: '10 111 claude' } } }] };
+  assert.deepEqual(identityProof({ a: { process: { pid: 10, start: '111' } } }, [inv], parse, 'claude-code'), { agents: 1, matched: 1, ok: true });
+  // A harness with the right pid and start that no hook resolved is not proof.
+  assert.deepEqual(identityProof({ a: { process: { pid: 10, start: '111' } } }, [{ ...inv, resolved: 20 }], parse, 'claude-code').ok, false);
+  assert.equal(identityProof({ a: { process: { pid: 10, start: '999' } } }, [inv], parse, 'claude-code').ok, false);
+  assert.equal(identityProof({ a: { process: { pid: 10, start: '111' } } }, [{ ...inv, captures: [{ pid: 10, forms: { row: { ww: '10 111 node' } } }] }], parse, 'claude-code').ok, false);
+  assert.equal(identityProof({ a: { process: null } }, [inv], parse, 'claude-code').ok, false);
+  assert.equal(identityProof({}, [inv], parse, 'claude-code').ok, false);
 });
 test('OpenCode plugin outcomes at the pinned version', () => {
   const p = '/x/plugin';
@@ -1561,9 +1711,12 @@ test('OpenCode plugin outcomes at the pinned version', () => {
   assert.equal(pluginOutcome(`msg="loading plugin" id=${p}`, p), 'loaded');
   assert.equal(pluginOutcome('', p), 'none');
 });
-test('prompts are removed from sampled harness arguments', () => {
-  assert.equal(redactArgs('claude -p "secret plan" --verbose'), 'claude -p <prompt> --verbose');
-  assert.equal(redactArgs('codex exec --json'), 'codex exec --json');
+test('ambient arguments keep only what recognition needs', () => {
+  assert.deepEqual(argSummary(['/Users/u/.local/bin/claude', '-p', 'secret', 'project', 'details']), { argv0_name: 'claude', role: 'other', count: 5 });
+  assert.deepEqual(argSummary(['2.1.282', 'daemon', 'run']), { argv0_name: '2.1.282', role: 'daemon', count: 3 });
+  const c = stripCapture({ pid: 1, label: 'x', truncated: false, forms: { args: { relay: 'claude -p secret project details', columns: 'claude -p secret project details', ww: 'claude -p secret project details', relay_len: 31, ww_len: 31, truncated: false, relay_is_prefix: true }, comm: { relay: 'claude', ww: 'claude' } } });
+  assert.equal(JSON.stringify(c).includes('secret'), false);
+  assert.deepEqual(c.forms.args, { relay_len: 31, ww_len: 31, truncated: false, relay_is_prefix: true });
 });
 ```
 
@@ -1589,18 +1742,56 @@ export async function ask(question, { hidden = false } = {}) {
 }
 ```
 
-- [ ] **Step 4: Implement D7**
+- [ ] **Step 4: Implement the wrapper and D7**
 
 ```js
-import { existsSync, readFileSync, mkdirSync } from 'node:fs';
+#!/usr/bin/env node
+// relay-wrapper.mjs — installed as <clone>/node_modules/.darwin-probe/relay.js (gitignored).
+// Records this hook process's own ancestry as relay will read it, then runs the committed
+// relay in this same process, so the recorded ancestry is the hook's real ancestry.
+import { appendFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+const clone = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const { createProcessOps, adapterFor } = await import(pathToFileURL(join(clone, 'src/index.js')).href);
+const { capture } = await import(process.env.DARWIN_PROBE_PS);
+const args = process.argv.slice(2), harness = args[args.indexOf('--harness') + 1];
+if (args[0] === 'hook' && process.env.DARWIN_PROBE_HOOKS) {
+  let record;
+  try {
+    const chain = createProcessOps().ancestors(process.pid);
+    let resolved = null, error = null; try { resolved = adapterFor(harness).resolveSessionPid(); } catch (e) { error = e.code ?? e.message; }
+    const upTo = chain.findIndex((r) => r.pid === resolved);
+    const captured = chain.slice(1, upTo >= 0 ? upTo + 1 : Math.min(chain.length, 6));
+    record = { pid: process.pid, resolved, error, ancestors: chain.map((r) => ({ pid: r.pid, ppid: r.ppid, comm: r.comm, tty: r.tty, starttime: r.starttime })),
+      captures: captured.map((r) => capture(r.pid, `hook-${r.pid}`)) };
+  } catch (e) { record = { pid: process.pid, error: e.code ?? e.message }; }
+  appendFileSync(process.env.DARWIN_PROBE_HOOKS, `${JSON.stringify(record)}\n`);
+}
+const { main } = await import(pathToFileURL(join(clone, 'bin/relay.js')).href);
+process.exit(await main(args));
+```
+
+```js
+// stages/d7-guard.mjs
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { basename, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { registryFor } from '../lib/context.mjs';
 import { ask } from '../lib/tty.mjs';
-import { sampleHarnessRows } from '../lib/ps.mjs';
-export function handleMatches(agents, samples, parseRow) {
+const WRAPPER = fileURLToPath(new URL('../lib/relay-wrapper.mjs', import.meta.url));
+const PS = new URL('../lib/ps.mjs', import.meta.url).href;
+const HARNESS_COMM = { 'claude-code': (c) => c === 'claude' || /^\d+\.\d+\.\d+$/.test(c), codex: (c) => c === 'codex' };
+export function identityProof(agents, invocations, parseRow, harness) {
   const list = Object.values(agents);
-  const matched = list.filter((a) => a.process && samples.some((s) => s.pid === a.process.pid && (() => { try { return parseRow(s.row_ww).starttime === a.process.start; } catch { return false; } })())).length;
+  const proven = (a) => a.process && invocations.some((inv) => {
+    if (inv.resolved !== a.process.pid || !inv.ancestors?.some((r) => r.pid === a.process.pid)) return false;
+    const row = inv.captures?.find((c) => c.pid === a.process.pid)?.forms?.row?.ww;
+    if (!row) return false;
+    try { const parsed = parseRow(row); return parsed.starttime === a.process.start && HARNESS_COMM[harness](basename(parsed.comm)); } catch { return false; }
+  });
+  const matched = list.filter(proven).length;
   return { agents: list.length, matched, ok: list.length > 0 && matched === list.length };
 }
 const PROVEN = `import json, runpy, sys
@@ -1610,29 +1801,37 @@ async function oneHarness(ctx, harness, token) {
   const name = harness === 'claude-code' ? 'claude' : 'codex';
   if ((await ctx.t.run('/usr/bin/which', [name])).exit !== 0) return { status: 'absent', reason: `${name} not installed` };
   const out = join(ctx.root, 'd7'); mkdirSync(out, { recursive: true });
-  const env = { ...ctx.env };
+  const hooks = join(out, `${harness}-hooks.jsonl`);
+  const env = { ...ctx.env, DARWIN_PROBE_HOOKS: hooks, DARWIN_PROBE_PS: PS };
   if (harness === 'claude-code') {
     if (!existsSync(join(homedir(), '.claude/.credentials.json'))) { if (!token) return { status: 'skipped', reason: 'no credentials file and no token' }; env.CLAUDE_CODE_OAUTH_TOKEN = token; }
   } else if (!existsSync(join(homedir(), '.codex/auth.json'))) return { status: 'skipped', reason: 'codex credentials not in ~/.codex/auth.json (keychain?)' };
+  const wrapper = join(ctx.clone, 'node_modules/.darwin-probe/relay.js');
+  mkdirSync(join(wrapper, '..'), { recursive: true }); copyFileSync(WRAPPER, wrapper); chmodSync(wrapper, 0o755);
   const probe = join(ctx.opsClone, 'bin/relay-guard-probe');
-  const args = ['--harness', harness, '--relay', join(ctx.clone, 'bin/relay.js'), '--guard', join(ctx.opsClone, 'hooks/relay-guard'), '--out', out];
+  const args = ['--harness', harness, '--relay', wrapper, '--guard', join(ctx.opsClone, 'hooks/relay-guard'), '--out', out];
   const pre = await ctx.t.run('python3', [probe, ...args, '--skip-live'], { env });
   ctx.log(`preflight ${harness}: exit ${pre.exit}\n${pre.stderr}`);
-  const replay = pre.exit === 0 ? JSON.parse(readFileSync(join(out, harness, 'results.json'), 'utf8')).replay : null;
+  if (pre.exit !== 0) return { status: 'error', reason: `preflight exited ${pre.exit}`, preflight: { allow: false, deny: false } };
+  const replay = JSON.parse(readFileSync(join(out, harness, 'results.json'), 'utf8')).replay;
   const preflight = { allow: !!replay?.clean?.reply?.includes('additionalContext'), deny: replay?.attribution?.exit === 2 && replay.attribution.reply.includes('"deny"') };
-  if (!preflight.allow || !preflight.deny) return { status: 'ran', preflight, proven: false, handle: { agents: 0, matched: 0, ok: false }, reason: 'preflight failed' };
-  const samples = [], timer = setInterval(() => samples.push(...sampleHarnessRows([name])), 1000);
+  if (!preflight.allow || !preflight.deny) return { status: 'ran', preflight, proven: false, hook: { invocations: 0, truncated: false }, handle: { agents: 0, matched: 0, ok: false }, reason: 'preflight replies wrong' };
   const live = await ctx.t.run('python3', [probe, ...args], { env, timeoutMs: 3600000 });
-  clearInterval(timer);
   ctx.log(`live ${harness}: exit ${live.exit}\n${live.stderr}`);
   const results = join(out, harness, 'results.json'), evidence = join(out, harness, 'evidence.json');
-  const proven = JSON.parse((await ctx.t.run('python3', ['-c', PROVEN, probe, results, evidence])).stdout || 'false');
-  const { readSnapshot } = await import(pathToFileURL(join(ctx.clone, 'src/index.js')).href);
+  if (!existsSync(results) || !existsSync(evidence)) return { status: 'error', reason: `live run exited ${live.exit} without results`, preflight };
+  const again = await ctx.t.run('python3', ['-c', PROVEN, probe, results, evidence]);
+  if (again.exit !== 0) return { status: 'error', reason: `proven check exited ${again.exit}: ${again.stderr.slice(0, 200)}`, preflight };
+  const invocations = existsSync(hooks) ? readFileSync(hooks, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
   const { parseDarwinRow } = await import(pathToFileURL(join(ctx.clone, 'src/bus/proc.js')).href);
-  const snap = await readSnapshot({ env: { RELAY_STATE_DIR: join(out, harness, 'state') } });
+  const registry = await registryFor(ctx.clone, { ...ctx.env, RELAY_STATE_DIR: join(out, harness, 'state') });
+  const snap = await registry.read();
   const summary = JSON.parse(readFileSync(results, 'utf8'));
-  return { status: 'ran', credentials: summary.credentials, preflight, proven, handle: handleMatches(snap?.agents ?? {}, samples, parseDarwinRow),
-    summary: { version: summary.version, attempt: summary.attempt, complete: summary.complete, results: summary.results }, evidence: JSON.parse(readFileSync(evidence, 'utf8')) };
+  return { status: 'ran', credentials: summary.credentials, preflight, proven: JSON.parse(again.stdout),
+    hook: { invocations: invocations.length, truncated: invocations.some((i) => i.captures?.some((c) => c.truncated)) },
+    handle: identityProof(snap?.agents ?? {}, invocations, parseDarwinRow, harness),
+    invocations, summary: { version: summary.version, attempt: summary.attempt, complete: summary.complete, results: summary.results },
+    evidence: JSON.parse(readFileSync(evidence, 'utf8')) };
 }
 export async function run(ctx) {
   if (ctx.platform !== 'darwin') return { status: 'skipped', reason: 'darwin only', observations: {} };
@@ -1643,8 +1842,11 @@ export async function run(ctx) {
 }
 ```
 
-The token lives only in the child environment. It is never logged, and it is not in
-`ctx.env`, which is what the stage records.
+The ops probe's `relay_snapshot()` runs `git status` and `rev-parse` against the wrapper's
+directory, which is inside the clone. `node_modules/` is gitignored, so it sees the clean
+recorded commit. The token lives only in the child environment. It is never logged, and it
+is not in `ctx.env`, which is what the stage records. Each invocation's `captures` feed
+`D7w`; confirmed truncation there blocks the release.
 
 - [ ] **Step 5: Implement D7b**
 
@@ -1654,7 +1856,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
+import { registryFor } from '../lib/context.mjs';
 export const PINNED = '2.0.15';
 export function pluginOutcome(log, pluginPath) {
   if (log.includes('configured plugin path must be a directory') && log.includes(pluginPath)) return 'rejected-file';
@@ -1670,12 +1872,14 @@ export async function run(ctx) {
   const configDir = join(ctx.root, 'xdg/opencode'); mkdirSync(configDir, { recursive: true });
   const install = await ctx.t.run(process.execPath, [join(ctx.clone, 'bin/relay.js'), 'install', '--harness', 'opencode', '--subscribers', subs,
     '--config-dir', configDir, '--artifact', join(ctx.root, 'd7b-artifact.json'), '--apply'], { env: ctx.env });
+  ctx.log(`install: exit ${install.exit}\n${install.stderr}`);
+  if (install.exit !== 0) return { status: 'error', reason: `relay install --harness opencode exited ${install.exit}`, observations: { version, install: { exit: install.exit } } };
   const project = join(ctx.root, 'd7b-project'); mkdirSync(project); execFileSync('git', ['init', '-q', project]);
   const password = randomBytes(18).toString('base64url'), port = await freePort(), base = `http://127.0.0.1:${port}`;
-  // Detached: the server leads its own process group, because `opencode` forks the process that
+  // The tracker makes the server lead its own process group: `opencode` forks the process that
   // keeps serving, and a signal to the spawned pid alone leaves that child running (observed
   // on the Linux host with v2.0.15).
-  const server = ctx.t.spawn('opencode', ['serve', '--hostname', '127.0.0.1', '--port', String(port)], { cwd: ctx.root, env: { ...ctx.env, OPENCODE_SERVER_PASSWORD: password }, stdio: 'ignore', detached: true });
+  const server = ctx.t.spawn('opencode', ['serve', '--hostname', '127.0.0.1', '--port', String(port)], { cwd: ctx.root, env: { ...ctx.env, OPENCODE_SERVER_PASSWORD: password }, stdio: 'ignore' });
   const auth = { Authorization: `Basic ${Buffer.from(`opencode:${password}`).toString('base64')}` };
   for (let i = 0; i < 60; i++) { try { await fetch(`${base}/`); break; } catch { await new Promise((r) => setTimeout(r, 250)); } }
   // v2.0.15 creates no project instance at startup; this request names the project, and the
@@ -1684,18 +1888,19 @@ export async function run(ctx) {
   const res = await fetch(url, { headers: auth }).catch(() => null);
   const body = res ? await res.json().catch(() => null) : null;
   const request = { status: res?.status ?? null, directory_match: body?.location?.directory === project };
-  const { readSnapshot, reapRegistry } = await import(pathToFileURL(join(ctx.clone, 'src/index.js')).href);
-  const env = { RELAY_STATE_DIR: ctx.env.RELAY_STATE_DIR };
+  const registry = await registryFor(ctx.clone, ctx.env);
+  const opencodeAgents = async () => Object.entries((await registry.read())?.agents ?? {}).filter(([id]) => id.startsWith('opencode:'));
   const started = performance.now(); let agents = [];
-  while (performance.now() - started < 10000) { agents = Object.entries((await readSnapshot({ env }))?.agents ?? {}).filter(([id]) => id.startsWith('opencode:')); if (agents.length) break; await new Promise((r) => setTimeout(r, 200)); }
-  const serverPids = [server.pid, ...execFileSync('/bin/ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' }).trim().split('\n').map((l) => l.trim().split(/\s+/).map(Number)).filter(([, pp]) => pp === server.pid).map(([p]) => p)];
+  while (performance.now() - started < 10000) { agents = await opencodeAgents(); if (agents.length) break; await new Promise((r) => setTimeout(r, 200)); }
+  // Every process in the server's group counts as the server: `opencode` forks the one that serves.
+  const serverPids = execFileSync('/bin/ps', ['-axo', 'pid=,pgid='], { encoding: 'utf8' }).trim().split('\n').map((l) => l.trim().split(/\s+/).map(Number)).filter(([, g]) => g === server.pid).map(([p]) => p);
   const agent = { count: agents.length, scope: agents[0]?.[1]?.scope ?? null, matches_server: agents.length === 1 && serverPids.includes(agents[0][1].process?.pid) };
-  const group = (signal) => { try { process.kill(-server.pid, signal); } catch {} };
-  group('SIGTERM');
-  await new Promise((r) => { const t = setTimeout(() => { group('SIGKILL'); r(); }, 10000); server.once('exit', () => { clearTimeout(t); r(); }); });
-  await new Promise((r) => setTimeout(r, 500)); group('SIGKILL');
-  let gone = !Object.keys((await readSnapshot({ env }))?.agents ?? {}).some((id) => id.startsWith('opencode:')), via = gone && agents.length ? 'dispose' : null;
-  if (!gone) { await reapRegistry({ env }); gone = !Object.keys((await readSnapshot({ env }))?.agents ?? {}).some((id) => id.startsWith('opencode:')); via = gone ? 'reap' : null; }
+  // SIGTERM first so the plugin can deliver dispose; then the tracker kills and waits out the group.
+  try { process.kill(-server.pid, 'SIGTERM'); } catch {}
+  await new Promise((r) => { const t = setTimeout(r, 10000); server.once('exit', () => { clearTimeout(t); r(); }); });
+  await ctx.t.kill(server.pid);
+  let gone = (await opencodeAgents()).length === 0, via = gone && agents.length ? 'dispose' : null;
+  if (!gone) { await registry.reap(); gone = (await opencodeAgents()).length === 0; via = gone ? 'reap' : null; }
   const logDir = join(ctx.root, 'data/opencode/log');
   const log = readdirSync(logDir).map((f) => readFileSync(join(logDir, f), 'utf8')).join('\n');
   const pluginPath = JSON.parse(readFileSync(join(configDir, 'opencode.json'), 'utf8')).plugin?.[0] ?? '';
@@ -1707,25 +1912,29 @@ export async function run(ctx) {
 - [ ] **Step 6: Implement D9**
 
 ```js
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ask } from '../lib/tty.mjs';
-import { capture, ps, sampleHarnessRows } from '../lib/ps.mjs';
-export const redactArgs = (text) => text.replace(/(\s(?:-p|--print|--prompt))\s+("[^"]*"|'[^']*'|\S+)/g, '$1 <prompt>');
+import { capture, sampleHarnessRows } from '../lib/ps.mjs';
+const ROLES = ['daemon', 'bg-pty-host'];
+// ps joins arguments with spaces, so a prompt's boundaries are unknowable; keep only what
+// relay's recognition reads (argv[0]'s name and whether argv[1] is a role word).
+export const argSummary = (argv) => ({ argv0_name: basename(argv[0] ?? ''), role: ROLES.includes(argv[1]) ? argv[1] : argv.length > 1 ? 'other' : 'none', count: argv.length });
+export function stripCapture(c) {
+  const { relay, columns, ww, ...facts } = c.forms.args ?? {};
+  return { ...c, forms: { ...c.forms, args: facts } };
+}
 export async function run(ctx) {
   if (ctx.platform !== 'darwin') return { status: 'skipped', reason: 'darwin only', observations: {} };
   const answer = await ask('Optional: open an interactive `claude` (and `claude --bg` or `codex` if you use them) in another terminal, then press Enter. Press Enter now to skip. ');
   if (answer === null) return { status: 'skipped', reason: 'no terminal', observations: {} };
-  const { createProcessOps, adapterFor } = await import(pathToFileURL(join(ctx.clone, 'src/index.js')).href);
+  const { createProcessOps } = await import(pathToFileURL(join(ctx.clone, 'src/index.js')).href);
   const ops = createProcessOps();
-  const rows = sampleHarnessRows(['claude', 'codex', 'opencode']);
-  const processes = rows.map((r) => {
-    const c = capture(r.pid, `ambient-${r.pid}`);
-    let chain = null, argv1 = null, error = null;
+  const processes = sampleHarnessRows(['claude', 'codex', 'opencode']).map((r) => {
+    let chain = null, args = null, error = null;
     try { chain = ops.ancestors(r.pid).map((x) => ({ pid: x.pid, ppid: x.ppid, comm: x.comm, tty: x.tty })); } catch (e) { error = e.code; }
-    try { argv1 = ops.argvOf(r.pid)[1] ?? null; } catch (e) { argv1 = `error:${e.code}`; }
-    for (const form of Object.values(c.forms)) for (const k of ['relay', 'columns', 'ww']) if (form[k]) form[k] = redactArgs(form[k]);
-    return { pid: r.pid, comm_ww: r.comm_ww, argv1, chain, error, capture: c };
+    try { args = argSummary(ops.argvOf(r.pid)); } catch (e) { args = { error: e.code }; }
+    return { pid: r.pid, comm_ww: r.comm_ww, args, chain, error, capture: stripCapture(capture(r.pid, `ambient-${r.pid}`)) };
   });
   return { status: 'ran', observations: { processes } };
 }
@@ -1772,8 +1981,14 @@ git commit -m "feat(tools): probe live guard sessions, OpenCode observation, and
      and the partial evidence is still worth reading.
   8. Packs `<bundle>/relay-darwin-results-<stamp>.tar.gz` and prints the verdict summary.
 
-  On `SIGINT` or `SIGTERM`, it kills tracked children, packs what completed, and exits
-  130 or 143.
+  On `SIGINT` or `SIGTERM`, it kills every tracked process group and waits for each to
+  empty, packs what completed, and exits 130 or 143. The same finalization runs on normal
+  completion. It tolerates partial observations: when D0 has run but has no end-of-run
+  host reading, finalization takes it; the judge turns anything malformed into an `error`
+  verdict.
+- At startup, before any stage, `probe.mjs` replaces its own `process.env` with the
+  isolated environment (recording first whether the user exported `COLUMNS`). Any relay
+  default that reads the ambient environment then lands inside the root too.
 - `run`: a POSIX `sh` script. It checks `node` >= 22, creates the root, sets the
   kill-and-remove trap, and executes `probe.mjs`.
 
@@ -1782,11 +1997,11 @@ git commit -m "feat(tools): probe live guard sessions, OpenCode observation, and
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { verifyManifest } from '../tools/darwin-probe/probe.mjs';
+import { cloneBundle, verifyManifest } from '../tools/darwin-probe/probe.mjs';
 
 test('a tampered bundle file fails manifest verification', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
@@ -1796,17 +2011,29 @@ test('a tampered bundle file fails manifest verification', (t) => {
   writeFileSync(join(d, 'a.txt'), 'y');
   assert.deepEqual(verifyManifest(d, manifest), ['a.txt']);
 });
-test('SIGINT during a stage packs completed results and leaves no tracked child', { timeout: 60000 }, async (t) => {
+test('a bundle verifies and clones outside any repository', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
-  // --self-test-hang runs D0 then a stage that spawns a tracked `sleep 600` and waits.
+  const src = join(d, 'src'); execFileSync('git', ['init', '-q', src]); writeFileSync(join(src, 'f'), 'x');
+  const g = (...a) => execFileSync('git', ['-C', src, '-c', 'user.email=p@example.invalid', '-c', 'user.name=p', ...a], { encoding: 'utf8' }).trim();
+  g('add', '.'); g('commit', '-qm', 'x'); g('bundle', 'create', join(d, 'r.bundle'), 'HEAD', g('rev-parse', '--abbrev-ref', 'HEAD'));
+  const out = join(d, 'nowhere'); mkdirSync(out);
+  assert.equal(execFileSync('git', ['-C', cloneBundle(join(d, 'r.bundle'), join(out, 'c'), g('rev-parse', 'HEAD')), 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), g('rev-parse', 'HEAD'));
+});
+test('SIGINT after a normal D0 packs results, fills D0, and leaves no grandchild', { timeout: 90000 }, async (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  // --self-test-hang runs the real D0, then a tracked `sh` that forks two sleeps, and waits.
   const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', join(d, 'root'), '--bundle', d], { stdio: 'ignore' });
-  await new Promise((r) => setTimeout(r, 4000));
+  const ps = () => execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' });
+  for (let i = 0; i < 100 && !ps().includes('sleep 600.654'); i++) await new Promise((r) => setTimeout(r, 200));
   child.kill('SIGINT');
-  const code = await new Promise((r) => child.once('exit', r));
-  assert.equal(code, 130);
-  assert.ok(readdirSync(d).some((f) => f.startsWith('relay-darwin-results-')));
-  const ps = await new Promise((r) => { const p = spawn('/bin/ps', ['-axo', 'args='], { stdio: ['ignore', 'pipe', 'ignore'] }); let s = ''; p.stdout.on('data', (x) => { s += x; }); p.once('close', () => r(s)); });
-  assert.ok(!ps.includes('sleep 600.123'));
+  assert.equal(await new Promise((r) => child.once('exit', r)), 130);
+  const tarball = readdirSync(d).find((f) => f.startsWith('relay-darwin-results-'));
+  assert.ok(tarball);
+  const x = join(d, 'x'); mkdirSync(x); execFileSync('tar', ['xzf', join(d, tarball), '-C', x]);
+  const d0 = JSON.parse(readFileSync(join(x, 'stages/D0.json'), 'utf8'));
+  assert.equal(d0.status, 'ran'); assert.ok(d0.observations.hosts.end);
+  assert.ok(JSON.parse(readFileSync(join(x, 'verdict.redacted.json'), 'utf8')).checks.D0);
+  assert.equal(ps().includes('sleep 600.321'), false); assert.equal(ps().includes('sleep 600.654'), false);
 });
 ```
 
@@ -1817,34 +2044,37 @@ test('SIGINT during a stage packs completed results and leaves no tracked child'
 ```js
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
-import { homedir, userInfo } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir, userInfo } from 'node:os';
+import { dirname, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { join, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { changedPaths, fingerprint, isolatedEnv, prepareRoot, stageLog, tracker, writeStage } from './lib/context.mjs';
 import { judge } from './judge.mjs';
-import { collectHosts, redactionMap, redactText } from './redact.mjs';
+import { collectHosts, redactFile, redactionMap } from './redact.mjs';
 
 const STAGES = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D7b', 'D8', 'D9'];
 const MODULES = { D0: 'd0-env', D1: 'd1-package', D2: 'd2-suite', D3: 'd3-identity', D4: 'd4-table', D5: 'd5-registry', D6: 'd6-dispatch', D7: 'd7-guard', D7b: 'd7b-opencode', D8: 'd8-launchd', D9: 'd9-ambient' };
 const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
 export const verifyManifest = (dir, manifest) => Object.entries(manifest.files).filter(([f, h]) => !existsSync(join(dir, f)) || sha256(join(dir, f)) !== h).map(([f]) => f);
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
-function cloneBundle(bundle, dest, commit) {
-  git(['bundle', 'verify', bundle]); execFileSync('git', ['clone', '-q', bundle, dest]);
+// `git bundle verify` needs a repository even for a self-contained bundle; use a throwaway one.
+export function cloneBundle(bundle, dest, commit) {
+  const scratch = mkdtempSync(join(tmpdir(), 'dp-verify-'));
+  try { git(['init', '-q'], scratch); git(['bundle', 'verify', bundle], scratch); } finally { rmSync(scratch, { recursive: true, force: true }); }
+  execFileSync('git', ['clone', '-q', bundle, dest]);
   const head = git(['rev-parse', 'HEAD'], dest), status = git(['status', '--porcelain'], dest);
   if (head !== commit || status) throw new Error(`${bundle}: HEAD ${head} (want ${commit}), status '${status}'`);
   return dest;
 }
-function walkFiles(dir) { return readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? walkFiles(p) : [p]; }); }
+const walkFiles = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? walkFiles(p) : [p]; });
 export function redactInto({ rawDir, outDir, map }) {
   const counts = {};
   for (const file of walkFiles(rawDir)) {
     const rel = relative(rawDir, file), target = join(outDir, rel);
-    mkdirSync(join(target, '..'), { recursive: true });
-    const r = redactText(readFileSync(file, 'utf8'), map);
+    mkdirSync(dirname(target), { recursive: true });
+    const r = redactFile(file, map);
     writeFileSync(target, r.text); counts[rel] = r.counts;
   }
   const manifestPath = join(outDir, 'manifest.json'), m = JSON.parse(readFileSync(manifestPath, 'utf8'));
@@ -1852,22 +2082,28 @@ export function redactInto({ rawDir, outDir, map }) {
 }
 export function loadResults(dir) {
   const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'));
-  const stages = Object.fromEntries(readdirSync(join(dir, 'stages')).map((f) => { const s = JSON.parse(readFileSync(join(dir, 'stages', f), 'utf8')); return [s.id, s]; }));
+  const stagesDir = join(dir, 'stages');
+  const stages = existsSync(stagesDir) ? Object.fromEntries(readdirSync(stagesDir).map((f) => { const s = JSON.parse(readFileSync(join(stagesDir, f), 'utf8')); return [s.id, s]; })) : {};
   return { manifest, stages };
 }
 
 async function main() {
   const { values } = parseArgs({ options: { bundle: { type: 'string' }, root: { type: 'string' }, 'allow-linux': { type: 'boolean' }, stages: { type: 'string' }, 'self-test-hang': { type: 'boolean' } } });
-  const platform = process.platform, root = values.root, bundle = values.bundle;
-  if (platform !== 'darwin' && !values['allow-linux'] && !values['self-test-hang']) throw new Error('this probe runs on macOS; pass --allow-linux for the smoke run');
+  const platform = process.platform, root = values.root, bundle = values.bundle, selfTest = values['self-test-hang'];
+  if (platform !== 'darwin' && !values['allow-linux'] && !selfTest) throw new Error('this probe runs on macOS; pass --allow-linux for the smoke run');
   mkdirSync(root, { recursive: true }); prepareRoot(root);
+  // Isolate this process too, so any relay default that reads the ambient environment lands in the root.
+  const ambient = { columns_exported: process.env.COLUMNS !== undefined };
+  const isolated = isolatedEnv(root);
+  for (const key of Object.keys(process.env)) if (!(key in isolated)) delete process.env[key];
+  Object.assign(process.env, isolated);
   const t = tracker(root), raw = join(root, 'results'), out = join(root, 'out');
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const manifest = values['self-test-hang'] ? { relay_commit: null, ops_commit: null, files: {} } : JSON.parse(readFileSync(join(bundle, 'manifest.json'), 'utf8'));
+  const manifest = selfTest ? { relay_commit: null, ops_commit: null, files: {} } : JSON.parse(readFileSync(join(bundle, 'manifest.json'), 'utf8'));
   const tampered = verifyManifest(bundle, manifest);
   if (tampered.length) throw new Error(`bundle files changed: ${tampered.join(', ')}`);
-  const ctx = { root, results: raw, bundle, env: isolatedEnv(root), t, platform, tarball: manifest.tarball && join(bundle, manifest.tarball) };
-  if (!values['self-test-hang']) {
+  const ctx = { root, results: raw, bundle, env: isolated, t, platform, ambient, tarball: manifest.tarball && join(bundle, manifest.tarball) };
+  if (!selfTest) {
     ctx.clone = cloneBundle(join(bundle, 'relay.bundle'), join(root, 'relay'), manifest.relay_commit);
     ctx.opsClone = cloneBundle(join(bundle, 'ops.bundle'), join(root, 'ops'), manifest.ops_commit);
   }
@@ -1875,12 +2111,20 @@ async function main() {
   const record = { schema: 1, relay_commit: manifest.relay_commit, ops_commit: manifest.ops_commit, opencode_pinned: '2.0.15',
     allow_linux: platform !== 'darwin', platform, started: new Date().toISOString(), stages: ran, isolation: {} };
   mkdirSync(raw, { recursive: true });
-  const finalize = async (signalCode) => {
-    t.killAll();
+  const d0mod = await import('./stages/d0-env.mjs');
+  let finalizing = null;
+  const finalize = (signalCode) => (finalizing ??= (async () => {
+    await t.killAll();
+    // D0's end-of-run host reading, however the run ended.
+    const d0path = join(raw, 'stages/D0.json');
+    if (existsSync(d0path)) {
+      const d0 = JSON.parse(readFileSync(d0path, 'utf8'));
+      if (d0.status === 'ran' && !d0.observations?.hosts?.end) { try { writeStage(raw, 'D0', await d0mod.finish(ctx, d0)); } catch (error) { ctx.log?.(`D0 finish: ${error.message}`); } }
+    }
     const after = fingerprint(home);
     Object.assign(record, { finished: new Date().toISOString(), isolation: { before, after, changed: changedPaths(before, after) }, interrupted: signalCode ?? null });
     writeFileSync(join(raw, 'manifest.json'), `${JSON.stringify(record, null, 2)}\n`);
-    const results = existsSync(join(raw, 'stages')) ? loadResults(raw) : { manifest: record, stages: {} };
+    const results = loadResults(raw);
     const map = redactionMap({ hosts: collectHosts(results), user: userInfo().username, home });
     const rawVerdict = judge(results);
     // Redact the files themselves, then judge exactly what will be packed. Verdict texts carry
@@ -1894,24 +2138,19 @@ async function main() {
     execFileSync('tar', ['czf', tarball, '-C', out, '.']);
     process.stdout.write(`release: ${rawVerdict.release}\n${Object.entries(rawVerdict.checks).map(([id, c]) => `  ${id} ${c.verdict} — ${c.detail}`).join('\n')}\ncutover: ${JSON.stringify(rawVerdict.cutover)}\nresults: ${tarball}\n`);
     if (record.isolation.changed.length) { process.stderr.write(`live paths changed: ${record.isolation.changed.join(', ')}\n`); process.exitCode = 1; }
+  })());
+  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) process.once(signal, () => { finalize(signal).finally(() => process.exit(code)); });
+  const stageRun = async (id, fn) => {
+    ctx.log = stageLog(raw, id);
+    let rec; try { rec = await fn(ctx); } catch (error) { rec = { status: 'error', reason: error.stack ?? String(error), observations: {} }; }
+    writeStage(raw, id, rec); ran.push(id);
   };
-  for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) process.once(signal, async () => { await finalize(signal); process.exit(code); });
-  if (values['self-test-hang']) {
-    t.spawn('/bin/sleep', ['600.123'], { stdio: 'ignore' });
-    writeStage(raw, 'D0', { status: 'error', reason: 'self-test', observations: {} }); ran.push('D0');
+  if (selfTest) {
+    await stageRun('D0', d0mod.run);
+    ctx.t.spawn('/bin/sh', ['-c', 'sleep 600.321 & sleep 600.654; true'], { stdio: 'ignore' });
     await new Promise(() => {});
   }
-  const wanted = values.stages ? values.stages.split(',') : STAGES;
-  let d0 = null;
-  for (const id of wanted) {
-    const mod = await import(`./stages/${MODULES[id]}.mjs`);
-    ctx.log = stageLog(raw, id);
-    let rec; try { rec = await mod.run(ctx); } catch (error) { rec = { status: 'error', reason: error.stack ?? String(error), observations: {} }; }
-    writeStage(raw, id, rec);
-    if (id === 'D0') d0 = { mod, rec };
-    ran.push(id);
-  }
-  if (d0) writeStage(raw, 'D0', await d0.mod.finish(ctx, d0.rec));
+  for (const id of values.stages ? values.stages.split(',') : STAGES) await stageRun(id, (await import(`./stages/${MODULES[id]}.mjs`)).run);
   await finalize(null);
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main().catch((error) => { process.stderr.write(`${error.stack ?? error}\n`); process.exit(2); });
@@ -2022,7 +2261,7 @@ export function shallowBundle(repo, dest) {
     execFileSync('git', ['clone', '-q', '--depth', '1', '--no-local', '--branch', branch, `file://${resolve(repo)}`, join(tmp, 's')]);
     if (git(['rev-parse', 'HEAD'], join(tmp, 's')) !== head) throw new Error(`${repo}: shallow clone is not at HEAD ${head}`);
     execFileSync('git', ['-C', join(tmp, 's'), 'bundle', 'create', dest, 'HEAD', branch], { stdio: 'ignore' });
-    git(['bundle', 'verify', dest]);
+    git(['bundle', 'verify', dest], join(tmp, 's'));
     return head;
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 }
@@ -2038,7 +2277,7 @@ export async function build({ relay, ops, out }) {
   // The replies D6 must byte-match, produced here by the same code the Mac runs.
   const root = mkdtempSync(join(tmpdir(), 'dpb-d6-')); prepareRoot(root); const t = tracker(root);
   try { writeFileSync(join(top, 'expected/d6.json'), JSON.stringify(await replay({ root, env: isolatedEnv(root), t, clone: relay }), null, 2)); }
-  finally { t.killAll(); rmSync(root, { recursive: true, force: true }); }
+  finally { await t.killAll(); rmSync(root, { recursive: true, force: true }); }
   const manifest = { schema: 1, relay_commit: relayCommit, ops_commit: opsCommit, tarball, opencode_pinned: '2.0.15', created: new Date().toISOString(),
     files: Object.fromEntries(files(top).map((p) => [relative(top, p), createHash('sha256').update(readFileSync(p)).digest('hex')])) };
   writeFileSync(join(top, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -2070,6 +2309,7 @@ darwin-bundle-check tarball:
     d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
     tar xzf "{{tarball}}" -C "$d"; b=$(echo "$d"/relay-darwin-probe-*)
     git clone -q "$b/relay.bundle" "$d/relay"; git clone -q "$b/ops.bundle" "$d/ops"
+    mkdir -p "$d/out"
     for h in claude-code codex; do
       command -v "$( [ "$h" = claude-code ] && echo claude || echo codex )" >/dev/null || continue
       python3 "$d/ops/bin/relay-guard-probe" --harness "$h" --relay "$d/relay/bin/relay.js" --guard "$d/ops/hooks/relay-guard" --out "$d/out" --skip-live >/dev/null
