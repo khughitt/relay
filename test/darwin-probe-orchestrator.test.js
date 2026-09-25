@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { homedir, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { cloneBundle, stableVerdict, verifyManifest } from '../tools/darwin-probe/probe.mjs';
 
@@ -40,6 +40,12 @@ test('SIGINT after a normal D0 packs results, fills D0, and leaves no grandchild
   assert.equal(await exited, 130);
   const tarball = readdirSync(d).find((f) => f.startsWith('relay-darwin-results-'));
   assert.ok(tarball);
+  // `--numeric-owner` at pack time keeps the Mac account's user and group name out of
+  // every archive header, not only the files it contains.
+  const listing = execFileSync('tar', ['tvzf', join(d, tarball)], { encoding: 'utf8' });
+  const groupname = execFileSync('id', ['-gn'], { encoding: 'utf8' }).trim();
+  assert.equal(listing.includes(userInfo().username), false, 'tar header carries the username');
+  assert.equal(listing.includes(groupname), false, 'tar header carries the group name');
   const x = join(d, 'x'); mkdirSync(x); execFileSync('tar', ['xzf', join(d, tarball), '-C', x]);
   const d0 = JSON.parse(readFileSync(join(x, 'stages/D0.json'), 'utf8'));
   assert.equal(d0.status, 'ran'); assert.ok(d0.observations.hosts.end);
