@@ -2,7 +2,8 @@
 
 Status: draft for review, 2026-09-25; revised after the first review (bundle checkouts,
 ops closure, harness-parented publishers, OpenCode scope, redaction invariance, the
-`SessionEnd` gate).
+`SessionEnd` gate), then after the second (OpenCode data and cache isolation, a
+project-scoped request to initialize OpenCode's plugin, D8's own live/dead fixture).
 Task: `relay-b12132`; gates `relay-c19c0a` (publish v0.1.0).
 Parent design: ops `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`),
 sections "Handle encodings", "Process identity and liveness" and "Required verification
@@ -117,10 +118,14 @@ it the live harness sessions.
 
 Isolation: every file the probe writes lives under one root
 (`$TMPDIR/relay-darwin-probe.XXXXXX`). For every process it launches, it sets
-`RELAY_STATE_DIR`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `CLAUDE_CONFIG_DIR` and
-`CODEX_HOME` inside that root. It never writes `~/.claude`, `~/.codex`, `~/.config/relay`,
-`~/.local/state/relay` or any live hook configuration. `run` records the mtimes of those
-paths before and after, and a change fails the attempt. A trap on `EXIT`, `INT` and `TERM`
+`RELAY_STATE_DIR`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `XDG_DATA_HOME`,
+`XDG_CACHE_HOME`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` inside that root. The data and
+cache variables matter for D7b: OpenCode keeps its logs and data under
+`~/.local/share/opencode` and its cache under `~/.cache/opencode`. The probe never writes
+`~/.claude`, `~/.codex`, `~/.config/relay`, `~/.local/state/relay`, `~/.config/opencode`,
+`~/.local/share/opencode`, `~/.cache/opencode` or any live hook configuration. `run`
+records the recursive mtimes and file counts of those paths before and after, and a
+change fails the attempt. A trap on `EXIT`, `INT` and `TERM`
 kills every pid the probe spawned (listed in `pids`) and removes the root, keeping only
 the results tarball.
 
@@ -303,23 +308,41 @@ as skipped with that reason.
 ### D7b OpenCode observation — cutover evidence
 
 When OpenCode is installed, relay's plugin is installed into the disposable config only:
-`relay install --harness opencode --config-dir <root>/xdg/opencode --apply`, with
-`XDG_CONFIG_HOME` pointing into the probe root. OpenCode then starts headless
-(`opencode serve` on a loopback port) and is stopped with `SIGTERM`. The plan confirms
-the headless command and the config lookup against the installed version and records
-both. No model call is needed, because the plugin publishes on load (`init`) and on
-shutdown (`dispose`). Gate: while the server runs, the registry holds one `opencode:`
-agent with `scope: process` whose `process` handle names the OpenCode server process.
-After shutdown, that agent is gone (dispose delivered) or `relay reap` removes it as dead;
-the evidence records which. No guard or reply is involved. When OpenCode is not
+`relay install --harness opencode --config-dir <root>/xdg/opencode --apply`, with every
+XDG variable pointing into the probe root (see Isolation). The probe creates a
+git-initialized disposable project under the root and starts OpenCode headless
+(`opencode serve` on a loopback port) from the probe root.
+
+Starting the server is not enough. Upstream `opencode serve` creates no project instance
+at startup; it initializes one per request for the project the request names, and
+plugins load with that instance. So once the server answers, the probe sends one
+read-only HTTP request scoped to the disposable project directory (for example, listing
+its sessions). The plan picks the route and the directory-scoping mechanism from the
+installed version's server and records both. It then polls the registry, bounded at
+10 seconds, until an `opencode:` agent appears. The server is then stopped with
+`SIGTERM`. No model call is needed, because the plugin publishes on instance load
+(`init`) and on shutdown (`dispose`).
+
+Gate:
+- the scoped request returned success;
+- the agent appeared within the bound;
+- the registry holds exactly one `opencode:` agent, with `scope: process`, whose
+  `process` handle names the OpenCode server process;
+- after shutdown, that agent is gone. Either dispose was delivered, or `relay reap`
+  removed it as dead; the evidence records which. No guard or reply is involved. When OpenCode is not
 installed, D7b is recorded as absent.
 
 ### D8 Launchd environment — release gate and cutover evidence
 
-- **Reap in a minimal environment.** `relay reap` runs under
-  `env -i HOME=<root> PATH=/usr/bin:/bin:<node dir> RELAY_STATE_DIR=<D5 state>`, the
-  minimal environment a scheduled job receives. Release gate: exit 0 and the same pruning
-  result as D5.
+- **Reap in a minimal environment.** D8 builds its own fixture in a fresh state
+  directory, because D5's cleanup has killed every D5 parent. Four constructed `codex`
+  parents publish as in D5, and two of them are killed with `SIGKILL` and waited on.
+  `relay reap` then runs under
+  `env -i HOME=<root> PATH=/usr/bin:/bin:<node dir> RELAY_STATE_DIR=<D8 state>`, the
+  minimal environment a scheduled job receives, while the other two parents are still
+  alive. Release gate: exit 0, and the snapshot holds exactly the two live parents'
+  agents, with unchanged handles. The live parents are released and reaped only after
+  the snapshot is read.
 - **Hook under launchd's `PATH`** (item 7). The probe renders the exact hook command
   string that `relay install` would write, and runs it with `PATH=/usr/bin:/bin:/usr/sbin:/sbin`
   on a recorded `PreToolUse` payload, with a denying guard subscribed. It records the
@@ -412,8 +435,8 @@ evidence confirms them:
   a truncated capture: the redacted copy keeps distinct host tokens and absolute paths,
   and yields the same verdicts as the raw copy.
 - The stages that do not need Darwin (D1, D2, D6, and D8's reap) run on the Linux host
-  through the same entry with `--allow-linux`, and so does D5 with its constructed
-  parents. The bundle is therefore smoke-tested end to end before it goes to the Mac. D3, D4, D7's sampler and D9 need Darwin `ps`, and the probe refuses to
+  through the same entry with `--allow-linux`, and so do D5 and D8's reap with their
+  constructed parents. The bundle is therefore smoke-tested end to end before it goes to the Mac. D3, D4, D7's sampler and D9 need Darwin `ps`, and the probe refuses to
   run them elsewhere.
 
 ## Out of scope
