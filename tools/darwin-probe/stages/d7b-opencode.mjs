@@ -1,14 +1,18 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { registryFor } from '../lib/context.mjs';
 export const PINNED = '2.0.15';
 export function pluginOutcome(log, pluginPath) {
-  if (log.includes('configured plugin path must be a directory') && log.includes(pluginPath)) return 'rejected-file';
-  if (log.includes('failed to load plugin') && log.includes(pluginPath)) return 'load-failed';
-  if (log.includes('loading plugin') && log.includes(pluginPath)) return 'loaded';
+  // The message and the plugin path must name the same event, not merely both appear
+  // somewhere in a multi-line log: match them on one line.
+  const lines = log.split('\n');
+  const matches = (needle) => lines.some((line) => line.includes(needle) && line.includes(pluginPath));
+  if (matches('configured plugin path must be a directory')) return 'rejected-file';
+  if (matches('failed to load plugin')) return 'load-failed';
+  if (matches('loading plugin')) return 'loaded';
   return 'none';
 }
 const freePort = () => new Promise((r) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => r(port)); }); });
@@ -38,7 +42,10 @@ export async function run(ctx) {
   const url = `${base}/api/plugin?${new URLSearchParams({ 'location[directory]': project })}`;
   const res = await fetch(url, { headers: auth, signal: AbortSignal.timeout(FETCH_MS) }).catch(() => null);
   const body = res ? await res.json().catch(() => null) : null;
-  const request = { status: res?.status ?? null, directory_match: body?.location?.directory === project };
+  // macOS resolves /var to /private/var; the server may report either form for the same
+  // project, so both the given path and its realpath count as a match.
+  const realProject = (() => { try { return realpathSync(project); } catch { return project; } })();
+  const request = { status: res?.status ?? null, directory_match: body?.location?.directory === project || body?.location?.directory === realProject };
   const registry = await registryFor(ctx.clone, ctx.env);
   const opencodeAgents = async () => Object.entries((await registry.read())?.agents ?? {}).filter(([id]) => id.startsWith('opencode:'));
   const started = performance.now(); let agents = [];

@@ -1,4 +1,4 @@
-import { openSync, closeSync } from 'node:fs';
+import { openSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { ReadStream, WriteStream } from 'node:tty';
 export async function ask(question, { hidden = false } = {}) {
@@ -7,9 +7,37 @@ export async function ask(question, { hidden = false } = {}) {
   try {
     if (hidden) input.setRawMode(true);
     output.write(question);
-    if (!hidden) { const rl = createInterface({ input, output, terminal: false }); const line = await new Promise((r) => rl.once('line', r)); rl.close(); return line.trim(); }
+    if (!hidden) {
+      const rl = createInterface({ input, output, terminal: false });
+      // EOF (Ctrl-D, or the stream erroring) never fires 'line'; without a 'close'/'error'
+      // fallback this promise — and the whole stage — would hang forever.
+      const line = await new Promise((resolve) => {
+        rl.once('line', resolve);
+        rl.once('close', () => resolve(null));
+        input.once('error', () => resolve(null));
+      });
+      rl.close();
+      return line === null ? null : line.trim();
+    }
     let value = '';
-    for await (const chunk of input) { const s = String(chunk); if (s.includes('\r') || s.includes('\n')) break; if (s === '\u0003') { value = ''; break; } value += s; }
-    output.write('\n'); return value.trim();
-  } finally { if (hidden) input.setRawMode(false); input.destroy(); output.destroy(); try { closeSync(fd); } catch {} }
+    // A pasted token followed by Enter can arrive as one chunk (text and the newline
+    // together); the text before the newline belongs in `value` before the loop breaks,
+    // not discarded with it.
+    for await (const chunk of input) {
+      const s = String(chunk);
+      if (s === '\u0003') { value = ''; break; }
+      const nl = s.search(/[\r\n]/);
+      if (nl === -1) { value += s; continue; }
+      value += s.slice(0, nl);
+      break;
+    }
+    output.write('\n');
+    return value.trim();
+  } finally {
+    if (hidden) input.setRawMode(false);
+    // input.destroy()/output.destroy() already close the shared fd; a further closeSync
+    // here would close it a second (or, with both streams, a third) time.
+    input.destroy();
+    output.destroy();
+  }
 }

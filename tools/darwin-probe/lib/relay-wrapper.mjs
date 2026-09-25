@@ -9,10 +9,12 @@ import { buffer } from 'node:stream/consumers';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const clone = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const { createProcessOps, adapterFor } = await import(pathToFileURL(join(clone, 'src/index.js')).href);
-const { capture } = await import(process.env.DARWIN_PROBE_PS);
 const args = process.argv.slice(2), harness = args[args.indexOf('--harness') + 1];
 let stdin = process.stdin;
 if (args[0] === 'hook' && process.env.DARWIN_PROBE_HOOKS) {
+  // Only the hook path records ancestry, so only it needs Task 4's capture(); an unset
+  // DARWIN_PROBE_PS would otherwise fail every wrapper invocation, not just this one.
+  const { capture } = await import(process.env.DARWIN_PROBE_PS);
   // Read the payload once: its session id binds this evidence to one agent, and the same
   // bytes go on to relay.
   const payload = await buffer(process.stdin);

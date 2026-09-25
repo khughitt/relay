@@ -1,8 +1,9 @@
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registryFor } from '../lib/context.mjs';
+import { stripCapture } from '../lib/ps.mjs';
 import { ask } from '../lib/tty.mjs';
 const WRAPPER = fileURLToPath(new URL('../lib/relay-wrapper.mjs', import.meta.url));
 const PS = new URL('../lib/ps.mjs', import.meta.url).href;
@@ -27,12 +28,19 @@ async function oneHarness(ctx, harness, token) {
   if ((await ctx.t.run('/usr/bin/which', [name])).exit !== 0) return { status: 'absent', reason: `${name} not installed` };
   const out = join(ctx.root, 'd7'); mkdirSync(out, { recursive: true });
   const hooks = join(out, `${harness}-hooks.jsonl`);
+  // Fresh per harness run: the ops probe's own preflight replay runs (through the wrapper)
+  // before every attempt, both --skip-live and the live one below, so a stale file would mix a
+  // prior run's invocations into this one's.
+  writeFileSync(hooks, '');
   const env = { ...ctx.env, DARWIN_PROBE_HOOKS: hooks, DARWIN_PROBE_PS: PS };
   if (harness === 'claude-code') {
     if (!existsSync(join(homedir(), '.claude/.credentials.json'))) { if (!token) return { status: 'skipped', reason: 'no credentials file and no token' }; env.CLAUDE_CODE_OAUTH_TOKEN = token; }
   } else if (!existsSync(join(homedir(), '.codex/auth.json'))) return { status: 'skipped', reason: 'codex credentials not in ~/.codex/auth.json (keychain?)' };
-  const wrapper = join(ctx.clone, 'node_modules/.darwin-probe/relay.js');
-  mkdirSync(join(wrapper, '..'), { recursive: true }); copyFileSync(WRAPPER, wrapper); chmodSync(wrapper, 0o755);
+  const wrapperDir = join(ctx.clone, 'node_modules/.darwin-probe'), wrapper = join(wrapperDir, 'relay.js');
+  mkdirSync(wrapperDir, { recursive: true }); copyFileSync(WRAPPER, wrapper); chmodSync(wrapper, 0o755);
+  // Node 22.0-22.6 do not detect ESM syntax without a package boundary above the file, and
+  // node_modules/ has none of relay's own package.json between it and the wrapper.
+  writeFileSync(join(wrapperDir, 'package.json'), '{"type":"module"}\n');
   const probe = join(ctx.opsClone, 'bin/relay-guard-probe');
   const args = ['--harness', harness, '--relay', wrapper, '--guard', join(ctx.opsClone, 'hooks/relay-guard'), '--out', out];
   const pre = await ctx.t.run('python3', [probe, ...args, '--skip-live'], { env });
@@ -47,14 +55,22 @@ async function oneHarness(ctx, harness, token) {
   if (!existsSync(results) || !existsSync(evidence)) return { status: 'error', reason: `live run exited ${live.exit} without results`, preflight };
   const again = await ctx.t.run('python3', ['-c', PROVEN, probe, results, evidence]);
   if (again.exit !== 0) return { status: 'error', reason: `proven check exited ${again.exit}: ${again.stderr.slice(0, 200)}`, preflight };
-  const invocations = existsSync(hooks) ? readFileSync(hooks, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  // The ops probe's own preflight replay publishes `<harness>:probe-replay` (process: null,
+  // never a real session) before every attempt, both --skip-live and the live run below; it
+  // can never be proven and must not count against D7w, so it is excluded from both the
+  // registry agents identityProof sees and the invocations recorded here.
+  const replaySession = `${harness}:probe-replay`;
+  const invocations = (existsSync(hooks) ? readFileSync(hooks, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
+    .filter((i) => i.agent_id !== replaySession)
+    .map((i) => ({ ...i, captures: i.captures?.map(stripCapture) }));
   const { parseDarwinRow } = await import(pathToFileURL(join(ctx.clone, 'src/bus/proc.js')).href);
   const registry = await registryFor(ctx.clone, { ...ctx.env, RELAY_STATE_DIR: join(out, harness, 'state') });
   const snap = await registry.read();
+  const agents = Object.fromEntries(Object.entries(snap?.agents ?? {}).filter(([id]) => id !== replaySession));
   const summary = JSON.parse(readFileSync(results, 'utf8'));
   return { status: 'ran', credentials: summary.credentials, preflight, proven: JSON.parse(again.stdout),
     hook: { invocations: invocations.length, truncated: invocations.some((i) => i.captures?.some((c) => c.truncated)) },
-    handle: identityProof(snap?.agents ?? {}, invocations, parseDarwinRow, harness),
+    handle: identityProof(agents, invocations, parseDarwinRow, harness),
     invocations, summary: { version: summary.version, attempt: summary.attempt, complete: summary.complete, results: summary.results },
     evidence: JSON.parse(readFileSync(evidence, 'utf8')) };
 }

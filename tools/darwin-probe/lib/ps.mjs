@@ -26,7 +26,16 @@ export function capture(pid, label) {
     const relay = pick(ps(args).stdout), columns = pick(ps(args, { columns: 500 }).stdout), ww = pick(ps(['-ww', ...args]).stdout);
     out[form] = { relay, columns, ww, ...compareCapture(relay, ww) };
   }
-  return { pid, label, forms: out, truncated: Object.values(out).some((f) => f.truncated) };
+  // relay's own capture is the pid,ppid,tty,lstart,comm row; it reads args only for argv[1],
+  // to recognize a role word, so only row/comm truncation can hide anything relay reads. A
+  // truncated args form is recorded (args_truncated) but does not gate `truncated`.
+  return { pid, label, forms: out, truncated: out.row.truncated || out.comm.truncated, args_truncated: out.args.truncated };
+}
+// D9 keeps only what recognition needs, so no argument text of a user's session leaves the
+// Mac; D7 applies the same strip to every hook invocation's captures for the same reason.
+export function stripCapture(c) {
+  const { relay, columns, ww, ...facts } = c.forms.args ?? {};
+  return { ...c, forms: { ...c.forms, args: facts } };
 }
 export function tableCounts() {
   const plain = ps(['-axo', ROW]).stdout.trimEnd().split('\n');
