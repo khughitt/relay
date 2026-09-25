@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createProcessOps, parseStat, parseDarwinRow, normalizeDarwinTty, runDarwinPs, parseDarwinExecutable } from '../src/bus/proc.js';
+import { createProcessOps, parseStat, parseDarwinRow, normalizeDarwinTty, runDarwinPs, parseDarwinExecutable, DEADLINE_CUT } from '../src/bus/proc.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
 test('proc parsing keeps state and exact field-22 text', () => {
@@ -94,6 +94,18 @@ test('Darwin subprocess has fixed locale, binary, deadline and output cap', () =
     assert.throws(() => runDarwinPs([], { spawn: () => result }), { code: 'PROCESS_UNAVAILABLE' });
   }
   assert.throws(() => runDarwinPs([], { clock: () => 10, deadline: 10 }), { code: 'DEADLINE_EXCEEDED' });
+});
+test('a Darwin lookup killed at the caller deadline is a deadline, not an unreadable process', () => {
+  // Mac regression (relay-6e9410): the last owner probe before a lock deadline got 1-5 ms, ps -p
+  // needs 3-6 ms, and the kill read as an owner of unknown identity.
+  const killed = { error: failure('ETIMEDOUT'), signal: 'SIGKILL', status: null };
+  for (const result of [killed, { error: failure('ETIMEDOUT'), signal: null, status: 0 }])
+    assert.throws(() => runDarwinPs([], { clock: () => 10, deadline: 13, spawn: () => result }), { code: 'DEADLINE_EXCEEDED' });
+  assert.throws(() => runDarwinPs([], { clock: () => 10, deadline: 60010, spawn: () => killed }), { code: 'PROCESS_UNAVAILABLE' });
+  const h = { ...handle, platform: 'darwin', bootId: null, start: String(Date.parse('Tue Jan 02 03:04:05 2024') / 1000) };
+  const ops = createProcessOps({ platform: 'darwin', hostname: () => 'host', kill: () => {},
+    runPs: () => { throw Object.assign(new Error('cut'), { code: 'DEADLINE_EXCEEDED' }); } });
+  assert.deepEqual(ops.probe(h), { status: 'unknown', reason: DEADLINE_CUT });
 });
 test('portable Darwin epoch under UTC and local DST date validation', () => {
   const corpus = JSON.parse(readFileSync(new URL('./fixtures/handles.json', import.meta.url)));

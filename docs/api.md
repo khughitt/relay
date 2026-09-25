@@ -465,7 +465,8 @@ LOCK_CLEANUP_FAILED, LOCK_OWNERSHIP_LOST, IO_ERROR, GIT_ERROR, USAGE,
 INVALID_REPLY, UNSUPPORTED_REPLY, INVALID_CONFIG, INVALID_EVIDENCE, UNSUPPORTED_BINDING,
 GUARD_FAILED and REGISTRY_SUPERSEDED.
 Unknown lock ownership at deadline is LOCK_IDENTITY_UNKNOWN;
-a live holder exceeding caller patience is LOCK_TIMEOUT. Causes may retain OS
+a live holder exceeding caller patience is LOCK_TIMEOUT, even when the deadline cut
+short the last check of that holder. Causes may retain OS
 errors internally but are not serialized into diagnostics. See the
 [operator repair procedure](runbooks/registry-lock-repair.md).
 

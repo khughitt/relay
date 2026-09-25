@@ -1,19 +1,21 @@
 ---
 id: relay-6e9410
 title: "lock-multiprocess: an increment worker errors on Darwin (8 workers, dead-main reclamation)"
-status: doing
+status: done
 priority: 1
 size: s
 complexity: mid
 process: direct
 owner: main
 created: 2026-09-25T17:33:41Z
-updated: 2026-09-25T20:04:18Z
+updated: 2026-09-25T20:05:53Z
 started: 2026-09-25T20:04:18Z
+completed: 2026-09-25T20:05:53Z
 depends: []
 parent: relay-1231bf
 tags: []
 source: relay-b12132
+model: "claude-opus-5-5[1m]"
 agent: claude-code/claude-opus-5-5
 ---
 
@@ -26,4 +28,8 @@ The first physical Mac run of the Darwin probe (macOS 26.7 arm64, node v25.8.2; 
 - 2026-09-25T20:04:03Z (main): Mac session (docs/runbooks/darwin-mac-handback-2026-09-25.md) found two causes. Scope narrowed to cause A: the last owner probe before the deadline gets the few ms left, ps is killed, and probe reports unknown, so a live owner at the deadline reads as LOCK_IDENTITY_UNKNOWN (9 of 30 CLI-test runs). Cause B, the reclaim race behind run 1's eight-worker error, is a protocol bug on every platform: null
 - 2026-09-25T20:04:10Z (main): Correction to the previous note: cause B is filed as relay-5e4d93 (the id printed as null).
 - 2026-09-25T20:04:18Z (main): started
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T20:05:53Z (relay-6e9410): done
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T20:05:53Z (relay-6e9410): Cause A fixed: a Darwin ps killed at the caller's deadline (not the 2 s cap) raises DEADLINE_EXCEEDED, probe reports it as unknown with reason DEADLINE_CUT, and withLock keeps the last completed owner verdict, so a live owner at the deadline is LOCK_TIMEOUT (matches api.md). Deterministic tests on Linux fail without each half; gate 334/334. Mac proof is D2 in relay-c19c0a's probe rerun. Cause B (the reclaim race behind run 1's worker error) is relay-5e4d93
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

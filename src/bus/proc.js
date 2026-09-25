@@ -70,9 +70,14 @@ function runDarwinTool(tool, args, { clock = performance.now.bind(performance), 
   if (remaining <= 0) throw relayError('DEADLINE_EXCEEDED', 'process deadline exceeded');
   const result = spawn(tool, args, { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' },
     timeout: Math.max(1, Math.floor(remaining)), maxBuffer: 4 * 1024 * 1024, killSignal: 'SIGKILL' });
+  // A lookup killed at the caller's deadline, rather than at the 2 s cap, says nothing about
+  // the process: ps -p takes 3-6 ms on a Mac, and the last lookup before a deadline gets less.
+  if (result.error?.code === 'ETIMEDOUT' && remaining < 2000) throw relayError('DEADLINE_EXCEEDED', 'process deadline exceeded', result.error);
   if (result.error || result.signal || result.status !== 0) throw relayError('PROCESS_UNAVAILABLE', 'cannot run process lookup', result.error);
   return result.stdout;
 }
+// The reason of an unknown verdict whose process read the caller's deadline cut short.
+export const DEADLINE_CUT = 'deadline exceeded';
 export const runDarwinPs = (args, options) => runDarwinTool('/bin/ps', args, options);
 export const runDarwinLsof = (args, options) => runDarwinTool('/usr/sbin/lsof', args, options);
 // lsof -F prints the process as `p<pid>`, then each text file as `n<path>`, some versions
@@ -170,7 +175,8 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
       if (handle.bootId !== identity.bootId) return verdict('dead', 'boot changed');
     }
     let row;
-    try { row = core(handle.pid, options); } catch { return verdict('unknown', 'process unreadable'); }
+    try { row = core(handle.pid, options); }
+    catch (error) { return verdict('unknown', error.code === 'DEADLINE_EXCEEDED' ? DEADLINE_CUT : 'process unreadable'); }
     if (!row) return verdict('dead', 'process absent');
     if (['Z', 'X', 'x'].includes(row.state)) return verdict('dead', 'process exited');
     if (row.starttime !== handle.start) return verdict('dead', 'process replaced');

@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { relayError, validateHandle } from '../protocol.js';
-import { createProcessOps } from './proc.js';
+import { DEADLINE_CUT, createProcessOps } from './proc.js';
 import { checkPrivate, ensurePrivateDir } from './store.js';
 
 async function readToken(path, io) {
@@ -58,6 +58,13 @@ export async function withLock(lockPath, fn, { clock = performance.now.bind(perf
   }
   await ensurePrivateDir(dirname(lockPath),{io});
   let unknown = false, token;
+  // A probe the deadline cut short learned nothing, so the last completed verdict stands: a
+  // live owner at the deadline is LOCK_TIMEOUT, not LOCK_IDENTITY_UNKNOWN.
+  const observe = (handle) => {
+    const { status, reason } = processOps.probe(handle,{clock,deadline});
+    if (reason !== DEADLINE_CUT) unknown = status === 'unknown';
+    return status;
+  };
   const expired = () => {
     if (clock() >= deadline) throw relayError(unknown ? 'LOCK_IDENTITY_UNKNOWN' : 'LOCK_TIMEOUT',unknown ? 'lock owner identity unavailable' : 'lock acquisition deadline exceeded');
   };
@@ -68,24 +75,20 @@ export async function withLock(lockPath, fn, { clock = performance.now.bind(perf
     if (await acquire(lockPath,token,io)) break;
     const owner = await readToken(lockPath,io);
     if (!owner) continue;
-    const status = processOps.probe(owner.holder,{clock,deadline}).status;
-    unknown = status === 'unknown';
+    const status = observe(owner.holder);
     if (status !== 'dead') { await pause(); continue; }
     const guardPath = `${lockPath}.reclaim`, guard = {schema:1,nonce:randomUUID(),holder};
     if (!await acquire(guardPath,guard,io)) {
       const current = await readToken(guardPath,io);
       if (!current) continue;
-      const guardStatus = processOps.probe(current.holder,{clock,deadline}).status;
-      if (guardStatus === 'dead') throw relayError('LOCK_REPAIR_REQUIRED','abandoned reclaim guard; operator repair required');
-      unknown = guardStatus === 'unknown'; await pause(); continue;
+      if (observe(current.holder) === 'dead') throw relayError('LOCK_REPAIR_REQUIRED','abandoned reclaim guard; operator repair required');
+      await pause(); continue;
     }
     let error;
     try {
       const current = await readToken(lockPath,io);
       if (current) {
-        const status = processOps.probe(current.holder,{clock,deadline}).status;
-        unknown = status === 'unknown';
-        if (status === 'dead') await io.unlink(lockPath);
+        if (observe(current.holder) === 'dead') await io.unlink(lockPath);
       }
     } catch (cause) { error = cause.code?.startsWith('LOCK_') ? cause : relayError('IO_ERROR','cannot reclaim lock',cause); }
     const cleanup = await release(guardPath,guard,io);

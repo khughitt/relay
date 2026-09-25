@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { withLock } from '../src/bus/lock.js';
-import { createProcessOps } from '../src/bus/proc.js';
+import { DEADLINE_CUT, createProcessOps } from '../src/bus/proc.js';
 import { tempState } from './helpers/fixture.js';
 test('serializes concurrent writers and releases callback errors', async (t) => {
   const { lockPath } = await tempState(t), order = [];
@@ -64,6 +64,21 @@ test('unknown main proof waits and reports identity unavailable', async t => {
   await writeToken(p.lockPath,owner);
   await assert.rejects(withLock(p.lockPath,()=>assert.fail('entered'),fakeWait()),{code:'LOCK_IDENTITY_UNKNOWN'});
   assert.deepEqual(JSON.parse(await fs.readFile(p.lockPath)),owner);
+});
+test('a probe the deadline cut short leaves the last completed owner verdict standing', async t => {
+  // Mac regression (relay-6e9410): ps killed at the deadline turned a live owner into
+  // LOCK_IDENTITY_UNKNOWN. Owner probes land at t=0, 20 and 40 of a 50 ms deadline.
+  const alive = { status: 'alive', reason: 'qualified process matches' }, cut = { status: 'unknown', reason: DEADLINE_CUT };
+  const foreign = { status: 'unknown', reason: 'foreign host' };
+  for (const [verdicts, code] of [[[alive, alive, cut], 'LOCK_TIMEOUT'], [[alive, foreign, cut], 'LOCK_IDENTITY_UNKNOWN'],
+    [[alive, alive, foreign], 'LOCK_IDENTITY_UNKNOWN']]) {
+    const p = await tempState(t), owner = token(); await writeToken(p.lockPath,owner);
+    const real = ops(), wait = fakeWait(); let calls = 0;
+    const probe = (h,o) => calls++ === 0 ? real.probe(h,o) : verdicts[Math.min(calls-2,verdicts.length-1)];
+    await assert.rejects(withLock(p.lockPath,()=>assert.fail('entered'),{...wait,processOps:{...real,probe}}),{code});
+    assert.equal(calls,4);
+    assert.deepEqual(JSON.parse(await fs.readFile(p.lockPath)),owner);
+  }
 });
 test('old live or unknown guard is never stolen; dead and malformed guards require repair', async t => {
   const p = await tempState(t); await writeToken(p.lockPath,deadToken());
