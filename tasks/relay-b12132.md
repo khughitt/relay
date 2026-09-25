@@ -1,19 +1,21 @@
 ---
 id: relay-b12132
 title: "Darwin live probe: a self-contained bundle that proves relay's Darwin paths on a physical Mac"
-status: doing
+status: done
 priority: 1
 size: m
 complexity: mid
 process: planned
 owner: darwin-attempt2
 created: 2026-09-25T10:57:49Z
-updated: 2026-09-25T18:48:03Z
+updated: 2026-09-25T18:48:59Z
 started: 2026-09-25T10:57:57Z
+completed: 2026-09-25T18:48:59Z
 depends: []
 parent: relay-1231bf
 tags: []
 source: ops-c8e4d1
+model: "claude-opus-5-5[1m]"
 agent: claude-code/claude-opus-5-5
 spec: docs/specs/2026-09-25-darwin-probe.md
 plan: docs/plans/2026-09-25-darwin-probe.md
@@ -76,4 +78,8 @@ The release gate relay-c19c0a carries: physical Darwin process/terminal verifica
 - 2026-09-25T17:54:21Z (main): parked (waiting on user, environment): User copies dist/relay-darwin-probe-0b92d14.tar.gz to the Mac, runs tar xzf … && cd relay-darwin-probe-0b92d14 && ./run, and returns the results tarball; agent then runs just darwin-judge <tarball> <ops checkout> in a worktree, commits the attempt, and files or fixes any failed gate (D2's lock-worker message goes to relay-6e9410)
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T18:48:03Z (darwin-attempt2): resumed
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T18:48:59Z (darwin-attempt2): done
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T18:48:59Z (darwin-attempt2): Darwin probe built, landed on main and run twice on a physical Mac (macOS 26.7 arm64); both result tarballs accepted by darwin-judge and recorded in docs/runbooks/darwin-probe.md. Attempt 2: D0,D1,D3,D5,D6,D8-reap,ISO,D7w pass; failing gates are relay defects filed as relay-6e9410 (D2 lock identity), relay-7eef39 (D4 executableOf), relay-661946 (hook needs node on PATH, cutover); probe follow-ups relay-cd176c, relay-dc2b03. relay-c19c0a reruns the probe after those land.
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
