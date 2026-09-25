@@ -1118,14 +1118,21 @@ Run: `node --test test/darwin-probe-stages-a.test.js` → FAIL (modules missing)
 - [ ] **Step 3: Implement D0** (`stages/d0-env.mjs`)
 
 ```js
+import { spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { readlinkSync, realpathSync } from 'node:fs';
 export const parseHostName = (r) => (r.exit === 0 && r.stdout.trim() ? r.stdout.trim() : null);
 export function pythonAtLeast(text, [major, minor]) {
   const m = /Python (\d+)\.(\d+)/.exec(text ?? ''); return !!m && (+m[1] > major || (+m[1] === major && +m[2] >= minor));
 }
+// Direct and bounded, not through the tracker: finalization takes the end reading after the
+// tracker has stopped accepting children.
 async function hosts(ctx) {
-  const scutil = async (key) => (ctx.platform === 'darwin' ? parseHostName(await ctx.t.run('scutil', ['--get', key])) : null);
+  const scutil = async (key) => {
+    if (ctx.platform !== 'darwin') return null;
+    const r = spawnSync('scutil', ['--get', key], { encoding: 'utf8', timeout: 2000 });
+    return parseHostName({ exit: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' });
+  };
   return { os: hostname(), HostName: await scutil('HostName'), LocalHostName: await scutil('LocalHostName'), ComputerName: await scutil('ComputerName') };
 }
 export async function run(ctx) {
