@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: darwin-probe
 created: 2026-09-25T10:57:49Z
-updated: 2026-09-25T12:53:54Z
+updated: 2026-09-25T13:07:09Z
 started: 2026-09-25T10:57:57Z
 depends: []
 parent: relay-1231bf
@@ -50,4 +50,8 @@ The release gate relay-c19c0a carries: physical Darwin process/terminal verifica
   provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T12:53:54Z (darwin-probe): Plan revised after second plan review: tracker stop() refuses spawns and killAll loops to empty with a survivor report; kill signals only owned groups, sweeper retires emptied ones; stage loop halts when stopping; verdicts carry no stage text, are exported through redactValue, and compare on stable fields; D7 wrapper binds evidence to agent_id from the payload's session_id; D0 end reading bypasses the stopped tracker.
 - 2026-09-25T12:53:54Z (darwin-probe): parked (waiting on user, review): User re-reviews docs/plans/2026-09-25-darwin-probe.md at 1565c22 on branch darwin-probe (.worktrees/relay-b12132) and picks the execution method; agent then executes Task 1 (relay-db8ca9) onward
+  provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T13:07:09Z (darwin-probe): resumed
+  provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T13:07:09Z (darwin-probe): parked (waiting on user, review): User re-reviews docs/plans/2026-09-25-darwin-probe.md at 7597743 on branch darwin-probe (.worktrees/relay-b12132) and picks the execution method; agent then executes Task 1 (relay-db8ca9) onward
   provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
