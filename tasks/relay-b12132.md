@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: darwin-probe
 created: 2026-09-25T10:57:49Z
-updated: 2026-09-25T16:31:26Z
+updated: 2026-09-25T16:32:21Z
 started: 2026-09-25T10:57:57Z
 depends: []
 parent: relay-1231bf
@@ -64,4 +64,6 @@ The release gate relay-c19c0a carries: physical Darwin process/terminal verifica
 - 2026-09-25T13:18:24Z (darwin-probe): Task 1 landed in ops a54e408 (feat(bin): let relay-guard-probe run Claude Code from a setup token); ops main fast-forwarded locally, not pushed
 - 2026-09-25T16:31:26Z (darwin-probe): All 12 plan tasks landed on darwin-probe (47 commits past main 8dc5639; ops a54e408); final review with-fixes → fix wave 163a7cb..ed893e5 re-reviewed clean; just gate 322/322; Linux smoke release=smoke, all Linux-runnable gates pass; follow-up relay-dc2b03
 - 2026-09-25T16:31:26Z (darwin-probe): parked (waiting on user, decision): User picks how darwin-probe lands (merge into relay main locally, PR, or keep); agent then merges, reruns just gate on main, builds the handoff bundle with just darwin-bundle from the merged commit, runs darwin-bundle-check, and parks for the Mac run
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T16:32:21Z (darwin-probe): resumed
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
