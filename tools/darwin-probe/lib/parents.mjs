@@ -25,9 +25,12 @@ export function buildParent(root) {
   built.set(root, out);
   return out;
 }
+// Every install is a fresh inode: macOS caches code-signature data per vnode, and a binary
+// that has run and is then rewritten in place is killed ("Killed: 9") on its next launch.
 const place = (binary, dir, name) => {
   mkdirSync(dir, { recursive: true });
-  const path = join(dir, name); copyFileSync(binary, path); chmodSync(path, 0o755); return path;
+  const path = join(dir, name);
+  rmSync(path, { force: true }); copyFileSync(binary, path); chmodSync(path, 0o755); return path;
 };
 // The path's basename is the harness name the adapter matches.
 export const installParent = (root, dir, name) => place(buildParent(root), dir, name);

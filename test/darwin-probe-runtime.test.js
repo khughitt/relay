@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
+import { linkSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -104,6 +104,11 @@ test('the parent is compiled once per root and every install is a copy of it', (
   const a = installParent(r, join(r, 'sp ace'), 's h');
   assert.equal(a, join(r, 'sp ace/s h')); assert.equal(statSync(a).mode & 0o777, 0o755);
   assert.deepEqual(readFileSync(a), readFileSync(built));
+  // A reinstall is a fresh inode: macOS caches code-signature data per vnode, and an executed
+  // binary rewritten in place is killed on its next launch.
+  // A second link pins the old inode, so the filesystem cannot hand its number straight back.
+  const old = join(r, 'old'); linkSync(a, old);
+  assert.equal(installParent(r, join(r, 'sp ace'), 's h'), a); assert.notEqual(statSync(a).ino, statSync(old).ino);
 });
 test('a parent that runs its payload passes the check and leaves nothing behind', async (t) => {
   const r = mkdtempSync(join(tmpdir(), 'dp-')); prepareRoot(r); const tr = tracker(r);
@@ -121,10 +126,29 @@ test('a parent that cannot run its payload is one error line within five seconds
   assert.ok(Date.now() - started < 5500, `${Date.now() - started}ms`);
   assert.deepEqual((await tr.killAll()).survivors, []);
 });
-test('a failed build names cc and the head of its stderr', (t) => {
+test('a missing cc is one error line naming cc', (t) => {
   const r = root(t); const saved = process.env.PATH; process.env.PATH = join(r, 'nothing');
   t.after(() => { process.env.PATH = saved; });
   assert.throws(() => buildParent(r), (e) => /^cc /.test(e.message) && !e.message.includes('\n'));
+});
+test('a failed build names cc, its exit and the first line of its stderr', (t) => {
+  const r = root(t), fake = join(r, 'fakebin'); mkdirSync(fake);
+  writeFileSync(join(fake, 'cc'), '#!/bin/sh\necho "parent.c:1: error: first" >&2\necho "second line" >&2\nexit 1\n', { mode: 0o755 });
+  const saved = process.env.PATH; process.env.PATH = `${fake}:${saved}`;
+  t.after(() => { process.env.PATH = saved; });
+  assert.throws(() => buildParent(r), { message: 'cc could not build the constructed parent: exit 1: parent.c:1: error: first' });
+});
+test('a constructed parent that exits fails its wait at once', async (t) => {
+  const r = mkdtempSync(join(tmpdir(), 'dp-')); prepareRoot(r); const tr = tracker(r);
+  t.after(async () => { await tr.killAll(); rmSync(r, { recursive: true, force: true }); });
+  // The compiled parent with a payload that does not exist: exec fails and it exits 127.
+  const exiting = join(r, 'exiting-parent');
+  writeFileSync(exiting, `#!/bin/sh\nexec '${buildParent(r)}' '${join(r, 'no-such-command')}'\n`, { mode: 0o755 });
+  const parent = startParent(tr, { parent: exiting, clone: process.cwd(), workdir: join(r, 'w0'), env: isolatedEnv(r), timeoutMs: 20000,
+    plan: { harness: 'codex', subscribers: join(r, 'xdg/relay/subscribers.json'), steps: [] } });
+  const started = Date.now();
+  await assert.rejects(parent.done(), { message: `parent ${parent.pid} exited before finishing (code=127, signal=null)` });
+  assert.ok(Date.now() - started < 2000, `${Date.now() - started}ms`);
 });
 test('a fleet waits longer the more agents are live', () => {
   assert.equal(fleetTimeoutMs(1, 0), 32000); assert.equal(fleetTimeoutMs(50, 0), 130000); assert.equal(fleetTimeoutMs(1, 50), 132000);
