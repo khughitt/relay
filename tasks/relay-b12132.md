@@ -6,9 +6,9 @@ priority: 1
 size: m
 complexity: mid
 process: planned
-owner: darwin-parent
+owner: darwin-attempt2
 created: 2026-09-25T10:57:49Z
-updated: 2026-09-25T17:54:21Z
+updated: 2026-09-25T18:48:03Z
 started: 2026-09-25T10:57:57Z
 depends: []
 parent: relay-1231bf
@@ -74,4 +74,6 @@ The release gate relay-c19c0a carries: physical Darwin process/terminal verifica
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T17:54:21Z (main): Mac attempt 1 (b7fc410, 2026-09-25T17:01, recorded 8c93b73): release incomplete — D4/D5/D8 errored because copied /bin/sh parents never ran on macOS 26 (launch constraints); fixed by compiled parents (d78e2c1, 0b92d14) with a checkParent pre-check. D2 failed relay's lock-multiprocess test on Darwin (relay-6e9410); the test now prints the worker's message. D7 proven live for claude-code and codex, ancestry read in full; D3/D6/ISO pass. Bundle 2: dist/relay-darwin-probe-0b92d14.tar.gz
 - 2026-09-25T17:54:21Z (main): parked (waiting on user, environment): User copies dist/relay-darwin-probe-0b92d14.tar.gz to the Mac, runs tar xzf … && cd relay-darwin-probe-0b92d14 && ./run, and returns the results tarball; agent then runs just darwin-judge <tarball> <ops checkout> in a worktree, commits the attempt, and files or fixes any failed gate (D2's lock-worker message goes to relay-6e9410)
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T18:48:03Z (darwin-attempt2): resumed
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

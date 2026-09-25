@@ -1,12 +1,12 @@
 {
   "manifest": {
     "schema": 1,
-    "relay_commit": "b7fc410a71e40d691b4282a89bb8550a3d505eef",
+    "relay_commit": "0b92d14ddc2aaf3c8d8d1454f28f05bd3907a090",
     "ops_commit": "ff9bfb036512e970e849f7bcf85e4a23925bb662",
     "opencode_pinned": "2.0.15",
     "allow_linux": false,
     "platform": "darwin",
-    "started": "2026-09-25T17:01:37.126Z",
+    "started": "2026-09-25T18:02:51.744Z",
     "requested_stages": null,
     "stages": [
       "D0",
@@ -188,14 +188,14 @@
         ".codex/config.toml": {
           "exists": true,
           "files": 1,
-          "size": 1333,
-          "mtimeMs": 1787693175929.9397
+          "size": 1394,
+          "mtimeMs": 1790359961576.9438
         },
         ".codex/auth.json": {
           "exists": true,
           "files": 1,
-          "size": 3993,
-          "mtimeMs": 1787507133508.0557
+          "size": 4082,
+          "mtimeMs": 1790360422849.3794
         },
         ".config/relay": {
           "exists": false,
@@ -228,12 +228,15 @@
           "mtimeMs": 1787953627416.594
         }
       },
-      "changed_during_d9": []
+      "changed_during_d9": [
+        ".codex/config.toml",
+        ".codex/auth.json"
+      ]
     },
     "cleanup": {
       "survivors": []
     },
-    "finished": "2026-09-25T17:25:07.929Z",
+    "finished": "2026-09-25T18:37:35.412Z",
     "interrupted": null,
     "redaction": {
       "files": {
@@ -253,6 +256,11 @@
           "home": 0
         },
         "logs/D7b.log": {
+          "host": 0,
+          "user": 0,
+          "home": 0
+        },
+        "logs/D8.log": {
           "host": 0,
           "user": 0,
           "home": 0
@@ -285,12 +293,12 @@
         "stages/D4.json": {
           "host": 0,
           "user": 0,
-          "home": 4
+          "home": 12
         },
         "stages/D5.json": {
-          "host": 0,
+          "host": 1,
           "user": 0,
-          "home": 5
+          "home": 0
         },
         "stages/D6.json": {
           "host": 0,
@@ -300,7 +308,7 @@
         "stages/D7.json": {
           "host": 0,
           "user": 0,
-          "home": 24
+          "home": 0
         },
         "stages/D7b.json": {
           "host": 0,
@@ -310,19 +318,19 @@
         "stages/D8.json": {
           "host": 0,
           "user": 0,
-          "home": 5
+          "home": 0
         },
         "stages/D9.json": {
           "host": 0,
           "user": 0,
-          "home": 0
+          "home": 21
         }
       }
     }
   },
   "verdict": {
     "schema": 1,
-    "release": "incomplete",
+    "release": "fail",
     "checks": {
       "D0": {
         "class": "release",
@@ -343,7 +351,7 @@
         "verdict": "fail",
         "detail": "248/249 passed, 0 skipped",
         "findings": [
-          "failed test: eight real processes retain all counter updates, including dead main reclamation"
+          "failed test: the CLI returns inside the outer timeout while another writer holds the lock"
         ]
       },
       "D3": {
@@ -356,15 +364,20 @@
       },
       "D4": {
         "class": "release",
-        "verdict": "error",
-        "detail": "stage error",
-        "findings": []
+        "verdict": "fail",
+        "detail": "ancestry, recognition or argument mismatch",
+        "findings": [
+          "Darwin comm holds the executable path (spec item 2)",
+          "process table: 671 rows, 460 past the cut, 0 truncated as relay reads it"
+        ]
       },
       "D5": {
         "class": "release",
-        "verdict": "error",
-        "detail": "stage error",
-        "findings": []
+        "verdict": "pass",
+        "detail": "registry, lock, reap and hook cost hold",
+        "findings": [
+          "50 agents: PreToolUse 207.156875 ms, SessionEnd 152.636125 ms (exit 0)"
+        ]
       },
       "D6": {
         "class": "release",
@@ -374,15 +387,17 @@
       },
       "D8": {
         "class": "release",
-        "verdict": "error",
-        "detail": "stage error",
+        "verdict": "pass",
+        "detail": "reap in a launchd-like environment keeps exactly the live agents",
         "findings": []
       },
       "ISO": {
         "class": "release",
         "verdict": "pass",
         "detail": "no live path changed",
-        "findings": []
+        "findings": [
+          "changed while D9 sampled live sessions (not gated): .codex/config.toml, .codex/auth.json"
+        ]
       },
       "D7w": {
         "class": "release",
@@ -393,9 +408,9 @@
     },
     "cutover": {
       "claude-code": "pass",
-      "codex": "pass",
+      "codex": "fail",
       "opencode": "fail",
-      "launchd-path": "error"
+      "launchd-path": "fail"
     }
   }
 }
