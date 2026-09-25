@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-09-25T17:33:41Z
-updated: 2026-09-25T18:48:36Z
+updated: 2026-09-25T19:18:53Z
 depends: []
 parent: relay-1231bf
 tags: []
@@ -20,3 +20,4 @@ The first physical Mac run of the Darwin probe (macOS 26.7 arm64, node v25.8.2; 
 ## Notes
 
 - 2026-09-25T18:48:36Z (darwin-attempt2): Mac attempt 2 (2026-09-25T18:02): lock-multiprocess passed, but test/cli.test.js 'the CLI returns inside the outer timeout while another writer holds the lock' failed with 'registry: LOCK_IDENTITY_UNKNOWN: lock owner identity unavailable' (src/bus/lock.js:55-62). Likely the same cause as attempt 1's worker error: the Darwin identity read of the lock holder (runDarwinPs, 2 s deadline) intermittently fails under contention.
+- 2026-09-25T19:18:53Z (main): Handed to a Mac Claude session (2026-09-25): code-only on branch mac/relay-6e9410 from main 0d56e30, returned as ~/Downloads/relay-mac.bundle + relay-mac-report.md; the Linux side merges, gates and closes. Brief: dist/relay-mac-handoff.md
