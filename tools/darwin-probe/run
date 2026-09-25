@@ -10,10 +10,29 @@ major=$(node -p 'process.versions.node.split(".")[0]')
 # which would push a constructed parent (<root>/p/codex, a full path in Darwin's comm) past
 # the width plain `ps` gives relay.
 ROOT=$(mktemp -d /tmp/rdp.XXXXXX)
+KEEP=
+# shellcheck disable=SC2329 # invoked by the EXIT trap (shellcheck 0.11 misses it before a final `exit`)
 cleanup() {
   if [ -f "$ROOT/pids" ]; then while read -r pid; do kill -s KILL -- "$pid" 2>/dev/null || true; done < "$ROOT/pids"; fi
-  rm -rf "$ROOT"
+  if [ -n "$KEEP" ]; then echo "the probe's working directory is kept at $ROOT" >&2 || true; else rm -rf "$ROOT"; fi
 }
-trap cleanup EXIT INT TERM HUP
+trap cleanup EXIT
+# The probe itself handles INT, TERM and HUP: it kills its children and packs the results.
+# The shell runs these traps only once node has exited, then falls through to the exit-code
+# check below; the root is removed on the way out unless node ended abnormally.
+trap : INT TERM HUP
 echo "Please close OpenCode (if it is running) for the duration of the probe."
-node "$BUNDLE/probe/probe.mjs" --bundle "$BUNDLE" --root "$ROOT" "$@"
+echo "If you use Claude Code, have the output of \`claude setup-token\` ready: the probe may ask for it at the start."
+# Idle sleep would expire the probe's deadlines and drop the live harness sessions' network.
+# caffeinate -w exits with this shell.
+if [ "$(uname -s)" = Darwin ]; then caffeinate -i -w $$ & fi
+code=0
+node "$BUNDLE/probe/probe.mjs" --bundle "$BUNDLE" --root "$ROOT" "$@" || code=$?
+# 0: done; 1: results refused or live paths changed; 2: a prerequisite or usage error;
+# 129/130/143: interrupted, results packed. Anything else (a crash, a SIGKILL) may have left
+# unpacked results in the root, so it is kept for the user.
+case $code in
+  0|1|2|129|130|143) ;;
+  *) KEEP=1; echo "the probe exited with status $code" >&2 || true ;;
+esac
+exit "$code"

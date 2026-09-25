@@ -100,8 +100,11 @@ export function judge(results) {
     const observations = id === 'D5' ? { ...stage.observations, platform } : stage.observations;
     checks[id] = { class: 'release', ...guarded(rules[id], observations) };
   }
-  const changed = results.manifest.isolation?.changed;
-  checks.ISO = { class: 'release', ...(Array.isArray(changed) ? result(changed.length === 0, changed.length ? `live paths changed: ${changed.join(', ')}` : 'no live path changed')
+  const changed = results.manifest.isolation?.changed, duringD9 = results.manifest.isolation?.changed_during_d9 ?? [];
+  // D9 invites the user's own live sessions, which may write their config; the gating reading
+  // is taken before it, and what changed afterwards is reported only.
+  const d9Findings = duringD9.length ? [`changed while D9 sampled live sessions (not gated): ${duringD9.join(', ')}`] : [];
+  checks.ISO = { class: 'release', ...(Array.isArray(changed) ? result(changed.length === 0, changed.length ? `live paths changed: ${changed.join(', ')}` : 'no live path changed', d9Findings)
     : { verdict: 'error', detail: 'isolation fingerprints missing', findings: [] }) };
   checks.D7w = { class: 'release', ...liveWidth(results.stages.D7) };
   const d8 = results.stages.D8?.status === 'ran' ? results.stages.D8.observations.hook_path : null;

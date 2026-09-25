@@ -9,7 +9,9 @@ export function ps(args, { columns = null } = {}) {
   const env = { ...process.env, LC_ALL: 'C' };
   delete env.COLUMNS;
   if (columns) env.COLUMNS = String(columns);
-  const r = spawnSync('/bin/ps', args, { env, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  // Bounded like relay's own ps (2 s there): a wedged ps is a failed read, never a hung probe.
+  const r = spawnSync('/bin/ps', args, { env, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 5000 });
+  if (r.error) return { exit: null, stdout: '' };
   return { exit: r.status, stdout: r.stdout ?? '' };
 }
 const pidOf = (line) => Number(/^\s*(\d+)/.exec(line)?.[1]);

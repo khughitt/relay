@@ -101,6 +101,12 @@ export function fingerprint(home) {
   return out;
 }
 export const changedPaths = (before, after) => Object.keys(before).filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+// The gating reading is the one before D9 when D9 ran (it invites live sessions that may write
+// their own config); whatever changed from there to the end is recorded, not gated.
+export function isolationOf(before, beforeD9, final) {
+  if (!beforeD9) return { before, after: final, after_taken: 'finalize', changed: changedPaths(before, final), changed_during_d9: [] };
+  return { before, after: beforeD9, after_taken: 'before D9', changed: changedPaths(before, beforeD9), final, changed_during_d9: changedPaths(beforeD9, final) };
+}
 export function writeStage(resultsDir, id, record) {
   mkdirSync(join(resultsDir, 'stages'), { recursive: true });
   writeFileSync(join(resultsDir, 'stages', `${id}.json`), `${JSON.stringify({ id, ...record }, null, 2)}\n`);

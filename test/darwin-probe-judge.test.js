@@ -99,3 +99,8 @@ test('D7b fails its cutover when the plugin is rejected or the version is not th
   assert.equal(ran({ plugin_log: 'rejected-file', appeared: false, agent: { count: 0 } }), 'fail');
   assert.equal(ran({ version: '2.1.0', version_match: false }), 'fail');
 });
+test('config changed while D9 sampled live sessions is a finding, not the isolation gate', () => {
+  const v = mutate((r) => { r.manifest.isolation.changed_during_d9 = ['.codex/config.toml']; });
+  assert.equal(v.checks.ISO.verdict, 'pass'); assert.equal(v.release, 'pass');
+  assert.ok(v.checks.ISO.findings.some((f) => f.includes('.codex/config.toml') && f.includes('D9')));
+});

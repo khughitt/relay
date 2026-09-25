@@ -128,9 +128,15 @@ cache variables matter for D7b: OpenCode keeps its logs and data under
 `~/.claude`, `~/.codex`, `~/.config/relay`, `~/.local/state/relay`, `~/.config/opencode`,
 `~/.local/share/opencode`, `~/.cache/opencode` or any live hook configuration. `run`
 records the recursive mtimes and file counts of those paths before and after, and a
-change fails the attempt. A trap on `EXIT`, `INT` and `TERM`
-kills every pid the probe spawned (listed in `pids`) and removes the root, keeping only
-the results tarball.
+change fails the attempt. The "after" reading is taken just before D9, which invites the
+user's own live sessions; what changes from there to the end is recorded as a finding,
+not gated. The probe handles `INT`, `TERM` and `HUP` itself (a closed terminal included):
+it kills every pid it spawned (listed in `pids`) and packs the results. `run`'s `EXIT`
+trap kills anything still listed and removes the root, keeping only the results tarball,
+unless node ended abnormally (a crash or a kill), in which case it keeps the root and
+names it. On macOS `run` holds `caffeinate -i` for its lifetime. Before packing, the
+results are scanned for a `.credentials.json` or `auth.json` file and for the Claude
+token; a hit names the files and nothing is packed.
 
 ## Checks
 
@@ -298,8 +304,9 @@ release too.
 
 Credentials: the ops probe copies `~/.claude/.credentials.json` and `~/.codex/auth.json`
 into the disposable config. Claude Code on macOS keeps its login in the Keychain, so the
-file may not exist. When it is missing, `run` asks the user to run `claude setup-token`
-and paste the token, or press Enter to skip Claude. It passes the token to the Claude
+file may not exist. When it is missing (and `claude` is on `PATH`), `run` asks at startup, before
+any stage, for the user to run `claude setup-token` and paste the token, or press Enter to
+skip Claude. It passes the token to the Claude
 runs as `CLAUDE_CODE_OAUTH_TOKEN` and never writes it to disk or to results. This needs
 one ops change, made in this task's plan: today `bin/relay-guard-probe` copies the
 credentials file unconditionally and raises `FileNotFoundError` without it. With

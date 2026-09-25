@@ -4,7 +4,6 @@ import { basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registryFor } from '../lib/context.mjs';
 import { stripCapture } from '../lib/ps.mjs';
-import { ask } from '../lib/tty.mjs';
 const WRAPPER = fileURLToPath(new URL('../lib/relay-wrapper.mjs', import.meta.url));
 const PS = new URL('../lib/ps.mjs', import.meta.url).href;
 const HARNESS_COMM = { 'claude-code': (c) => c === 'claude' || /^\d+\.\d+\.\d+$/.test(c), codex: (c) => c === 'codex' };
@@ -74,10 +73,9 @@ async function oneHarness(ctx, harness, token) {
     invocations, summary: { version: summary.version, attempt: summary.attempt, complete: summary.complete, results: summary.results },
     evidence: JSON.parse(readFileSync(evidence, 'utf8')) };
 }
+// The Claude token was asked for at probe startup (probe.mjs) and lives in ctx.token only; it
+// reaches the Claude runs as CLAUDE_CODE_OAUTH_TOKEN in that one child's environment.
 export async function run(ctx) {
   if (ctx.platform !== 'darwin') return { status: 'skipped', reason: 'darwin only', observations: {} };
-  let token = null;
-  if (!existsSync(join(homedir(), '.claude/.credentials.json')))
-    token = await ask('Claude Code keeps its login in the Keychain. Run `claude setup-token` in another terminal and paste the token (Enter skips Claude): ', { hidden: true });
-  return { status: 'ran', observations: { 'claude-code': await oneHarness(ctx, 'claude-code', token || null), codex: await oneHarness(ctx, 'codex', null) } };
+  return { status: 'ran', observations: { 'claude-code': await oneHarness(ctx, 'claude-code', ctx.token ?? null), codex: await oneHarness(ctx, 'codex', null) } };
 }
