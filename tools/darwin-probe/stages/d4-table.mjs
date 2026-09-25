@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { installShell } from '../lib/parents.mjs';
+import { requireStarted } from '../lib/context.mjs';
 import { capture, tableCounts } from '../lib/ps.mjs';
 const REPORT = fileURLToPath(new URL('../lib/chain-report.mjs', import.meta.url));
 const wait = async (path, ms = 20000) => { const until = Date.now() + ms; while (!existsSync(path)) { if (Date.now() > until) throw new Error(`timeout waiting for ${path}`); await new Promise((r) => setTimeout(r, 50)); } };
@@ -14,7 +15,7 @@ export async function run(ctx) {
   const longDir = join(ctx.root, 'l', 'x'.repeat(90));
   const claude = installShell(longDir, 'claude');
   const chainOut = join(ctx.root, 'd4-chain.json');
-  const script = ctx.t.spawn('script', ['-q', '/dev/null', claude, '-c', `"${process.execPath}" "${REPORT}" "${ctx.clone}" "${chainOut}" claude-code; true`], { env: ctx.env, stdio: 'ignore' });
+  const script = requireStarted(ctx.t.spawn('script', ['-q', '/dev/null', claude, '-c', `"${process.execPath}" "${REPORT}" "${ctx.clone}" "${chainOut}" claude-code; true`], { env: ctx.env, stdio: 'ignore' }), 'script');
   let chain;
   try {
     await wait(chainOut);
@@ -25,7 +26,7 @@ export async function run(ctx) {
   // 2. A Claude-shaped native install: …/claude/versions/9.9.9 started as `9.9.9`.
   const versioned = installShell(join(ctx.root, 'n/claude/versions'), '9.9.9');
   const nativeOut = join(ctx.root, 'd4-native.json');
-  const native = ctx.t.spawn(versioned, ['-c', `"${process.execPath}" "${REPORT}" "${ctx.clone}" "${nativeOut}" claude-code; sleep 300; true`], { env: ctx.env, argv0: '9.9.9', stdio: 'ignore' });
+  const native = requireStarted(ctx.t.spawn(versioned, ['-c', `"${process.execPath}" "${REPORT}" "${ctx.clone}" "${nativeOut}" claude-code; sleep 300; true`], { env: ctx.env, argv0: '9.9.9', stdio: 'ignore' }), versioned);
   let nat, executable = null;
   try {
     await wait(nativeOut);
@@ -37,7 +38,7 @@ export async function run(ctx) {
   // 3. argvOf on an executable path and arguments with spaces.
   const spaced = installShell(join(ctx.root, 'sp ace'), 's h');
   // `; true` keeps the shell itself alive: sh may exec a final simple command in its place.
-  const sp = ctx.t.spawn(spaced, ['-c', 'sleep 300; true', 'arg with space'], { env: ctx.env, stdio: 'ignore' });
+  const sp = requireStarted(ctx.t.spawn(spaced, ['-c', 'sleep 300; true', 'arg with space'], { env: ctx.env, stdio: 'ignore' }), spaced);
   let argv = null, argvError = null, spCapture;
   try {
     await new Promise((r) => setTimeout(r, 300));

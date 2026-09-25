@@ -4,6 +4,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFile
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { requireStarted } from './context.mjs';
 const TIMED = fileURLToPath(new URL('./timed-hook.mjs', import.meta.url));
 export function installShell(dir, name) {
   mkdirSync(dir, { recursive: true });
@@ -17,7 +18,7 @@ export function startParent(t, { shell, clone, plan, workdir, env }) {
   // The hook runs as a non-final command so this shell stays its parent; `read` from a FIFO
   // nobody writes keeps it alive with no child until the probe kills it.
   const script = '"$1" "$2" "$3/plan.json"; read line < "$3/hold"';
-  const child = t.spawn(shell, ['-c', script, 'parent', process.execPath, TIMED, workdir], { env, stdio: 'ignore' });
+  const child = requireStarted(t.spawn(shell, ['-c', script, 'parent', process.execPath, TIMED, workdir], { env, stdio: 'ignore' }), shell);
   const done = async (timeoutMs = 30000) => {
     const until = Date.now() + timeoutMs;
     while (!existsSync(join(workdir, 'done'))) { if (Date.now() > until) throw new Error(`parent ${child.pid} did not finish`); await new Promise((r) => setTimeout(r, 50)); }

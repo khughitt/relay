@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { ps } from '../lib/ps.mjs';
+import { requireStarted } from '../lib/context.mjs';
 const CHILD = fileURLToPath(new URL('../lib/identity-child.mjs', import.meta.url));
 export async function epochFromLstart(lstart, run, env) {
   const r = await run('date', ['-j', '-f', '%a %b %d %T %Y', lstart.replace(/\s+/g, ' ').trim(), '+%s'], { env: { ...env, LC_ALL: 'C' } });
@@ -28,7 +29,7 @@ export async function run(ctx) {
   const tzEnv = (tz) => { const env = { ...ctx.env }; if (tz) env.TZ = tz; else delete env.TZ; return env; };
   const handleUnder = async (tz, pid) => JSON.parse((await ctx.t.run(process.execPath, [CHILD, ctx.clone, 'handle', String(pid)], { env: tzEnv(tz) })).stdout);
   const probeUnder = async (tz, h) => JSON.parse((await ctx.t.run(process.execPath, [CHILD, ctx.clone, 'probe', JSON.stringify(h)], { env: tzEnv(tz) })).stdout);
-  const sleeper = ctx.t.spawn('/bin/sleep', ['300'], { env: ctx.env, stdio: 'ignore' });
+  const sleeper = requireStarted(ctx.t.spawn('/bin/sleep', ['300'], { env: ctx.env, stdio: 'ignore' }), '/bin/sleep');
   await new Promise((r) => setTimeout(r, 200));
   const h = await handleUnder('', sleeper.pid);
   const lstart = ps(['-p', String(sleeper.pid), '-o', 'lstart=']).stdout.trim();

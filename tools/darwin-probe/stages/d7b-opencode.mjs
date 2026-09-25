@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFi
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { registryFor } from '../lib/context.mjs';
+import { registryFor, requireStarted } from '../lib/context.mjs';
 export const PINNED = '2.0.15';
 export function pluginOutcome(log, pluginPath) {
   // The message and the plugin path must name the same event, not merely both appear
@@ -34,7 +34,7 @@ export async function run(ctx) {
   // The tracker makes the server lead its own process group: `opencode` forks the process that
   // keeps serving, and a signal to the spawned pid alone leaves that child running (observed
   // on the Linux host with v2.0.15).
-  const server = ctx.t.spawn('opencode', ['serve', '--hostname', '127.0.0.1', '--port', String(port)], { cwd: ctx.root, env: { ...ctx.env, OPENCODE_SERVER_PASSWORD: password }, stdio: 'ignore' });
+  const server = requireStarted(ctx.t.spawn('opencode', ['serve', '--hostname', '127.0.0.1', '--port', String(port)], { cwd: ctx.root, env: { ...ctx.env, OPENCODE_SERVER_PASSWORD: password }, stdio: 'ignore' }), 'opencode');
   const auth = { Authorization: `Basic ${Buffer.from(`opencode:${password}`).toString('base64')}` };
   for (let i = 0; i < 60; i++) { try { await fetch(`${base}/`, { signal: AbortSignal.timeout(FETCH_MS) }); break; } catch { await new Promise((r) => setTimeout(r, 250)); } }
   // v2.0.15 creates no project instance at startup; this request names the project, and the

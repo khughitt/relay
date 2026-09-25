@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readdirSync, writeFileSync, appendFileSync as log } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const SESSION_VARS = ['CLAUDECODE', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_ENTRYPOINT', 'CODEX_SESSION_ID', 'CODEX_THREAD_ID'];
@@ -27,6 +27,12 @@ export async function registryFor(clone, env) {
   return { paths, read: () => relay.readSnapshot({ paths }), list: () => relay.listAgents({ paths }), reap: () => relay.reapRegistry({ paths }) };
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// A child with no pid never started. The cause arrives a tick later as child.spawnError; the
+// synchronous check names the program only (its basename, so no path reaches a stage record).
+export function requireStarted(child, cmd) {
+  if (!child.pid) throw new Error(`cannot start ${basename(cmd)}: ${child.spawnError?.code ?? 'spawn failed'}`);
+  return child;
+}
 export function tracker(root) {
   const file = join(root, 'pids'), groups = new Map();
   let stopping = false, sweeper = null;
@@ -48,6 +54,9 @@ export function tracker(root) {
     // Retire eagerly on the leader's own exit too, not only on the 250ms tick: a fast-lived
     // child (no grandchildren) would otherwise leave its group, and the sweeper interval,
     // alive for up to 250ms after the caller has moved on and may have torn down `root`.
+    // A spawn failure (ENOENT, EACCES) is emitted as 'error' on the next tick; unheard, it would
+    // crash the probe. Record it on the child; callers that spawn directly check requireStarted.
+    child.on('error', (error) => { child.spawnError = error; });
     if (child.pid) { groups.set(child.pid, child); save(); child.once('exit', sweep); sweeper ??= setInterval(sweep, 250); sweeper.unref?.(); }
     return child;
   };

@@ -4,7 +4,8 @@ import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { isolatedEnv, prepareRoot, registryFor, tracker, fingerprint, changedPaths, WATCHED_FILES, WATCHED_TREES } from '../tools/darwin-probe/lib/context.mjs';
+import { isolatedEnv, prepareRoot, registryFor, requireStarted, tracker, fingerprint, changedPaths, WATCHED_FILES, WATCHED_TREES } from '../tools/darwin-probe/lib/context.mjs';
+import { readHidden } from '../tools/darwin-probe/lib/tty.mjs';
 import { compareCapture, rowFor } from '../tools/darwin-probe/lib/ps.mjs';
 import { installShell, startParent } from '../tools/darwin-probe/lib/parents.mjs';
 import { fleetTimeoutMs } from '../tools/darwin-probe/lib/fleet.mjs';
@@ -96,4 +97,20 @@ test('a constructed codex parent publishes its own qualified handle and stays al
 });
 test('a fleet waits longer the more agents are live', () => {
   assert.equal(fleetTimeoutMs(1, 0), 32000); assert.equal(fleetTimeoutMs(50, 0), 130000); assert.equal(fleetTimeoutMs(1, 50), 132000);
+});
+test('a child that cannot start records its spawn error instead of crashing the probe', async (t) => {
+  const r = root(t); const tr = tracker(r);
+  const child = tr.spawn(join(r, 'no-such-program'), [], { stdio: 'ignore' });
+  assert.equal(child.pid, undefined);
+  await new Promise((x) => setImmediate(x));
+  assert.equal(child.spawnError?.code, 'ENOENT');
+  assert.throws(() => requireStarted(child, join(r, 'no-such-program')), /cannot start no-such-program: ENOENT/);
+});
+test('a hidden paste skips a leading newline, keeps the first line, and Enter alone is empty', async () => {
+  const chunks = (...xs) => (async function* () { yield* xs.map((x) => Buffer.from(x)); })();
+  assert.equal(await readHidden(chunks('\nsk-ant-oat01-abc\n')), 'sk-ant-oat01-abc');
+  assert.equal(await readHidden(chunks('sk-ant-', 'oat01-abc', '\r')), 'sk-ant-oat01-abc');
+  assert.equal(await readHidden(chunks('\r')), '');
+  assert.equal(await readHidden(chunks('abc', '\u0003')), '');
+  assert.equal(await readHidden(chunks('first\nsecond\n')), 'first');
 });

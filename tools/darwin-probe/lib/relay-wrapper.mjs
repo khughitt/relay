@@ -20,15 +20,18 @@ if (args[0] === 'hook' && process.env.DARWIN_PROBE_HOOKS) {
   const payload = await buffer(process.stdin);
   stdin = Readable.from([payload]);
   let agentId = null; try { agentId = `${harness}:${JSON.parse(payload.toString('utf8')).session_id}`; } catch {}
+  // Whether the harness exported COLUMNS into this hook: capture() drops it for its own ps
+  // calls, so this records what relay's own ps saw.
+  const columns = process.env.COLUMNS ?? null;
   let record;
   try {
     const chain = createProcessOps().ancestors(process.pid);
     let resolved = null, error = null; try { resolved = adapterFor(harness).resolveSessionPid(); } catch (e) { error = e.code ?? e.message; }
     const upTo = chain.findIndex((r) => r.pid === resolved);
     const captured = chain.slice(1, upTo >= 0 ? upTo + 1 : Math.min(chain.length, 6));
-    record = { pid: process.pid, agent_id: agentId, resolved, error, ancestors: chain.map((r) => ({ pid: r.pid, ppid: r.ppid, comm: r.comm, tty: r.tty, starttime: r.starttime })),
+    record = { pid: process.pid, agent_id: agentId, columns, resolved, error, ancestors: chain.map((r) => ({ pid: r.pid, ppid: r.ppid, comm: r.comm, tty: r.tty, starttime: r.starttime })),
       captures: captured.map((r) => capture(r.pid, `hook-${r.pid}`)) };
-  } catch (e) { record = { pid: process.pid, agent_id: agentId, error: e.code ?? e.message }; }
+  } catch (e) { record = { pid: process.pid, agent_id: agentId, columns, error: e.code ?? e.message }; }
   appendFileSync(process.env.DARWIN_PROBE_HOOKS, `${JSON.stringify(record)}\n`);
 }
 const { main } = await import(pathToFileURL(join(clone, 'bin/relay.js')).href);
