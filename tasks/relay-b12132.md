@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: darwin-probe
 created: 2026-09-25T10:57:49Z
-updated: 2026-09-25T13:12:22Z
+updated: 2026-09-25T13:18:24Z
 started: 2026-09-25T10:57:57Z
 depends: []
 parent: relay-1231bf
@@ -61,3 +61,4 @@ The release gate relay-c19c0a carries: physical Darwin process/terminal verifica
   provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T13:12:22Z (darwin-probe): resumed
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T13:18:24Z (darwin-probe): Task 1 landed in ops a54e408 (feat(bin): let relay-guard-probe run Claude Code from a setup token); ops main fast-forwarded locally, not pushed
