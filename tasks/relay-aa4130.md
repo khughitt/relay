@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: relay-dc2b03
 created: 2026-09-25T21:41:04Z
-updated: 2026-09-25T21:43:00Z
+updated: 2026-09-25T21:45:21Z
 started: 2026-09-25T21:41:04Z
 completed: 2026-09-25T21:43:00Z
 depends: []
@@ -28,3 +28,4 @@ ops 1169107 (ops-4130ea) writes a harness's refreshed login back to ~/.codex/aut
   provenance: {"harness_session":"claude-code:3c606fb5-d94a-4c2d-b41f-4c120db27c0d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T21:43:00Z (relay-dc2b03): D7 fingerprints the harness's live login file around the ops probe's live run; isolationOf reports a change matching those readings as written_back (an ISO finding) and still gates any other change
   provenance: {"harness_session":"claude-code:3c606fb5-d94a-4c2d-b41f-4c120db27c0d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T21:45:21Z (relay-dc2b03): Review minor (deferred): an interrupted D7, or one that throws after its live run, writes no D7.json, so finalize sees no credential_write and a real write-back reads as 'live paths changed' (fails closed, but misleading). Fix if it bites: keep the write on ctx for finalize.

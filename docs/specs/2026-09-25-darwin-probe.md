@@ -126,7 +126,8 @@ gives relay). For every process it launches, it sets
 cache variables matter for D7b: OpenCode keeps its logs and data under
 `~/.local/share/opencode` and its cache under `~/.cache/opencode`. The probe never writes
 `~/.claude`, `~/.codex`, `~/.config/relay`, `~/.local/state/relay`, `~/.config/opencode`,
-`~/.local/share/opencode`, `~/.cache/opencode` or any live hook configuration. `run`
+`~/.local/share/opencode`, `~/.cache/opencode` or any live hook configuration, apart from
+the guard probe's login write-back below. `run`
 records the recursive mtimes and file counts of those paths before and after, and a
 change fails the attempt. The "after" reading is taken just before D9, which invites the
 user's own live sessions; what changes from there to the end is recorded as a finding,
@@ -325,7 +326,9 @@ Codex's nested route) and the handle check passes. A handle check that fails bec
 release too.
 
 Credentials: the ops probe copies `~/.claude/.credentials.json` and `~/.codex/auth.json`
-into the disposable config. Claude Code on macOS keeps its login in the Keychain, so the
+into the disposable config, and afterwards writes a login the harness refreshed there back
+to the live file, if the live file is unchanged (ops-4130ea): a refresh rotates the token,
+so the live copy would otherwise stop working. Claude Code on macOS keeps its login in the Keychain, so the
 file may not exist. When it is missing (and `claude` is on `PATH`), `run` asks at startup, before
 any stage, for the user to run `claude setup-token` and paste the token, or press Enter to
 skip Claude. It passes the token to the Claude
