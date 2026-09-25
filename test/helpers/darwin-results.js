@@ -30,8 +30,8 @@ export function passingResults({ platform = 'darwin' } = {}) {
         zombie: { status: 'alive', reason: 'qualified process matches' } } },
       D4: { id: 'D4', status: 'ran', observations: {
         chain: { ancestors_match: true, tty_match: true, resolved: 4101, expected: 4101 },
-        native: { recognized: true, executable: '/private/var/folders/x/relay-darwin-probe.1/n/claude/versions/9.9.9', executable_absolute: true },
-        argv: { expected_argv0: '/private/var/folders/x/relay-darwin-probe.1/sp ace/s h', result: null, error: 'PROCESS_UNREADABLE', ok: true },
+        native: { recognized: true, executable: '/private/tmp/rdp.AbC123/n/claude/versions/9.9.9', executable_absolute: true },
+        argv: { expected_argv0: '/private/tmp/rdp.AbC123/sp ace/s h', result: null, error: 'PROCESS_UNREADABLE', ok: true },
         captures: [{ pid: 4101, label: 'chain-claude', truncated: false }, { pid: 4102, label: 'native-claude', truncated: false }, { pid: 4103, label: 'argv-spaces', truncated: false }], comm_kind: 'path',
         table: { rows: 512, over_cut: 40, truncated: 0 } } },
       D5: { id: 'D5', status: 'ran', observations: {

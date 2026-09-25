@@ -6,7 +6,10 @@ BUNDLE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 command -v node >/dev/null 2>&1 || { echo "node is not installed (brew install node)" >&2; exit 2; }
 major=$(node -p 'process.versions.node.split(".")[0]')
 [ "$major" -ge 22 ] || { echo "node $major is older than 22 (brew install node)" >&2; exit 2; }
-ROOT=$(mktemp -d "${TMPDIR:-/tmp}/relay-darwin-probe.XXXXXX")
+# A short root under /tmp, not $TMPDIR: macOS puts TMPDIR under /var/folders/xx/<30 chars>/T/,
+# which would push a constructed parent (<root>/p/codex, a full path in Darwin's comm) past
+# the width plain `ps` gives relay.
+ROOT=$(mktemp -d /tmp/rdp.XXXXXX)
 cleanup() {
   if [ -f "$ROOT/pids" ]; then while read -r pid; do kill -s KILL -- "$pid" 2>/dev/null || true; done < "$ROOT/pids"; fi
   rm -rf "$ROOT"

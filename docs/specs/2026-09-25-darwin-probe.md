@@ -118,9 +118,11 @@ sessions); pressing Enter skips either. Expected wall clock is about 10 minutes,
 it the live harness sessions.
 
 Isolation: every file the probe writes lives under one root
-(`$TMPDIR/relay-darwin-probe.XXXXXX`). For every process it launches, it sets
+(`/tmp/rdp.XXXXXX`: short, because macOS's `TMPDIR` under `/var/folders` would push a
+constructed parent's path, which Darwin's `comm` holds in full, past the width plain `ps`
+gives relay). For every process it launches, it sets
 `RELAY_STATE_DIR`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `XDG_DATA_HOME`,
-`XDG_CACHE_HOME`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` inside that root. The data and
+`XDG_CACHE_HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and `TMPDIR` inside that root. The data and
 cache variables matter for D7b: OpenCode keeps its logs and data under
 `~/.local/share/opencode` and its cache under `~/.cache/opencode`. The probe never writes
 `~/.claude`, `~/.codex`, `~/.config/relay`, `~/.local/state/relay`, `~/.config/opencode`,
@@ -165,7 +167,7 @@ Darwin.
 
 ### D2 Suite — release gate
 
-Run `npm test` in the relay clone and record each test's result. Gate: no failure. The evidence also carries, by name, the three places
+Run `npm test`'s file set in the relay clone, less the probe's own `test/darwin-probe-*.test.js` (they repeat D5 and D8 and must not gate relay's release; the number excluded is recorded), and record each test's result. Gate: no failure. The evidence also carries, by name, the three places
 that weaken on Darwin (item 8). Each must be covered by a live check here: the
 `executableOf` early return by D4, the lock Darwin cases by D5's lock recovery, and the
 transaction assertion by D5's publishers, whose snapshot handles must carry

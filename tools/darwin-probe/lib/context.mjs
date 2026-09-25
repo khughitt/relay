@@ -9,10 +9,13 @@ export function isolatedEnv(root, base = process.env) {
   delete env.COLUMNS;
   for (const key of SESSION_VARS) delete env[key];
   return { ...env, RELAY_STATE_DIR: join(root, 'relay-state'), XDG_CONFIG_HOME: join(root, 'xdg'), XDG_STATE_HOME: join(root, 'state'),
-    XDG_DATA_HOME: join(root, 'data'), XDG_CACHE_HOME: join(root, 'cache'), CLAUDE_CONFIG_DIR: join(root, 'claude'), CODEX_HOME: join(root, 'codex') };
+    XDG_DATA_HOME: join(root, 'data'), XDG_CACHE_HOME: join(root, 'cache'), CLAUDE_CONFIG_DIR: join(root, 'claude'), CODEX_HOME: join(root, 'codex'),
+    // Temporary files too: relay's tests, npm, OpenCode and Node's own caches otherwise land in
+    // the host's TMPDIR, outside the root the run removes.
+    TMPDIR: join(root, 'tmp') };
 }
 export function prepareRoot(root) {
-  for (const dir of ['state', 'data', 'cache', 'claude', 'codex']) mkdirSync(join(root, dir), { recursive: true });
+  for (const dir of ['state', 'data', 'cache', 'claude', 'codex', 'tmp']) mkdirSync(join(root, dir), { recursive: true });
   mkdirSync(join(root, 'xdg/relay'), { recursive: true, mode: 0o700 });
   mkdirSync(join(root, 'relay-state'), { mode: 0o700 });
 }

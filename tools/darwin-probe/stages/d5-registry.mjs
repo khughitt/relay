@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { fleetBase, killParents, startFleet } from '../lib/fleet.mjs';
+import { fleetBase, killParents, PARENT_ROW_CUT, parentCapture, parentRowCut, startFleet } from '../lib/fleet.mjs';
 const pretool = (id, repo) => ({ event: 'PreToolUse', outerMs: 600000, payload: { session_id: id, cwd: repo, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'true' } } });
 const sessionEnd = (id, repo) => ({ event: 'SessionEnd', outerMs: 3000, payload: { session_id: id, cwd: repo } });
 const sameHandles = (before, after, ids) => ids.every((id) => after.agents[id] && JSON.stringify(before.agents[id]?.process) === JSON.stringify(after.agents[id].process));
@@ -15,6 +15,8 @@ export async function run(ctx) {
     const concurrent = { expected: 8, present: eight.filter((p) => snap?.agents[p.id]).length,
       handles_match: eight.every((p) => JSON.stringify(snap?.agents[p.id]?.process) === JSON.stringify(p.handle)),
       platforms: [...new Set(eight.map((p) => snap?.agents[p.id]?.process?.platform))], boot_ids_null: eight.every((p) => snap?.agents[p.id]?.process?.bootId === null) };
+    const parent_capture = parentCapture(eight[0].pid, 'd5-parent');
+    if (parentRowCut(parent_capture)) return { status: 'error', reason: PARENT_ROW_CUT, observations: { concurrent, parent_capture } };
     // Lock recovery through relay's own worker fixture, forked under the tracker. The worker
     // gets the isolated environment (not the ambient process.env), so it points at the same
     // state dir and never touches a real registry or lock file on this host.
@@ -63,6 +65,6 @@ export async function run(ctx) {
           revision_delta: (end.after?.revision ?? 0) - (end.before?.revision ?? 0), others_retained: sameHandles(end.before, end.after, ids) } };
       await killParents(ctx, [...live, timed]);
     }
-    return { status: 'ran', observations: { concurrent, lock: { holder, recovered, value }, reap, cost } };
+    return { status: 'ran', observations: { concurrent, parent_capture, lock: { holder, recovered, value }, reap, cost } };
   } finally { await killParents(ctx, all); }
 }

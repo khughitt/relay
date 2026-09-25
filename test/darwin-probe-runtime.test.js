@@ -12,7 +12,7 @@ import { createProcessOps } from '../src/index.js';
 const root = (t) => { const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true })); return d; };
 test('isolation sets every redirect and drops COLUMNS and session variables', (t) => {
   const r = root(t), env = isolatedEnv(r, { HOME: '/h', COLUMNS: '80', CLAUDE_CODE_SESSION_ID: 'x', PATH: '/bin' });
-  for (const k of ['RELAY_STATE_DIR','XDG_CONFIG_HOME','XDG_STATE_HOME','XDG_DATA_HOME','XDG_CACHE_HOME','CLAUDE_CONFIG_DIR','CODEX_HOME']) assert.ok(env[k].startsWith(r), k);
+  for (const k of ['RELAY_STATE_DIR','XDG_CONFIG_HOME','XDG_STATE_HOME','XDG_DATA_HOME','XDG_CACHE_HOME','CLAUDE_CONFIG_DIR','CODEX_HOME','TMPDIR']) assert.ok(env[k].startsWith(r), k);
   assert.equal(env.COLUMNS, undefined); assert.equal(env.CLAUDE_CODE_SESSION_ID, undefined); assert.equal(env.PATH, '/bin');
 });
 test('the watched set covers config and credentials, not session transcripts', () => {
