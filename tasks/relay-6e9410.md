@@ -1,13 +1,15 @@
 ---
 id: relay-6e9410
 title: "lock-multiprocess: an increment worker errors on Darwin (8 workers, dead-main reclamation)"
-status: todo
+status: doing
 priority: 1
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-09-25T17:33:41Z
-updated: 2026-09-25T20:04:10Z
+updated: 2026-09-25T20:04:18Z
+started: 2026-09-25T20:04:18Z
 depends: []
 parent: relay-1231bf
 tags: []
@@ -23,3 +25,5 @@ The first physical Mac run of the Darwin probe (macOS 26.7 arm64, node v25.8.2; 
 - 2026-09-25T19:18:53Z (main): Handed to a Mac Claude session (2026-09-25): code-only on branch mac/relay-6e9410 from main 0d56e30, returned as ~/Downloads/relay-mac.bundle + relay-mac-report.md; the Linux side merges, gates and closes. Brief: dist/relay-mac-handoff.md
 - 2026-09-25T20:04:03Z (main): Mac session (docs/runbooks/darwin-mac-handback-2026-09-25.md) found two causes. Scope narrowed to cause A: the last owner probe before the deadline gets the few ms left, ps is killed, and probe reports unknown, so a live owner at the deadline reads as LOCK_IDENTITY_UNKNOWN (9 of 30 CLI-test runs). Cause B, the reclaim race behind run 1's eight-worker error, is a protocol bug on every platform: null
 - 2026-09-25T20:04:10Z (main): Correction to the previous note: cause B is filed as relay-5e4d93 (the id printed as null).
+- 2026-09-25T20:04:18Z (main): started
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
