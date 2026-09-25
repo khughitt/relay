@@ -6,9 +6,9 @@ priority: 1
 size: m
 complexity: high
 process: planned
-owner: main
+owner: relay-5e4d93
 created: 2026-09-25T20:04:03Z
-updated: 2026-09-25T21:05:42Z
+updated: 2026-09-25T21:10:02Z
 started: 2026-09-25T21:02:11Z
 depends: []
 tags: [lock]
@@ -26,3 +26,6 @@ Found by the Mac session for relay-6e9410 (docs/runbooks/darwin-mac-handback-202
 - 2026-09-25T21:05:36Z (relay-5e4d93): Spec addendum drafted (docs/specs/2026-09-25-lock-reclamation-order.md): under the guard, probe then reread and unlink only an identical token; same recheck before declaring an abandoned guard. Mac repro reproduces on Linux against main; a throwaway reorder on a scratch copy fixes both variants. Awaiting user review.
 - 2026-09-25T21:05:42Z (relay-5e4d93): parked (waiting on user, review): User reviews docs/specs/2026-09-25-lock-reclamation-order.md in .worktrees/relay-5e4d93; on approval the agent writes the implementation plan (writing-plans), then implements
   provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T21:10:02Z (relay-5e4d93): resumed
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T21:10:02Z (relay-5e4d93): Spec approved by the user after correcting the zombie bullet to Linux only (Darwin's probe reads no process state). Next: implementation plan for review.

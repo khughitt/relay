@@ -1,6 +1,6 @@
 # Lock reclamation order
 
-Status: draft for review (2026-09-25).
+Status: approved 2026-09-25, after correcting the zombie bullet to Linux only.
 Task: `relay-5e4d93`.
 Amends: [Registry lock safety during extraction](2026-09-17-registry-lock-safety.md), the
 "Main owner confirmed dead" and "Reclamation guard owned by a confirmed-dead process" rows.
@@ -79,7 +79,9 @@ such as an operator removing files during active writers. It stays `IO_ERROR`, a
 Correctness rests on a dead verdict being true, which the process-handle contract already
 requires of every reclamation. That contract judges a process dead when:
 - it is absent;
-- it is a zombie;
+- on Linux, it is a zombie (Darwin's probe reads no process state, so there a zombie whose
+  start matches reads as alive until it is reaped: recovery waits longer, but the verdict
+  is never falsely dead);
 - its start time differs from the handle's (PID reuse);
 - or, on Linux, the boot changed.
 
