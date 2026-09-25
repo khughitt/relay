@@ -9,7 +9,7 @@ bundle on a Mac. Design: `docs/specs/2026-09-25-darwin-probe.md`; plan:
 1. On the Linux host, from clean relay and ops checkouts:
    `just darwin-bundle <ops checkout>`, then `just darwin-bundle-check dist/relay-darwin-probe-<sha>.tar.gz`.
 2. Copy the tarball to the Mac. There: `tar xzf relay-darwin-probe-<sha>.tar.gz && cd relay-darwin-probe-<sha> && ./run`.
-   Prerequisites: Node >= 22, the Xcode Command Line Tools, python3 >= 3.11. Close OpenCode first; if you use Claude Code, have `claude setup-token` ready (the probe asks for its output at the start).
+   Prerequisites: Node >= 22, the Xcode Command Line Tools (they provide the `cc` that builds the probe's constructed harness parents), python3 >= 3.11. Close OpenCode first; if you use Claude Code, have `claude setup-token` ready (the probe asks for its output at the start).
 3. Copy `relay-darwin-results-<stamp>.tar.gz` back and run `just darwin-judge <tarball> <ops checkout>`.
    Commit the appended section and `darwin-evidence.json`.
 

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { registryFor } from './context.mjs';
 import { capture, stripCapture } from './ps.mjs';
-import { installShell, startParent } from './parents.mjs';
+import { checkParent, installParent, startParent } from './parents.mjs';
 export async function fleetBase(ctx, stateDir) {
   mkdirSync(stateDir, { mode: 0o700, recursive: true });
   const env = { ...ctx.env, RELAY_STATE_DIR: stateDir };
@@ -13,23 +13,25 @@ export async function fleetBase(ctx, stateDir) {
   const repo = join(ctx.root, 'fleet-repo'); mkdirSync(repo, { recursive: true }); execFileSync('git', ['init', '-q', repo]);
   // A short path (the root is /tmp/rdp.XXXXXX) keeps D5 and D8 independent of the ps width
   // question D4 owns; parentCapture below confirms it on the Mac rather than assuming it.
-  const shell = installShell(join(ctx.root, 'p'), 'codex');
+  // A parent that cannot run is one stage error now, not a fleet timeout later.
+  await checkParent(ctx.t, ctx.root, env);
+  const parent = installParent(ctx.root, join(ctx.root, 'p'), 'codex');
   const { createProcessOps } = await import(pathToFileURL(join(ctx.clone, 'src/index.js')).href);
-  return { env, subscribers, repo, shell, ops: createProcessOps(), registry: await registryFor(ctx.clone, env) };
+  return { env, subscribers, repo, parent, ops: createProcessOps(), registry: await registryFor(ctx.clone, env) };
 }
 // Each publish probes every live agent, and on Darwin each probe is a ps spawn (~1,225 of them
 // for a 50-agent fleet), so a fleet's wait scales with the agents live while it starts.
 export const fleetTimeoutMs = (count, live = 0) => 30000 + 2000 * (count + live);
 export async function startFleet(ctx, base, { count, prefix, live = 0, extraSteps = () => [] }) {
-  const parents = [];
+  const parents = [], timeoutMs = fleetTimeoutMs(count, live);
   try {
     for (let i = 0; i < count; i++) {
       const id = `${prefix}${i}`;
-      const p = startParent(ctx.t, { shell: base.shell, clone: ctx.clone, workdir: join(ctx.root, 'fleet', id), env: base.env,
+      const p = startParent(ctx.t, { parent: base.parent, clone: ctx.clone, workdir: join(ctx.root, 'fleet', id), env: base.env, timeoutMs,
         plan: { harness: 'codex', subscribers: base.subscribers, steps: [{ event: 'SessionStart', outerMs: 600000, payload: { session_id: id, cwd: base.repo } }, ...extraSteps(id)] } });
       parents.push({ id: `codex:${id}`, pid: p.pid, handle: base.ops.handleOf(p.pid), done: p.done });
     }
-    const settled = await Promise.allSettled(parents.map((p) => p.done(fleetTimeoutMs(count, live))));
+    const settled = await Promise.allSettled(parents.map((p) => p.done()));
     const failed = settled.find((r) => r.status === 'rejected');
     if (failed) throw failed.reason;
     return parents.map((p, i) => ({ ...p, steps: settled[i].value }));

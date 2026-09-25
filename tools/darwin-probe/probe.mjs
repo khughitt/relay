@@ -89,7 +89,8 @@ async function main() {
   const isolated = isolatedEnv(root);
   for (const key of Object.keys(process.env)) if (!(key in isolated)) delete process.env[key];
   Object.assign(process.env, isolated);
-  // Before any git call: the Command Line Tools also provide the git this probe shells out to.
+  // Before any git call: the Command Line Tools also provide the git this probe shells out to
+  // and the cc that compiles its constructed harness parents (lib/parent.c).
   if (platform === 'darwin') {
     try { execFileSync('xcode-select', ['-p'], { stdio: 'ignore' }); }
     catch { die('the Xcode Command Line Tools are required: run xcode-select --install'); }

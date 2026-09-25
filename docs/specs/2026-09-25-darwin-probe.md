@@ -212,13 +212,22 @@ The capture targets are the constructed processes below and, in D7 and D9, real 
 processes. The judge compares the variants field by field. Truncation in relay's variant
 on any row whose full path is longer than the cut is recorded as the item-1 defect.
 
+Every constructed process below is a *constructed parent*: `tools/darwin-probe/lib/parent.c`,
+compiled on the host with `cc` (the Command Line Tools provide it) and copied under the
+harness's name. `parent CMD [ARGS...]` runs its command as a child, waits for it, then
+blocks until the probe kills it. It is not a copy of `/bin/sh`: macOS refuses to launch a
+copied Apple platform binary from `/tmp`, which killed the first Mac attempt's D4, D5 and
+D8 parents before they ran anything. Before D4, D5 and D8 use one, the probe runs a
+parent named `codex` with a `node` payload that writes a file, and a parent that cannot
+run is one stage error within five seconds.
+
 Then:
-- **A constructed chain.** `script` owns a pseudo-terminal and runs a copy of `/bin/sh`
+- **A constructed chain.** `script` owns a pseudo-terminal and runs a constructed parent
   named `claude`, placed under a long directory path so that the executable path exceeds
-  100 characters. That shell runs a `node` child. The check compares `ancestors()` with
+  100 characters. That parent runs a `node` child. The check compares `ancestors()` with
   an independent `ps -axo pid,ppid` walk, the recorded `tty` with `ps -o tty=`, and the
   Claude adapter's handle resolution with the process the chain was built to name.
-- **A Claude-shaped native install.** A copy of `/bin/sh` is placed at
+- **A Claude-shaped native install.** A constructed parent is placed at
   `<root>/…/claude/versions/9.9.9` and started under the name `9.9.9`. The check runs
   the version-shaped recognition rule and `executableOf` on it.
 - **`argvOf`** runs on a process whose executable path and arguments contain spaces.
@@ -238,13 +247,12 @@ evidence corrects the session-process spec's line 98 either way.
 This check uses a disposable state directory, and every publisher runs under a
 constructed harness parent. A hook launched directly by the probe has no recognized
 harness ancestor, so relay would correctly publish `process: null` and nothing
-Darwin-specific would be tested. The parent is a copy of `/bin/sh` at a short path
+Darwin-specific would be tested. The parent is a constructed parent (D4) at a short path
 (`<root>/p/codex`), started as `codex`, so the Codex adapter's rule (nearest ancestor
 whose `comm` is `codex`, no terminal required) names it. The short path keeps this check
 independent of the D4 width question. Each parent runs `relay hook --harness codex
-SessionStart` on a payload with its own session id and a git-initialized cwd, as a
-non-final command so the shell stays its parent. It then blocks reading a FIFO until the
-probe releases it. For each parent the probe records `handleOf(parent pid)` independently
+SessionStart` on a payload with its own session id and a git-initialized cwd, as its
+child, and then blocks until the probe kills it. For each parent the probe records `handleOf(parent pid)` independently
 before the hook runs.
 
 - **Concurrent writers.** Eight parents publish at once, and the final snapshot holds

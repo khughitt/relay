@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { isolatedEnv, prepareRoot, registryFor, requireStarted, tracker, fingerprint, changedPaths, WATCHED_FILES, WATCHED_TREES } from '../tools/darwin-probe/lib/context.mjs';
 import { readHidden } from '../tools/darwin-probe/lib/tty.mjs';
 import { compareCapture, rowFor } from '../tools/darwin-probe/lib/ps.mjs';
-import { installShell, startParent } from '../tools/darwin-probe/lib/parents.mjs';
+import { buildParent, checkParent, installParent, startParent } from '../tools/darwin-probe/lib/parents.mjs';
 import { fleetTimeoutMs } from '../tools/darwin-probe/lib/fleet.mjs';
 import { createProcessOps } from '../src/index.js';
 
@@ -86,14 +86,45 @@ test('a constructed codex parent publishes its own qualified handle and stays al
   t.after(async () => { await tr.killAll(); rmSync(r, { recursive: true, force: true }); });
   const env = isolatedEnv(r); writeFileSync(join(r, 'xdg/relay/subscribers.json'), '{"schema":1,"subscribers":[]}\n', { mode: 0o600 });
   const repo = join(r, 'repo'); mkdirSync(repo); execFileSync('git', ['init', '-q', repo]);
-  const shell = installShell(join(r, 'p'), 'codex');
-  const parent = startParent(tr, { shell, clone: process.cwd(), workdir: join(r, 'w0'), env, plan: { harness: 'codex',
+  const installed = installParent(r, join(r, 'p'), 'codex');
+  const parent = startParent(tr, { parent: installed, clone: process.cwd(), workdir: join(r, 'w0'), env, plan: { harness: 'codex',
     subscribers: join(r, 'xdg/relay/subscribers.json'), steps: [{ event: 'SessionStart', outerMs: 600000, payload: { session_id: 'k0', cwd: repo } }] } });
   const expected = createProcessOps().handleOf(parent.pid);
   const [step] = await parent.done();
   assert.equal(step.exit, 0);
   assert.deepEqual(step.after.agents['codex:k0'].process, expected);
+  // The compiled parent is named by its installed file and outlives its payload.
+  assert.equal(execFileSync('/bin/ps', ['-p', String(parent.pid), '-o', 'comm='], { encoding: 'utf8' }).trim(), 'codex');
+  await new Promise((x) => setTimeout(x, 300));
   assert.equal(createProcessOps().probe(expected).status, 'alive');
+});
+test('the parent is compiled once per root and every install is a copy of it', (t) => {
+  const r = root(t), built = buildParent(r);
+  assert.equal(built, join(r, 'bin/parent')); assert.equal(buildParent(r), built);
+  const a = installParent(r, join(r, 'sp ace'), 's h');
+  assert.equal(a, join(r, 'sp ace/s h')); assert.equal(statSync(a).mode & 0o777, 0o755);
+  assert.deepEqual(readFileSync(a), readFileSync(built));
+});
+test('a parent that runs its payload passes the check and leaves nothing behind', async (t) => {
+  const r = mkdtempSync(join(tmpdir(), 'dp-')); prepareRoot(r); const tr = tracker(r);
+  t.after(async () => { await tr.killAll(); rmSync(r, { recursive: true, force: true }); });
+  await checkParent(tr, r, isolatedEnv(r));
+  assert.deepEqual((await tr.killAll()).survivors, []);
+  assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes(join(r, 'pcheck/codex')), false);
+});
+test('a parent that cannot run its payload is one error line within five seconds', async (t) => {
+  const r = mkdtempSync(join(tmpdir(), 'dp-')); prepareRoot(r); const tr = tracker(r);
+  t.after(async () => { await tr.killAll(); rmSync(r, { recursive: true, force: true }); });
+  const junk = join(r, 'junk'); writeFileSync(junk, Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0, 1, 2, 3]));
+  const started = Date.now();
+  await assert.rejects(checkParent(tr, r, isolatedEnv(r), junk), (e) => /^constructed parent could not run: /.test(e.message) && !e.message.includes('\n'));
+  assert.ok(Date.now() - started < 5500, `${Date.now() - started}ms`);
+  assert.deepEqual((await tr.killAll()).survivors, []);
+});
+test('a failed build names cc and the head of its stderr', (t) => {
+  const r = root(t); const saved = process.env.PATH; process.env.PATH = join(r, 'nothing');
+  t.after(() => { process.env.PATH = saved; });
+  assert.throws(() => buildParent(r), (e) => /^cc /.test(e.message) && !e.message.includes('\n'));
 });
 test('a fleet waits longer the more agents are live', () => {
   assert.equal(fleetTimeoutMs(1, 0), 32000); assert.equal(fleetTimeoutMs(50, 0), 130000); assert.equal(fleetTimeoutMs(1, 50), 132000);
