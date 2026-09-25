@@ -11,6 +11,8 @@ const rules = {
     if (o.hosts.start.HostName === null) findings.push('HostName is not set: the host name can change with the network (spec item 4)');
     if (o.hosts.start.os !== o.hosts.end.os) findings.push('host changed during the run');
     if (o.columns_exported) findings.push('COLUMNS is exported in the user environment');
+    const expected = ['macos', 'node22', 'clt', 'python311'];
+    if (expected.some((k) => typeof o.prerequisites[k] !== 'boolean')) throw new Error('malformed prerequisites');
     const missing = Object.entries(o.prerequisites).filter(([k, v]) => !v && !(k === 'macos' && o.platform !== 'darwin')).map(([k]) => k);
     return result(missing.length === 0, missing.length ? `missing prerequisites: ${missing.join(', ')}` : 'environment recorded', findings);
   },

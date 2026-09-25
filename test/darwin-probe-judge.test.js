@@ -31,6 +31,14 @@ test('each release check fails the release on its own', () => {
     assert.equal(v.release, 'fail', id);
   }
 });
+test('an incomplete D0 prerequisites record is an error, not a silent pass', () => {
+  const empty = mutate((r) => { r.stages.D0.observations.prerequisites = {}; });
+  assert.equal(empty.checks.D0.verdict, 'error');
+  assert.equal(empty.release, 'incomplete');
+  const missingKey = mutate((r) => { delete r.stages.D0.observations.prerequisites.python311; });
+  assert.equal(missingKey.checks.D0.verdict, 'error');
+  assert.equal(missingKey.release, 'incomplete');
+});
 test('a fast but failed SessionEnd fails D5', () => {
   for (const f of [(c) => { c.exit = 1; }, (c) => { c.stderr = 'DEADLINE_EXCEEDED: registry'; }, (c) => { c.ending_absent = false; }, (c) => { c.others_retained = false; }, (c) => { c.revision_delta = 0; }, (c) => { c.ms = 3001; }])
     assert.equal(mutate((r) => f(r.stages.D5.observations.cost.n10.sessionend)).checks.D5.verdict, 'fail');
