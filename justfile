@@ -74,3 +74,31 @@ hook-pre-commit:
 # What the pre-push hook runs: the same commands as `gate`, under one hook target.
 hook-pre-push:
     {{tt}} hook-pre-push -- sh -c '{{check_cmd}} && {{test_cmd}}'
+
+# Build the Darwin probe bundle from clean relay and ops checkouts (docs/specs/2026-09-25-darwin-probe.md).
+darwin-bundle ops:
+    node tools/darwin-probe/bundle.mjs --ops {{ops}}
+
+# Unpack a bundle, clone both Git bundles, and run the ops guard preflight from the unpacked copies.
+darwin-bundle-check tarball:
+    #!/bin/sh
+    set -eu
+    d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
+    tar xzf "{{tarball}}" -C "$d"; b=$(echo "$d"/relay-darwin-probe-*)
+    git clone -q "$b/relay.bundle" "$d/relay"; git clone -q "$b/ops.bundle" "$d/ops"
+    mkdir -p "$d/out"
+    for h in claude-code codex; do
+      command -v "$( [ "$h" = claude-code ] && echo claude || echo codex )" >/dev/null || continue
+      python3 "$d/ops/bin/relay-guard-probe" --harness "$h" --relay "$d/relay/bin/relay.js" --guard "$d/ops/hooks/relay-guard" --out "$d/out" --skip-live >/dev/null
+      python3 - "$d/out/$h/results.json" <<'PY'
+    import json, sys
+    r = json.load(open(sys.argv[1]))["replay"]
+    assert "additionalContext" in r["clean"]["reply"], r
+    assert r["attribution"]["exit"] == 2 and '"deny"' in r["attribution"]["reply"], r
+    print("preflight ok:", sys.argv[1].split("/")[-2])
+    PY
+    done
+
+# Judge a returned results tarball and write docs/runbooks/darwin-probe.md and darwin-evidence.json.
+darwin-judge tarball ops:
+    node tools/darwin-probe/judge-cli.mjs --tarball {{tarball}} --ops {{ops}}
