@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { installShell } from '../lib/parents.mjs';
-import { capture, ps, tableCounts } from '../lib/ps.mjs';
+import { capture, tableCounts } from '../lib/ps.mjs';
 const REPORT = fileURLToPath(new URL('../lib/chain-report.mjs', import.meta.url));
 const wait = async (path, ms = 20000) => { const until = Date.now() + ms; while (!existsSync(path)) { if (Date.now() > until) throw new Error(`timeout waiting for ${path}`); await new Promise((r) => setTimeout(r, 50)); } };
 const normTty = (t) => (!t || t === '??' ? null : t.startsWith('tty') ? t : `tty${t}`);
@@ -15,25 +15,37 @@ export async function run(ctx) {
   const claude = installShell(longDir, 'claude');
   const chainOut = join(ctx.root, 'd4-chain.json');
   const script = ctx.t.spawn('script', ['-q', '/dev/null', claude, '-c', `"${process.execPath}" "${REPORT}" "${ctx.clone}" "${chainOut}" claude-code; true`], { env: ctx.env, stdio: 'ignore' });
-  await wait(chainOut);
-  const chain = JSON.parse(readFileSync(chainOut, 'utf8'));
-  await ctx.t.kill(script.pid);
+  let chain;
+  try {
+    await wait(chainOut);
+    chain = JSON.parse(readFileSync(chainOut, 'utf8'));
+  } finally {
+    await ctx.t.kill(script.pid);
+  }
   // 2. A Claude-shaped native install: …/claude/versions/9.9.9 started as `9.9.9`.
   const versioned = installShell(join(ctx.root, 'n/claude/versions'), '9.9.9');
   const nativeOut = join(ctx.root, 'd4-native.json');
   const native = ctx.t.spawn(versioned, ['-c', `"${process.execPath}" "${REPORT}" "${ctx.clone}" "${nativeOut}" claude-code; sleep 300; true`], { env: ctx.env, argv0: '9.9.9', stdio: 'ignore' });
-  await wait(nativeOut);
-  const nat = JSON.parse(readFileSync(nativeOut, 'utf8'));
-  let executable = null; try { executable = ops.executableOf(native.pid); } catch (e) { executable = `error:${e.code}`; }
-  await ctx.t.kill(native.pid);
+  let nat, executable = null;
+  try {
+    await wait(nativeOut);
+    nat = JSON.parse(readFileSync(nativeOut, 'utf8'));
+    try { executable = ops.executableOf(native.pid); } catch (e) { executable = `error:${e.code}`; }
+  } finally {
+    await ctx.t.kill(native.pid);
+  }
   // 3. argvOf on an executable path and arguments with spaces.
   const spaced = installShell(join(ctx.root, 'sp ace'), 's h');
   // `; true` keeps the shell itself alive: sh may exec a final simple command in its place.
-  const sp = ctx.t.spawn(spaced, ['-c', 'sleep 300; true', 'arg with space'], { stdio: 'ignore' });
-  await new Promise((r) => setTimeout(r, 300));
-  let argv = null, argvError = null; try { argv = ops.argvOf(sp.pid); } catch (e) { argvError = e.code; }
-  const spCapture = capture(sp.pid, 'argv-spaces');
-  await ctx.t.kill(sp.pid);
+  const sp = ctx.t.spawn(spaced, ['-c', 'sleep 300; true', 'arg with space'], { env: ctx.env, stdio: 'ignore' });
+  let argv = null, argvError = null, spCapture;
+  try {
+    await new Promise((r) => setTimeout(r, 300));
+    try { argv = ops.argvOf(sp.pid); } catch (e) { argvError = e.code; }
+    spCapture = capture(sp.pid, 'argv-spaces');
+  } finally {
+    await ctx.t.kill(sp.pid);
+  }
   const commWw = chain.capture.forms.comm.ww;
   const comm_kind = commWw === claude ? 'path' : commWw === 'claude' || commWw === claude.split('/').pop() ? 'argv0' : 'other';
   return { status: 'ran', observations: {
