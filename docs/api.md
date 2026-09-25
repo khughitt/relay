@@ -427,7 +427,11 @@ The CLI's commands are `relay list`, `relay reap [--outer-ms N]`,
 [--retire familiar] [--apply --artifact FILE]`, and `relay rollback --artifact FILE`; `relay --help`,
 `relay help [<command>]`, `relay <command> --help`, and `relay --version` round it out. `--json` and
 `--pretty` are global and mutually exclusive, `RELAY_FORMAT` sets the default, and `install` is JSON
-by default (its value is the installation artifact). List emits one JSON Listing under `--json`.
+by default (its value is the installation artifact). Each hook command it writes runs
+relay.js through the installer's own node (`process.execPath`, absolute and quoted), because a
+harness launched from the macOS GUI inherits launchd's `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`),
+where `#!/usr/bin/env node` finds no nvm or Homebrew node. That path can be version-specific (an
+nvm path always is): removing that node breaks installed hooks until relay is reinstalled. List emits one JSON Listing under `--json`.
 On failure any command exits 1 with one stderr envelope whose `kind` is `<command>_failed`:
 
 ```json

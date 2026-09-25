@@ -9,8 +9,11 @@ const table = {
 const nativeKey = event => event.startsWith('Notification:') ? 'Notification' : event;
 const esc = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const executable = "(?:'(?:[^']|'\\\\'')*'|[^\\s']+)";
-const command = (bin, harness, event, outerMs, subscribersPath) => `${shellQuote(bin)} hook --harness ${harness} --outer-ms ${outerMs} --subscribers ${shellQuote(subscribersPath)} ${event}`;
-const relay = (value, harness, event) => new RegExp(`^${executable} hook --harness ${esc(harness)}(?: --outer-ms \\d+)?(?: --subscribers ${executable})? ${esc(event)}$`).test(value);
+// The command names node itself: a harness started from the macOS GUI inherits launchd's
+// PATH (/usr/bin:/bin:/usr/sbin:/sbin), where relay.js's `#!/usr/bin/env node` finds no node.
+const command = (node, bin, harness, event, outerMs, subscribersPath) => `${shellQuote(node)} ${shellQuote(bin)} hook --harness ${harness} --outer-ms ${outerMs} --subscribers ${shellQuote(subscribersPath)} ${event}`;
+// An entry installed before the node path, with relay.js alone, is still relay's own.
+const relay = (value, harness, event) => new RegExp(`^(?:${executable} )?${executable} hook --harness ${esc(harness)}(?: --outer-ms \\d+)?(?: --subscribers ${executable})? ${esc(event)}$`).test(value);
 const familiar = (value, event) => new RegExp(`^${executable} hook(?: --agent codex)? ${esc(event)}(?: --agent codex)?$`).test(value);
 // Both harnesses store a hook's outer timeout in whole seconds; relay is told the same
 // budget in milliseconds. A profile that is not a positive whole second cannot be written.
@@ -25,8 +28,9 @@ export function bindingsFor(harness) {
   return table[harness].map(([event, matcher, outerMs = 600000]) => ({ event, matcher, outerMs }));
 }
 
-export function planHooks({ text, harness, relayBin, subscribersPath, retireFamiliar = false }) {
+export function planHooks({ text, harness, relayBin, subscribersPath, nodeBin = process.execPath, retireFamiliar = false }) {
   if (typeof subscribersPath !== 'string' || !isAbsolute(subscribersPath)) throw new Error('subscriber path must be absolute');
+  if (typeof nodeBin !== 'string' || !isAbsolute(nodeBin)) throw new Error('node path must be absolute');
   const errors = [], value = parse(text, errors, { allowTrailingComma: true });
   if (errors.length || value === null || typeof value !== 'object' || Array.isArray(value)
     || (value.hooks !== undefined && (value.hooks === null || typeof value.hooks !== 'object' || Array.isArray(value.hooks)))) {
@@ -43,7 +47,7 @@ export function planHooks({ text, harness, relayBin, subscribersPath, retireFami
     const old = matched.find(item => familiar(item.hooks[0].command, binding.event));
     if (old && !retireFamiliar) throw new Error(`familiar writer for ${binding.event} requires --retire familiar`);
     const next = existing.filter(item => item !== owned[0] && item !== old);
-    next.push(entry(command(relayBin, harness, binding.event, binding.outerMs, subscribersPath), binding.matcher, binding.outerMs));
+    next.push(entry(command(nodeBin, relayBin, harness, binding.event, binding.outerMs, subscribersPath), binding.matcher, binding.outerMs));
     const edits = modify(output, ['hooks', key], next, { formattingOptions: { insertSpaces: true, tabSize: 2 } });
     output = applyEdits(output, edits);
   }

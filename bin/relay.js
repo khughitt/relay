@@ -131,8 +131,8 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
       const subscribersPath = f['--subscribers'], subscribers = await loadSubscribersFrom(subscribersPath);
       const evidence = f['--evidence'] ? (await import('../src/install/capabilities.js')).parseEvidence(readFileSync(f['--evidence'], 'utf8')) : null;
       const relayBin = realpathSync(process.argv[1]); let artifact;
-      if (harness === 'claude-code') artifact = (await import('../src/install/claude-code.js')).planClaudeCode({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
-      else if (harness === 'codex') artifact = (await import('../src/install/codex.js')).planCodex({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
+      if (harness === 'claude-code') artifact = (await import('../src/install/claude-code.js')).planClaudeCode({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin: process.execPath, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
+      else if (harness === 'codex') artifact = (await import('../src/install/codex.js')).planCodex({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin: process.execPath, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
       else { const dir = f['--config-dir'], read = name => { const path = join(dir, name); return existsSync(path) ? readFileSync(path, 'utf8') : null; }; artifact = (await import('../src/install/opencode.js')).planOpenCode({ configDir: dir, json: read('opencode.json'), jsonc: read('opencode.jsonc'), relayPlugin: new URL('../integrations/opencode/plugin.js', import.meta.url).pathname, subscribers }); }
       if (f['--apply']) (await import('../src/install/atomic.js')).applyArtifact(f['--artifact'], artifact);
       if (!silent) {
