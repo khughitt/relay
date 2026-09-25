@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: darwin-probe
 created: 2026-09-25T10:57:49Z
-updated: 2026-09-25T13:07:19Z
+updated: 2026-09-25T13:12:22Z
 started: 2026-09-25T10:57:57Z
 depends: []
 parent: relay-1231bf
@@ -59,3 +59,5 @@ The release gate relay-c19c0a carries: physical Darwin process/terminal verifica
   provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-25T13:07:19Z (darwin-probe): parked (waiting on user, review): User re-reviews docs/plans/2026-09-25-darwin-probe.md at d31ad68 on branch darwin-probe (.worktrees/relay-b12132) and picks the execution method; agent then executes Task 1 (relay-db8ca9) onward
   provenance: {"harness_session":"claude-code:6562017c-99e6-4191-ae1d-ff9e25678dc0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-25T13:12:22Z (darwin-probe): resumed
+  provenance: {"harness_session":"claude-code:e2e5c9ac-0117-427a-bf31-489aecc94355","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
