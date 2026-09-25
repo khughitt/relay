@@ -73,8 +73,12 @@ export function packResults(dir, dest) {
 }
 // The spec's refusal: no credential file and no token leaves the Mac. A hit names the files.
 const CREDENTIAL_FILES = ['.credentials.json', 'auth.json'];
+// Codex's login holds JWTs (id and access tokens), which D7's harness output heads could carry;
+// the header segment of any JWT starts with base64url '{"', i.e. eyJ.
+const JWT = /eyJ[\w-]{8,}\.eyJ[\w-]{8,}\.[\w-]{16,}/;
 export function credentialHits(dir, token) {
-  return walkFiles(dir).filter((file) => CREDENTIAL_FILES.includes(basename(file)) || (!!token && readFileSync(file).includes(token)))
+  return walkFiles(dir).filter((file) => { const text = readFileSync(file);
+    return CREDENTIAL_FILES.includes(basename(file)) || (!!token && text.includes(token)) || JWT.test(text.toString('latin1')); })
     .map((file) => relative(dir, file));
 }
 // The scan covers the raw results as well as the redacted copy that is packed.
@@ -229,6 +233,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
   process.on('uncaughtException', crash); process.on('unhandledRejection', crash);
   main().catch((error) => {
     process.stderr.write(error instanceof ProbeError ? `${error.message}\n` : `${error.stack ?? error}\n`);
-    process.exit(2);
+    // A finalize that failed on the way out has already set CRASHED: the results were not packed.
+    process.exit(process.exitCode === CRASHED ? CRASHED : 2);
   });
 }

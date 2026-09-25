@@ -13,6 +13,7 @@ test('comm_kind reads the native and chain parents together', () => {
   const kind = (chainComm, nativeComm) => commKind({ chain: { path: chain, comm: chainComm }, native: { path: native, argv0: '9.9.9', comm: nativeComm } });
   assert.equal(kind(chain, '9.9.9'), 'argv0');
   assert.equal(kind(chain, native), 'path');
+  assert.equal(kind('claude', native), 'other'); // contradictory evidence decides nothing
   assert.equal(kind('claude', '9.9.9'), 'basename');
   assert.equal(kind(chain, 'node'), 'other');
   assert.equal(kind('claud', '9.9.9'), 'other');

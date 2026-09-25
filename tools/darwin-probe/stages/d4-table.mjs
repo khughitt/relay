@@ -23,7 +23,7 @@ const killStray = (path) => {
 // (9.9.9) is also its file name. The native parent separates path from argv[0]; the chain
 // parent then separates argv[0] (its path) from the file name (claude).
 export function commKind({ chain, native }) {
-  if (native.comm === native.path) return 'path';
+  if (native.comm === native.path) return chain.comm === chain.path ? 'path' : 'other';
   if (native.comm !== native.argv0) return 'other';
   if (chain.comm === chain.path) return 'argv0';
   return chain.comm === basename(chain.path) ? 'basename' : 'other';

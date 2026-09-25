@@ -92,6 +92,15 @@ test('a credential file or the token anywhere in the results is found', (t) => {
   assert.deepEqual(credentialHits(d, token).sort(), ['auth.json', 'logs/D7.log', 'stages/.credentials.json']);
   assert.deepEqual(credentialHits(d, null).sort(), ['auth.json', 'stages/.credentials.json']);
 });
+test('a JWT-shaped token (Codex\'s login) anywhere in the results is found', (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const jwt = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({ sub: 'user-123456', exp: 1900000000 })}.${'s'.repeat(43)}`;
+  writeFileSync(join(d, 'D7.log'), 'run a/allow: exit 0 after 12.0 s\n--- stdout\n{"note":"eyJ is a prefix","v":"a.b.c"}\n');
+  assert.deepEqual(credentialHits(d, null), []);
+  writeFileSync(join(d, 'D7.log'), `--- stderr\nAuthorization: Bearer ${jwt}\n`);
+  assert.deepEqual(credentialHits(d, null), ['D7.log']);
+});
 test('credential material in the raw results alone still refuses packing', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
   const raw = join(d, 'results'), out = join(d, 'out'), token = 'sk-ant-oat01-' + 'x'.repeat(40);
@@ -231,7 +240,8 @@ const timer = at > 0 && setInterval(() => {
   assert.equal(existsSync(join(root, 'results/stages/D0.json')), true);
   assert.equal(psArgs().includes('sleep 600.654'), false);
 });
-test('a failure while packing exits CRASHED, not the signal code, so run keeps the root', { timeout: 90000 }, async (t) => {
+const asRoot = process.getuid?.() === 0; // chmod does not stop root from writing
+test('a failure while packing exits CRASHED, not the signal code, so run keeps the root', { timeout: 90000, skip: asRoot }, async (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => { chmodSync(d, 0o755); rmSync(d, { recursive: true, force: true }); });
   const root = join(d, 'root'); mkdirSync(root);
   chmodSync(d, 0o555); // the tarball cannot be moved into the bundle directory
@@ -243,4 +253,30 @@ test('a failure while packing exits CRASHED, not the signal code, so run keeps t
   assert.equal(await exited, CRASHED, stderr);
   assert.match(stderr, /finalize failed/);
   assert.equal(psArgs().includes('sleep 600.654'), false);
+});
+test('a throw outside a stage whose finalize also fails exits CRASHED, not 2', { timeout: 60000, skip: asRoot }, async (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')), root = join(d, 'root'), results = join(root, 'results');
+  t.after(() => { chmodSync(results, 0o755); rmSync(d, { recursive: true, force: true }); });
+  // An unwritable results directory: the first stage's log cannot be opened (outside the
+  // stage's own try), and finalize cannot write the manifest either.
+  mkdirSync(results, { recursive: true }); chmodSync(results, 0o555);
+  const r = spawnSync(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', root, '--bundle', d], { encoding: 'utf8', timeout: 50000 });
+  assert.equal(r.status, CRASHED, r.stderr);
+  assert.match(r.stderr, /finalize failed/);
+});
+test('a kept root whose credential copy cannot be removed says so', { skip: asRoot }, (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  execFileSync('cp', ['tools/darwin-probe/run', join(d, 'run')]); mkdirSync(join(d, 'probe'));
+  writeFileSync(join(d, 'probe/probe.mjs'), `import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+const a = process.argv, root = a[a.indexOf('--root') + 1];
+writeFileSync(${JSON.stringify(join(d, 'root.txt'))}, root);
+mkdirSync(root + '/d7/locked', { recursive: true }); writeFileSync(root + '/d7/locked/auth.json', '{}'); chmodSync(root + '/d7/locked', 0o555);
+process.kill(process.pid, 'SIGKILL');
+`);
+  const r = spawnSync('/bin/sh', [join(d, 'run')], { encoding: 'utf8' });
+  const root = readFileSync(join(d, 'root.txt'), 'utf8');
+  t.after(() => { chmodSync(join(root, 'd7/locked'), 0o755); rmSync(root, { recursive: true, force: true }); });
+  assert.equal(r.status, 137, r.stderr);
+  assert.match(r.stderr, /could not remove every credential copy/);
+  assert.doesNotMatch(r.stderr, /credential copies removed/);
 });

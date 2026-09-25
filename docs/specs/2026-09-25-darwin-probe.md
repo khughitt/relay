@@ -138,8 +138,8 @@ unless node ended abnormally (a kill, or the probe's own crash, which it reports
 from it, and names it as unredacted. On macOS `run` holds `caffeinate -i` for its
 lifetime. `--stages` selects stages but never reorders them: they run in the order of
 this document. Before packing, the raw and the redacted results are scanned for a
-`.credentials.json` or `auth.json` file and for the Claude token; a hit names the files
-and nothing is packed.
+`.credentials.json` or `auth.json` file, for the Claude token and for a JWT-shaped token
+(Codex's login); a hit names the files and nothing is packed.
 
 ## Checks
 

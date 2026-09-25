@@ -16,8 +16,12 @@ cleanup() {
   if [ -f "$ROOT/pids" ]; then while read -r pid; do kill -s KILL -- "$pid" 2>/dev/null || true; done < "$ROOT/pids"; fi
   if [ -n "$KEEP" ]; then
     # A killed guard probe (D7) leaves its 0600 copy of a harness login under the root.
-    find "$ROOT" -type f \( -name auth.json -o -name .credentials.json \) -exec rm -f -- {} + 2>/dev/null || true
-    echo "the probe's working directory is kept at $ROOT; it is unredacted (credential copies removed), so do not send it" >&2 || true
+    if find "$ROOT" -type f \( -name auth.json -o -name .credentials.json \) -exec rm -f -- {} +; then
+      scrub="credential copies removed"
+    else
+      scrub="could not remove every credential copy: find $ROOT -name auth.json -o -name .credentials.json"
+    fi
+    echo "the probe's working directory is kept at $ROOT; it is unredacted ($scrub), so do not send it" >&2 || true
   else rm -rf "$ROOT"; fi
 }
 trap cleanup EXIT
