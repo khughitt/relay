@@ -3,6 +3,7 @@
 export const RELEASE = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D8'];
 const SESSIONEND_BUDGET_MS = 3000;
 const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+const COMM_KINDS = { path: 'the executable path', argv0: 'argv[0]', basename: 'the executable file name' };
 const result = (ok, detail, findings = []) => ({ verdict: ok ? 'pass' : 'fail', detail, findings });
 
 const rules = {
@@ -37,7 +38,7 @@ const rules = {
     const ok = o.captures.length >= 3 && o.chain.ancestors_match && o.chain.tty_match && o.chain.resolved === o.chain.expected
       && o.native.recognized && o.native.executable_absolute && o.argv.ok && truncated.length === 0;
     return result(ok, truncated.length ? `ps truncated relay's capture of ${truncated.join(', ')} (spec item 1)` : ok ? 'table, ancestry and arguments agree' : 'ancestry, recognition or argument mismatch',
-      [`Darwin comm holds the ${o.comm_kind === 'path' ? 'executable path' : o.comm_kind === 'argv0' ? 'argv[0]' : 'unexpected value'} (spec item 2)`,
+      [`Darwin comm holds ${COMM_KINDS[o.comm_kind] ?? 'an unexpected value'} (spec item 2)`,
        `process table: ${o.table.rows} rows, ${o.table.over_cut} past the cut, ${o.table.truncated} truncated as relay reads it`]);
   },
   D5(o) {

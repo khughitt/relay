@@ -64,6 +64,10 @@ test('findings are reported: host drift, unset HostName, zombie, comm kind', () 
   assert.ok(v.checks.D0.findings.some((f) => f.includes('HostName is not set')));
   assert.ok(v.checks.D3.findings.some((f) => f.includes('zombie')));
   assert.ok(v.checks.D4.findings.some((f) => f.includes('comm')));
+  const kind = (k) => mutate((r) => { r.stages.D4.observations.comm_kind = k; }).checks.D4.findings[0];
+  assert.equal(kind('argv0'), 'Darwin comm holds argv[0] (spec item 2)');
+  assert.equal(kind('basename'), 'Darwin comm holds the executable file name (spec item 2)');
+  assert.equal(kind('path'), 'Darwin comm holds the executable path (spec item 2)');
 });
 test('requirements the first draft missed each fail on their own', () => {
   assert.equal(mutate((r) => { r.stages.D4.observations.native.recognized = false; }).checks.D4.verdict, 'fail');

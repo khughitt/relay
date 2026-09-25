@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { checkParent, installParent } from '../lib/parents.mjs';
 import { requireStarted } from '../lib/context.mjs';
@@ -18,6 +18,16 @@ const killStray = (path) => {
     for (const target of [-Number(pid), Number(pid)]) { try { process.kill(target, 'SIGKILL'); } catch {} }
   }
 };
+// What Darwin's comm holds. Neither parent decides it alone: the chain parent is started with
+// its path as argv[0], so path and argv[0] read the same there, and the native parent's argv[0]
+// (9.9.9) is also its file name. The native parent separates path from argv[0]; the chain
+// parent then separates argv[0] (its path) from the file name (claude).
+export function commKind({ chain, native }) {
+  if (native.comm === native.path) return 'path';
+  if (native.comm !== native.argv0) return 'other';
+  if (chain.comm === chain.path) return 'argv0';
+  return chain.comm === basename(chain.path) ? 'basename' : 'other';
+}
 export async function run(ctx) {
   if (ctx.platform !== 'darwin') return { status: 'skipped', reason: 'darwin only', observations: {} };
   const { createProcessOps } = await import(pathToFileURL(join(ctx.clone, 'src/index.js')).href);
@@ -65,8 +75,8 @@ export async function run(ctx) {
   } finally {
     await ctx.t.kill(sp.pid);
   }
-  const commWw = chain.capture.forms.comm.ww;
-  const comm_kind = commWw === claude ? 'path' : commWw === 'claude' || commWw === claude.split('/').pop() ? 'argv0' : 'other';
+  const comm_kind = commKind({ chain: { path: claude, comm: chain.capture.forms.comm.ww },
+    native: { path: versioned, argv0: '9.9.9', comm: nat.capture.forms.comm.ww } });
   return { status: 'ran', observations: {
     chain: { ancestors_match: JSON.stringify(chain.ancestors_relay) === JSON.stringify(chain.ancestors_ps.slice(0, chain.ancestors_relay.length)),
       tty_match: chain.tty_relay === normTty(chain.tty_ps), resolved: chain.resolved, expected: chain.ppid, error: chain.error },
