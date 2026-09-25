@@ -23,4 +23,8 @@ test('D5 on this host: eight publishers, lock recovery, exact reap, SessionEnd m
 test('D8 reap keeps exactly the live half of its own fleet', { timeout: 120000 }, async (t) => {
   const o = (await d8(ctxFor(t))).observations;
   assert.equal(o.reap.exit, 0); assert.deepEqual(o.reap.kept.sort(), o.reap.expected_kept.sort()); assert.ok(o.reap.handles_unchanged);
+  // A PreToolUse deny under claude-code always exits 2 (src/adapters/reply.js:
+  // encodeStandardReply writes the refusal "as exit 2 with the reason on stderr"); the deny
+  // is what `denied` checks.
+  assert.equal(o.hook_path.exit, 2); assert.equal(o.hook_path.denied, true);
 });

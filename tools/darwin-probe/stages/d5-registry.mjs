@@ -15,15 +15,34 @@ export async function run(ctx) {
     const concurrent = { expected: 8, present: eight.filter((p) => snap?.agents[p.id]).length,
       handles_match: eight.every((p) => JSON.stringify(snap?.agents[p.id]?.process) === JSON.stringify(p.handle)),
       platforms: [...new Set(eight.map((p) => snap?.agents[p.id]?.process?.platform))], boot_ids_null: eight.every((p) => snap?.agents[p.id]?.process?.bootId === null) };
-    // Lock recovery through relay's own worker fixture, forked under the tracker.
+    // Lock recovery through relay's own worker fixture, forked under the tracker. The worker
+    // gets the isolated environment (not the ambient process.env), so it points at the same
+    // state dir and never touches a real registry or lock file on this host.
     const lockPath = base.registry.paths.lockPath;
-    const worker = ctx.t.fork(join(ctx.clone, 'test/fixtures/lock-worker.js'), ['hold-main', base.env.RELAY_STATE_DIR]);
-    const next = () => new Promise((r) => worker.once('message', r));
-    await next(); worker.send('start'); await next();
-    let holder = null; try { holder = JSON.parse(readFileSync(lockPath, 'utf8')).holder ?? null; } catch (e) { holder = `unreadable: ${e.code ?? e.message}`; }
-    await ctx.t.kill(worker.pid);
-    const { withLock } = await import(pathToFileURL(join(ctx.clone, 'src/bus/lock.js')).href);
-    let recovered = false, value = null; try { value = (await withLock(lockPath, () => 42)).value; recovered = value === 42; } catch (e) { value = e.code ?? e.message; }
+    const worker = ctx.t.fork(join(ctx.clone, 'test/fixtures/lock-worker.js'), ['hold-main', base.env.RELAY_STATE_DIR], { env: base.env });
+    // Each half of the handshake resolves on the expected message, or rejects on the worker
+    // exiting/erroring before it arrives, or after 10s — so a broken worker can never hang D5.
+    const next = () => new Promise((resolve, reject) => {
+      const cleanup = () => { clearTimeout(timer); worker.off('message', onMessage); worker.off('exit', onExit); worker.off('error', onError); };
+      const onMessage = (m) => { cleanup(); resolve(m); };
+      const onExit = (code, signal) => { cleanup(); reject(new Error(`lock worker exited before handshake (code=${code}, signal=${signal})`)); };
+      const onError = (err) => { cleanup(); reject(err); };
+      const timer = setTimeout(() => { cleanup(); reject(new Error('lock worker handshake timed out after 10000ms')); }, 10000);
+      worker.on('message', onMessage); worker.on('exit', onExit); worker.on('error', onError);
+    });
+    let holder = null, recovered = false, value = null;
+    try {
+      await next(); worker.send('start'); await next();
+      try { holder = JSON.parse(readFileSync(lockPath, 'utf8')).holder ?? null; } catch (e) { holder = `unreadable: ${e.code ?? e.message}`; }
+      await ctx.t.kill(worker.pid);
+      const { withLock } = await import(pathToFileURL(join(ctx.clone, 'src/bus/lock.js')).href);
+      try { value = (await withLock(lockPath, () => 42)).value; recovered = value === 42; } catch (e) { value = e.code ?? e.message; }
+    } catch (e) {
+      // The handshake itself failed: the rest of D5 (reap, cost) is still worth collecting, so
+      // record the failure instead of letting it abort the stage.
+      holder = null; recovered = false; value = `handshake failed: ${e.code ?? e.message ?? String(e)}`;
+      await ctx.t.kill(worker.pid);
+    }
     // Reap: kill four, keep four.
     await killParents(ctx, eight.slice(0, 4));
     const reaped = await base.registry.reap();
