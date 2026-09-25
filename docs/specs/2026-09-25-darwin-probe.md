@@ -1,0 +1,345 @@
+# The Darwin live probe
+
+Status: draft for review, 2026-09-25.
+Task: `relay-b12132`; gates `relay-c19c0a` (publish v0.1.0).
+Parent design: ops `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`),
+sections "Handle encodings", "Process identity and liveness" and "Required verification
+for the release". Execution brief: ops `docs/plans/2026-09-16-relay-bootstrap.md`, which
+keeps "physical Darwin validation remains a release gate"; README and `docs/api.md` say
+the same.
+Scope: a self-contained bundle, run once by the user on a physical Mac, that exercises
+every relay behaviour whose correctness depends on Darwin, returns redacted evidence, and
+is judged on the Linux host. It adds no relay runtime behaviour; the defects it finds are fixed
+in their own tasks.
+
+## Why
+
+Relay's Darwin paths have run only as fixture strings and mocks on Linux. An inventory of
+the source on 2026-09-25 found these untested assumptions:
+
+1. **`ps` width.** Relay calls `/bin/ps` without `-ww`. BSD `ps` writing to a pipe is
+   believed to cut the last column near 79 characters unless `COLUMNS` is set, and `comm`
+   is that column. A cut path (`…/claude/versions/2.1.280`, an npm Codex vendor path)
+   parses without error, so harness recognition would fail silently (`src/bus/proc.js`
+   `runDarwinPs`, `parseDarwinRow`, `argvOf`).
+2. **What `comm` holds.** Relay's session-process spec (line 98) treats Darwin `comm` as
+   the unabbreviated executable path; BSD `ps` may report argv[0] instead. The Claude
+   adapter's version-shaped check and `executableOf` (which on Darwin has no absolute-path
+   check) depend on the answer.
+3. **Time zone.** A Darwin handle's `start` is `lstart` read as local time. Publisher and
+   prober agree only if `ps` and Node interpret the same zone the same way; if they don't,
+   live agents look `process replaced` and `relay reap` deletes them.
+4. **Host name.** The Darwin `host` is `os.hostname()`, which can change with the network
+   when no `HostName` is set. A changed host makes every handle `unknown`: nothing is
+   reaped and a dead lock holder is never judged dead.
+5. **No zombie state.** Darwin rows carry `state: null`, so a zombie with the same start
+   reads `alive`.
+6. **Cost.** Every Darwin process read spawns `ps`, synchronously. A hook pays for one
+   table walk, argv reads, and one probe per registered agent. The tightest installed
+   budget is Codex `SessionEnd` at 3 s.
+7. **Hook `PATH`.** An installed hook runs `'<relay.js>' hook …` through `#!/usr/bin/env
+   node`. A harness launched from a GUI inherits launchd's `PATH`
+   (`/usr/bin:/bin:/usr/sbin:/sbin`), which has no Homebrew or nvm Node, so the hook would
+   exit 127. That is a non-blocking hook error, so guards would fail open.
+8. **Tests that weaken on Darwin.** `proc.test.js` returns early from its real
+   `executableOf` test off Linux, `lock.test.js` skips its Darwin loop cases, and
+   `transaction.test.js` asserts only on Linux. `cli-surface.test.js` needs Python 3.11.
+
+The user's MacBook is not reachable from the Linux host. On 2026-09-25 they chose a bundle they
+copy over and run, rather than ssh.
+
+## Shape
+
+```
+Linux host                               Mac                                Linux host
+just darwin-bundle  --copy-->  ./run  --> results tarball  --copy-->  just darwin-judge
+ (clean relay + ops commits)     (live probe, local verdict)            (authoritative verdict,
+                                                                         runbook + evidence)
+```
+
+Three units, each testable on its own:
+
+- **Bundle builder** (`tools/darwin-probe/bundle`, recipe `just darwin-bundle`). Refuses a
+  dirty relay or ops checkout. Writes `dist/relay-darwin-probe-<relay short sha>.tar.gz`
+  (gitignored) holding: `git archive HEAD` of relay (source and tests); the `npm pack`
+  tarball of that commit, which already bundles `jsonc-parser`; the ops guard files at a
+  recorded ops commit (`bin/relay-guard-probe`, `hooks/relay-guard`,
+  `hooks/claude-pretooluse`); the probe files; and `manifest.json` with both commits and
+  a sha256 per file.
+- **Live probe** (`run`, a POSIX `sh` entry, and `probe.mjs`). Runs the stages below,
+  writes raw observations, runs the judge locally so the user sees a verdict at the Mac,
+  and packs `relay-darwin-results-<timestamp>.tar.gz` beside the bundle.
+- **Judge** (`judge.mjs`). Pure functions from a results directory to a verdict per check.
+  Unit-tested on Linux against fixture result directories. The Linux host's run over the returned
+  tarball is the authoritative verdict.
+
+The probe observes; it does not patch relay. For example, it records `ps` output with and
+without `-ww` so the evidence shows whether relay needs the flag, but it runs relay as
+committed.
+
+## Running it
+
+The user copies the bundle to the Mac (AirDrop, Dropbox, or a USB stick), then:
+
+```sh
+tar xzf relay-darwin-probe-<sha>.tar.gz && cd relay-darwin-probe-<sha> && ./run
+```
+
+`run` verifies the manifest hashes, then checks prerequisites and stops with one line
+naming anything missing:
+- macOS;
+- Node >= 22 (`brew install node`);
+- the Xcode Command Line Tools (`xcode-select -p`), because `/usr/bin/git` is a shim
+  without them and relay's identity step runs git;
+- `python3` >= 3.11 (`brew install python`), which relay's `cli-surface` test and the ops
+  guard probe need.
+
+Two optional moments ask the user something (D7's credential token and D9's ambient
+sessions); pressing Enter skips either. Expected wall clock is about 10 minutes, most of
+it the live harness sessions.
+
+Isolation: every file the probe writes lives under one root
+(`$TMPDIR/relay-darwin-probe.XXXXXX`). For every process it launches, it sets
+`RELAY_STATE_DIR`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `CLAUDE_CONFIG_DIR` and
+`CODEX_HOME` inside that root. It never writes `~/.claude`, `~/.codex`, `~/.config/relay`,
+`~/.local/state/relay` or any live hook configuration. `run` records the mtimes of those
+paths before and after, and a change fails the attempt. A trap on `EXIT`, `INT` and `TERM`
+kills every pid the probe spawned (listed in `pids`) and removes the root, keeping only
+the results tarball.
+
+## Checks
+
+Each check has an id and a pass condition the judge evaluates from raw observations.
+Checks fall into three classes:
+- **Release gate** blocks `relay-c19c0a`.
+- **Cutover evidence** feeds `ai-539508`: a platform without it stays uncut-over, but the
+  release does not wait for it.
+- **Finding** is recorded and reported without gating, because no spec states the Darwin
+  answer yet. Each finding becomes a relay idea.
+
+### D0 Environment — release gate
+
+Records:
+- `sw_vers` and `uname -m`;
+- Node, npm, git and python3 versions, and `xcode-select -p`;
+- each harness's version and resolved executable path (`claude`, `codex`, `opencode`),
+  which tells native, Homebrew and npm installs apart;
+- `TZ`, and the zone name from `readlink /etc/localtime`;
+- `os.hostname()` plus `scutil --get HostName`, `LocalHostName` and `ComputerName`, taken
+  at the start and again at the end.
+
+Gate: the record is complete and every prerequisite is met. **Finding:** whether
+`HostName` is unset, which is the case where item 4's host drift can happen, and whether
+the host name changed during the run.
+
+### D1 Package — release gate
+
+Install the relay tarball with `npm install --offline` into an empty project with an empty
+cache. Run `relay --help`, and `relay list --json` against an empty state directory.
+Import every named export and both packaged fixtures. Gate: every command exits 0 and
+every export is defined. This proves the published artifact installs and loads on
+Darwin.
+
+### D2 Suite — release gate
+
+Run `npm test` on the archived source, using the installed dependencies, and record each
+test's result. Gate: no failure. The evidence also carries, by name, the three places
+that weaken on Darwin (item 8). Each must be covered by a live check here: the
+`executableOf` early return by D4, the lock Darwin cases by D5's lock recovery, and the
+transaction assertion by D5's publishers, whose snapshot handles must carry
+`platform: darwin` and `bootId: null`. Otherwise it is listed as uncovered.
+
+### D3 Process identity — release gate
+
+Spawns a `sleep` child and compares relay's `handleOf(pid)` with an independent reading
+(`ps -o lstart=` converted by `date -j -f`, not by relay's parser). Then, with the same
+child:
+
+- it computes the handle under `TZ=UTC` and probes under `TZ=Pacific/Chatham`, and the
+  reverse, and each time also with `TZ` unset against an explicit zone. The verdict is
+  `alive` every way, because the spec requires every reader to agree on the same epoch
+  seconds (item 3);
+- `probe` returns `alive` / `qualified process matches`, and after `SIGKILL` and wait
+  returns `dead` / `process absent`;
+- a handle with the right pid and a start one second off returns `dead` / `process
+  replaced`;
+- a handle naming another host returns `unknown` / `foreign host`, and one with
+  `platform: linux` returns `unknown` / `foreign platform`;
+- `handleOf(1)` (launchd) yields a valid handle with `bootId: null`.
+
+Gate: every comparison holds. **Finding:** what `probe` answers for a zombie child
+(item 5).
+
+### D4 Process table, ancestry and arguments — release gate
+
+Raw capture first. Every `ps` form relay uses (`-axo pid=,ppid=,tty=,lstart=,comm=`,
+`-p <pid> -o comm=`, `-p <pid> -o args=`) runs with stdout piped in three variants:
+- as relay runs it;
+- with `COLUMNS=500`;
+- with `-ww`.
+
+The capture targets are the constructed processes below and, in D7 and D9, real harness
+processes. The judge compares the variants field by field. Truncation in relay's variant
+on any row whose full path is longer than the cut is recorded as the item-1 defect.
+
+Then:
+- **A constructed chain.** `script` owns a pseudo-terminal and runs a copy of `/bin/sh`
+  named `claude`, placed under a long directory path so that the executable path exceeds
+  100 characters. That shell runs a `node` child. The check compares `ancestors()` with
+  an independent `ps -axo pid,ppid` walk, the recorded `tty` with `ps -o tty=`, and the
+  Claude adapter's handle resolution with the process the chain was built to name.
+- **A Claude-shaped native install.** A copy of `/bin/sh` is placed at
+  `<root>/…/claude/versions/9.9.9` and started under the name `9.9.9`. The check runs
+  the version-shaped recognition rule and `executableOf` on it.
+- **`argvOf`** runs on a process whose executable path and arguments contain spaces.
+
+Gate:
+- ancestry, tty and the constructed chain's resolution match;
+- `executableOf` returns an absolute path;
+- an argument boundary relay cannot establish fails closed with `PROCESS_UNREADABLE`,
+  never as a wrong argv;
+- relay's own variant of every capture is complete, or the judge names the truncation.
+
+**Finding:** whether Darwin `comm` is the executable path or argv[0] (item 2). The
+evidence corrects the session-process spec's line 98 either way.
+
+### D5 Registry, lock and cost — release gate
+
+This check uses a disposable state directory.
+
+- **Concurrent writers.** Eight concurrent `relay hook` `SessionStart` publishers each
+  write a distinct agent, and the final snapshot holds all eight.
+- **Lock recovery.** A lock holder is killed with `SIGKILL` while holding the lock. The
+  next writer must detect it as dead through its Darwin handle and recover. This exercises
+  the lock Darwin cases that `lock.test.js` skips.
+- **Reap.** `relay reap` removes an agent whose handle D3 proved dead and keeps one whose
+  handle is alive.
+- **Cost.** The probe times `PreToolUse` and Codex `SessionEnd` hooks with 0, 10 and 50
+  live agents registered (item 6).
+
+Gate: the first three hold, every published handle carries `platform: darwin` and
+`bootId: null`, and with 10 agents Codex `SessionEnd` completes within its installed
+3000 ms budget. The 50-agent timings are a finding.
+
+### D6 Dispatch without a harness — release gate
+
+Replays recorded Claude Code and Codex `PreToolUse` payloads through `relay hook` with
+three guards: one that allows, one that denies, and one that hangs. Gate: the allow and
+deny replies byte-match the Linux host's replay of the same inputs, the hanging guard is refused
+within its budget, and no guard process survives (checked with `ps`).
+
+### D7 Live harness sessions — cutover evidence
+
+For each harness installed on the Mac, runs ops `bin/relay-guard-probe` exactly as on
+the Linux host, which produces a Darwin evidence record. It adds two things:
+- during each run a sampler takes the D4 `ps` captures once a second, bounded to the run;
+- after each run it reads the disposable registry and checks that the published
+  `Agent.process` handle names the harness process that ran the hook: an ancestor of the
+  recorded hook pid whose executable is the harness.
+
+A harness that is not installed is recorded as absent. Gate: for each installed harness,
+the ops predicate `proven(summary, record)` holds (with the Linux host's `PENDING` entry for
+Codex's nested route) and the handle check passes. A handle check that fails because
+`comm` was truncated is the item-1 defect: it is filed against relay and blocks the
+release too.
+
+Credentials: the ops probe copies `~/.claude/.credentials.json` and `~/.codex/auth.json`
+into the disposable config. Claude Code on macOS keeps its login in the Keychain, so the
+file may not exist. When it is missing, `run` asks the user to run `claude setup-token`
+and paste the token, or press Enter to skip Claude. It passes the token to the Claude
+runs as `CLAUDE_CODE_OAUTH_TOKEN` and never writes it to disk or to results. This needs
+one ops change, made in this task's plan: today `bin/relay-guard-probe` copies the
+credentials file unconditionally and raises `FileNotFoundError` without it. With
+`CLAUDE_CODE_OAUTH_TOKEN` set, it will skip the copy for Claude Code and record
+`"credentials": "token"` in the summary. The bundle carries the ops commit that contains
+this change. If Codex keeps its credentials in the Keychain instead, Codex D7 is recorded
+as skipped with that reason.
+
+### D8 Launchd environment — release gate and cutover evidence
+
+- **Reap in a minimal environment.** `relay reap` runs under
+  `env -i HOME=<root> PATH=/usr/bin:/bin:<node dir> RELAY_STATE_DIR=<D5 state>`, the
+  minimal environment a scheduled job receives. Release gate: exit 0 and the same pruning
+  result as D5.
+- **Hook under launchd's `PATH`** (item 7). The probe renders the exact hook command
+  string that `relay install` would write, and runs it with `PATH=/usr/bin:/bin:/usr/sbin:/sbin`
+  on a recorded `PreToolUse` payload, with a denying guard subscribed. It records the
+  exit code and whether the denial arrived. Cutover evidence: a denial that did not
+  arrive means guards fail open for GUI-launched harnesses on this Mac, and `ai-539508`
+  must not cut over Darwin until relay's installer writes an absolute Node path or an
+  equivalent. That fix is a relay task, not this one.
+
+### D9 Ambient sessions — finding, optional
+
+Before D7, `run` offers: "Open an interactive `claude` (and, if you use it, `claude --bg`
+and `codex`) in another terminal, then press Enter; or press Enter to skip." It then takes
+the D4 captures of every running `claude`, `codex` and `opencode` process and its
+ancestors. It runs relay's recognition, handle resolution and terminal lookup offline over
+those rows. This is read-only: no hooks and no registry writes. It covers the
+TTY-owning, background (`bg-pty-host`, `daemon`) and GUI-launched shapes that headless D7
+cannot, and it supplies the Darwin background chain the session-process spec asks for.
+The rows keep only the process columns and the harness's own arguments, with the prompt
+text of any `-p` argument replaced by `<prompt>`.
+
+## Evidence and redaction
+
+Results hold raw observations per stage (JSON), stderr logs, and the judge's verdict.
+Before packing, every text file has these replaced:
+- the Mac's host names (all four from D0) with `<host>`;
+- the user name with `<user>`;
+- the home directory with `~`.
+
+`manifest.json` counts replacements per file, and the judge rejects a results tarball
+without those counts. No credential file or token is copied into the results root; `run`
+fails if one is found there, using the same check as the ops probe's final `find`.
+
+On the Linux host, `just darwin-judge <tarball>` verifies the manifest and re-derives every
+verdict. It writes `docs/runbooks/darwin-probe.md`, with one section per attempt covering:
+- the Mac's architecture and macOS version;
+- harness versions and install kinds;
+- the relay and ops commits;
+- the check table and the findings;
+- the `ps` width comparison;
+- skips and uncovered cases.
+
+It also writes `docs/runbooks/darwin-evidence.json`. D7's per-harness evidence records
+move to ops as Darwin variants of `relay-guard-evidence-<harness>.json` during
+`ai-539508`'s cutover, not in this task.
+
+## Failure handling
+
+A failed release gate means a relay defect or a probe defect. The judge names the check
+and its raw observation. The fix is filed as a relay task, `relay-c19c0a` stays blocked
+on `relay-b12132`, and the user reruns a new bundle. A partial run still packs results,
+so completed stages are analyzed before any rerun. Expected candidates, filed only if the
+evidence confirms them:
+- `-ww` on every relay `ps` call (item 1);
+- an absolute Node path in installed hook commands (item 7);
+- a Darwin zombie read (item 5);
+- a documented `HostName` precondition (item 4).
+
+## Testing the probe itself
+
+- The judge is covered by unit tests over fixture result directories: one passing, and
+  one per check with that check's failure.
+- The bundle builder is tested on the Linux host: it refuses dirty checkouts, and its output holds
+  exactly the manifest's files with matching hashes.
+- The stages that do not need Darwin (D1, D2, D5, D6, and D8's reap) run on the Linux host through
+  the same entry with `--allow-linux`, so the bundle is smoke-tested end to end before it
+  goes to the Mac. D3, D4, D7's sampler and D9 need Darwin `ps`, and the probe refuses to
+  run them elsewhere.
+
+## Out of scope
+
+- Familiar's Darwin terminal emission and any launchd schedule (`fam-6e8321`). Relay
+  ships no reap schedule; `relay reap` and every hook's own pruning are the only reaping.
+- tasks on Darwin: by the parent spec, tasks keeps its unverifiable/TTL claim behaviour
+  there, and native Darwin claim liveness is separate work.
+- Installing or changing any live hook on the Mac, which is `ai-539508`'s cutover.
+- Durability: relay's store renames without `fsync`, and macOS `fsync` does not flush
+  the drive cache (`F_FULLFSYNC`). Crash durability is not a Darwin-specific release
+  question.
+- Intel versus Apple silicon: the probe records the architecture; a second machine is
+  not required.
+- Running relay's justfile on the Mac: `setup` uses Linux `attr`, and the bundle does not
+  use the justfile there.
