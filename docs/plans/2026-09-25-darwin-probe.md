@@ -1057,6 +1057,8 @@ for (const step of plan.steps) {
     let stdout = '', stderr = '';
     child.stdout.on('data', (d) => { stdout += d; }); child.stderr.on('data', (d) => { stderr += d; });
     child.once('close', (exit) => resolve({ exit, stdout, stderr }));
+    // A hook that fails before reading its input closes stdin; its exit and stderr are the evidence.
+    child.stdin.on('error', (error) => { if (error.code !== 'EPIPE') stderr += `stdin: ${error.message}\n`; });
     child.stdin.end(JSON.stringify(step.payload));
   });
   const ms = performance.now() - started, after = await readSnapshot();
