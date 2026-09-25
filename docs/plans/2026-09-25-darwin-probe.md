@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft for review, 2026-09-25; revised after the first plan review (registry paths, process-group cleanup, D9 argument stripping, tolerant finalization, a stricter judge, bundle verification, `planHooks` for D8, hook-ancestry identity in D7, structural JSON redaction).
+**Status:** draft for review, 2026-09-25; revised after the second plan review (stop-first cleanup, owned-group signalling with a sweeper and survivor report, verdicts free of stage text and exported redacted, session-bound D7 identity) and the first (registry paths, process-group cleanup, D9 argument stripping, tolerant finalization, a stricter judge, bundle verification, `planHooks` for D8, hook-ancestry identity in D7, structural JSON redaction).
 
 **Goal:** Build the bundle, live probe and judge that `docs/specs/2026-09-25-darwin-probe.md`
 specifies, prove it end to end on the Linux host, and hand the user a bundle to run on
@@ -445,7 +445,9 @@ git commit -m "feat(tools): redact Darwin probe results without touching facts"
   checks. `ISO` requires `manifest.isolation.changed` to be an empty array. `D7w` fails
   when live-harness hook ancestry was truncated as relay reads it.
 - A rule that meets missing or malformed observations returns verdict `error`, and never
-  throws. `error`, `missing` and `skipped` release checks make the release `incomplete`.
+  throws. Verdicts never copy free text from observations: not `stage.reason`, not an
+  exception message. An errored stage's detail is `stage <status>`. The reason stays in
+  the stage file, which is redacted like every other results file. `error`, `missing` and `skipped` release checks make the release `incomplete`.
 - Cutover values are `pass`, `fail`, `absent` (the harness is not installed), `skipped`
   (installed but not run, for example no credentials), and `error` (the stage failed).
 
@@ -522,6 +524,15 @@ test('requirements the first draft missed each fail on their own', () => {
 test('partial observations are an error verdict, never a throw', () => {
   const v = mutate((r) => { r.stages.D0.observations.hosts.end = null; delete r.stages.D6.observations.hang; });
   assert.equal(v.checks.D0.verdict, 'error'); assert.equal(v.checks.D6.verdict, 'error'); assert.equal(v.release, 'incomplete');
+});
+test('verdicts never carry stage text', () => {
+  const v = mutate((r) => {
+    r.stages.D5 = { id: 'D5', status: 'error', reason: 'Error: EACCES /Users/alice/private-directory on Mac-A.local', observations: {} };
+    r.stages.D6.observations = { replies: null };
+  });
+  const text = JSON.stringify(v);
+  assert.equal(text.includes('/Users/alice'), false); assert.equal(text.includes('Mac-A'), false);
+  assert.equal(v.checks.D5.detail, 'stage error'); assert.equal(v.checks.D6.detail, 'malformed observations');
 });
 test('execution failures are distinct from absent harnesses', () => {
   assert.equal(mutate((r) => { r.stages.D7b = { id: 'D7b', status: 'error', reason: 'boom', observations: {} }; }).cutover.opencode, 'error');
@@ -607,7 +618,7 @@ const rules = {
     return result(ok, ok ? 'reap in a launchd-like environment keeps exactly the live agents' : 'reap in a minimal environment failed');
   },
 };
-const guarded = (fn, o) => { try { return fn(o); } catch (error) { return { verdict: 'error', detail: `malformed observations: ${error.message}`, findings: [] }; } };
+const guarded = (fn, o) => { try { return fn(o); } catch { return { verdict: 'error', detail: 'malformed observations', findings: [] }; } };
 
 function cutoverHarness(stage, name) {
   if (!stage) return 'missing';
@@ -641,7 +652,8 @@ export function judge(results) {
   for (const id of RELEASE) {
     const stage = results.stages[id];
     if (!stage) { checks[id] = { class: 'release', verdict: 'missing', detail: 'stage did not run', findings: [] }; continue; }
-    if (stage.status !== 'ran') { checks[id] = { class: 'release', verdict: stage.status === 'skipped' ? 'skipped' : 'error', detail: stage.reason ?? '', findings: [] }; continue; }
+    // Never stage.reason: it can carry raw paths and host names, and verdicts are exported.
+    if (stage.status !== 'ran') { checks[id] = { class: 'release', verdict: stage.status === 'skipped' ? 'skipped' : 'error', detail: `stage ${stage.status}`, findings: [] }; continue; }
     const observations = id === 'D5' ? { ...stage.observations, platform } : stage.observations;
     checks[id] = { class: 'release', ...guarded(rules[id], observations) };
   }
@@ -693,7 +705,16 @@ git commit -m "feat(tools): judge Darwin probe results into release and cutover 
     session variables, and sets the seven isolation variables.
   - `prepareRoot(root)`: creates `xdg/relay` (0700), `relay-state` (0700), and `state`,
     `data`, `cache`, `claude`, `codex`.
-  - `tracker(root) -> {spawn(cmd,args,opts), fork(module,args,opts), run(cmd,args,{env,cwd,input,timeoutMs,argv0}) -> Promise<{exit,signal,stdout,stderr,ms}>, kill(pgid) -> Promise<void>, killAll() -> Promise<void>}`.
+  - `tracker(root) -> {spawn(cmd,args,opts), fork(module,args,opts), run(cmd,args,{env,cwd,input,timeoutMs,argv0}) -> Promise<{exit,signal,stdout,stderr,ms}>, kill(pgid) -> Promise<void>, stop() -> void, stopping: boolean, killAll() -> Promise<{survivors: number[]}>}`.
+    Ownership rules:
+    - `kill(pgid)` signals only a group the tracker still owns, so a second kill of the
+      same group is a no-op.
+    - A sweeper checks every owned group every 250 ms and retires it once
+      `kill(-pgid, 0)` reports `ESRCH`, whether or not its leader has exited.
+    - After `stop()`, `spawn`, `fork` and `run` throw `Error('probe is stopping')`.
+    - `killAll()` repeats until the tracker owns nothing or 10 s pass, and returns the
+      groups still alive as `survivors`. `probe.mjs` records them in the manifest and
+      prints them.
     Every child is spawned `detached`, so it leads its own process group and a signal to
     `-pgid` reaches everything it forks: a harness under Python, a `sleep` under `sh`, or
     OpenCode's forked server. `<root>/pids` lists only the groups still owned, one `-pgid`
@@ -767,12 +788,31 @@ test('registry access follows the given env, never the ambient one', async (t) =
   const reg = await registryFor(process.cwd(), isolatedEnv(r));
   assert.equal(reg.paths.stateDir, join(r, 'relay-state'));
 });
+test('after stop, spawning is refused and a resumed stage cannot outlive cleanup', async (t) => {
+  const r = root(t); const tr = tracker(r);
+  // A stage that resumes whenever its child dies and immediately spawns another.
+  const stage = (async () => { for (;;) await tr.run('/bin/sleep', ['600.777']); })().catch((e) => e.message);
+  await new Promise((x) => setTimeout(x, 300));
+  tr.stop();
+  const { survivors } = await tr.killAll();
+  assert.deepEqual(survivors, []);
+  assert.equal(await stage, 'probe is stopping');
+  assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes('sleep 600.777'), false);
+  assert.throws(() => tr.spawn('/bin/true', []), /stopping/);
+});
+test('kill is idempotent and a group is retired when its last member exits', async (t) => {
+  const r = root(t); const tr = tracker(r);
+  const c = tr.spawn('/bin/sh', ['-c', 'sleep 0.3 & exit 0'], { stdio: 'ignore' });
+  await new Promise((x) => setTimeout(x, 1000));
+  assert.equal(readFileSync(join(r, 'pids'), 'utf8'), '');
+  await tr.kill(c.pid); await tr.kill(c.pid);
+});
 test('killAll reaches grandchildren and forgets only emptied groups', async (t) => {
   const r = root(t); const tr = tracker(r);
   const child = tr.spawn('/bin/sh', ['-c', 'sleep 600.321 & sleep 600.654; true'], { stdio: 'ignore' });
   await new Promise((x) => setTimeout(x, 300));
   assert.match(readFileSync(join(r, 'pids'), 'utf8'), new RegExp(`^-${child.pid}$`, 'm'));
-  await tr.killAll();
+  assert.deepEqual((await tr.killAll()).survivors, []);
   assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes('sleep 600.321'), false);
   assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes('sleep 600.654'), false);
   assert.equal(readFileSync(join(r, 'pids'), 'utf8'), '');
@@ -834,23 +874,35 @@ export async function registryFor(clone, env) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export function tracker(root) {
   const file = join(root, 'pids'), groups = new Map();
+  let stopping = false, sweeper = null;
   const save = () => writeFileSync(file, [...groups.keys()].map((g) => `-${g}\n`).join(''));
   const alive = (pgid) => { try { process.kill(-pgid, 0); return true; } catch (error) { return error.code === 'EPERM'; } };
-  const forget = (pgid) => { if (!alive(pgid)) { groups.delete(pgid); save(); } };
+  // Retire a group once it is empty, whichever member exits last; only owned, non-empty groups
+  // are ever signalled, which bounds the window in which a reused pgid could be hit.
+  const sweep = () => {
+    let changed = false;
+    for (const pgid of groups.keys()) if (!alive(pgid)) { groups.delete(pgid); changed = true; }
+    if (changed) save();
+    if (!groups.size && sweeper) { clearInterval(sweeper); sweeper = null; }
+  };
+  const refuse = () => { if (stopping) throw new Error('probe is stopping'); };
   // Every child leads its own process group, so one signal reaches everything it forks.
   const spawnTracked = (cmd, args, options = {}) => {
+    refuse();
     const child = spawn(cmd, args, { ...options, detached: true });
-    if (child.pid) { groups.set(child.pid, child); save(); child.once('exit', () => setTimeout(() => forget(child.pid), 100)); }
+    if (child.pid) { groups.set(child.pid, child); save(); sweeper ??= setInterval(sweep, 250); sweeper.unref?.(); }
     return child;
   };
   const kill = async (pgid) => {
-    try { process.kill(-pgid, 'SIGKILL'); } catch {}
+    if (!groups.has(pgid)) return;
+    if (alive(pgid)) { try { process.kill(-pgid, 'SIGKILL'); } catch {} }
     for (const until = Date.now() + 5000; alive(pgid) && Date.now() < until;) await sleep(50);
-    forget(pgid);
+    sweep();
   };
   const fork = (module, args, options = {}) => spawnTracked(process.execPath, [module, ...args], { ...options, stdio: options.stdio ?? ['ignore', 'ignore', 'inherit', 'ipc'] });
-  const run = (cmd, args, { env, cwd, input, timeoutMs = 600000, argv0 } = {}) => new Promise((resolve) => {
-    const started = performance.now(), child = spawnTracked(cmd, args, { env, cwd, argv0, stdio: ['pipe', 'pipe', 'pipe'] });
+  const run = (cmd, args, { env, cwd, input, timeoutMs = 600000, argv0 } = {}) => new Promise((resolve, reject) => {
+    let child; try { child = spawnTracked(cmd, args, { env, cwd, argv0, stdio: ['pipe', 'pipe', 'pipe'] }); } catch (error) { reject(error); return; }
+    const started = performance.now();
     let stdout = '', stderr = '';
     child.stdout.on('data', (d) => { stdout += d; }); child.stderr.on('data', (d) => { stderr += d; });
     const timer = setTimeout(() => { kill(child.pid); }, timeoutMs);
@@ -858,7 +910,11 @@ export function tracker(root) {
     child.once('close', (exit, signal) => { clearTimeout(timer); resolve({ exit, signal, stdout, stderr, ms: performance.now() - started }); });
     child.stdin.end(input ?? '');
   });
-  return { spawn: spawnTracked, fork, run, kill, killAll: () => Promise.all([...groups.keys()].map(kill)) };
+  const killAll = async () => {
+    for (const until = Date.now() + 10000; groups.size && Date.now() < until;) { await Promise.all([...groups.keys()].map(kill)); sweep(); }
+    return { survivors: [...groups.keys()].filter(alive) };
+  };
+  return { spawn: spawnTracked, fork, run, kill, killAll, stop: () => { stopping = true; }, get stopping() { return stopping; } };
 }
 // Live sessions the user keeps open (D9) write transcripts under ~/.claude and ~/.codex, so
 // those two are watched by their configuration and credential files only.
@@ -1000,7 +1056,7 @@ writeFileSync(join(dirname(planPath), 'done'), '');
 - [ ] **Step 6: Run to see it pass**
 
 Run: `node --test test/darwin-probe-runtime.test.js`
-Expected: PASS (7 tests). The parent test proves on Linux that the constructed-parent path
+Expected: PASS (9 tests). The parent test proves on Linux that the constructed-parent path
 publishes a qualified handle; D5 relies on the same path on Darwin.
 
 - [ ] **Step 7: Commit**
@@ -1648,10 +1704,12 @@ git commit -m "feat(tools): replay guard dispatch against the Linux host's recor
 - `relay-wrapper.mjs` is installed by D7 at `<clone>/node_modules/.darwin-probe/relay.js`,
   which is gitignored, so the clone stays clean for the ops probe's `relay_snapshot()`. D7
   passes that path to the ops probe as `--relay`. The ops probe then writes it into the
-  hook command, and every live `PreToolUse` hook runs as the wrapper process. Before
-  calling relay's exported `main`, the wrapper appends one JSON line to
-  `$DARWIN_PROBE_HOOKS`:
-  `{pid, resolved, ancestors: [{pid, ppid, comm, tty, starttime}], captures: [capture(ancestor)]}`.
+  hook command, and every live `PreToolUse` hook runs as the wrapper process. The
+  wrapper reads the hook payload from stdin, records its `session_id`, and passes the same
+  bytes to relay's exported `main` through `main`'s `stdin` option. Before calling `main`,
+  it appends one JSON line to `$DARWIN_PROBE_HOOKS`:
+  `{pid, agent_id, resolved, ancestors: [{pid, ppid, comm, tty, starttime}], captures: [capture(ancestor)]}`,
+  where `agent_id` is `<harness>:<session_id>`, the id relay publishes under.
   - `resolved` is the harness adapter's `resolveSessionPid()`.
   - `captures` are the Task 4 three-variant captures of every ancestor up to and
     including the resolved one.
@@ -1659,8 +1717,9 @@ git commit -m "feat(tools): replay guard dispatch against the Linux host's recor
   Relay's code runs unchanged, in the same process, so its ancestry is the real hook's
   ancestry.
 - D7 exports `identityProof(agents, invocations, parseRow, harness) -> {agents, matched, ok}`.
-  It is pure. An agent is proven when three things hold:
-  - one hook invocation resolved exactly the agent's `process.pid`;
+  It is pure. An agent is proven only by invocations from its own session, meaning those
+  whose `agent_id` equals the agent's registry id. Among those, three things must hold:
+  - the invocation resolved exactly the agent's `process.pid`;
   - that pid is in the invocation's recorded ancestry;
   - the ancestor's `-ww` row, parsed by relay's `parseDarwinRow`, has the agent's `start`
     and a `comm` naming the harness (`claude` or `codex` by basename, or Claude's
@@ -1692,16 +1751,17 @@ import { identityProof } from '../tools/darwin-probe/stages/d7-guard.mjs';
 import { pluginOutcome, PINNED } from '../tools/darwin-probe/stages/d7b-opencode.mjs';
 import { argSummary, stripCapture } from '../tools/darwin-probe/stages/d9-ambient.mjs';
 
-test('an agent is proven only through the hook that resolved it', () => {
+test('an agent is proven only through its own session\'s hook', () => {
   const parse = (line) => { const [pid, start, comm] = line.split(' '); return { pid: Number(pid), starttime: start, comm }; };
-  const inv = { resolved: 10, ancestors: [{ pid: 20 }, { pid: 10 }], captures: [{ pid: 10, forms: { row: { ww: '10 111 claude' } } }] };
-  assert.deepEqual(identityProof({ a: { process: { pid: 10, start: '111' } } }, [inv], parse, 'claude-code'), { agents: 1, matched: 1, ok: true });
-  // A harness with the right pid and start that no hook resolved is not proof.
-  assert.deepEqual(identityProof({ a: { process: { pid: 10, start: '111' } } }, [{ ...inv, resolved: 20 }], parse, 'claude-code').ok, false);
-  assert.equal(identityProof({ a: { process: { pid: 10, start: '999' } } }, [inv], parse, 'claude-code').ok, false);
-  assert.equal(identityProof({ a: { process: { pid: 10, start: '111' } } }, [{ ...inv, captures: [{ pid: 10, forms: { row: { ww: '10 111 node' } } }] }], parse, 'claude-code').ok, false);
-  assert.equal(identityProof({ a: { process: null } }, [inv], parse, 'claude-code').ok, false);
-  assert.equal(identityProof({}, [inv], parse, 'claude-code').ok, false);
+  const inv = (agent_id, pid, start) => ({ agent_id, resolved: pid, ancestors: [{ pid: 99 }, { pid }], captures: [{ pid, forms: { row: { ww: `${pid} ${start} claude` } } }] });
+  const A = inv('claude-code:A', 10, '111'), B = inv('claude-code:B', 20, '222');
+  assert.deepEqual(identityProof({ 'claude-code:A': { process: { pid: 10, start: '111' } } }, [A, B], parse, 'claude-code'), { agents: 1, matched: 1, ok: true });
+  // Agent A carrying session B's handle is not proven by B's evidence.
+  assert.equal(identityProof({ 'claude-code:A': { process: { pid: 20, start: '222' } } }, [A, B], parse, 'claude-code').ok, false);
+  assert.equal(identityProof({ 'claude-code:A': { process: { pid: 10, start: '999' } } }, [A], parse, 'claude-code').ok, false);
+  assert.equal(identityProof({ 'claude-code:A': { process: { pid: 10, start: '111' } } }, [{ ...A, captures: [{ pid: 10, forms: { row: { ww: '10 111 node' } } }] }], parse, 'claude-code').ok, false);
+  assert.equal(identityProof({ 'claude-code:A': { process: null } }, [A], parse, 'claude-code').ok, false);
+  assert.equal(identityProof({}, [A], parse, 'claude-code').ok, false);
 });
 test('OpenCode plugin outcomes at the pinned version', () => {
   const p = '/x/plugin';
@@ -1751,25 +1811,33 @@ export async function ask(question, { hidden = false } = {}) {
 // relay in this same process, so the recorded ancestry is the hook's real ancestry.
 import { appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { Readable } from 'node:stream';
+import { buffer } from 'node:stream/consumers';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const clone = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const { createProcessOps, adapterFor } = await import(pathToFileURL(join(clone, 'src/index.js')).href);
 const { capture } = await import(process.env.DARWIN_PROBE_PS);
 const args = process.argv.slice(2), harness = args[args.indexOf('--harness') + 1];
+let stdin = process.stdin;
 if (args[0] === 'hook' && process.env.DARWIN_PROBE_HOOKS) {
+  // Read the payload once: its session id binds this evidence to one agent, and the same
+  // bytes go on to relay.
+  const payload = await buffer(process.stdin);
+  stdin = Readable.from([payload]);
+  let agentId = null; try { agentId = `${harness}:${JSON.parse(payload.toString('utf8')).session_id}`; } catch {}
   let record;
   try {
     const chain = createProcessOps().ancestors(process.pid);
     let resolved = null, error = null; try { resolved = adapterFor(harness).resolveSessionPid(); } catch (e) { error = e.code ?? e.message; }
     const upTo = chain.findIndex((r) => r.pid === resolved);
     const captured = chain.slice(1, upTo >= 0 ? upTo + 1 : Math.min(chain.length, 6));
-    record = { pid: process.pid, resolved, error, ancestors: chain.map((r) => ({ pid: r.pid, ppid: r.ppid, comm: r.comm, tty: r.tty, starttime: r.starttime })),
+    record = { pid: process.pid, agent_id: agentId, resolved, error, ancestors: chain.map((r) => ({ pid: r.pid, ppid: r.ppid, comm: r.comm, tty: r.tty, starttime: r.starttime })),
       captures: captured.map((r) => capture(r.pid, `hook-${r.pid}`)) };
-  } catch (e) { record = { pid: process.pid, error: e.code ?? e.message }; }
+  } catch (e) { record = { pid: process.pid, agent_id: agentId, error: e.code ?? e.message }; }
   appendFileSync(process.env.DARWIN_PROBE_HOOKS, `${JSON.stringify(record)}\n`);
 }
 const { main } = await import(pathToFileURL(join(clone, 'bin/relay.js')).href);
-process.exit(await main(args));
+process.exit(await main(args, { stdin }));
 ```
 
 ```js
@@ -1784,8 +1852,9 @@ const WRAPPER = fileURLToPath(new URL('../lib/relay-wrapper.mjs', import.meta.ur
 const PS = new URL('../lib/ps.mjs', import.meta.url).href;
 const HARNESS_COMM = { 'claude-code': (c) => c === 'claude' || /^\d+\.\d+\.\d+$/.test(c), codex: (c) => c === 'codex' };
 export function identityProof(agents, invocations, parseRow, harness) {
-  const list = Object.values(agents);
-  const proven = (a) => a.process && invocations.some((inv) => {
+  const list = Object.entries(agents);
+  const proven = ([id, a]) => a.process && invocations.some((inv) => {
+    if (inv.agent_id !== id) return false;
     if (inv.resolved !== a.process.pid || !inv.ancestors?.some((r) => r.pid === a.process.pid)) return false;
     const row = inv.captures?.find((c) => c.pid === a.process.pid)?.forms?.row?.ww;
     if (!row) return false;
@@ -1976,13 +2045,19 @@ git commit -m "feat(tools): probe live guard sessions, OpenCode observation, and
   4. Runs the stages in order. Each stage's record is written as it completes.
   5. Calls D0's `finish`, then fingerprints again.
   6. Judges the raw results, then redacts the files into `<root>/out`.
-  7. Judges the redacted files as packed and writes both verdicts. If they differ, the
-     results are still packed with a warning, because the Linux host's CLI rejects them
-     and the partial evidence is still worth reading.
+  7. Judges the redacted files as packed and writes both verdicts. Each is passed through
+     `redactValue` with the same map before writing, so no verdict leaves the Mac
+     unredacted, although by construction a verdict carries no stage text. The two are
+     compared on their stable fields: `release`, each check's `class` and `verdict`, and
+     `cutover`. A difference is printed, and the results are still packed. The Linux host
+     rejects them, but their partial evidence is still worth reading.
   8. Packs `<bundle>/relay-darwin-results-<stamp>.tar.gz` and prints the verdict summary.
 
-  On `SIGINT` or `SIGTERM`, it kills every tracked process group and waits for each to
-  empty, packs what completed, and exits 130 or 143. The same finalization runs on normal
+  On `SIGINT` or `SIGTERM`, it first marks the run as stopping: the tracker refuses new
+  children, the stage loop starts no further stage, and a stage that returns after that is
+  not recorded. It then kills every owned group, waiting for each to empty, and records
+  any survivor in `manifest.cleanup.survivors`. It packs what completed and exits 130 or
+  143. The same finalization runs on normal
   completion. It tolerates partial observations: when D0 has run but has no end-of-run
   host reading, finalization takes it; the judge turns anything malformed into an `error`
   verdict.
@@ -1999,9 +2074,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cloneBundle, verifyManifest } from '../tools/darwin-probe/probe.mjs';
+import { cloneBundle, stableVerdict, verifyManifest } from '../tools/darwin-probe/probe.mjs';
 
 test('a tampered bundle file fails manifest verification', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
@@ -2010,6 +2085,11 @@ test('a tampered bundle file fails manifest verification', (t) => {
   assert.deepEqual(verifyManifest(d, manifest), []);
   writeFileSync(join(d, 'a.txt'), 'y');
   assert.deepEqual(verifyManifest(d, manifest), ['a.txt']);
+});
+test('verdicts compare on stable fields only', () => {
+  const v = { release: 'pass', cutover: { codex: 'absent' }, checks: { D0: { class: 'release', verdict: 'pass', detail: 'x', findings: ['a'] } } };
+  assert.deepEqual(stableVerdict(v), stableVerdict({ ...v, checks: { D0: { ...v.checks.D0, detail: 'y', findings: [] } } }));
+  assert.notDeepEqual(stableVerdict(v), stableVerdict({ ...v, release: 'fail' }));
 });
 test('a bundle verifies and clones outside any repository', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
@@ -2021,7 +2101,8 @@ test('a bundle verifies and clones outside any repository', (t) => {
 });
 test('SIGINT after a normal D0 packs results, fills D0, and leaves no grandchild', { timeout: 90000 }, async (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
-  // --self-test-hang runs the real D0, then a tracked `sh` that forks two sleeps, and waits.
+  // --self-test-hang runs the real D0, then a stage that respawns `sh` (with two sleeps)
+  // whenever it dies, which is the race between cleanup and a resuming stage.
   const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', join(d, 'root'), '--bundle', d], { stdio: 'ignore' });
   const ps = () => execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' });
   for (let i = 0; i < 100 && !ps().includes('sleep 600.654'); i++) await new Promise((r) => setTimeout(r, 200));
@@ -2033,7 +2114,10 @@ test('SIGINT after a normal D0 packs results, fills D0, and leaves no grandchild
   const d0 = JSON.parse(readFileSync(join(x, 'stages/D0.json'), 'utf8'));
   assert.equal(d0.status, 'ran'); assert.ok(d0.observations.hosts.end);
   assert.ok(JSON.parse(readFileSync(join(x, 'verdict.redacted.json'), 'utf8')).checks.D0);
+  assert.deepEqual(JSON.parse(readFileSync(join(x, 'manifest.json'), 'utf8')).cleanup.survivors, []);
+  await new Promise((r) => setTimeout(r, 1000));
   assert.equal(ps().includes('sleep 600.321'), false); assert.equal(ps().includes('sleep 600.654'), false);
+  for (const f of ['verdict.raw.json', 'verdict.redacted.json', 'manifest.json']) assert.equal(readFileSync(join(x, f), 'utf8').includes(homedir()), false, f);
 });
 ```
 
@@ -2052,7 +2136,7 @@ import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { changedPaths, fingerprint, isolatedEnv, prepareRoot, stageLog, tracker, writeStage } from './lib/context.mjs';
 import { judge } from './judge.mjs';
-import { collectHosts, redactFile, redactionMap } from './redact.mjs';
+import { collectHosts, redactFile, redactionMap, redactValue } from './redact.mjs';
 
 const STAGES = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D7b', 'D8', 'D9'];
 const MODULES = { D0: 'd0-env', D1: 'd1-package', D2: 'd2-suite', D3: 'd3-identity', D4: 'd4-table', D5: 'd5-registry', D6: 'd6-dispatch', D7: 'd7-guard', D7b: 'd7b-opencode', D8: 'd8-launchd', D9: 'd9-ambient' };
@@ -2080,6 +2164,9 @@ export function redactInto({ rawDir, outDir, map }) {
   const manifestPath = join(outDir, 'manifest.json'), m = JSON.parse(readFileSync(manifestPath, 'utf8'));
   m.redaction = { files: counts }; writeFileSync(manifestPath, `${JSON.stringify(m, null, 2)}\n`);
 }
+// The fields a redaction must not change; details and findings are prose.
+export const stableVerdict = (v) => ({ release: v.release, cutover: v.cutover,
+  checks: Object.fromEntries(Object.entries(v.checks).map(([id, c]) => [id, { class: c.class, verdict: c.verdict }])) });
 export function loadResults(dir) {
   const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'));
   const stagesDir = join(dir, 'stages');
@@ -2114,7 +2201,10 @@ async function main() {
   const d0mod = await import('./stages/d0-env.mjs');
   let finalizing = null;
   const finalize = (signalCode) => (finalizing ??= (async () => {
-    await t.killAll();
+    t.stop();
+    const { survivors } = await t.killAll();
+    record.cleanup = { survivors };
+    if (survivors.length) process.stderr.write(`process groups survived cleanup: ${survivors.join(', ')}\n`);
     // D0's end-of-run host reading, however the run ended.
     const d0path = join(raw, 'stages/D0.json');
     if (existsSync(d0path)) {
@@ -2131,9 +2221,10 @@ async function main() {
     // no host or user strings by construction, so the raw verdict is written as computed.
     redactInto({ rawDir: raw, outDir: out, map });
     const redactedVerdict = judge(loadResults(out));
-    writeFileSync(join(out, 'verdict.raw.json'), `${JSON.stringify(rawVerdict, null, 2)}\n`);
-    writeFileSync(join(out, 'verdict.redacted.json'), `${JSON.stringify(redactedVerdict, null, 2)}\n`);
-    if (JSON.stringify(rawVerdict) !== JSON.stringify(redactedVerdict)) process.stderr.write('redaction changed a verdict: the Linux host will reject these results\n');
+    const exported = (v) => `${JSON.stringify(redactValue(v, map, { host: 0, user: 0, home: 0 }), null, 2)}\n`;
+    writeFileSync(join(out, 'verdict.raw.json'), exported(rawVerdict));
+    writeFileSync(join(out, 'verdict.redacted.json'), exported(redactedVerdict));
+    if (JSON.stringify(stableVerdict(rawVerdict)) !== JSON.stringify(stableVerdict(redactedVerdict))) process.stderr.write('redaction changed a verdict: the Linux host will reject these results\n');
     const tarball = join(bundle, `relay-darwin-results-${stamp}.tar.gz`);
     execFileSync('tar', ['czf', tarball, '-C', out, '.']);
     process.stdout.write(`release: ${rawVerdict.release}\n${Object.entries(rawVerdict.checks).map(([id, c]) => `  ${id} ${c.verdict} — ${c.detail}`).join('\n')}\ncutover: ${JSON.stringify(rawVerdict.cutover)}\nresults: ${tarball}\n`);
@@ -2141,16 +2232,20 @@ async function main() {
   })());
   for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) process.once(signal, () => { finalize(signal).finally(() => process.exit(code)); });
   const stageRun = async (id, fn) => {
+    if (t.stopping) return;
     ctx.log = stageLog(raw, id);
     let rec; try { rec = await fn(ctx); } catch (error) { rec = { status: 'error', reason: error.stack ?? String(error), observations: {} }; }
+    if (t.stopping) return; // finalization owns the results directory from here on
     writeStage(raw, id, rec); ran.push(id);
   };
   if (selfTest) {
     await stageRun('D0', d0mod.run);
-    ctx.t.spawn('/bin/sh', ['-c', 'sleep 600.321 & sleep 600.654; true'], { stdio: 'ignore' });
-    await new Promise(() => {});
+    // A stage that resumes whenever its child dies, with grandchildren: the interrupt race.
+    await stageRun('D1', async () => { for (;;) await ctx.t.run('/bin/sh', ['-c', 'sleep 600.321 & sleep 600.654; true']); });
+    return;
   }
-  for (const id of values.stages ? values.stages.split(',') : STAGES) await stageRun(id, (await import(`./stages/${MODULES[id]}.mjs`)).run);
+  for (const id of values.stages ? values.stages.split(',') : STAGES) { if (t.stopping) break; await stageRun(id, (await import(`./stages/${MODULES[id]}.mjs`)).run); }
+  if (t.stopping) return;
   await finalize(null);
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main().catch((error) => { process.stderr.write(`${error.stack ?? error}\n`); process.exit(2); });
@@ -2404,11 +2499,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { judge } from './judge.mjs';
-import { loadResults } from './probe.mjs';
+import { loadResults, stableVerdict } from './probe.mjs';
 export function crossCheck(results, raw, redacted) {
-  const now = JSON.stringify(judge(results)), problems = [];
-  if (JSON.stringify(raw) !== now) problems.push('verdict.raw.json disagrees with the recomputed verdict');
-  if (JSON.stringify(redacted) !== now) problems.push('verdict.redacted.json disagrees with the recomputed verdict');
+  const now = JSON.stringify(stableVerdict(judge(results))), problems = [];
+  if (JSON.stringify(stableVerdict(raw)) !== now) problems.push('verdict.raw.json disagrees with the recomputed verdict');
+  if (JSON.stringify(stableVerdict(redacted)) !== now) problems.push('verdict.redacted.json disagrees with the recomputed verdict');
   if (!results.manifest.redaction?.files) problems.push('manifest has no redaction counts');
   return problems;
 }
