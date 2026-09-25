@@ -7,12 +7,13 @@ import { join, relative, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 import { isolatedEnv, prepareRoot, tracker } from './lib/context.mjs';
+import { cloneBundle } from './probe.mjs';
 import { replay } from './stages/d6-dispatch.mjs';
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 export function assertClean(dir) { if (git(['status', '--porcelain'], dir)) throw new Error(`${dir} is dirty; commit or stash first`); }
-export function shallowBundle(repo, dest) {
+export function gitBundle(repo, dest) {
   const head = git(['rev-parse', 'HEAD'], repo), branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], repo);
-  const tmp = mkdtempSync(join(tmpdir(), 'dpb-shallow-'));
+  const tmp = mkdtempSync(join(tmpdir(), 'dpb-clone-'));
   try {
     // Full clone, not `--depth 1`: gitformat-bundle(5) documents that "the Git bundle v2
     // format cannot represent a shallow clone repository" — `git bundle create` from a
@@ -31,23 +32,28 @@ const files = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n);
 export async function build({ relay, ops, out }) {
   assertClean(relay); assertClean(ops);
   const short = git(['rev-parse', '--short', 'HEAD'], relay), name = `relay-darwin-probe-${short}`;
-  const stage = mkdtempSync(join(tmpdir(), 'dpb-')), top = join(stage, name); mkdirSync(join(top, 'expected'), { recursive: true });
-  const relayCommit = shallowBundle(relay, join(top, 'relay.bundle')), opsCommit = shallowBundle(ops, join(top, 'ops.bundle'));
-  const tarball = execFileSync('npm', ['pack', '--silent', '--pack-destination', top], { cwd: relay, encoding: 'utf8' }).trim().split('\n').pop();
-  cpSync(join(relay, 'tools/darwin-probe'), join(top, 'probe'), { recursive: true });
-  cpSync(join(top, 'probe/run'), join(top, 'run')); chmodSync(join(top, 'run'), 0o755);
-  // The replies D6 must byte-match, produced here by the same code the Mac runs.
-  const root = mkdtempSync(join(tmpdir(), 'dpb-d6-')); prepareRoot(root); const t = tracker(root);
-  try { writeFileSync(join(top, 'expected/d6.json'), JSON.stringify(await replay({ root, env: isolatedEnv(root), t, clone: relay }), null, 2)); }
-  finally { await t.killAll(); rmSync(root, { recursive: true, force: true }); }
-  const manifest = { schema: 1, relay_commit: relayCommit, ops_commit: opsCommit, tarball, opencode_pinned: '2.0.15', created: new Date().toISOString(),
-    files: Object.fromEntries(files(top).map((p) => [relative(top, p), createHash('sha256').update(readFileSync(p)).digest('hex')])) };
-  writeFileSync(join(top, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  mkdirSync(out, { recursive: true });
-  const archive = join(resolve(out), `${name}.tar.gz`);
-  execFileSync('tar', ['czf', archive, '-C', stage, name]);
-  rmSync(stage, { recursive: true, force: true });
-  return { tarball: archive, manifest };
+  const stage = mkdtempSync(join(tmpdir(), 'dpb-'));
+  try {
+    const top = join(stage, name); mkdirSync(join(top, 'expected'), { recursive: true });
+    const relayCommit = gitBundle(relay, join(top, 'relay.bundle')), opsCommit = gitBundle(ops, join(top, 'ops.bundle'));
+    const tarball = execFileSync('npm', ['pack', '--silent', '--pack-destination', top], { cwd: relay, encoding: 'utf8' }).trim().split('\n').pop();
+    cpSync(join(relay, 'tools/darwin-probe'), join(top, 'probe'), { recursive: true });
+    cpSync(join(top, 'probe/run'), join(top, 'run')); chmodSync(join(top, 'run'), 0o755);
+    // The replies D6 must byte-match what the Mac gets: replayed against a fresh, verified
+    // clone of the relay.bundle just built (the shipped artifact), not the live checkout.
+    const root = mkdtempSync(join(tmpdir(), 'dpb-d6-')); prepareRoot(root); const t = tracker(root);
+    try {
+      const clone = cloneBundle(join(top, 'relay.bundle'), join(root, 'relay'), relayCommit, root);
+      writeFileSync(join(top, 'expected/d6.json'), JSON.stringify(await replay({ root, env: isolatedEnv(root), t, clone }), null, 2));
+    } finally { await t.killAll(); rmSync(root, { recursive: true, force: true }); }
+    const manifest = { schema: 1, relay_commit: relayCommit, ops_commit: opsCommit, tarball, opencode_pinned: '2.0.15', created: new Date().toISOString(),
+      files: Object.fromEntries(files(top).map((p) => [relative(top, p), createHash('sha256').update(readFileSync(p)).digest('hex')])) };
+    writeFileSync(join(top, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+    mkdirSync(out, { recursive: true });
+    const archive = join(resolve(out), `${name}.tar.gz`);
+    execFileSync('tar', ['czf', archive, '-C', stage, name]);
+    return { tarball: archive, manifest };
+  } finally { rmSync(stage, { recursive: true, force: true }); }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const { values } = parseArgs({ options: { ops: { type: 'string' }, out: { type: 'string', default: 'dist' } } });
