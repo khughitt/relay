@@ -106,7 +106,9 @@ export function judge(results) {
   const changed = results.manifest.isolation?.changed, duringD9 = results.manifest.isolation?.changed_during_d9 ?? [];
   // D9 invites the user's own live sessions, which may write their config; the gating reading
   // is taken before it, and what changed afterwards is reported only.
-  const d9Findings = duringD9.length ? [`changed while D9 sampled live sessions (not gated): ${duringD9.join(', ')}`] : [];
+  const writtenBack = results.manifest.isolation?.written_back ?? [];
+  const d9Findings = [...(duringD9.length ? [`changed while D9 sampled live sessions (not gated): ${duringD9.join(', ')}`] : []),
+    ...(writtenBack.length ? [`the guard probe wrote back a refreshed login (ops-4130ea; not gated): ${writtenBack.join(', ')}`] : [])];
   checks.ISO = { class: 'release', ...(Array.isArray(changed) ? result(changed.length === 0, changed.length ? `live paths changed: ${changed.join(', ')}` : 'no live path changed', d9Findings)
     : { verdict: 'error', detail: 'isolation fingerprints missing', findings: [] }) };
   checks.D7w = { class: 'release', ...liveWidth(results.stages.D7) };

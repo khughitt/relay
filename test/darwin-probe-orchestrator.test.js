@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, realpath
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { CRASHED, cloneBundle, credentialHits, loadResults, packResults, packingHits, requestedStages, stableVerdict, verifyManifest } from '../tools/darwin-probe/probe.mjs';
-import { isolationOf } from '../tools/darwin-probe/lib/context.mjs';
+import { credentialWrites, isolationOf } from '../tools/darwin-probe/lib/context.mjs';
 
 test('a tampered bundle file fails manifest verification', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
@@ -118,9 +118,30 @@ test('requested stages run in canonical order, once each, and an unknown id is r
 });
 test('the isolation reading is taken before D9 and later changes are only a finding', () => {
   const a = { '.codex/config.toml': { exists: true, size: 1 } }, b = { '.codex/config.toml': { exists: true, size: 2 } };
-  assert.deepEqual(isolationOf(a, null, a), { before: a, after: a, after_taken: 'finalize', changed: [], changed_during_d9: [] });
-  assert.deepEqual(isolationOf(a, a, b), { before: a, after: a, after_taken: 'before D9', changed: [], final: b, changed_during_d9: ['.codex/config.toml'] });
+  assert.deepEqual(isolationOf(a, null, a), { before: a, after: a, after_taken: 'finalize', changed: [], written_back: [], changed_during_d9: [] });
+  assert.deepEqual(isolationOf(a, a, b), { before: a, after: a, after_taken: 'before D9', changed: [], written_back: [], final: b, changed_during_d9: ['.codex/config.toml'] });
   assert.deepEqual(isolationOf(a, b, b).changed, ['.codex/config.toml']);
+});
+test('a login the guard probe wrote back is a finding, not a live-path change', () => {
+  // ops relay-guard-probe writes a harness's refreshed token back to the live file (ops-4130ea).
+  const f = (size, mtimeMs) => ({ exists: true, files: 1, size, mtimeMs });
+  const before = { '.codex/auth.json': f(10, 1), '.codex/config.toml': f(1, 1) };
+  const after = { '.codex/auth.json': f(12, 2), '.codex/config.toml': f(1, 1) };
+  const write = { path: '.codex/auth.json', before: f(10, 1), after: f(12, 2) };
+  const iso = isolationOf(before, null, after, [write]);
+  assert.deepEqual([iso.changed, iso.written_back], [[], ['.codex/auth.json']]);
+  assert.deepEqual(isolationOf(before, after, after, [write]).written_back, ['.codex/auth.json']);
+  // Any other change to that file, before or after D7's own readings, still gates.
+  assert.deepEqual(isolationOf(before, null, { ...after, '.codex/auth.json': f(13, 3) }, [write]).changed, ['.codex/auth.json']);
+  assert.deepEqual(isolationOf(before, null, after, [{ ...write, before: f(11, 1) }]).changed, ['.codex/auth.json']);
+  // A write D7 recorded for another path excuses nothing here.
+  assert.deepEqual(isolationOf(before, null, after, [{ ...write, path: '.claude/.credentials.json' }]).changed, ['.codex/auth.json']);
+});
+test('credential writes are read from each D7 harness observation', () => {
+  const w = { path: '.codex/auth.json', before: {}, after: {} };
+  assert.deepEqual(credentialWrites({ status: 'ran', observations: { 'claude-code': { status: 'absent' }, codex: { status: 'ran', credential_write: w } } }), [w]);
+  assert.deepEqual(credentialWrites(undefined), []);
+  assert.deepEqual(credentialWrites({ status: 'skipped', observations: {} }), []);
 });
 test('python3 older than 3.11, or none, stops the probe with one line (exit 2)', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));

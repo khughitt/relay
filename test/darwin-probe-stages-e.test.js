@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { identityProof, runHeads } from '../tools/darwin-probe/stages/d7-guard.mjs';
+import { credentialWrite, identityProof, runHeads } from '../tools/darwin-probe/stages/d7-guard.mjs';
 import { pluginOutcome, PINNED } from '../tools/darwin-probe/stages/d7b-opencode.mjs';
 import { argSummary, stripCapture } from '../tools/darwin-probe/stages/d9-ambient.mjs';
 
@@ -61,4 +61,9 @@ test('an output head is also cut to a byte budget', () => {
     const [entry] = runHeads(d);
     assert.ok(entry.length < 4200, String(entry.length));
   } finally { rmSync(d, { recursive: true, force: true }); }
+});
+test('a credential file is recorded as written only when its reading changed across the live run', () => {
+  const r = (size) => ({ exists: true, files: 1, size, mtimeMs: 5 });
+  assert.equal(credentialWrite('.codex/auth.json', r(1), r(1)), undefined);
+  assert.deepEqual(credentialWrite('.codex/auth.json', r(1), r(2)), { path: '.codex/auth.json', before: r(1), after: r(2) });
 });

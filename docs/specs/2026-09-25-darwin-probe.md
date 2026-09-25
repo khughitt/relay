@@ -130,7 +130,10 @@ cache variables matter for D7b: OpenCode keeps its logs and data under
 records the recursive mtimes and file counts of those paths before and after, and a
 change fails the attempt. The "after" reading is taken just before D9, which invites the
 user's own live sessions; what changes from there to the end is recorded as a finding,
-not gated. The probe handles `INT`, `TERM` and `HUP` itself (a closed terminal included):
+not gated. One change is expected: the ops guard probe writes a harness's refreshed login
+back to `~/.codex/auth.json` or `~/.claude/.credentials.json` (ops-4130ea). D7 reads that
+file just before and after the live run it drives, and a change whose run-wide readings
+equal D7's own is recorded as written back, a finding; any other change to it still fails. The probe handles `INT`, `TERM` and `HUP` itself (a closed terminal included):
 it kills every pid it spawned (listed in `pids`) and packs the results. `run`'s `EXIT`
 trap kills anything still listed and removes the root, keeping only the results tarball,
 unless node ended abnormally (a kill, or the probe's own crash, which it reports as exit

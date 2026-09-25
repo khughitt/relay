@@ -117,3 +117,8 @@ test('a missing or errored 50-agent measurement is a finding and never decides D
   // n10 still gates: an errored n10 is not a pass.
   assert.notEqual(mutate((r) => { r.stages.D5.observations.cost.n10 = { error: 'x' }; }).checks.D5.verdict, 'pass');
 });
+test('a login the guard probe wrote back passes ISO with a finding', () => {
+  const v = mutate((r) => { r.manifest.isolation.written_back = ['.codex/auth.json']; });
+  assert.equal(v.checks.ISO.verdict, 'pass');
+  assert.ok(v.checks.ISO.findings.some((f) => f.includes('.codex/auth.json') && f.includes('wrote back')), JSON.stringify(v.checks.ISO));
+});

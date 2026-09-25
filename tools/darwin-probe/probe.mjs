@@ -6,7 +6,7 @@ import { basename, delimiter, dirname, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import { fingerprint, isolatedEnv, isolationOf, prepareRoot, stageLog, tracker, writeStage } from './lib/context.mjs';
+import { credentialWrites, fingerprint, isolatedEnv, isolationOf, prepareRoot, stageLog, tracker, writeStage } from './lib/context.mjs';
 import { ask } from './lib/tty.mjs';
 import { pythonAtLeast } from './stages/d0-env.mjs';
 import { judge } from './judge.mjs';
@@ -157,7 +157,8 @@ async function main() {
       const d0 = JSON.parse(readFileSync(d0path, 'utf8'));
       if (d0.status === 'ran' && !d0.observations?.hosts?.end) { try { writeStage(raw, 'D0', await d0mod.finish(ctx, d0)); } catch (error) { ctx.log?.(`D0 finish: ${error.message}`); } }
     }
-    Object.assign(record, { finished: new Date().toISOString(), isolation: isolationOf(before, beforeD9, fingerprint(home)), interrupted: signalCode ?? null });
+    const d7path = join(raw, 'stages/D7.json'), d7 = existsSync(d7path) ? JSON.parse(readFileSync(d7path, 'utf8')) : undefined;
+    Object.assign(record, { finished: new Date().toISOString(), isolation: isolationOf(before, beforeD9, fingerprint(home), credentialWrites(d7)), interrupted: signalCode ?? null });
     writeFileSync(join(raw, 'manifest.json'), `${JSON.stringify(record, null, 2)}\n`);
     const results = loadResults(raw);
     // Seed the host list with the machine's own name too: collectHosts only sees hosts a

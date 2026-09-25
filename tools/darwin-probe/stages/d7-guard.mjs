@@ -2,7 +2,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSy
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { registryFor } from '../lib/context.mjs';
+import { fingerprint, registryFor } from '../lib/context.mjs';
 import { stripCapture } from '../lib/ps.mjs';
 const WRAPPER = fileURLToPath(new URL('../lib/relay-wrapper.mjs', import.meta.url));
 const PS = new URL('../lib/ps.mjs', import.meta.url).href;
@@ -34,6 +34,10 @@ export function runHeads(harnessDir) {
     return `run ${attempt}/${name}: exit ${read('exit').trim() || '?'} after ${read('seconds').trim() || '?'} s\n--- stderr\n${head(read('stderr'))}\n--- stdout\n${head(read('transcript.jsonl'))}`;
   }));
 }
+// The harness's live login file, read around the live run: the ops probe writes a refreshed
+// token back to it (ops-4130ea), which the isolation check then accepts as that write-back.
+const CREDENTIAL = { 'claude-code': '.claude/.credentials.json', codex: '.codex/auth.json' };
+export const credentialWrite = (path, before, after) => (JSON.stringify(before) === JSON.stringify(after) ? undefined : { path, before, after });
 const PROVEN = `import json, runpy, sys
 proven = runpy.run_path(sys.argv[1])["proven"]
 print(json.dumps(bool(proven(json.load(open(sys.argv[2])), json.load(open(sys.argv[3]))))))`;
@@ -63,13 +67,15 @@ async function oneHarness(ctx, harness, token) {
   const replay = JSON.parse(readFileSync(join(out, harness, 'results.json'), 'utf8')).replay;
   const preflight = { allow: !!replay?.clean?.reply?.includes('additionalContext'), deny: replay?.attribution?.exit === 2 && replay.attribution.reply.includes('"deny"') };
   if (!preflight.allow || !preflight.deny) return { status: 'ran', preflight, proven: false, hook: { invocations: 0, truncated: false }, handle: { agents: 0, matched: 0, ok: false }, reason: 'preflight replies wrong' };
+  const credential = CREDENTIAL[harness], credentialBefore = fingerprint(homedir())[credential];
   const live = await ctx.t.run('python3', [probe, ...args], { env, timeoutMs: 3600000 });
+  const credential_write = credentialWrite(credential, credentialBefore, fingerprint(homedir())[credential]);
   ctx.log(`live ${harness}: exit ${live.exit}\n${live.stderr}`);
   for (const entry of runHeads(join(out, harness))) ctx.log(entry);
   const results = join(out, harness, 'results.json'), evidence = join(out, harness, 'evidence.json');
-  if (!existsSync(results) || !existsSync(evidence)) return { status: 'error', reason: `live run exited ${live.exit} without results`, preflight };
+  if (!existsSync(results) || !existsSync(evidence)) return { status: 'error', reason: `live run exited ${live.exit} without results`, preflight, credential_write };
   const again = await ctx.t.run('python3', ['-c', PROVEN, probe, results, evidence]);
-  if (again.exit !== 0) return { status: 'error', reason: `proven check exited ${again.exit}: ${again.stderr.slice(0, 200)}`, preflight };
+  if (again.exit !== 0) return { status: 'error', reason: `proven check exited ${again.exit}: ${again.stderr.slice(0, 200)}`, preflight, credential_write };
   // The ops probe's own preflight replay publishes `<harness>:probe-replay` (process: null,
   // never a real session) before every attempt, both --skip-live and the live run below; it
   // can never be proven and must not count against D7w, so it is excluded from both the
@@ -83,7 +89,7 @@ async function oneHarness(ctx, harness, token) {
   const snap = await registry.read();
   const agents = Object.fromEntries(Object.entries(snap?.agents ?? {}).filter(([id]) => id !== replaySession));
   const summary = JSON.parse(readFileSync(results, 'utf8'));
-  return { status: 'ran', credentials: summary.credentials, preflight, proven: JSON.parse(again.stdout),
+  return { status: 'ran', credentials: summary.credentials, credential_write, preflight, proven: JSON.parse(again.stdout),
     hook: { invocations: invocations.length, truncated: invocations.some((i) => i.captures?.some((c) => c.truncated)) },
     handle: identityProof(agents, invocations, parseDarwinRow, harness),
     invocations, summary: { version: summary.version, attempt: summary.attempt, complete: summary.complete, results: summary.results },
