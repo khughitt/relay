@@ -1,8 +1,9 @@
 # The Darwin live probe
 
-Status: draft for review, 2026-09-25; revised after the first review (bundle checkouts,
-ops closure, harness-parented publishers, OpenCode scope, redaction invariance, the
-`SessionEnd` gate), then after the second (OpenCode data and cache isolation, a
+Status: implemented; awaiting the physical Mac run, 2026-09-25. Drafted 2026-09-25 and
+revised after the first review (bundle checkouts, ops closure, harness-parented
+publishers, OpenCode scope, redaction invariance, the `SessionEnd` gate), then after the
+second (OpenCode data and cache isolation, a
 project-scoped request to initialize OpenCode's plugin, D8's own live/dead fixture).
 Task: `relay-b12132`; gates `relay-c19c0a` (publish v0.1.0).
 Parent design: ops `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`),
