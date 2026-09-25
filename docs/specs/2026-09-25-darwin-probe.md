@@ -1,6 +1,8 @@
 # The Darwin live probe
 
-Status: draft for review, 2026-09-25.
+Status: draft for review, 2026-09-25; revised after the first review (bundle checkouts,
+ops closure, harness-parented publishers, OpenCode scope, redaction invariance, the
+`SessionEnd` gate).
 Task: `relay-b12132`; gates `relay-c19c0a` (publish v0.1.0).
 Parent design: ops `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`),
 sections "Handle encodings", "Process identity and liveness" and "Required verification
@@ -61,17 +63,32 @@ Three units, each testable on its own:
 
 - **Bundle builder** (`tools/darwin-probe/bundle`, recipe `just darwin-bundle`). Refuses a
   dirty relay or ops checkout. Writes `dist/relay-darwin-probe-<relay short sha>.tar.gz`
-  (gitignored) holding: `git archive HEAD` of relay (source and tests); the `npm pack`
-  tarball of that commit, which already bundles `jsonc-parser`; the ops guard files at a
-  recorded ops commit (`bin/relay-guard-probe`, `hooks/relay-guard`,
-  `hooks/claude-pretooluse`); the probe files; and `manifest.json` with both commits and
-  a sha256 per file.
+  (gitignored) holding:
+  - `relay.bundle` and `ops.bundle`: single-commit Git bundles (`git bundle create` from a
+    `--depth 1` clone) of relay `HEAD` and ops `HEAD`;
+  - the `npm pack` tarball of that relay commit, which already bundles `jsonc-parser`;
+  - the probe files;
+  - `manifest.json` with both commit ids and a sha256 per file.
+
+  Ops ships whole rather than as a file list, because the guard's load closure is not
+  three files: `hooks/relay-guard` loads `hooks/claude-pretooluse`, which loads
+  `hooks/claude-posttooluse`, `bin/tt` and `bin/ops-profile`, and that set changes as
+  ops changes. The ops tree is about 3.5 MB.
 - **Live probe** (`run`, a POSIX `sh` entry, and `probe.mjs`). Runs the stages below,
   writes raw observations, runs the judge locally so the user sees a verdict at the Mac,
   and packs `relay-darwin-results-<timestamp>.tar.gz` beside the bundle.
 - **Judge** (`judge.mjs`). Pure functions from a results directory to a verdict per check.
   Unit-tested on Linux against fixture result directories. The Linux host's run over the returned
   tarball is the authoritative verdict.
+
+**Checkouts on the Mac.** `run` verifies each Git bundle (`git bundle verify`), clones
+it into the probe root, and requires `git rev-parse HEAD` to equal the manifest's commit
+and `git status --porcelain` to be empty. The relay clone gets its one runtime dependency
+by copying `jsonc-parser` out of D1's installed package into `node_modules/`, which relay
+gitignores, after checking its version against the clone's `package-lock.json`. The ops
+guard probe then runs unchanged against `<relay clone>/bin/relay.js`: its
+`relay_snapshot()` reads a real, clean checkout at the recorded commit before preflight
+and before every live run, exactly as on the Linux host.
 
 The probe observes; it does not patch relay. For example, it records `ps` output with and
 without `-ww` so the evidence shows whether relay needs the flag, but it runs relay as
@@ -142,8 +159,7 @@ Darwin.
 
 ### D2 Suite — release gate
 
-Run `npm test` on the archived source, using the installed dependencies, and record each
-test's result. Gate: no failure. The evidence also carries, by name, the three places
+Run `npm test` in the relay clone and record each test's result. Gate: no failure. The evidence also carries, by name, the three places
 that weaken on Darwin (item 8). Each must be covered by a live check here: the
 `executableOf` early return by D4, the lock Darwin cases by D5's lock recovery, and the
 transaction assertion by D5's publishers, whose snapshot handles must carry
@@ -205,21 +221,44 @@ evidence corrects the session-process spec's line 98 either way.
 
 ### D5 Registry, lock and cost — release gate
 
-This check uses a disposable state directory.
+This check uses a disposable state directory, and every publisher runs under a
+constructed harness parent. A hook launched directly by the probe has no recognized
+harness ancestor, so relay would correctly publish `process: null` and nothing
+Darwin-specific would be tested. The parent is a copy of `/bin/sh` at a short path
+(`<root>/p/codex`), started as `codex`, so the Codex adapter's rule (nearest ancestor
+whose `comm` is `codex`, no terminal required) names it. The short path keeps this check
+independent of the D4 width question. Each parent runs `relay hook --harness codex
+SessionStart` on a payload with its own session id and a git-initialized cwd, as a
+non-final command so the shell stays its parent. It then blocks reading a FIFO until the
+probe releases it. For each parent the probe records `handleOf(parent pid)` independently
+before the hook runs.
 
-- **Concurrent writers.** Eight concurrent `relay hook` `SessionStart` publishers each
-  write a distinct agent, and the final snapshot holds all eight.
-- **Lock recovery.** A lock holder is killed with `SIGKILL` while holding the lock. The
-  next writer must detect it as dead through its Darwin handle and recover. This exercises
-  the lock Darwin cases that `lock.test.js` skips.
-- **Reap.** `relay reap` removes an agent whose handle D3 proved dead and keeps one whose
-  handle is alive.
-- **Cost.** The probe times `PreToolUse` and Codex `SessionEnd` hooks with 0, 10 and 50
-  live agents registered (item 6).
+- **Concurrent writers.** Eight parents publish at once, and the final snapshot holds
+  all eight agents. Each agent's `process` equals its parent's recorded handle, with
+  `platform: darwin` and `bootId: null`.
+- **Lock recovery.** The probe reuses the relay clone's `test/fixtures/lock-worker.js`
+  as `lock-multiprocess.test.js` does. A forked worker in `hold-main` mode reports
+  `entered` while holding the lock and is then killed with `SIGKILL`. The probe records
+  the lock token's holder handle, which must be Darwin-qualified. The next `withLock`
+  must judge that holder dead through its Darwin handle and return its value. This
+  exercises the lock Darwin cases that `lock.test.js` skips.
+- **Reap.** Four of the eight parents are killed with `SIGKILL` and waited on. `relay
+  reap` removes exactly those four agents and keeps the four whose parents are alive.
+- **Cost.** With 0, 10 and 50 live parent-published agents registered, the probe times a
+  `PreToolUse` hook and a Codex `SessionEnd` hook, each issued from under one more live
+  constructed parent (item 6).
 
-Gate: the first three hold, every published handle carries `platform: darwin` and
-`bootId: null`, and with 10 agents Codex `SessionEnd` completes within its installed
-3000 ms budget. The 50-agent timings are a finding.
+Gate:
+- the first three hold;
+- with 10 agents, the Codex `SessionEnd` hook exits 0 within its installed 3000 ms
+  budget. Its reply and diagnostics carry no error. In the snapshot that follows, the
+  ending agent is absent, the revision advanced by one, and the other 10 agents are
+  present with unchanged handles;
+- with 10 agents, the `PreToolUse` hook exits 0 with an allow reply and leaves every
+  agent present.
+
+A failed or timed-out hook therefore fails the gate however fast it returned. The
+50-agent timings are a finding. All parents are released and reaped before D5 ends.
 
 ### D6 Dispatch without a harness — release gate
 
@@ -228,17 +267,23 @@ three guards: one that allows, one that denies, and one that hangs. Gate: the al
 deny replies byte-match the Linux host's replay of the same inputs, the hanging guard is refused
 within its budget, and no guard process survives (checked with `ps`).
 
-### D7 Live harness sessions — cutover evidence
+### D7 Live guard sessions: Claude Code and Codex — cutover evidence
 
-For each harness installed on the Mac, runs ops `bin/relay-guard-probe` exactly as on
-the Linux host, which produces a Darwin evidence record. It adds two things:
+Guard proof applies only to Claude Code and Codex. Those are the harnesses the ops
+runner accepts and the only ones with a `PreToolUse` guard reply channel; OpenCode is D7b.
+For each of the two installed on the Mac, D7 first runs the ops probe's preflight
+(`bin/relay-guard-probe --skip-live`) from the ops clone against the relay clone. That
+preflight replays the clean and attribution inputs through the unpacked guard and must
+return the allow and deny replies before any live run starts. It then runs ops
+`bin/relay-guard-probe` as on the Linux host, which produces a Darwin evidence record. It
+adds two things:
 - during each run a sampler takes the D4 `ps` captures once a second, bounded to the run;
 - after each run it reads the disposable registry and checks that the published
   `Agent.process` handle names the harness process that ran the hook: an ancestor of the
   recorded hook pid whose executable is the harness.
 
-A harness that is not installed is recorded as absent. Gate: for each installed harness,
-the ops predicate `proven(summary, record)` holds (with the Linux host's `PENDING` entry for
+Of these two harnesses, one that is not installed is recorded as absent. Gate: for each
+installed one, the preflight replies match, the ops predicate `proven(summary, record)` holds (with the Linux host's `PENDING` entry for
 Codex's nested route) and the handle check passes. A handle check that fails because
 `comm` was truncated is the item-1 defect: it is filed against relay and blocks the
 release too.
@@ -254,6 +299,20 @@ credentials file unconditionally and raises `FileNotFoundError` without it. With
 `"credentials": "token"` in the summary. The bundle carries the ops commit that contains
 this change. If Codex keeps its credentials in the Keychain instead, Codex D7 is recorded
 as skipped with that reason.
+
+### D7b OpenCode observation — cutover evidence
+
+When OpenCode is installed, relay's plugin is installed into the disposable config only:
+`relay install --harness opencode --config-dir <root>/xdg/opencode --apply`, with
+`XDG_CONFIG_HOME` pointing into the probe root. OpenCode then starts headless
+(`opencode serve` on a loopback port) and is stopped with `SIGTERM`. The plan confirms
+the headless command and the config lookup against the installed version and records
+both. No model call is needed, because the plugin publishes on load (`init`) and on
+shutdown (`dispose`). Gate: while the server runs, the registry holds one `opencode:`
+agent with `scope: process` whose `process` handle names the OpenCode server process.
+After shutdown, that agent is gone (dispose delivered) or `relay reap` removes it as dead;
+the evidence records which. No guard or reply is involved. When OpenCode is not
+installed, D7b is recorded as absent.
 
 ### D8 Launchd environment — release gate and cutover evidence
 
@@ -283,15 +342,34 @@ text of any `-p` argument replaced by `<prompt>`.
 
 ## Evidence and redaction
 
-Results hold raw observations per stage (JSON), stderr logs, and the judge's verdict.
-Before packing, every text file has these replaced:
-- the Mac's host names (all four from D0) with `<host>`;
-- the user name with `<user>`;
-- the home directory with `~`.
+Results hold raw observations per stage (JSON), stderr logs, and verdicts. Redaction must
+not change any verdict, so it is built in three parts.
 
-`manifest.json` counts replacements per file, and the judge rejects a results tarball
-without those counts. No credential file or token is copied into the results root; `run`
-fails if one is found there, using the same check as the ops probe's final `find`.
+**Facts that depend on raw values are recorded as properties at capture time.** Examples
+are string lengths, whether a `comm` value is absolute, whether a relay capture is a
+strict prefix of its `-ww` twin, and whether two host readings are equal. The probe
+stores them as booleans and numbers beside the text they describe. The judge reads the
+properties, never lengths or shapes recomputed from redacted text, and redaction never
+alters a boolean or a number. The full `ps -axo` table is not kept, because it lists
+every app on the Mac. The probe keeps only rows in the chains it constructed or sampled,
+plus table-wide counts: rows, rows over the cut, and rows truncated.
+
+**Identities stay distinct.** Each distinct host string observed anywhere (D0's four
+names at both readings, handle `host` fields) maps to `<host-1>`, `<host-2>`, … in order
+of first appearance. So a changed host remains visible as two tokens, and D3's foreign
+host remains a third. The home directory `/Users/<name>` becomes `/Users/<user>`: the
+user-name component is replaced, but the path stays absolute and keeps its structure.
+The user name elsewhere becomes `<user>`. The mapping never leaves the Mac: it is
+neither written to results nor printed.
+
+**Verdicts must survive redaction.** Before packing, `run` runs the judge over the raw
+results and again over the redacted copy, and stores both verdict sets. The Linux host's
+judge recomputes the verdicts from the redacted results and accepts the attempt only if
+all three are identical, check by check. The manifest also records per-file replacement
+counts, and the judge rejects a results tarball without them.
+
+No credential file or token is copied into the results root; `run` fails if one is found
+there, using the same check as the ops probe's final `find`.
 
 On the Linux host, `just darwin-judge <tarball>` verifies the manifest and re-derives every
 verdict. It writes `docs/runbooks/darwin-probe.md`, with one section per attempt covering:
@@ -322,11 +400,20 @@ evidence confirms them:
 
 - The judge is covered by unit tests over fixture result directories: one passing, and
   one per check with that check's failure.
-- The bundle builder is tested on the Linux host: it refuses dirty checkouts, and its output holds
-  exactly the manifest's files with matching hashes.
-- The stages that do not need Darwin (D1, D2, D5, D6, and D8's reap) run on the Linux host through
-  the same entry with `--allow-linux`, so the bundle is smoke-tested end to end before it
-  goes to the Mac. D3, D4, D7's sampler and D9 need Darwin `ps`, and the probe refuses to
+- The bundle builder is tested on the Linux host. It refuses dirty checkouts, and its
+  output holds exactly the manifest's files with matching hashes. The test then unpacks
+  the output into a temporary directory and clones both bundles, checking the recorded
+  commits and a clean status. It runs the ops preflight
+  (`bin/relay-guard-probe --skip-live`) from the unpacked ops clone against the unpacked
+  relay clone for each harness installed on the Linux host, and requires the allow and
+  deny replies. That catches a missing file in the guard's load closure before the bundle
+  leaves the host.
+- Redaction is tested over fixture results that contain two host names, a home path, and
+  a truncated capture: the redacted copy keeps distinct host tokens and absolute paths,
+  and yields the same verdicts as the raw copy.
+- The stages that do not need Darwin (D1, D2, D6, and D8's reap) run on the Linux host
+  through the same entry with `--allow-linux`, and so does D5 with its constructed
+  parents. The bundle is therefore smoke-tested end to end before it goes to the Mac. D3, D4, D7's sampler and D9 need Darwin `ps`, and the probe refuses to
   run them elsewhere.
 
 ## Out of scope
