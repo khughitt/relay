@@ -1,1 +1,4 @@
 prefix = "relay"
+
+[feedback]
+scope = "Harness adapters, hook dispatch to non-Claude harnesses, the live-agent registry, and relay identity."
