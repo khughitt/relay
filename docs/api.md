@@ -5,8 +5,9 @@ an operation: direct applyEvent performs no policy check. R2's `dispatchHook` ru
 guards before optional enrichment/publication and retains their result when observation
 fails. No hooks or plugins are registered by this package.
 
-Node >=22, ES modules, Node built-ins only. No install lifecycle scripts or runtime
-dependencies. Named root exports are exactly those below. Package subpath
+Node >=22, ES modules, Node built-ins only. No install lifecycle scripts. The one
+runtime dependency, `jsonc-parser` (bundled), is used only by the install path.
+Named root exports are exactly those below. Package subpath
 `relay/opencode` exports only the async Relay plugin function; the
 `relay/fixtures/handles.json` subpath supplies portable schema fixtures.
 

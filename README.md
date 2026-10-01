@@ -4,7 +4,8 @@ Normalized harness observation and a host-local live-agent registry.
 
 R2 adds bounded guard and observer dispatch to qualified process identity, twenty
 event mappings, safe atomic registry publication, read-only listing and explicit
-reaping. Node >=22; ES modules and built-ins only. Familiar retains presentation;
+reaping. Node >=22; ES modules and built-ins only, except the installer's
+jsonc-parser. Familiar retains presentation;
 ohai remains the notification client.
 
 ```sh
@@ -17,7 +18,8 @@ node bin/relay.js hook --harness claude-code PreToolUse < payload.json
 ```
 
 The fast and full suites are intentionally identical; there is no affected-only
-selector. No dependency installation or node_modules hydration is needed.
+selector. The one npm dependency, `jsonc-parser` (bundled), is needed only by
+`relay install`; `just setup` installs it.
 
 Read the [API contract](docs/api.md) and
 [operator lock-repair procedure](docs/runbooks/registry-lock-repair.md).

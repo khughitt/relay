@@ -10,7 +10,8 @@
 - Use conventional commits without AI attribution.
 - Runtime: Node >=22, ES modules, Node built-ins. No presentation dependencies.
 - GitHub owner is khughitt; check the active gh account before every gh write.
-- Run `just setup` after creating a worktree. There are no npm dependencies to install.
+- Run `just setup` after creating a worktree. It installs the one npm dependency,
+  `jsonc-parser` (bundled; only `relay install` needs it).
 - Verify through `just test-fast` while working and `just gate` before integration.
   Fast and full commands intentionally run the same suite. Hooks use the vendored
   ops front door; install core.hooksPath .githooks in a new clone.
