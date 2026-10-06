@@ -11,7 +11,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 test('opencode install plans the plugin by its real path when the checkout path has spaces', async t => {
   const base = await tempState(t);
-  const root = join(base.stateDir, 'relay checkout');
+  const root = join(base.stateDir, 'relay checkout (wip)');
   for (const entry of ['bin', 'src', 'integrations', 'node_modules', 'package.json'])
     await fs.cp(join(ROOT, entry), join(root, entry), { recursive: true });
   const subscribers = join(base.stateDir, 'subscribers.json');
