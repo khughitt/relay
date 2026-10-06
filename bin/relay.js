@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { realpathSync, readFileSync, existsSync } from 'node:fs';
 import { join, isAbsolute } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { listAgents } from '../src/index.js';
 import { dispatchHook, reconcile } from '../src/dispatch.js';
 import { relayError } from '../src/protocol.js';
@@ -133,7 +133,7 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
       const relayBin = realpathSync(process.argv[1]); let artifact;
       if (harness === 'claude-code') artifact = (await import('../src/install/claude-code.js')).planClaudeCode({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin: process.execPath, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
       else if (harness === 'codex') artifact = (await import('../src/install/codex.js')).planCodex({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin: process.execPath, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
-      else { const dir = f['--config-dir'], read = name => { const path = join(dir, name); return existsSync(path) ? readFileSync(path, 'utf8') : null; }; artifact = (await import('../src/install/opencode.js')).planOpenCode({ configDir: dir, json: read('opencode.json'), jsonc: read('opencode.jsonc'), relayPlugin: new URL('../integrations/opencode/plugin.js', import.meta.url).pathname, subscribers }); }
+      else { const dir = f['--config-dir'], read = name => { const path = join(dir, name); return existsSync(path) ? readFileSync(path, 'utf8') : null; }; artifact = (await import('../src/install/opencode.js')).planOpenCode({ configDir: dir, json: read('opencode.json'), jsonc: read('opencode.jsonc'), relayPlugin: fileURLToPath(new URL('../integrations/opencode/plugin.js', import.meta.url)), subscribers }); }
       if (f['--apply']) (await import('../src/install/atomic.js')).applyArtifact(f['--artifact'], artifact);
       if (!silent) {
         if (mode === 'json') await emit(stdout, `${JSON.stringify(artifact)}\n`);
