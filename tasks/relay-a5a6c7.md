@@ -6,9 +6,9 @@ priority: 2
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: relay-a5a6c7
 created: 2026-09-25T11:04:08Z
-updated: 2026-10-06T15:22:21Z
+updated: 2026-10-06T15:22:37Z
 started: 2026-10-06T15:22:21Z
 depends: []
 tags: []
@@ -21,3 +21,5 @@ bin/relay.js install (opencode branch) passes new URL('../integrations/opencode/
 ## Notes
 
 - 2026-10-06T15:22:21Z (main): started
+- 2026-10-06T15:22:37Z (relay-a5a6c7): resumed
+- 2026-10-06T15:22:37Z (relay-a5a6c7): took over Unix session (owner main, stale)
