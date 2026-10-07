@@ -7,8 +7,8 @@ size: l
 complexity: high
 process: planned
 created: 2026-09-17T00:49:49Z
-updated: 2026-10-02T01:42:03Z
-depends: [fam-6e8321, ops-c8e4d1, tack-539508]
+updated: 2026-10-07T23:15:51Z
+depends: [fam-6e8321, ops-c8e4d1, hq-539508]
 tags: []
 source: ops-998bbb
 agent: codex
