@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T22:49:06Z
+updated: 2026-10-11T23:00:21Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -62,3 +62,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-11T22:49:06Z (design/typed-messages): parked (waiting on user, review): user reviews .worktrees/typed-messages/docs/plans/2026-10-11-typed-interaction-messages.md and picks an execution method; then the agent starts Task 1 (relay-0f389a)
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-11T23:00:21Z (design/typed-messages): review: plan round 1 — verdict: revise; findings: P1 2, P2 4; reviewer: codex
