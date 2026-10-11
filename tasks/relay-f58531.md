@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T20:50:14Z
+updated: 2026-10-11T21:48:13Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -45,3 +45,5 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-11T20:50:05Z (design/typed-messages): review: spec round 1 — verdict: revise; findings: P1 3, P2 3; reviewer: codex
 - 2026-10-11T20:50:14Z (design/typed-messages): Spec review details: P1 consumed is sent before hook exit or harness receipt (9.1); withdrawal exits with the same native-release behavior and reopens the revoked question (9.1); superseding promises one atomic replacement but writes two entry files without recovery for a partial replacement (5.5/6). P2 defer remains pending but ask emits resolution only on leaving pending, with no released transition (5.2/7.2/9.1); startup can reuse sequence numbers after terminal-entry pruning by ignoring the durable seq high-water mark (6); retry with the winning answerId has no defined replay from undeliverable (5.2/5.3). Delivery confirmation also requires adding PostToolUse adapter, normalization and installer support: the observer described as existing in 9.1 is absent. Spec unchanged; no live probes or implementation tests run.
+- 2026-10-11T21:48:13Z (design/typed-messages): resumed
+  provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
