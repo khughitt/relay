@@ -7,8 +7,8 @@ size: l
 complexity: high
 process: planned
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T17:52:19Z
-depends: []
+updated: 2026-10-11T17:53:46Z
+depends: [hq-d85ede]
 tags: [cross-project]
 agent: claude-code/claude-fable-5-1
 ---
