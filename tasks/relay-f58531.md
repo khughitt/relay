@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T21:55:53Z
+updated: 2026-10-11T22:15:02Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -52,3 +52,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-11T21:55:38Z (design/typed-messages): review: spec round 2 — verdict: revise; findings: P1 1, P2 1; reviewer: codex
 - 2026-10-11T21:55:53Z (design/typed-messages): Spec round 2 on 702837f: original findings 2, 4, 5 and 6 are resolved. P1: service can persist handed then restart before the acknowledgement reaches the live hook; reattachment returns handed (or unconfirmed after 60 s), but 9.1 only delivers from answered and 5.2 defines no handed retry, so the saved answer can remain undelivered until the outer timeout. Define idempotent handoff retry for the same waiter and resume before its first stdout reply; test restart after durable handed but before acknowledgement, including delayed reconnect. P2: 5.5 reconciliation requires predecessor X for every nonterminal replacement N, while 6 prunes terminal X after 30 days even when N remains answered awaiting its asker. Retain predecessors referenced by nonterminal replacements, or persist replacement completion independently; test pruning plus restart with a still-active replacement. Spec unchanged; read-only contract review, no live probes or runtime suite.
+- 2026-10-11T22:15:02Z (design/typed-messages): spec round 2 findings addressed in 5eee47e + follow-up: idempotent handoff retry for the recorded waiter (NOT_WAITER otherwise), crash test between persisting handed and its ack with early and late reattach; pruning retains a predecessor named by a non-terminal replacement, test added
