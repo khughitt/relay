@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T22:17:06Z
+updated: 2026-10-11T22:26:58Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -57,3 +57,5 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-11T22:16:58Z (design/typed-messages): review: spec round 3 — verdict: accept; findings: none; reviewer: codex
 - 2026-10-11T22:17:06Z (design/typed-messages): Spec round 3 checked 5eee47e and 58f470d: same-waiter handed retry and unfinished-handoff handling cover lost acknowledgement with early or late reattachment; predecessor retention matches startup reconciliation until the replacement is terminal. Acceptance cases cover both fixes. All prior review findings are resolved at the specification level; no new findings. tasks check passes. Review complete; the author can proceed to the implementation plan. Live P1/P2/P3 probes and runtime tests remain implementation work; no spec or code edits made in this review.
+- 2026-10-11T22:26:58Z (design/typed-messages): resumed
+  provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
