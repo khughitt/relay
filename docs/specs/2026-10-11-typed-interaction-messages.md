@@ -341,6 +341,12 @@ cannot reach that state through steps 1 to 3, so it treats N as corrupt: it move
 to `inbox/rejected/`, reports it, and leaves X untouched. A crash before step 2
 leaves nothing, and the asker retries its question with the same `id`.
 
+Reconciliation can always find X because pruning keeps it (§6): a terminal entry named
+by the `supersedes` of a retained non-terminal entry is never pruned. So a missing X
+under a non-terminal N is corruption, never age, and is handled like the other corrupt
+case. X becomes prunable once N is terminal, and each is then pruned on its own 30-day
+clock.
+
 A question with an `artifact` requires every answer to echo `artifactRevision`, and the
 service rejects a mismatch as `STALE`. Because a question is immutable, the only way to
 put a new revision under decision is a superseding question, and that keeps an answer
@@ -382,7 +388,8 @@ On start the service does the following, in order, before accepting connections:
 4. Move `handed` entries whose confirmation window has passed to `unconfirmed`.
 5. Begin the waiter checks (§9.1).
 
-Terminal entries older than 30 days are pruned at start and daily. An entry that fails
+Terminal entries older than 30 days are pruned at start and daily, except a
+predecessor still named by a non-terminal replacement (§5.5). An entry that fails
 validation is moved to `inbox/rejected/` and reported, never loaded or deleted silently.
 
 Raw harness payloads, transcripts and environment values never enter the store. A
@@ -518,13 +525,28 @@ as for every live hook.
    `handback: true` when P1 holds. It then holds the connection. A `here` presence
    returns `passthrough` immediately, and no entry is created.
 4. **Resolve.** The hook acts on the `state` lines for its entry:
-   - **Answered.** The hook sends `handed` and waits for the acknowledgement. Then it maps
+   - **Answered,** or a handoff this waiter began but did not finish (below). The hook
+     sends `handed` and waits for the acknowledgement. Then it maps
      option ids back to labels, joins multi choices with `, `, passes an `other` value
      as its text, writes `allow` with `updatedInput` (the original `questions` plus
      `answers`) and exits 0. `handed` is sent before the reply is written, because once
      the reply is written the hook may be killed at any moment. If the hook dies after
      `handed` but before writing, the entry reads "handed, receipt not confirmed" and
      never "received". That is true, if pessimistic.
+
+     *Handoff retry.* `handed` is idempotent for the entry's recorded waiter. A `handed`
+     from the waiter whose handle matches the entry's, on an entry already `handed` or
+     `unconfirmed`, is acknowledged again and changes nothing. A `handed` from any other
+     process is refused with `NOT_WAITER`. When that waiter reattaches (by resending
+     `ask` with the same `id`), the service sends the entry's current state and saved
+     answer as usual. A hook that has not yet written its reply treats `handed` or
+     `unconfirmed` as an unfinished handoff: it resends `handed` and, once acknowledged,
+     writes its reply. A hook writes its reply at most once and then exits, so a retry
+     can never deliver twice. Without this rule, a service crash after `handed` is
+     persisted but before it is acknowledged leaves a live hook holding an undelivered
+     answer until Claude's outer timeout. With it, the hook finishes on reattach. The
+     entry may already read `unconfirmed` if the reattach took longer than the window,
+     and a later PostToolUse still moves it to `consumed`.
    - **Declined.** Same order, with an `answers` map in which each question maps to
      `(declined)`, plus `additionalContext` saying the user chose not to answer. P2
      confirms it like any answer.
@@ -545,10 +567,12 @@ as for every live hook.
    `handed` is the normal end. Esc, session close and a guard's denial all kill or end
    the hook (P3), and all look like a closed connection. The entry also records the
    hook's process handle (relay's `Handle`). If the service restarts while a hook
-   waits, the hook reconnects and resends `ask` with the same `id`, which reattaches.
-   A pending or answered waiter that has not reattached within 10 s of service start
-   is probed with relay's liveness probe, and only a confirmed death applies the rule
-   above.
+   waits, the hook reconnects with backoff until its own outer timeout and resends
+   `ask` with the same `id`, which reattaches. A pending or answered waiter that has
+   not reattached within 10 s of service start is probed with relay's liveness probe,
+   and only a confirmed death applies the rule above. A live waiter that is slow to
+   reattach keeps its entry. A `handed` entry whose waiter never returns needs no
+   probe: its confirmation window moves it to `unconfirmed`.
 6. **Confirm receipt.** The PostToolUse hook sends `confirm` with the `tool_use_id` and
    the answers from `tool_response` (P2), then exits 0 with no output.
    - If the entry is `handed` or `unconfirmed` and the answers equal the saved
@@ -645,12 +669,19 @@ design §5.3).
    §5.2, with crash recovery tested for:
    - a crash between `seq` and the entry;
    - a crash between the two writes of a supersession;
-   - pruning the highest-numbered entry, then a restart.
+   - pruning the highest-numbered entry, then a restart;
+   - pruning past 30 days while a replacement is still `answered` and waiting for its
+     asker: the predecessor is retained, the restart reconciles cleanly, and both are
+     pruned once the replacement is terminal and old enough.
 
    Replay of the same `answerId` is tested in every answer-holding state.
 4. `relay serve` with the socket and the waiter liveness, tested with real processes
    and sockets, including:
    - a hook killed mid-wait, before and after `handed`;
+   - a service crash between persisting `handed` and acknowledging it, with the hook
+     reattaching both inside and after the 60 s window: the hook writes its reply once,
+     and a later confirmation moves the entry to `consumed`;
+   - `handed` from a process that is not the waiter, refused;
    - a service restart under a waiting hook;
    - a defer reaching a waiting hook as `released`.
 5. The HTTP surface and guard, tested for every proxied and local case of §7.3 and for
