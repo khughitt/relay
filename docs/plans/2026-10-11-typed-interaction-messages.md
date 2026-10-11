@@ -148,6 +148,11 @@ const scenarios = {
   'under-denial': (log) => ({ PreToolUse: [{ matcher: 'AskUserQuestion', hooks: [entry('deny', 0, log), entry('answer', 120, log)] }], PostToolUse: [{ matcher: 'AskUserQuestion', hooks: [entry('post-log', 0, log, 10)] }] }),
 };
 const capture = (name) => tmux('capture-pane', '-p', '-t', name, '-S', '-200');
+async function until(check, ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { if (check()) return true; await sleep(1000); }
+  return false;
+}
 async function waitFor(name, pattern, ms) {
   const end = Date.now() + ms;
   while (Date.now() < end) { const pane = capture(name); if (pattern.test(pane)) return pane; await sleep(1000); }
@@ -164,19 +169,26 @@ for (const [name, settingsFor] of Object.entries(scenarios)) {
   tmux('new-session', '-d', '-s', name, '-x', '200', '-y', '50', '-c', ws, `claude --settings ${join(dir, 'settings.json')} ${JSON.stringify(PROMPT)}`);
   if (await waitFor(name, /trust/i, 15000)) tmux('send-keys', '-t', name, 'Enter');
   const started = Date.now();
+  const keys = [];
   if (name === 'release') {
-    // After the hook exits (120 s), the native question should appear: choose the second option.
-    const shown = await waitFor(name, /Square/, 200000);
-    if (shown && events(log).some((e) => e.event === 'return')) {
-      tmux('send-keys', '-t', name, 'Down'); await sleep(500); tmux('send-keys', '-t', name, 'Enter');
-      if (await waitFor(name, /Submit/i, 5000)) tmux('send-keys', '-t', name, 'Enter');
+    // The prompt itself names Circle and Square, so wait for the hook's release first, then for
+    // the native option list: "2. Square" appears only there. Try the key sequences in turn until
+    // PostToolUse fires, and record every key sent.
+    const answered = () => events(log).some((e) => e.event === 'fired' && e.hook === 'PostToolUse');
+    if (await until(() => events(log).some((e) => e.event === 'return'), 200000)) {
+      for (const attempt of [['Down', 'Enter'], ['2'], ['Enter']]) {
+        if (answered() || !await waitFor(name, /\b2\.\s+Square/, 20000)) break;
+        for (const key of attempt) { tmux('send-keys', '-t', name, key); keys.push(key); await sleep(500); }
+        if (await waitFor(name, /Submit|Review your answers/i, 3000)) { tmux('send-keys', '-t', name, 'Enter'); keys.push('Enter'); }
+        await until(answered, 10000);
+      }
     }
   }
   const finished = await waitFor(name, /CHOSEN=\w+/, name === 'deny' ? 60000 : 260000);
   await sleep(name === 'deny' ? 60000 : 5000); // deny: watch for a re-ask
   const pane = capture(name);
   writeFileSync(join(dir, 'pane.txt'), pane);
-  summary.scenarios[name] = { startedAt: started, chosen: /CHOSEN=(\w+)/.exec(finished ?? pane)?.[1] ?? null, events: events(log) };
+  summary.scenarios[name] = { startedAt: started, chosen: /CHOSEN=(\w+)/.exec(finished ?? pane)?.[1] ?? null, keys, events: events(log) };
   tmux('kill-session', '-t', name);
 }
 writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2));
@@ -187,10 +199,12 @@ process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 
 Run: `node tools/answer-probe/run.mjs --out "$(mktemp -d)/answer-probe"`
 Expected: a JSON summary naming the installed Claude version, with four scenarios, each
-holding its hook events. It runs for about 12 minutes. If `release` never shows the
-native question, attach read-only with `tmux -L relay-probe capture-pane -p -t release`
-while it runs, drive the UI with `tmux -L relay-probe send-keys -t release ...`, and
-write down every key you sent.
+holding its hook events and, for `release`, the keys the driver sent. It runs for about
+12 minutes. If `release` shows the hook's release but no PostToolUse after all three key
+sequences, rerun it with `--only release`. While it runs, watch with
+`tmux -L relay-probe capture-pane -p -t release` and drive the UI by hand with
+`tmux -L relay-probe send-keys -t release ...`. Write down every key you sent: a
+failure to drive the UI is not a P1 failure.
 
 - [ ] **Step 4: Judge each row and write the evidence record**
 
@@ -918,7 +932,8 @@ git commit -m "feat(interaction): question lifecycle state machine"
   - `writeDurable(path, text, { io }) -> Promise<void>`.
   - `loadStore(stateDir, { io, now }) -> Promise<{ store, rejected: Array<{ name, reason }> }>`.
   - The store object:
-    - `get(id) -> entry | null`, `all() -> entry[]`, `seq() -> number`
+    - `get(id) -> entry | null`, `all() -> entry[]`, and `seq() -> number`, the highest
+      committed sequence number, never one allocated to a write still in flight
     - `put(entry) -> Promise<stamped entry>`
     - `supersede(replacement, withdrawnPredecessor) -> Promise<[n, x]>`
     - `prune(now) -> Promise<string[]>`, which returns the pruned ids.
@@ -960,6 +975,18 @@ test('a crash between seq and entry never reuses a number', async (t) => {
   const { store: after } = await loadStore(p.stateDir, { now: NOW });
   assert.equal(after.seq(), first.seq + 1);
   assert.equal((await after.put(entry())).seq, first.seq + 2);
+});
+test('seq() exposes only committed numbers while a write is paused', async (t) => {
+  const p = await tempState(t);
+  let release, reached;
+  const hit = new Promise((r) => { reached = r; }), gate = new Promise((r) => { release = r; });
+  const io = { ...fs, rename: async (from, to) => { if (to.endsWith('.json')) { reached(); await gate; } return fs.rename(from, to); } };
+  const { store } = await loadStore(p.stateDir, { io, now: NOW });
+  const writing = store.put(entry());
+  await hit;
+  assert.equal(store.seq(), 0);
+  release(); const stamped = await writing;
+  assert.equal(store.seq(), stamped.seq);
 });
 test('pruning the highest entry then restarting keeps the counter', async (t) => {
   const p = await tempState(t), { store } = await loadStore(p.stateDir, { now: NOW });
@@ -1096,19 +1123,22 @@ export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
   return { store, rejected };
 }
 function makeStore(p, entries, start, io) {
-  let current = start;
+  // allocated runs ahead of committed while a write is in flight; only committed is ever
+  // exposed, so a cursor never names a change that is not yet readable.
+  let allocated = start, committed = start;
   async function put(entry) {
-    current += 1;
-    const seq = current, stamped = { ...entry, seq, log: entry.log.map((l) => l.seq === null ? { ...l, seq } : l) };
+    allocated += 1;
+    const seq = allocated, stamped = { ...entry, seq, log: entry.log.map((l) => l.seq === null ? { ...l, seq } : l) };
     await writeDurable(p.seqPath, `${seq}\n`, { io });
     await writeDurable(join(p.entriesDir, `${stamped.id}.json`), `${JSON.stringify(stamped)}\n`, { io });
     entries.set(stamped.id, stamped);
+    committed = seq;
     return stamped;
   }
   return {
     get: (id) => entries.get(id) ?? null,
     all: () => [...entries.values()].sort((a, b) => a.seq - b.seq),
-    seq: () => current,
+    seq: () => committed,
     put,
     // Fixed order (spec §5.5): the replacement first, then the predecessor's withdrawal.
     async supersede(replacement, withdrawnPredecessor) { const n = await put(replacement); const x = await put(withdrawnPredecessor); return [n, x]; },
@@ -1164,7 +1194,13 @@ git commit -m "feat(interaction): durable inbox store with recovery"
       `Result = { entry, error }`.
     - **Clock and retention:** `sweep() -> Promise<void>`,
       `nextDeadline() -> number | null`, `prune() -> Promise<string[]>`.
-    - **Reads:** `list({ since?, states? }) -> entry[]`, `get(id)`, `seq()`.
+    - **Reads:** `list({ since?, states? }) -> entry[]`, `get(id)` and `seq()`, which are
+      unserialized and for internal checks only.
+    - **Cursor reads:** `snapshot({ since?, states? }) -> Promise<{ seq, entries }>` and
+      `watch(since, fn) -> Promise<{ seq, unsubscribe }>`. Both are queued with the
+      writes. Every surface that hands a client a sequence number uses them.
+    - **Failure:** `halted: Promise<Error>` resolves with `STORE_FAILED` after a failed
+      write. Every later operation rejects with that error.
     - **Presence:** `presence() -> { mode, updatedAt }` and `setPresence(mode) -> Promise<presence>`.
     - **Events:** `subscribe(fn) -> unsubscribe`, where fn receives
       `{ type: 'entry', entry } | { type: 'presence', presence }`.
@@ -1177,6 +1213,7 @@ git commit -m "feat(interaction): durable inbox store with recovery"
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs/promises';
 import { tempState } from './helpers/fixture.js';
 import { openInbox } from '../src/serve/inbox.js';
 import { CONFIRM_WINDOW_MS } from '../src/interaction/lifecycle.js';
@@ -1267,6 +1304,44 @@ test('list: non-terminal by default, terminal ones changed since a seq; notices'
   const n = noticeMessage(); await inbox.notify(n);
   assert.equal((await inbox.seen(n.id)).entry.seen, true);
 });
+test('a failed replacement write stops the inbox; reopening reconciles', async (t) => {
+  const p = await tempState(t), arm = { fail: null };
+  const io = { ...fs, rename: async (from, to) => { if (arm.fail?.(to)) { arm.fail = null; throw Object.assign(new Error('disk'), { code: 'EIO' }); } return fs.rename(from, to); } };
+  const open = () => openInbox({ stateDir: p.stateDir, io, expectAnswers: () => ({}) });
+  const { inbox } = await open(); await inbox.setPresence('away');
+  const x = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000 } });
+  await ask(inbox, x);
+  const n = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000, supersedes: x.id } });
+  arm.fail = (to) => to.endsWith(`${x.id}.json`);
+  await assert.rejects(ask(inbox, n), { code: 'STORE_FAILED' });
+  for (const id of [n.id, x.id]) await assert.rejects(inbox.answer(id, answerMessage(id === n.id ? n : x)), { code: 'STORE_FAILED' });
+  await assert.rejects(inbox.snapshot(), { code: 'STORE_FAILED' });
+  assert.equal((await inbox.halted).code, 'STORE_FAILED');
+  const { inbox: again, rejected } = await open();
+  assert.deepEqual(rejected, []);
+  assert.deepEqual([again.get(x.id).state, again.get(x.id).supersededBy, again.get(n.id).state], ['withdrawn', n.id, 'pending']);
+});
+test('snapshot and watch wait for a write in flight and never skip it', async (t) => {
+  const p = await tempState(t);
+  let release, reached = null;
+  const io = { ...fs, rename: async (from, to) => { if (reached && to.endsWith('.json')) { const r = reached; reached = null; r(); await new Promise((g) => { release = g; }); } return fs.rename(from, to); } };
+  const { inbox } = await openInbox({ stateDir: p.stateDir, io, expectAnswers: () => ({}) });
+  await inbox.setPresence('away');
+  const q = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000 } });
+  const asked = (await ask(inbox, q)).entry;
+  const hit = new Promise((r) => { reached = r; });
+  const answering = inbox.answer(q.id, answerMessage(q));
+  await hit;
+  const snap = inbox.snapshot(), seen = [], watching = inbox.watch(asked.seq, (e) => seen.push(e));
+  assert.equal(inbox.seq(), asked.seq);
+  release();
+  const [answered, s] = await Promise.all([answering, snap]);
+  assert.equal(s.seq, answered.entry.seq);
+  assert.equal(s.entries.find((e) => e.id === q.id).state, 'answered');
+  const w = await watching;
+  assert.equal(w.seq, answered.entry.seq);
+  assert.deepEqual(seen.map((e) => e.entry.state), ['answered']);
+});
 test('defer on a handback route releases', async (t) => {
   const { inbox } = await setup(t), q = questionMessage();
   await ask(inbox, q, true);
@@ -1302,15 +1377,29 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
   if (saved !== undefined && !(saved?.schema === 1 && MODES.includes(saved.mode) && Number.isSafeInteger(saved.updatedAt))) throw relayError('CORRUPT_STATE', 'invalid presence file');
   let presence = saved ? { mode: saved.mode, updatedAt: saved.updatedAt } : { mode: 'here', updatedAt: 0 };
   const listeners = new Set();
+  // Fail-stop: after any failed write the in-memory state may disagree with the disk (a
+  // replacement saved, its predecessor not yet withdrawn). Nothing more is served; the service
+  // exits on `halted`, and the next start reconciles from disk before accepting a request.
+  let failure = null;
+  const halted = Promise.withResolvers();
   let chain = Promise.resolve();
-  const serial = (fn) => { const run = chain.then(fn); chain = run.catch(() => {}); return run; };
+  const serial = (fn) => {
+    const run = chain.then(() => { if (failure) throw failure; return fn(); });
+    chain = run.catch(() => {});
+    return run;
+  };
+  async function persist(write) {
+    try { return await write(); }
+    catch (cause) { failure = relayError('STORE_FAILED', 'an inbox write failed; relay serve must restart', cause); halted.resolve(failure); throw failure; }
+  }
   const publish = (event) => { for (const fn of listeners) fn(event); };
   async function commit(result) {
     if (!result.changed) return { entry: result.entry, error: result.error };
-    const entry = await store.put(result.entry);
+    const entry = await persist(() => store.put(result.entry));
     onCommit(entry); publish({ type: 'entry', entry });
     return { entry, error: result.error };
   }
+  const list = ({ since, states } = {}) => store.all().filter((e) => (!L.isTerminal(e) || (since !== undefined && e.seq > since)) && (!states || states.includes(e.state)));
   async function current(id) {
     const entry = store.get(id);
     return entry ? (await commit(L.applyClock(entry, clock()))).entry : null;
@@ -1330,7 +1419,7 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
       if (x === null) return commit({ entry, changed: true, error: null });
       const predecessor = await current(x), refusal = L.checkSupersede(predecessor, message);
       if (refusal) return { entry: null, error: refusal };
-      const [n, w] = await store.supersede(entry, L.applySuperseded(predecessor, entry.id, now).entry);
+      const [n, w] = await persist(() => store.supersede(entry, L.applySuperseded(predecessor, entry.id, now).entry));
       for (const e of [n, w]) { onCommit(e); publish({ type: 'entry', entry: e }); }
       return { entry: n, error: null };
     }),
@@ -1349,16 +1438,27 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
     }),
     notify: (message) => serial(async () => store.get(message.id) ? { entry: store.get(message.id), error: null } : commit({ entry: L.createNotice(message, { now: clock() }), changed: true, error: null })),
     sweep: () => serial(async () => { for (const e of store.all()) await commit(L.applyClock(e, clock())); }),
-    prune: () => serial(() => store.prune(clock())),
+    prune: () => serial(() => persist(() => store.prune(clock()))),
     nextDeadline: () => { const due = store.all().map(L.nextDeadline).filter((d) => d !== null); return due.length ? Math.min(...due) : null; },
-    list: ({ since, states } = {}) => store.all().filter((e) => (!L.isTerminal(e) || (since !== undefined && e.seq > since)) && (!states || states.includes(e.state))),
+    // Unserialized reads for internal checks; anything that hands a client a cursor uses
+    // snapshot or watch, which run in the queue so no write is half done.
+    list,
     get: (id) => store.get(id),
     seq: () => store.seq(),
+    snapshot: ({ since, states } = {}) => serial(() => ({ seq: store.seq(), entries: list({ since, states }) })),
+    // Replays the entries changed after `since` through fn, then subscribes fn, in one queued
+    // step: nothing published in between is lost or reordered.
+    watch: (since, fn) => serial(() => {
+      for (const entry of list({ since }).filter((e) => e.seq > since)) fn({ type: 'entry', entry });
+      listeners.add(fn);
+      return { seq: store.seq(), unsubscribe: () => listeners.delete(fn) };
+    }),
+    halted: halted.promise,
     presence: () => presence,
     setPresence: (mode) => serial(async () => {
       if (!MODES.includes(mode)) throw relayError('INVALID_INPUT', `presence must be here or away, got ${JSON.stringify(mode)}`);
       const next = { mode, updatedAt: clock() };
-      await writeDurable(presencePath, `${JSON.stringify({ schema: 1, ...next })}\n`, { io });
+      await persist(() => writeDurable(presencePath, `${JSON.stringify({ schema: 1, ...next })}\n`, { io }));
       presence = next; publish({ type: 'presence', presence });
       return presence;
     }),
@@ -1604,11 +1704,11 @@ A push line is `{ type: 'state', entry }` to the entry's waiter. A watcher recei
 | `confirm` | `harness`, `callId`, `observed` | `{ entry }` |
 | `answer` / `defer` / `withdraw` | `message` | `{ entry }` |
 | `notify` | `message` | `{ entry }` |
-| `list` | `since?`, `states?` | `{ entries, seq }` |
+| `list` | `since?`, `states?` | `{ entries, seq }`, read in the queue with the writes |
 | `get` | `id` | `{ entry }` |
 | `presence.get` | none | `{ presence }` |
 | `presence.set` | `mode` | `{ presence }` |
-| `watch` | `since?` | `{ entries, seq }`, then pushes |
+| `watch` | `since?` | the entries changed after `since` as pushes, then `{ seq }`, then live pushes |
 
 - [ ] **Step 1: Write the shared test helper and fixtures**
 
@@ -1771,7 +1871,9 @@ test('watch replays since a seq and then pushes changes and presence', async (t)
   const watcher = await connectSocket(ctx.socketPath); t.after(() => watcher.close());
   const pushes = []; watcher.onPush((m) => pushes.push(m));
   const first = await watcher.request('watch', { since: 0 });
-  assert.ok(first.entries.some((e) => e.id === q.id));
+  assert.equal(typeof first.seq, 'number');
+  assert.ok(pushes.some((m) => m.type === 'entry' && m.entry.id === q.id));
+  pushes.length = 0;
   await ctx.client.request('presence.set', { mode: 'here' });
   await ctx.client.request('withdraw', { message: { ...answerMessage(q), kind: 'withdrawal', body: { reason: 'user' } } });
   await new Promise((r) => setTimeout(r, 50));
@@ -1955,12 +2057,11 @@ import { lineReader } from './lines.js';
 const send = (socket, value) => { if (!socket.destroyed) socket.write(`${JSON.stringify(value)}\n`); };
 const kind = (message, expected) => { if (message.kind !== expected) throw relayError('INVALID_MESSAGE', `expected a ${expected} message`); return message; };
 export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 10000, log }) {
-  const waiters = new Map(), watchers = new Set(), sockets = new Set();
+  const waiters = new Map(), sockets = new Set();
   let closing = false;
   const report = (error) => log(`${error.code ?? 'ERROR'}: ${error.message}`);
   const unsubscribe = inbox.subscribe((event) => {
     if (event.type === 'entry') { const w = waiters.get(event.entry.id); if (w) send(w, { type: 'state', entry: event.entry }); }
-    for (const s of watchers) send(s, event);
   });
   const handlers = {
     async ask(req, socket) {
@@ -1988,11 +2089,17 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
       return inbox.withdraw(m.correlationId, m.body.reason);
     },
     notify: (req) => inbox.notify(kind(validateMessage(req.message), 'notice')),
-    list: (req) => ({ entries: inbox.list({ since: req.since, states: req.states }), seq: inbox.seq() }),
+    list: (req) => inbox.snapshot({ since: req.since, states: req.states }),
     get: (req) => { const entry = inbox.get(req.id); return entry ? { entry } : { entry: null, error: { code: 'NOT_FOUND' } }; },
     'presence.get': () => ({ presence: inbox.presence() }),
     'presence.set': async (req) => ({ presence: await inbox.setPresence(req.mode) }),
-    watch: (req, socket) => { watchers.add(socket); return { entries: inbox.list({ since: req.since ?? 0 }), seq: inbox.seq() }; },
+    // Replayed entries arrive as pushes before this response; then live changes follow.
+    watch: async (req, socket) => {
+      if (socket.unwatch) throw relayError('INVALID_REQUEST', 'this connection already watches');
+      const { seq, unsubscribe } = await inbox.watch(Number.isSafeInteger(req.since) ? req.since : 0, (event) => send(socket, event));
+      socket.unwatch = unsubscribe;
+      return { seq };
+    },
   };
   async function handle(socket, line) {
     let req;
@@ -2015,7 +2122,7 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
     socket.on('error', () => {}); // always followed by close
     lineReader(socket, (line) => { handle(socket, line); });
     socket.on('close', () => {
-      sockets.delete(socket); watchers.delete(socket);
+      sockets.delete(socket); socket.unwatch?.();
       if (closing) return;
       for (const id of socket.waiting) if (waiters.get(id) === socket) { waiters.delete(id); inbox.askerGone(id).catch(report); }
     });
@@ -2077,9 +2184,12 @@ export async function runServe({ env = process.env, signal, clock = Date.now, pr
     const daily = setInterval(() => inbox.prune().catch(report), DAY_MS);
     const socket = await serveSocket({ inbox, socketPath: sp.socketPath, processOps, reattachMs, log });
     ready({ socketPath: sp.socketPath, httpPort: null });
-    await new Promise((resolve) => { if (signal.aborted) resolve(); else signal.addEventListener('abort', resolve, { once: true }); });
+    const stopped = new Promise((resolve) => { if (signal.aborted) resolve(null); else signal.addEventListener('abort', () => resolve(null), { once: true }); });
+    const failure = await Promise.race([stopped, inbox.halted]);
     clearTimeout(timer); clearInterval(daily);
-    await socket.close(); await inbox.idle();
+    await socket.close();
+    if (failure) throw failure; // exit nonzero: the unit restarts us and startup reconciles
+    await inbox.idle();
   }
   let held;
   try { held = await withLock(sp.lockPath, serveUntilAborted, { deadline: performance.now() + 2000, processOps }); }
@@ -2181,6 +2291,10 @@ test('guard: proxied needs exact login and host and no Funnel; local needs loopb
   for (const h of [{ ...phone, 'tailscale-user-login': 'Me@example.com' }, { ...phone, host: `${HOST}:443` }, { ...phone, host: HOST.toUpperCase() },
     { ...phone, 'tailscale-funnel-request': '?1' }, { 'x-forwarded-host': 'x', host: '127.0.0.1:3340' }]) assert.equal(classify(h, cfg).allowed, false, JSON.stringify(h));
   assert.equal(classify(phone, { ...cfg, serveHost: null, serveLogin: null }).allowed, false);
+  // tailscale serve on a port other than 443 keeps the port in Host; the configured authority carries it.
+  const on8443 = { ...cfg, serveHost: `${HOST}:8443` };
+  assert.deepEqual(classify({ ...phone, host: `${HOST}:8443` }, on8443), { allowed: true, surface: 'phone', origin: `https://${HOST}:8443` });
+  assert.equal(classify(phone, on8443).allowed, false);
   assert.deepEqual(classify({ host: '127.0.0.1:3340' }, cfg), { allowed: true, surface: 'desktop', origin: 'http://127.0.0.1:3340' });
   for (const host of ['localhost:3340', '[::1]:3340']) assert.equal(classify({ host }, cfg).allowed, true);
   for (const host of ['127.0.0.1:9999', '192.168.1.2:3340', '127.0.0.1', undefined]) assert.equal(classify(host ? { host } : {}, cfg).allowed, false);
@@ -2339,17 +2453,17 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     try { data = await fs.readFile(file); } catch { return fail(res, 404, 'NOT_FOUND', 'not found'); }
     res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-cache' }); res.end(data);
   }
-  function events(req, res, url) {
-    const since = Number(req.headers['last-event-id'] ?? url.searchParams.get('since') ?? 0);
+  async function events(req, res, url) {
+    const raw = Number(req.headers['last-event-id'] ?? url.searchParams.get('since') ?? 0), since = Number.isSafeInteger(raw) && raw >= 0 ? raw : 0;
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
     const write = (event) => {
       if (event.type === 'entry') res.write(`id: ${event.entry.seq}\nevent: entry\ndata: ${JSON.stringify(event.entry)}\n\n`);
       else res.write(`event: presence\ndata: ${JSON.stringify(event.presence)}\n\n`);
     };
-    for (const entry of inbox.list({ since: Number.isSafeInteger(since) ? since : 0 }).filter((e) => e.seq > since)) write({ type: 'entry', entry });
-    const unsubscribe = inbox.subscribe(write);
+    const { unsubscribe } = await inbox.watch(since, write);
     const ping = setInterval(() => res.write(': ping\n\n'), 25000);
-    req.on('close', () => { clearInterval(ping); unsubscribe(); });
+    const stop = () => { clearInterval(ping); unsubscribe(); };
+    if (res.destroyed) stop(); else res.on('close', stop);
   }
   async function route(req, res) {
     const verdict = classify(req.headers, { port, serveHost: cfg.serveHost, serveLogin: cfg.serveLogin });
@@ -2363,7 +2477,7 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     const [, area, id, action] = parts;
     if (req.method === 'GET' && area === 'inbox' && !id) {
       const since = url.searchParams.has('since') ? Number(url.searchParams.get('since')) : undefined;
-      return json(res, 200, { seq: inbox.seq(), entries: inbox.list({ since }) });
+      return json(res, 200, await inbox.snapshot({ since }));
     }
     if (req.method === 'GET' && area === 'inbox' && id && !action) { const e = inbox.get(id); return e ? json(res, 200, { entry: e }) : fail(res, 404, 'NOT_FOUND', 'no such entry'); }
     if (req.method === 'GET' && area === 'events' && !id) return events(req, res, url);
@@ -2893,11 +3007,15 @@ git commit -m "feat(cli): desk inbox and presence commands over the socket"
 - Produces:
   - `parseEvidence(text)`, which now also returns `routes: Array<{ name, passed, note }>`.
     A record without `routes` still parses.
-  - `routeBindings(harness, evidence) -> Array<{ event, matcher, outerMs, handback? }>`.
-    It throws `UNSUPPORTED_BINDING`.
-  - `planRouteHooks({ text, harness, relayBin, nodeBin, rows }) -> text`.
-  - `planClaudeCode({ ..., withAsk })`. With `withAsk: true` it adds the route's rows,
-    which is the CLI's `--with ask`.
+  - `routeBindings(harness, evidence, installedVersion) -> Array<{ event, matcher, outerMs, handback? }>`.
+    It throws `UNSUPPORTED_BINDING` when the evidence's `version` is not the installed
+    harness version, or when a required row has not passed.
+  - `planRouteHooks({ text, harness, relayBin, nodeBin, rows }) -> text`. It reconciles
+    both of the route's events (`ROUTE_EVENTS`): it removes every relay-owned `ask` entry
+    whose event has no row, and writes one entry per row.
+  - `planClaudeCode({ ..., withAsk, installedVersion })`. With `withAsk: true` it
+    reconciles the route's entries, which is the CLI's `--with ask`. `installedVersion`
+    is required then. Without `withAsk`, existing `ask` entries are left untouched.
 
 The installed commands are:
 
@@ -2928,23 +3046,42 @@ test('evidence routes are optional, named from the closed set, and unique', () =
     assert.throws(() => parseEvidence(record(bad)), { code: 'INVALID_EVIDENCE' }, JSON.stringify(bad));
   }
 });
+test('route evidence must be for the installed version', () => {
+  const ev = parseEvidence(record(all));
+  assert.throws(() => routeBindings('claude-code', ev, '2.1.300'), { code: 'UNSUPPORTED_BINDING', message: /2\.1\.296.*2\.1\.300/ });
+  assert.throws(() => routeBindings('claude-code', ev, undefined), { code: 'UNSUPPORTED_BINDING' });
+  assert.equal(routeBindings('claude-code', ev, '2.1.296').length, 2);
+});
 test('route bindings follow the evidence', () => {
   const ev = (rows) => parseEvidence(record(rows));
-  assert.deepEqual(routeBindings('claude-code', ev(all)), [
+  const bind = (h, e) => routeBindings(h, e, '2.1.296');
+  assert.deepEqual(bind('claude-code', ev(all)), [
     { event: 'PreToolUse', matcher: 'AskUserQuestion', outerMs: 86400000, handback: true },
     { event: 'PostToolUse', matcher: 'AskUserQuestion', outerMs: 10000 }]);
   const noRelease = all.map((r) => r.name === 'answer-release-native' ? { ...r, passed: false } : r);
-  assert.equal(routeBindings('claude-code', ev(noRelease))[0].handback, false);
+  assert.equal(bind('claude-code', ev(noRelease))[0].handback, false);
   const noReceipt = all.filter((r) => r.name !== 'answer-receipt-observed');
-  assert.equal(routeBindings('claude-code', ev(noReceipt)).length, 1);
+  assert.equal(bind('claude-code', ev(noReceipt)).length, 1);
   for (const missing of ['answer-hook-terminal', 'answer-hook-deny-stops']) {
-    assert.throws(() => routeBindings('claude-code', ev(all.filter((r) => r.name !== missing))), { code: 'UNSUPPORTED_BINDING', message: new RegExp(missing) });
+    assert.throws(() => bind('claude-code', ev(all.filter((r) => r.name !== missing))), { code: 'UNSUPPORTED_BINDING', message: new RegExp(missing) });
   }
-  assert.throws(() => routeBindings('claude-code', null), { code: 'UNSUPPORTED_BINDING' });
-  assert.throws(() => routeBindings('codex', ev(all)), { code: 'UNSUPPORTED_BINDING' });
+  assert.throws(() => bind('claude-code', null), { code: 'UNSUPPORTED_BINDING' });
+  assert.throws(() => bind('codex', ev(all)), { code: 'UNSUPPORTED_BINDING' });
+});
+test('replanning without P2 removes the confirmation hook it installed before', () => {
+  const args = { harness: 'claude-code', relayBin: '/r/bin/relay.js', nodeBin: '/n/node' };
+  const full = routeBindings('claude-code', parseEvidence(record(all)), '2.1.296');
+  const once = planRouteHooks({ ...args, text: '{"hooks":{}}', rows: full });
+  assert.equal(JSON.parse(once).hooks.PostToolUse.length, 1);
+  const theirs = { matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: '/x/their-post', timeout: 5 }] };
+  const mixed = JSON.stringify({ hooks: { ...JSON.parse(once).hooks, PostToolUse: [...JSON.parse(once).hooks.PostToolUse, theirs] } });
+  const again = planRouteHooks({ ...args, text: mixed, rows: full.filter((r) => r.event === 'PreToolUse') });
+  assert.deepEqual(JSON.parse(again).hooks.PostToolUse, [theirs]);
+  assert.equal(JSON.parse(again).hooks.PreToolUse.length, 1);
+  assert.equal(planRouteHooks({ ...args, text: '{"hooks":{}}', rows: [] }), '{"hooks":{}}'); // nothing owned, nothing requested: untouched
 });
 test('planRouteHooks writes and replaces only relay ask entries, idempotently', () => {
-  const rows = routeBindings('claude-code', parseEvidence(record(all)));
+  const rows = routeBindings('claude-code', parseEvidence(record(all)), '2.1.296');
   const theirs = { matcher: 'AskUserQuestion', hooks: [{ type: 'command', command: '/x/other-hook', timeout: 5 }] };
   const text = JSON.stringify({ hooks: { PreToolUse: [theirs] } });
   const once = planRouteHooks({ text, harness: 'claude-code', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', rows });
@@ -2960,7 +3097,8 @@ test('planClaudeCode adds the route only with withAsk', () => {
   const base = { target: '/t/settings.json', text: '{}', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
     subscribers: { schema: 1, subscribers: [] }, evidence: parseEvidence(record(all)) };
   assert.doesNotMatch(planClaudeCode(base).changes[0].after, / ask --harness/);
-  assert.match(planClaudeCode({ ...base, withAsk: true }).changes[0].after, / ask --harness claude-code --handback PreToolUse/);
+  assert.match(planClaudeCode({ ...base, withAsk: true, installedVersion: '2.1.296' }).changes[0].after, / ask --harness claude-code --handback PreToolUse/);
+  assert.throws(() => planClaudeCode({ ...base, withAsk: true, installedVersion: '2.2.0' }), { code: 'UNSUPPORTED_BINDING' });
 });
 ```
 
@@ -3003,9 +3141,16 @@ In `src/install/hooks.js`, add a `relayError` import from `../protocol.js` and a
 // The ask route (spec §9.1, §11): its own entries, gated on route evidence, not on the
 // event/reply probes the dispatch bindings use.
 export const ROUTE_EVIDENCE = Object.freeze(['answer-hook-terminal', 'answer-hook-deny-stops', 'answer-release-native', 'answer-receipt-observed', 'answer-hook-under-denial']);
-export function routeBindings(harness, evidence) {
+export const ROUTE_EVENTS = Object.freeze(['PreToolUse', 'PostToolUse']);
+// Route evidence holds only for the harness version it was probed on (spec §11): after an
+// upgrade the probes run again before the route is installed.
+export function routeBindings(harness, evidence, installedVersion) {
   if (harness !== 'claude-code') throw relayError('UNSUPPORTED_BINDING', 'the ask route exists only for claude-code');
-  const passed = (name) => evidence?.routes?.some((r) => r.name === name && r.passed) ?? false;
+  if (!evidence) throw relayError('UNSUPPORTED_BINDING', 'the ask route needs route evidence (--evidence)');
+  if (typeof installedVersion !== 'string' || evidence.version !== installedVersion) {
+    throw relayError('UNSUPPORTED_BINDING', `route evidence is for ${harness} ${evidence.version}, installed is ${installedVersion ?? 'unknown'}; rerun the answer route probes`);
+  }
+  const passed = (name) => evidence.routes?.some((r) => r.name === name && r.passed) ?? false;
   for (const name of ['answer-hook-terminal', 'answer-hook-deny-stops']) {
     if (!passed(name)) throw relayError('UNSUPPORTED_BINDING', `missing route evidence (${harness},${name})`);
   }
@@ -3015,18 +3160,22 @@ export function routeBindings(harness, evidence) {
 }
 const askCommand = (node, bin, harness, event, handback) => `${shellQuote(node)} ${shellQuote(bin)} ask --harness ${harness}${handback ? ' --handback' : ''} ${event}`;
 const askOwned = (value, harness, event) => new RegExp(`^(?:${executable} )?${executable} ask --harness ${esc(harness)}(?: --handback)? ${esc(event)}$`).test(value);
+// Reconciles both route events: an owned entry whose event has no row is removed, so evidence
+// that no longer supports a binding takes it out on the next plan.
 export function planRouteHooks({ text, harness, relayBin, nodeBin = process.execPath, rows }) {
   if (typeof nodeBin !== 'string' || !isAbsolute(nodeBin) || !isAbsolute(relayBin)) throw new Error('node and relay paths must be absolute');
   let output = text;
-  for (const row of rows) {
-    const existing = parse(output).hooks?.[row.event] ?? [];
-    if (!Array.isArray(existing)) throw new Error(`hooks.${row.event} must be an array`);
-    const owned = existing.filter((item) => item?.matcher === row.matcher && Array.isArray(item.hooks) && item.hooks.length === 1
-      && typeof item.hooks[0]?.command === 'string' && askOwned(item.hooks[0].command, harness, row.event));
-    if (owned.length > 1) throw new Error(`duplicate relay ask writer for ${row.event}`);
+  for (const event of ROUTE_EVENTS) {
+    const row = rows.find((r) => r.event === event) ?? null;
+    const existing = parse(output).hooks?.[event] ?? [];
+    if (!Array.isArray(existing)) throw new Error(`hooks.${event} must be an array`);
+    const owned = existing.filter((item) => Array.isArray(item?.hooks) && item.hooks.length === 1
+      && typeof item.hooks[0]?.command === 'string' && askOwned(item.hooks[0].command, harness, event));
+    if (owned.length > 1) throw new Error(`duplicate relay ask writer for ${event}`);
+    if (!row && owned.length === 0) continue;
     const next = existing.filter((item) => item !== owned[0]);
-    next.push(entry(askCommand(nodeBin, relayBin, harness, row.event, row.handback === true), row.matcher, row.outerMs));
-    output = applyEdits(output, modify(output, ['hooks', row.event], next, { formattingOptions: { insertSpaces: true, tabSize: 2 } }));
+    if (row) next.push(entry(askCommand(nodeBin, relayBin, harness, event, row.handback === true), row.matcher, row.outerMs));
+    output = applyEdits(output, modify(output, ['hooks', event], next, { formattingOptions: { insertSpaces: true, tabSize: 2 } }));
   }
   return output;
 }
@@ -3043,10 +3192,10 @@ In `src/install/claude-code.js`:
 ```js
 import { bindingsFor, planHooks, planRouteHooks, routeBindings } from './hooks.js';
 // ...
-export function planClaudeCode({ target, text, relayBin, nodeBin = process.execPath, subscribersPath, subscribers, evidence = null, retireFamiliar = false, withAsk = false }) {
+export function planClaudeCode({ target, text, relayBin, nodeBin = process.execPath, subscribersPath, subscribers, evidence = null, retireFamiliar = false, withAsk = false, installedVersion }) {
   // ...existing checks and capability validation...
   let after = planHooks({ text, harness: 'claude-code', relayBin, nodeBin, subscribersPath, retireFamiliar });
-  if (withAsk) after = planRouteHooks({ text: after, harness: 'claude-code', relayBin, nodeBin, rows: routeBindings('claude-code', evidence) });
+  if (withAsk) after = planRouteHooks({ text: after, harness: 'claude-code', relayBin, nodeBin, rows: routeBindings('claude-code', evidence, installedVersion) });
   return { schema: 1, harness: 'claude-code', changes: after === text ? [] : [{ path: target, before: text, after }], evidence: capability.evidence };
 }
 ```
@@ -3292,8 +3441,12 @@ In `rootHelp`, list each command by `c.path.join(' ')`, padded to 15.
   `json` under `--json` or `text` otherwise.
 - **`presence [mode]`.** A mode outside `here|away` is a usage error. Call `runPresence`
   and print the same way as `inbox`.
-- **`install`.** Pass `withAsk: f['--with'] === 'ask'` to `planClaudeCode`.
-  `--with ask` on another harness is a usage error.
+- **`install`.** Pass `withAsk: f['--with'] === 'ask'` to `planClaudeCode`. With it,
+  also pass `installedVersion`, the first word of
+  `execFileSync('claude', ['--version'], { encoding: 'utf8' })`. A missing `claude` is an
+  error (`HARNESS_UNAVAILABLE`), never a skipped check. `--with ask` on another harness
+  is a usage error. Tests replace `claude` with a stub script on `PATH` that prints the
+  evidence's version.
 
 Errors with `code` print through the existing JSON or pretty error path (exit 1).
 `USAGE` exits 2.
@@ -3358,7 +3511,8 @@ Add a section to `docs/api.md` that states, in the style of the existing section
 - the error codes (`ALREADY_ANSWERED`, `ANSWERED`, `WITHDRAWN`, `EXPIRED`, `RELEASED`,
   `UNDELIVERABLE`, `STALE`, `INVALID_ANSWER`, `LOCAL_ONLY`, `NOT_WAITER`,
   `NOT_ANSWERED`, `NOT_HANDED`, `NOT_SUPERSEDABLE`, `ID_CONFLICT`, `NOT_FOUND`,
-  `SERVE_RUNNING`, `SERVE_UNAVAILABLE`, `INVALID_CONFIG`, `INVALID_ENTRY`);
+  `SERVE_RUNNING`, `SERVE_UNAVAILABLE`, `STORE_FAILED`, `INVALID_CONFIG`, `INVALID_ENTRY`,
+  `HARNESS_UNAVAILABLE`);
 - that no root package export is added in v1. The interaction modules are reached
   through the CLI and the socket, not through a library API.
 
@@ -3389,7 +3543,9 @@ WantedBy=default.target
 
 2. **Phone access.** `tailscale serve --bg --https=443 http://127.0.0.1:3340`, its
    prerequisites (MagicDNS and HTTPS certificates), and how to remove it
-   (`tailscale serve --https=443 off`).
+   (`tailscale serve --https=443 off`). On any port other than 443, `RELAY_SERVE_HOST`
+   includes the port (`<host>.<tailnet>.ts.net:8443`), because Tailscale passes the
+   incoming `Host` through. The phone's `Origin` then carries the same port.
 3. **Installing the route.** First run the probes (`docs/runbooks/answer-route-probes.md`).
    Then plan with `relay install --harness claude-code --subscribers ... --target ... --evidence docs/evidence/claude-code-answer-routes.json --with ask`,
    inspect the artifact, and apply with `--apply --artifact FILE`. Roll back with
@@ -3444,7 +3600,7 @@ here touches the user's real Claude settings or relay's real state directory.
 3. Start the service from the worktree:
 
    ```bash
-   RELAY_STATE_DIR=S/state RELAY_HTTP_PORT=3341 RELAY_SERVE_HOST=<host>.<tailnet>.ts.net RELAY_SERVE_LOGIN=<login> node .worktrees/typed-messages/bin/relay.js serve
+   RELAY_STATE_DIR=S/state RELAY_HTTP_PORT=3341 RELAY_SERVE_HOST=<host>.<tailnet>.ts.net:8443 RELAY_SERVE_LOGIN=<login> node .worktrees/typed-messages/bin/relay.js serve
    ```
 
    Run it as a background command whose timeout covers the session. Record its pid.
@@ -3467,8 +3623,10 @@ to ask one AskUserQuestion. Each hook command names the worktree's
 `RELAY_STATE_DIR=S/state` in the shell that starts `claude`.
 
 1. **Answered from the phone.** From the phone, run
-   `curl https://<host>.<tailnet>.ts.net:8443/v1/inbox`, then POST an answer with the
-   matching `Origin`. Expected: the Claude turn continues with the chosen label, and
+   `curl https://<host>.<tailnet>.ts.net:8443/v1/inbox`, then POST an answer with
+   `Origin: https://<host>.<tailnet>.ts.net:8443`, port included. Tailscale passes the
+   incoming `Host` through unchanged, so the guard sees `<host>.<tailnet>.ts.net:8443`.
+   Before the cases, check that a GET from the phone returns 200 and not 403. Expected: the Claude turn continues with the chosen label, and
    `GET /v1/inbox/<id>` shows `consumed`.
 2. **Deferred.** A new question; POST `/defer` from the phone. Expected: the native
    question appears in the terminal, and after answering there the entry is `released`
