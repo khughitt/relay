@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T23:00:36Z
+updated: 2026-10-11T23:18:39Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -64,3 +64,5 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-11T23:00:21Z (design/typed-messages): review: plan round 1 — verdict: revise; findings: P1 2, P2 4; reviewer: codex
 - 2026-10-11T23:00:36Z (design/typed-messages): Plan round 1 on b7ce270: P1 (Task 4 lines 1101-1111; Tasks 5/8) seq() exposes an allocated number before its entry is committed; an HTTP snapshot can return seq 2 with pending entry seq 1, then Last-Event-ID 2 skips the saved answer. Serialize snapshots or expose a committed snapshot cursor, including atomic replacement visibility; test a read during a blocked entry write. P1 (Task 5 line 1306/1333; Task 4 line 1114) an IO_ERROR on the second supersession write leaves both questions pending and the queue continues; retries return the replacement without reconciliation, both answers succeed, and startup quarantines the answered replacement. Stop serving on uncertain storage failure or reconcile before accepting more operations; test a failed second write without immediately restarting. P2 (Task 11 lines 3006-3014) route evidence is never compared with the installed Claude version; add the version gate and mismatch test required by spec 11. P2 (Task 11 lines 3021-3029) planning without P2 leaves a previously installed relay ask PostToolUse entry intact; reconcile owned entries for both events and test true-to-false/missing P2. P2 (Task 1 lines 169-173) release readiness matches Square in the echoed prompt before the 120-second hook returns, skips the answer branch permanently, and can misclassify P1/P2; wait for the release log and an actual native-question marker. P2 (Task 14 line 3447) configured host omits :8443 while the phone URL uses it; the exact Host/Origin guard refuses the acceptance run. Configure the full authority and test the port. Verified storage failures and installer/config cases with isolated copies of the planned code; checked probe predicate against its prompt and Tailscale upstream Host forwarding. tasks check passed. No plan or implementation edits; no live probes or full runtime suite run.
+- 2026-10-11T23:18:39Z (design/typed-messages): resumed
+  provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
