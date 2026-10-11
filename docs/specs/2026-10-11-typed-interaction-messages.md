@@ -412,7 +412,7 @@ one request object per line and one response per line, correlated by a client `r
 | Op | Request | Response |
 | --- | --- | --- |
 | `ask` | a question message, `waiter` (process handle) and `handback` (whether the route can return the question to the harness's UI) | the entry, then a `state` line on every later transition of the entry, until the connection closes |
-| `handed` | `{ id }`, sent by the route before it gives the answer to the harness | entry |
+| `handed` | `{ id }`, sent by the waiter before it gives the answer to the harness; idempotent for that waiter (§9.1) | entry, or `NOT_WAITER` |
 | `confirm` | `{ harness, callId, answers }` from the route's post-call observation | entry or `NOT_FOUND` |
 | `answer` / `defer` / `withdraw` | message | entry or error |
 | `list` | `{ since?: seq, states?: [...] }` | entries |
