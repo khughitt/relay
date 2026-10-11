@@ -6,9 +6,9 @@ priority: 2
 size: l
 complexity: high
 process: planned
-owner: main
+owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T20:39:50Z
+updated: 2026-10-11T20:40:02Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -36,4 +36,6 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 
 - 2026-10-11T19:36:32Z (main): hq-d85ede results for the design (facts answer-* in hq facts/capabilities.toml). Constraints: (1) correlation id = the harness's call id (Claude tool_use_id, Codex itemId+turnId, OpenCode form id); after a restart every harness that re-asks does so under a new id, and a late answer must be rejected, never matched by question text, which the probe showed lands on the new question. (2) Delivery needs a long-lived service: Codex and OpenCode routes are protocol clients holding a connection to the harness server, and the Claude hook route blocks a hook process on the inbox (2100 s probed). (3) Withdrawal: Claude hook death (Esc, session close) must withdraw the inbox entry; hook deny with a reason is seen by the model as a hook error and it stops; Codex serverRequest/resolved tells the relay the terminal answered first; OpenCode form cancel interrupts the step and does not pass a message in the body to the model (query parameter unprobed); the Codex async card cannot be withdrawn. (4) Two answers: Claude defer resume refuses a second, Codex ignores a second response silently (first wins), OpenCode returns 409 FormAlreadySettledError; the relay's own first-wins rule must hold for the Claude hook route, where a second answer has no consumer. (5) Restart: Claude -p defer survives (resume replays the same tool_use_id), interactive hook does not; Codex daemon restart aborts and runs a recovery turn re-asking under a new itemId; OpenCode server restart drops the form (404). Codex threads and OpenCode sessions outlive their terminal, so answer saved vs consumed maps onto request resolved vs pending.
 - 2026-10-11T20:39:50Z (main): started
+  provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-11T20:40:02Z (design/typed-messages): resumed
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
