@@ -8,11 +8,12 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T20:42:07Z
+updated: 2026-10-11T20:45:43Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
 agent: claude-code/claude-fable-5-1
+spec: docs/specs/2026-10-11-typed-interaction-messages.md
 ---
 
 Piece of ops-cb50a8 (typed exchanges; phone inbox). Planned: design spec for user review, then a plan. Depends on hq-d85ede, which verifies how an answer reaches a waiting turn per harness and session mode.
