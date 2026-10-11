@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T23:42:00Z
+updated: 2026-10-11T23:42:11Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -70,3 +70,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-11T23:18:40Z (design/typed-messages): parked (waiting on user, review): plan review round 2 on .worktrees/typed-messages/docs/plans/2026-10-11-typed-interaction-messages.md; on accept the user picks an execution method and the agent starts Task 1 (relay-0f389a)
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-11T23:42:00Z (design/typed-messages): review: plan round 2 — verdict: revise; findings: P2 1; reviewer: codex
+- 2026-10-11T23:42:11Z (design/typed-messages): Plan round 2 on 16ed415: all six round 1 findings are resolved. Isolated planned-code checks verified failed replacement writes refuse later writes/snapshots and reconcile on reopen, snapshot/watch wait for persistence, the service returns STORE_FAILED and releases its lock, version mismatch refuses route bindings, absent P2 removes only the owned PostToolUse entry, and the 8443 authority matches. Read the probe change: release is awaited before native options and driving failure is not evidence failure. One new P2 in Task 7 lines 2097-2100: watch awaits queued inbox.watch before installing socket.unwatch. If the socket closes while a write blocks that queue, the close handler runs without an unsubscribe; later the queued watch adds a permanent listener to the dead socket. Reproduced with a paused answer write and a real local socket; the listener survived disconnect and server.close(). After watch resolves, unsubscribe immediately if the socket is already destroyed; reserve watch ownership before awaiting so concurrent watch requests cannot both register. Add a disconnect-during-queued-watch regression test. tasks check passed. Plan and implementation unchanged; no live Claude/phone probes or full runtime suite run.
