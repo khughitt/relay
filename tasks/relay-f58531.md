@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T21:51:22Z
+updated: 2026-10-11T21:51:23Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -48,3 +48,5 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-11T21:48:13Z (design/typed-messages): resumed
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-11T21:51:22Z (design/typed-messages): spec round 1 findings addressed in 702837f: handed vs consumed (consumed only on matching PostToolUse, P2; unconfirmed after 60 s), withdrawal denies instead of releasing (hq-d85ede deny-stops fact), supersession write order + startup reconciliation, defer -> released with state lines to the waiter, seq = max(persisted, entries) written before entry, same-answerId replay in every answer-holding state; new probe P3 (ask hook under another hook's deny)
+- 2026-10-11T21:51:23Z (design/typed-messages): parked (waiting on user, review): user (or codex) runs spec review round 2 on .worktrees/typed-messages/docs/specs/2026-10-11-typed-interaction-messages.md; on accept the agent runs writing-plans
+  provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
