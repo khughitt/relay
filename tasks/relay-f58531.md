@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T22:15:03Z
+updated: 2026-10-11T22:16:58Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -55,3 +55,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-11T22:15:02Z (design/typed-messages): spec round 2 findings addressed in 5eee47e + follow-up: idempotent handoff retry for the recorded waiter (NOT_WAITER otherwise), crash test between persisting handed and its ack with early and late reattach; pruning retains a predecessor named by a non-terminal replacement, test added
 - 2026-10-11T22:15:03Z (design/typed-messages): parked (waiting on user, review): spec review round 3 on .worktrees/typed-messages/docs/specs/2026-10-11-typed-interaction-messages.md; on accept the agent runs writing-plans
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-11T22:16:58Z (design/typed-messages): review: spec round 3 — verdict: accept; findings: none; reviewer: codex
