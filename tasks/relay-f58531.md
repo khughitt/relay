@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-11T20:45:51Z
+updated: 2026-10-11T20:50:05Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -43,3 +43,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-11T20:42:07Z (design/typed-messages): design decisions 2026-10-11: one long-lived relay serve as sole inbox writer (unix socket for local clients, loopback HTTP behind tailscale serve for the phone), rejected files-as-truth multi-writer; user chose presence mode for routing (relay presence away|here; here = hook passes through to the native question; defer on the Claude terminal route releases the hook to the native question)
 - 2026-10-11T20:45:51Z (design/typed-messages): parked (waiting on user, review): user reviews .worktrees/typed-messages/docs/specs/2026-10-11-typed-interaction-messages.md; on approval the agent runs writing-plans (probes P1/P2 first)
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-11T20:50:05Z (design/typed-messages): review: spec round 1 — verdict: revise; findings: P1 3, P2 3; reviewer: codex
