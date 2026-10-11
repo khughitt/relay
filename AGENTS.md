@@ -1,7 +1,7 @@
 # relay — agent guide
 
 - Follow the tasks skill: `tasks prime`, start before changes, CLI-only task edits,
-  `tasks check` before commits, and completion in the same commit as its work.
+  `tasks check` before commits, and completion on the task's branch before it merges.
 - Planned work requires reviewed specs and plans before implementation. Reuse the
   approved extraction spec in ops; tasks identity has a separate design gate.
 - Committed designs live in `docs/specs/`; implementation plans in `docs/plans/`.
