@@ -1201,6 +1201,7 @@ git commit -m "feat(interaction): durable inbox store with recovery"
       writes. Every surface that hands a client a sequence number uses them.
     - **Failure:** `halted: Promise<Error>` resolves with `STORE_FAILED` after a failed
       write. Every later operation rejects with that error.
+    - **Diagnostic:** `subscribers() -> number`, the live listener count, for tests.
     - **Presence:** `presence() -> { mode, updatedAt }` and `setPresence(mode) -> Promise<presence>`.
     - **Events:** `subscribe(fn) -> unsubscribe`, where fn receives
       `{ type: 'entry', entry } | { type: 'presence', presence }`.
@@ -1454,6 +1455,7 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
       return { seq: store.seq(), unsubscribe: () => listeners.delete(fn) };
     }),
     halted: halted.promise,
+    subscribers: () => listeners.size, // diagnostic: tests assert no listener outlives its client
     presence: () => presence,
     setPresence: (mode) => serial(async () => {
       if (!MODES.includes(mode)) throw relayError('INVALID_INPUT', `presence must be here or away, got ${JSON.stringify(mode)}`);
@@ -1809,9 +1811,9 @@ import { createProcessOps } from '../src/bus/proc.js';
 import { questionMessage, answerMessage, deferMessage, OTHER_HANDLE } from './helpers/interaction.js';
 
 const waiterFile = new URL('./fixtures/socket-waiter.js', import.meta.url).pathname;
-async function setup(t) {
+async function setup(t, { io } = {}) {
   const p = await tempState(t), socketPath = join(p.stateDir, 'serve.sock');
-  const { inbox } = await openInbox({ stateDir: p.stateDir, expectAnswers });
+  const { inbox } = await openInbox({ stateDir: p.stateDir, expectAnswers, ...(io ? { io } : {}) });
   await inbox.setPresence('away');
   const server = await serveSocket({ inbox, socketPath, processOps: createProcessOps(), reattachMs: 60000, log: () => {} });
   t.after(() => server.close());
@@ -1878,6 +1880,23 @@ test('watch replays since a seq and then pushes changes and presence', async (t)
   await ctx.client.request('withdraw', { message: { ...answerMessage(q), kind: 'withdrawal', body: { reason: 'user' } } });
   await new Promise((r) => setTimeout(r, 50));
   assert.deepEqual(pushes.map((m) => m.type), ['presence', 'entry']);
+});
+test('a watcher that disconnects while its registration is queued leaves no listener', async (t) => {
+  let release, reached = null;
+  const io = { ...fs, rename: async (from, to) => { if (reached && to.endsWith('.json')) { const r = reached; reached = null; r(); await new Promise((g) => { release = g; }); } return fs.rename(from, to); } };
+  const ctx = await setup(t, { io }), { q } = await waiter(t, ctx);
+  const baseline = ctx.inbox.subscribers();
+  const hit = new Promise((r) => { reached = r; });
+  const answering = ctx.client.request('answer', { message: answerMessage(q) });
+  await hit; // the answer's write is paused, so the watch below waits in the queue
+  const raw = net.createConnection(ctx.socketPath);
+  await new Promise((r) => raw.once('connect', r));
+  raw.write(`${JSON.stringify({ reqId: 1, op: 'watch', since: 0 })}\n`);
+  await new Promise((r) => setTimeout(r, 50));
+  raw.destroy();
+  await new Promise((r) => setTimeout(r, 50)); // the server has seen the close
+  release(); await answering; await ctx.inbox.idle();
+  assert.equal(ctx.inbox.subscribers(), baseline);
 });
 test('withdraw over the socket accepts only user and asker reasons', async (t) => {
   const ctx = await setup(t), { q } = await waiter(t, ctx);
@@ -2094,9 +2113,13 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
     'presence.get': () => ({ presence: inbox.presence() }),
     'presence.set': async (req) => ({ presence: await inbox.setPresence(req.mode) }),
     // Replayed entries arrive as pushes before this response; then live changes follow.
+    // Ownership is reserved before the queued registration; a socket that closed while it
+    // waited is unsubscribed as soon as registration resolves, so no listener outlives it.
     watch: async (req, socket) => {
-      if (socket.unwatch) throw relayError('INVALID_REQUEST', 'this connection already watches');
+      if (socket.watching) throw relayError('INVALID_REQUEST', 'this connection already watches');
+      socket.watching = true;
       const { seq, unsubscribe } = await inbox.watch(Number.isSafeInteger(req.since) ? req.since : 0, (event) => send(socket, event));
+      if (socket.destroyed) { unsubscribe(); return { seq }; }
       socket.unwatch = unsubscribe;
       return { seq };
     },
@@ -2122,7 +2145,7 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
     socket.on('error', () => {}); // always followed by close
     lineReader(socket, (line) => { handle(socket, line); });
     socket.on('close', () => {
-      sockets.delete(socket); socket.unwatch?.();
+      sockets.delete(socket); socket.unwatch?.(); // a registration still queued cleans up after itself
       if (closing) return;
       for (const id of socket.waiting) if (waiters.get(id) === socket) { waiters.delete(id); inbox.askerGone(id).catch(report); }
     });
@@ -2253,9 +2276,9 @@ import { expectAnswers } from '../src/routes/index.js';
 import { questionMessage, HANDLE, uuid } from './helpers/interaction.js';
 
 const LOGIN = 'me@example.com', HOST = 'desk.tail1234.ts.net';
-async function setup(t, { clientDir = null, now = Date.now } = {}) {
+async function setup(t, { clientDir = null, now = Date.now, io } = {}) {
   const p = await tempState(t);
-  const { inbox } = await openInbox({ stateDir: p.stateDir, clock: now, expectAnswers });
+  const { inbox } = await openInbox({ stateDir: p.stateDir, clock: now, expectAnswers, ...(io ? { io } : {}) });
   await inbox.setPresence('away');
   const srv = await serveHttp({ inbox, http: { port: 0, serveHost: HOST, serveLogin: LOGIN, clientDir }, readAgents: async () => ({ agents: {} }), clock: now, log: () => {} });
   t.after(() => srv.close());
@@ -2345,6 +2368,22 @@ test('inbox listing, one entry, defer, presence, agents', async (t) => {
   assert.equal((await call(port, { method: 'PUT', path: '/v1/presence', headers: h, body: { mode: 'here' } })).json.presence.mode, 'here');
   assert.equal((await call(port, { path: '/v1/presence', headers: h })).json.presence.mode, 'here');
   assert.deepEqual((await call(port, { path: '/v1/agents', headers: h })).json, { agents: [] });
+});
+test('an event stream closed while its registration is queued leaves no listener', async (t) => {
+  let release, reached = null;
+  const io = { ...fs, rename: async (from, to) => { if (reached && to.endsWith('.json')) { const r = reached; reached = null; r(); await new Promise((g) => { release = g; }); } return fs.rename(from, to); } };
+  const { port, q, inbox } = await setup(t, { io }), baseline = inbox.subscribers();
+  const hit = new Promise((r) => { reached = r; });
+  const withdrawing = inbox.withdraw(q.id, 'user');
+  await hit; // the withdrawal's write is paused, so the stream's watch waits in the queue
+  const req = http.request({ host: '127.0.0.1', port, path: '/v1/events', headers: phone });
+  req.on('error', () => {}); req.end();
+  await new Promise((r) => setTimeout(r, 50));
+  req.destroy();
+  await new Promise((r) => setTimeout(r, 50));
+  release(); await withdrawing; await inbox.idle();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(inbox.subscribers(), baseline);
 });
 test('events: Last-Event-ID replays newer entries, then streams', async (t) => {
   const { port, q, inbox } = await setup(t), mark = inbox.seq();
