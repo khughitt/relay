@@ -1,15 +1,16 @@
 ---
 id: relay-e889bc
 title: "Installer: the ask route's bindings behind its evidence"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T09:27:37Z
+updated: 2026-10-12T09:27:38Z
 started: 2026-10-12T09:13:16Z
+completed: 2026-10-12T09:27:38Z
 depends: [relay-f33482]
 parent: relay-f58531
 tags: []
@@ -30,3 +31,7 @@ step: "Task 11: Installer: the ask route's bindings behind its evidence"
 - 2026-10-12T09:22:16Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T09:27:37Z (design/typed-messages): review: impl round 1 — verdict: accept; findings: Minor 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T09:27:38Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T09:27:38Z (design/typed-messages): Implemented strict optional route evidence, exact installed harness/version gates, P1 handback/P2 confirmation, and both-event owned hook reconciliation. Independent spec and task quality review accepted; covering25/25 and serialfull560/560 Node22/26. Prior dispatch100ms timing failure retained and filed relay-fc28a4; live installation remains later gate.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
