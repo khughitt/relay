@@ -23,7 +23,7 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
   const halted = Promise.withResolvers();
   let chain = Promise.resolve();
   const serial = (fn) => {
-    const run = chain.then(() => { if (failure) throw failure; return fn(); });
+    const run = chain.then(() => { if (failure) throw failure; return fn(clock()); });
     chain = run.catch(() => {});
     return run;
   };
@@ -39,24 +39,28 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
     return { entry, error: result.error };
   }
   const list = ({ since, states } = {}) => store.all().filter((e) => (!L.isTerminal(e) || (since !== undefined && e.seq > since)) && (!states || states.includes(e.state)));
-  async function current(id) {
+  async function current(id, now) {
     const entry = store.get(id);
-    return entry ? (await commit(L.applyClock(entry, clock()))).entry : null;
+    return entry ? (await commit(L.applyClock(entry, now))).entry : null;
   }
-  const on = (id, fn) => serial(async () => {
-    const entry = await current(id);
-    return entry ? commit(fn(entry, clock())) : { entry: null, error: { code: 'NOT_FOUND' } };
+  const on = (id, fn) => serial(async (now) => {
+    const entry = await current(id, now);
+    return entry ? commit(fn(entry, now)) : { entry: null, error: { code: 'NOT_FOUND' } };
   });
   const inbox = {
-    ask: (message, { handback, waiter }) => serial(async () => {
-      const existing = await current(message.id);
+    ask: (message, { handback, waiter }) => serial(async (now) => {
+      const existing = await current(message.id, now);
       if (existing) return existing.kind === 'question' && isDeepStrictEqual(existing.question, message)
         ? { entry: existing, error: null } : { entry: existing, error: { code: 'ID_CONFLICT' } };
       if (presence.mode === 'here') return { passthrough: true };
-      const now = clock(), entry = L.createEntry(message, { handback, waiter, now });
+      const entry = L.applyClock(L.createEntry(message, { handback, waiter, now }), now).entry;
       const x = message.body.supersedes;
       if (x === null) return commit({ entry, changed: true, error: null });
-      const predecessor = await current(x), refusal = L.checkSupersede(predecessor, message);
+      if (entry.state === 'expired') {
+        const saved = store.get(x), predecessor = saved ? L.applyClock(saved, now).entry : null;
+        return { entry: null, error: L.checkSupersede(predecessor, message) ?? { code: 'EXPIRED' } };
+      }
+      const predecessor = await current(x, now), refusal = L.checkSupersede(predecessor, message);
       if (refusal) return { entry: null, error: refusal };
       const [n, w] = await persist(() => store.supersede(entry, L.applySuperseded(predecessor, entry.id, now).entry));
       for (const e of [n, w]) { onCommit(e); publish({ type: 'entry', entry: e }); }
@@ -68,16 +72,20 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
     handed: (id, waiter) => on(id, (e, now) => L.applyHanded(e, waiter, now)),
     askerGone: (id) => on(id, (e, now) => L.applyAskerGone(e, now)),
     seen: (id) => on(id, (e, now) => L.applySeen(e, now)),
-    confirm: ({ harness, callId, observed }) => serial(async () => {
+    confirm: ({ harness, callId, observed }) => serial(async (now) => {
       const found = store.all().find((e) => e.kind === 'question' && e.question.body.native?.harness === harness && e.question.body.native.callId === callId);
       if (!found) return { entry: null, error: { code: 'NOT_FOUND' } };
-      const e = await current(found.id);
+      const e = await current(found.id, now);
       const matches = e.answer !== null && isDeepStrictEqual(expectAnswers(e), observed);
-      return commit(L.applyConfirm(e, { matches, observed }, clock()));
+      return commit(L.applyConfirm(e, { matches, observed }, now));
     }),
-    notify: (message) => serial(async () => store.get(message.id) ? { entry: store.get(message.id), error: null } : commit({ entry: L.createNotice(message, { now: clock() }), changed: true, error: null })),
-    sweep: () => serial(async () => { for (const e of store.all()) await commit(L.applyClock(e, clock())); }),
-    prune: () => serial(() => persist(() => store.prune(clock()))),
+    notify: (message) => serial(async (now) => {
+      const existing = await current(message.id, now);
+      return existing ? { entry: existing, error: null }
+        : commit({ entry: L.applyClock(L.createNotice(message, { now }), now).entry, changed: true, error: null });
+    }),
+    sweep: () => serial(async (now) => { for (const e of store.all()) await commit(L.applyClock(e, now)); }),
+    prune: () => serial((now) => persist(() => store.prune(now))),
     nextDeadline: () => { const due = store.all().map(L.nextDeadline).filter((d) => d !== null); return due.length ? Math.min(...due) : null; },
     // Unserialized reads for internal checks; anything that hands a client a cursor uses
     // snapshot or watch, which run in the queue so no write is half done.
@@ -95,9 +103,9 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
     halted: halted.promise,
     subscribers: () => listeners.size, // diagnostic: tests assert no listener outlives its client
     presence: () => presence,
-    setPresence: (mode) => serial(async () => {
+    setPresence: (mode) => serial(async (now) => {
       if (!MODES.includes(mode)) throw relayError('INVALID_INPUT', `presence must be here or away, got ${JSON.stringify(mode)}`);
-      const next = { mode, updatedAt: clock() };
+      const next = { mode, updatedAt: now };
       await persist(() => writeDurable(presencePath, `${JSON.stringify({ schema: 1, ...next })}\n`, { io }));
       presence = next; publish({ type: 'presence', presence });
       return presence;

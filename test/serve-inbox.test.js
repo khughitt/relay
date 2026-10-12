@@ -260,3 +260,72 @@ test('a presence write failure halts queued operations without publishing an upd
   assert.equal((await inbox.halted).code, 'STORE_FAILED');
   assert.equal(inbox.presence().mode, 'here'); assert.deepEqual(events, []);
 });
+
+for (const kind of ['question', 'notice']) for (const lateness of [0, 1]) {
+  test(`new ${kind} at expiry plus ${lateness}ms is published expired and reopens intact`, async (t) => {
+    const { inbox, open } = await setup(t), events = [];
+    inbox.subscribe((event) => events.push(event.entry));
+    const message = kind === 'question'
+      ? questionMessage({ body: { expiresAt: NOW - lateness } })
+      : noticeMessage({ body: { expiresAt: NOW - lateness, title: 'Done', text: 'All green', level: 'info' } });
+    const result = kind === 'question' ? await ask(inbox, message) : await inbox.notify(message);
+    assert.equal(result.error, null); assert.equal(result.entry.state, 'expired');
+    assert.deepEqual(events.map((entry) => entry.state), ['expired']);
+    assert.deepEqual(result.entry.log.map((row) => row.cause), [kind, 'expiry']);
+    assert.equal(result.entry.log.every((row) => row.seq === result.entry.seq && row.at === NOW), true);
+    validateEntry(result.entry);
+    assert.deepEqual((await inbox.snapshot()).entries, []);
+    const reopened = await open();
+    assert.deepEqual(reopened.rejected, []);
+    assert.deepEqual(reopened.inbox.get(message.id), result.entry);
+  });
+}
+test('expired superseding question preserves the predecessor without publication or allocation', async (t) => {
+  const { inbox, open } = await setup(t), q = questionMessage(), events = [];
+  const original = (await ask(inbox, q)).entry, mark = inbox.seq();
+  inbox.subscribe((event) => events.push(event));
+  const expired = questionMessage({ body: { expiresAt: NOW, supersedes: q.id } });
+  const result = await ask(inbox, expired);
+  assert.deepEqual(result, { entry: null, error: { code: 'EXPIRED' } });
+  assert.deepEqual(inbox.get(q.id), original); assert.equal(inbox.get(expired.id), null);
+  assert.equal(inbox.seq(), mark); assert.deepEqual(events, []);
+  const reopened = await open();
+  assert.deepEqual(reopened.rejected, []); assert.deepEqual(reopened.inbox.get(q.id), original);
+  assert.equal(reopened.inbox.get(expired.id), null); assert.equal(reopened.inbox.seq(), mark);
+});
+test('expired replacement still reports answered or ineligible predecessor first', async (t) => {
+  const { inbox } = await setup(t), q = questionMessage();
+  await ask(inbox, q); const answer = answerMessage(q); await inbox.answer(q.id, answer);
+  const expired = questionMessage({ body: { expiresAt: NOW, supersedes: q.id } });
+  assert.deepEqual((await ask(inbox, expired)).error, { code: 'ANSWERED', answer });
+  const other = questionMessage(); await ask(inbox, other);
+  const wrongAsker = questionMessage({ from: { kind: 'agent', agentId: 'codex:z' }, body: { expiresAt: NOW, supersedes: other.id } });
+  assert.equal((await ask(inbox, wrongAsker)).error.code, 'NOT_SUPERSEDABLE');
+});
+test('answer uses one operation timestamp when clock readings would cross expiry', async (t) => {
+  const p = await tempState(t), expiresAt = NOW + 100;
+  let crossing = false, reads = 0;
+  const clock = () => crossing ? expiresAt - 1 + reads++ : NOW;
+  const { inbox } = await openInbox({ stateDir: p.stateDir, clock, expectAnswers: () => ({}) });
+  await inbox.setPresence('away');
+  const q = questionMessage({ body: { expiresAt } }); await ask(inbox, q);
+  crossing = true;
+  const result = await inbox.answer(q.id, answerMessage(q));
+  assert.equal(result.error, null); assert.equal(result.entry.state, 'answered');
+  assert.equal(result.entry.updatedAt, expiresAt - 1);
+  assert.equal(result.entry.messages[0].at, expiresAt - 1);
+  assert.equal(result.entry.log.at(-1).at, expiresAt - 1);
+  assert.equal(reads, 1); validateEntry(result.entry);
+});
+test('sweep uses the same timestamp for every entry when the clock crosses expiry', async (t) => {
+  const p = await tempState(t), expiresAt = NOW + 100;
+  let crossing = false, reads = 0;
+  const clock = () => crossing ? expiresAt - 1 + reads++ : NOW;
+  const { inbox } = await openInbox({ stateDir: p.stateDir, clock });
+  await inbox.setPresence('away');
+  const a = questionMessage({ body: { expiresAt } }), b = questionMessage({ body: { expiresAt } });
+  await ask(inbox, a); await ask(inbox, b);
+  crossing = true; await inbox.sweep();
+  assert.deepEqual([inbox.get(a.id).state, inbox.get(b.id).state], ['pending', 'pending']);
+  assert.equal(reads, 1);
+});
