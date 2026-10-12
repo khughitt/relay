@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:47Z
-updated: 2026-10-12T03:48:31Z
+updated: 2026-10-12T03:48:32Z
 started: 2026-10-12T03:30:41Z
 depends: [relay-1ad9ae]
 parent: relay-f58531
@@ -34,3 +34,5 @@ step: "Task 4: Durable inbox store"
 - 2026-10-12T03:43:51Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12e28-9857-75f0-8e97-2fc2d4eecd09","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T03:48:31Z (design/typed-messages): Fix round 1: F15 shared validator rejects question/notice frame, route and log extras; canonical waiter enforcement verified. F16 parent directory fsyncs at startup in order dirname(stateDir), stateDir, inbox root cover initial publication and failed-init retry. RED expected missing exception/rejection and missing parent sync; GREEN 50/50 focused Node26/22, fast415/415, tasks check clean.
+- 2026-10-12T03:48:32Z (design/typed-messages): parked (waiting on agent): Controller: scoped re-review Task 4 fix round 1 in .worktrees/typed-messages against FIX_BASE9611d6e0049fa45e8fe66c64e75331876795d777, inspect task-4-report.md fix appendix, then close after acceptance.
+  provenance: {"harness_session":"codex:01a12e28-9857-75f0-8e97-2fc2d4eecd09","harness_session_source":"CODEX_THREAD_ID"}
