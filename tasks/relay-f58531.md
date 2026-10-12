@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-12T00:00:28Z
+updated: 2026-10-12T00:00:29Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -74,3 +74,5 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-12T00:00:27Z (design/typed-messages): resumed
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-12T00:00:27Z (design/typed-messages): plan round 2 finding addressed: socket watch reserves ownership before the queued registration and unsubscribes at once if the socket closed meanwhile; inbox.subscribers() diagnostic; disconnect-during-registration tests for the socket and the SSE stream (both with a paused write)
+- 2026-10-12T00:00:28Z (design/typed-messages): parked (waiting on user, review): plan review round 3 on .worktrees/typed-messages/docs/plans/2026-10-11-typed-interaction-messages.md; on accept the user picks an execution method and the agent starts Task 1 (relay-0f389a)
+  provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
