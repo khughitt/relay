@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:52Z
-updated: 2026-10-12T06:10:45Z
+updated: 2026-10-12T06:11:21Z
 started: 2026-10-12T05:54:20Z
 depends: [relay-1e92bf]
 parent: relay-f58531
@@ -23,3 +23,5 @@ step: "Task 9: The `relay ask` hook runner"
 - 2026-10-12T05:54:20Z (design/typed-messages): started
   provenance: {"harness_session":"codex:01a12eac-3bfd-7ea1-9580-1eb40a8292ab","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T06:10:45Z (design/typed-messages): Task 9 implemented with immutable question/project/waiter reconnect and ack-before-stdout; focused 21/21 and serial full 543/543 on Node26 and Node22. Failed overlapping suite runs retained in task-9-report.md; global marker feedback relay-a7aea1; no unrelated changes; exact owned children cleaned.
+- 2026-10-12T06:11:21Z (design/typed-messages): parked (waiting on agent): Controller: review implementation commit 0b68021 and task-9-report.md in .worktrees/typed-messages, then start this task for review fixes or closure.
+  provenance: {"harness_session":"codex:01a12eac-3bfd-7ea1-9580-1eb40a8292ab","harness_session_source":"CODEX_THREAD_ID"}
