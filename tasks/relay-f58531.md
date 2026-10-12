@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-12T02:20:23Z
+updated: 2026-10-12T02:27:44Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -91,3 +91,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
   provenance: {"harness_session":"codex:01a12dc7-d9ad-7a93-9f5d-7a8f238cb051","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T02:20:23Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T02:27:44Z (design/typed-messages): Execution preflight: all 14 tasks and 91 pairs scanned. Adopted F1-F9 in the SDD ledger: bounded monotonic probe pilot; truthful P1/P2 fallbacks; validator/schema agreement; accepted-message and native-observation history; byte-limited complete socket lines; every X-Forwarded-* marks proxy; known registry project context; prescribed desktop labels; apply scratch installer artifact. Baseline just test-fast passed 351/351 on Node 26.5.0.
