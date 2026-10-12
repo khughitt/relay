@@ -1,6 +1,7 @@
 import net from 'node:net';
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { ensurePrivateDir } from '../bus/store.js';
 import { relayError, validateHandle } from '../protocol.js';
 import { validateMessage } from '../interaction/message.js';
@@ -37,12 +38,14 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
       if (previous.accepted && previous.socket.destroyed) gone(id, previous);
     } else waiters.delete(id);
   };
+  const acceptedOwner = (id) => {
+    let owner = waiters.get(id);
+    while (owner && !owner.accepted) owner = owner.previous;
+    return owner;
+  };
   const unsubscribe = inbox.subscribe((event) => {
     if (event.type !== 'entry') return;
-    const latest = waiters.get(event.entry.id);
-    let accepted = latest;
-    while (accepted && !accepted.accepted) accepted = accepted.previous;
-    const owner = accepted ?? latest;
+    const owner = acceptedOwner(event.entry.id) ?? waiters.get(event.entry.id);
     if (owner) send(owner.socket, { type: 'state', entry: event.entry });
   });
   const handlers = {
@@ -55,6 +58,9 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
       let result;
       try { result = await inbox.ask(message, { handback: req.handback, waiter }); }
       catch (error) { restore(message.id, owner); throw error; }
+      if (!result.passthrough && !result.error && !isDeepStrictEqual(result.entry.route.waiter, waiter)) {
+        result = { ...result, error: { code: 'NOT_WAITER' } };
+      }
       if (result.passthrough || result.error) restore(message.id, owner);
       else {
         owner.accepted = true; owner.previous = null;
@@ -140,9 +146,25 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
   }
   // Waiters recorded before a restart get reattachMs to come back; only a confirmed death withdraws.
   const recheck = setTimeout(() => {
-    for (const e of inbox.list({ states: ['pending', 'answered'] })) {
-      if (e.kind === 'question' && e.route.waiter && !waiters.has(e.id) && processOps.probe(e.route.waiter).status === 'dead') inbox.askerGone(e.id).catch(report);
-    }
+    const run = (async () => {
+      const { entries } = await inbox.snapshot({ states: ['pending', 'answered'] });
+      for (const e of entries) {
+        if (closing) return;
+        if (e.kind !== 'question' || !e.route.waiter) continue;
+        let latest = waiters.get(e.id);
+        // A request queued after the first snapshot must settle before it counts as reattached.
+        while (latest && !latest.accepted && !latest.refused) {
+          await inbox.snapshot({ since: 0 });
+          if (closing) return;
+          latest = waiters.get(e.id);
+        }
+        const owner = acceptedOwner(e.id);
+        if (!owner || owner.socket.destroyed) {
+          if (processOps.probe(e.route.waiter).status === 'dead') await inbox.askerGone(e.id);
+        }
+      }
+    })().catch(report);
+    pending.add(run); run.finally(() => pending.delete(run));
   }, reattachMs);
   recheck.unref();
   return {

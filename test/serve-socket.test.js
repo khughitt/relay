@@ -314,3 +314,114 @@ test('each socket message operation rejects a valid envelope of the wrong kind',
   }
   assert.equal(inbox.seq(), 0);
 });
+
+test('a different waiter cannot take an identical replay or the original route liveness', async (t) => {
+  const ctx = await setup(t);
+  const q = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3600000 } });
+  await ctx.client.request('ask', { message: q, waiter: HANDLE, handback: false });
+  const a = [], b = []; ctx.client.onPush((m) => a.push(m));
+  const other = await connectSocket(ctx.socketPath); t.after(() => other.close()); other.onPush((m) => b.push(m));
+  const conflict = await other.request('ask', { message: { ...q, context: { ...q.context, project: 'conflict' } }, waiter: OTHER_HANDLE, handback: false });
+  assert.equal(conflict.error.code, 'ID_CONFLICT');
+  const replay = await other.request('ask', { message: q, waiter: OTHER_HANDLE, handback: false });
+  assert.equal(replay.error?.code, 'NOT_WAITER');
+  assert.deepEqual(replay.entry.route.waiter, HANDLE);
+  await other.request('answer', { message: answerMessage(q) });
+  assert.ok(a.some((m) => m.type === 'state' && m.entry.state === 'answered'));
+  assert.equal(b.filter((m) => m.type === 'state').length, 0);
+  other.close(); await other.closed; await new Promise((r) => setTimeout(r, 30));
+  assert.equal((await ctx.client.request('get', { id: q.id })).entry.state, 'answered');
+  ctx.client.close(); await ctx.client.closed; await new Promise((r) => setTimeout(r, 30)); await ctx.inbox.idle();
+  assert.equal(ctx.inbox.get(q.id).state, 'undeliverable');
+});
+
+for (const initial of ['pending', 'answered']) {
+  test(`startup recovery still probes a dead ${initial} waiter after a queued conflict spans grace`, async (t) => {
+    let pause = false, release, reached;
+    t.after(() => release?.());
+    const io = { ...fs, rename: async (from, to) => {
+      if (pause && to.endsWith('.json')) { pause = false; reached(); await new Promise((r) => { release = r; }); }
+      return fs.rename(from, to);
+    } };
+    const p = await tempState(t), socketPath = join(p.stateDir, 'serve.sock');
+    const { inbox } = await openInbox({ stateDir: p.stateDir, expectAnswers, io }); await inbox.setPresence('away');
+    const q = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3600000 } });
+    await inbox.ask(q, { waiter: HANDLE, handback: false });
+    if (initial === 'answered') await inbox.answer(q.id, answerMessage(q));
+    const probes = [];
+    const server = await serveSocket({ inbox, socketPath, processOps: { probe: (handle) => { probes.push(handle); return { status: 'dead' }; } }, reattachMs: 40, log: () => {} });
+    t.after(() => server.close());
+    const client = await connectSocket(socketPath); t.after(() => client.close());
+    const hit = new Promise((r) => { reached = r; }); pause = true;
+    const writing = client.request('presence.set', { mode: 'away' }); await hit;
+    const conflict = client.request('ask', { message: { ...q, context: { ...q.context, project: 'conflict' } }, waiter: OTHER_HANDLE, handback: false });
+    try { await new Promise((r) => setTimeout(r, 80)); } finally { release(); }
+    await writing; assert.equal((await conflict).error.code, 'ID_CONFLICT');
+    await new Promise((r) => setTimeout(r, 30)); await inbox.idle();
+    assert.deepEqual(probes, [HANDLE]);
+    const entry = (await client.request('get', { id: q.id })).entry;
+    assert.equal(entry.state, initial === 'pending' ? 'withdrawn' : 'undeliverable');
+    assert.equal(entry.log.filter((row) => row.cause === 'asker-gone').length, 1);
+  });
+}
+
+for (const after of [false, true]) {
+  test(`same-handle reattachment queued ${after ? 'after' : 'before'} the grace snapshot preserves delivery and ownership`, async (t) => {
+    let pause = false, release, reached;
+    t.after(() => release?.());
+    const io = { ...fs, rename: async (from, to) => {
+      if (pause && to.endsWith('.json')) { pause = false; reached(); await new Promise((r) => { release = r; }); }
+      return fs.rename(from, to);
+    } };
+    const p = await tempState(t), socketPath = join(p.stateDir, 'serve.sock');
+    const { inbox } = await openInbox({ stateDir: p.stateDir, expectAnswers, io }); await inbox.setPresence('away');
+    const q = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3600000 } });
+    await inbox.ask(q, { waiter: HANDLE, handback: false });
+    let probes = 0;
+    const server = await serveSocket({ inbox, socketPath, processOps: { probe: () => { probes++; return { status: 'alive' }; } }, reattachMs: 40, log: () => {} });
+    t.after(() => server.close());
+    const client = await connectSocket(socketPath); t.after(() => client.close());
+    const hit = new Promise((r) => { reached = r; }); pause = true;
+    const writing = client.request('presence.set', { mode: 'away' }); await hit;
+    let attaching;
+    if (!after) attaching = client.request('ask', { message: q, waiter: HANDLE, handback: false });
+    try {
+      await new Promise((r) => setTimeout(r, 80));
+      if (after) {
+        attaching = client.request('ask', { message: q, waiter: HANDLE, handback: false });
+        await new Promise((r) => setTimeout(r, 30));
+      }
+    } finally { release(); }
+    await writing; assert.equal((await attaching).ok, true);
+    await new Promise((r) => setTimeout(r, 30)); assert.equal(probes, 0);
+    const pushes = []; client.onPush((m) => pushes.push(m));
+    await client.request('answer', { message: answerMessage(q) });
+    assert.ok(pushes.some((m) => m.type === 'state' && m.entry.state === 'answered'));
+    client.close(); await client.closed; await new Promise((r) => setTimeout(r, 30)); await inbox.idle();
+    assert.equal(inbox.get(q.id).state, 'undeliverable');
+  });
+}
+
+test('shutdown suppresses recovery blocked behind an inbox write and waits for cleanup', async (t) => {
+  let pause = false, release, reached;
+  t.after(() => release?.());
+  const io = { ...fs, rename: async (from, to) => {
+    if (pause && to.endsWith('.json')) { pause = false; reached(); await new Promise((r) => { release = r; }); }
+    return fs.rename(from, to);
+  } };
+  const p = await tempState(t), socketPath = join(p.stateDir, 'serve.sock');
+  const { inbox } = await openInbox({ stateDir: p.stateDir, expectAnswers, io }); await inbox.setPresence('away');
+  const q = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3600000 } });
+  await inbox.ask(q, { waiter: HANDLE, handback: false });
+  let probes = 0;
+  const server = await serveSocket({ inbox, socketPath, processOps: { probe: () => { probes++; return { status: 'dead' }; } }, reattachMs: 40, log: () => {} });
+  t.after(() => server.close());
+  const client = await connectSocket(socketPath); t.after(() => client.close());
+  const hit = new Promise((r) => { reached = r; }); pause = true;
+  const writing = client.request('presence.set', { mode: 'away' }).catch((error) => error.code); await hit;
+  await new Promise((r) => setTimeout(r, 80));
+  let closed = false; const closing = server.close().then(() => { closed = true; });
+  try { await new Promise((r) => setTimeout(r, 30)); assert.equal(closed, false); } finally { release(); }
+  await closing; await writing; await inbox.idle();
+  assert.equal(probes, 0); assert.equal(inbox.get(q.id).state, 'pending');
+});
