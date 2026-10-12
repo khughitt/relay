@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:46Z
-updated: 2026-10-12T03:20:21Z
+updated: 2026-10-12T03:21:20Z
 started: 2026-10-12T03:08:11Z
 depends: [relay-cb1b45]
 parent: relay-f58531
@@ -27,3 +27,4 @@ step: "Task 3: Lifecycle state machine"
 - 2026-10-12T03:20:20Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T03:20:21Z (design/typed-messages): review: impl round 1 — verdict: revise; findings: Important 3; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T03:21:20Z (design/typed-messages): Rulings F12-F14: persist trustworthy state/cause evidence for handoff/receipt; distinguish generated death/supersession from sender withdrawals; refuse conflicting message-id reuse as ID_CONFLICT while preserving replay/state precedence. Correct inherited validator gap and new history invariants with focused RED/GREEN regressions.
