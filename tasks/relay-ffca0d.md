@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:49Z
-updated: 2026-10-12T04:28:12Z
+updated: 2026-10-12T04:29:55Z
 started: 2026-10-12T04:17:57Z
 depends: [relay-05ba81]
 parent: relay-f58531
@@ -33,3 +33,5 @@ step: "Task 6: Claude Code route translation"
 - 2026-10-12T04:27:38Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12e54-1e8d-7c41-9790-5ec1e5fd7107","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T04:28:12Z (design/typed-messages): review: impl round 1 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T04:29:55Z (design/typed-messages): parked (waiting on agent): Controller scoped re-review of I1 fix commit 2eded1e in .worktrees/typed-messages
+  provenance: {"harness_session":"codex:01a12e54-1e8d-7c41-9790-5ec1e5fd7107","harness_session_source":"CODEX_THREAD_ID"}
