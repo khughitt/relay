@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-12T02:10:53Z
+updated: 2026-10-12T02:10:54Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -82,3 +82,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
   provenance: {"harness_session":"codex:01a12dc7-d9ad-7a93-9f5d-7a8f238cb051","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T02:10:53Z (design/typed-messages): resumed
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-12T02:10:54Z (design/typed-messages): plan round 3 finding addressed: Task 8's sleeping-host test now sets now = q.body.expiresAt + 1 instead of advancing a clock captured before setup
