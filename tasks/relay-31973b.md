@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:55Z
-updated: 2026-10-12T11:19:40Z
+updated: 2026-10-12T11:23:01Z
 started: 2026-10-12T11:11:22Z
 depends: [relay-b14337]
 parent: relay-f58531
@@ -23,3 +23,4 @@ step: "Task 13: Documentation, packaging and the Node 22 floor"
 - 2026-10-12T11:11:22Z (design/typed-messages): started
   provenance: {"harness_session":"codex:01a12fce-7534-7a31-a888-cce1e88befc8","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T11:19:40Z (design/typed-messages): Task 13 packaging RED: tarball lacked interaction schema; GREEN actual local tarball install smoke 1/1. Serial gates Node 26.5.0 and Node 22.23.2 each 571/571. Extra test-fast first run 570/571: Darwin orchestrator SIGINT archive lacked D0.json; isolated focused characterization 1/1. Same global sleep marker appears in runtime fixture and orchestrator readiness (possible same-suite race; exact collision not proved); unchanged one retry planned, original logs retained.
+- 2026-10-12T11:23:01Z (design/typed-messages): F32 controller disposition: characterize repeated unrelated SIGINT missing-D0 failure with one test-fast front-door run using per-run fast_cmd override and --test-concurrency=1, preserving all tests. Both literal default runtime gates passed 571/571; default test-fast failed twice 570/571, isolated case passed 1/1. This is not a fixture fix or proof of default reliability; retain all outputs, commit only if serial all-tests fast run is green.
