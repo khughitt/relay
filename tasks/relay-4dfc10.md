@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-12T12:27:35Z
+updated: 2026-10-12T12:33:47Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -26,4 +26,6 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-12T11:53:37Z (design/typed-messages): parked (waiting on agent, review): Controller: finish whole-branch review, then ask person for phone readiness and explicit Serve8443 approval; inspect .worktrees/typed-messages/.superpowers/sdd/2026-10-11-typed-interaction-messages/task-14-prep-report.md and /mnt/ssd3/tmp/relay-task14-iqxnxjxr/acceptance-commands.md, resume relay-4dfc10 in .worktrees/typed-messages, recheck version/ports and private auth/isolation, then run live acceptance. No services or host pointers active.
   provenance: {"harness_session":"codex:01a12fee-d4d1-7122-802a-3f3052597ba3","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T12:27:35Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T12:33:47Z (design/typed-messages): parked (waiting on user, review): User confirms phone readiness and approves temporary tailscale serve --bg --https=8443 http://127.0.0.1:3341 with restore --https=8443 off; controller rechecks versions/ports, guides private Claude sign-in and hook isolation, runs tracked service plus three phone/native cases, restores all live state, records/reviews acceptance and runs integration gate.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
