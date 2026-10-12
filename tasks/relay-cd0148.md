@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-12T11:57:31Z
-updated: 2026-10-12T12:03:21Z
+updated: 2026-10-12T12:11:39Z
 started: 2026-10-12T12:03:21Z
 depends: []
 parent: relay-f58531
@@ -26,3 +26,4 @@ Whole-branch review found three Important gaps before overall close: preserve wi
 - 2026-10-12T12:00:16Z (design/typed-messages): concerns: relay-0f389a defect — malformed probe selectors or output arguments could silently expand into paid live scenarios instead of failing before external work.
 - 2026-10-12T12:03:21Z (design/typed-messages): started
   provenance: {"harness_session":"codex:01a12ffd-2aa7-7d80-94e1-0b25e34bba89","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T12:11:39Z (design/typed-messages): Corrective round 1: I1 keeps exit1/kind/detail and adds winning entry/values/surface/durable save time; I2 startup fsyncs whole ancestor chain including earlier service mkdir and retry, no format/permission change; I3 strict closed argv refuses before tools/output. Focused RED both runtimes 41/46 with 5 expected failures; initial GREEN 45/46 had only nested Error assertion mismatch (EIO preserved), corrected predicate; focused final GREEN 46/46 both. Complete suites will run serial per F32 with no test exclusion.
