@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-12T09:43:33Z
+updated: 2026-10-12T10:16:32Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -96,4 +96,6 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-12T03:29:02Z (design/typed-messages): Execution progress: Tasks 1-3 completed with independent review; all live Claude capability rows true. Schema/Unicode/UUID and lifecycle/history evidence corrections reviewed. Next: durable inbox store, then serialized inbox and transports; no live hooks or host pointers changed.
 - 2026-10-12T04:37:19Z (design/typed-messages): Execution: Tasks 1-6 complete and independently reviewed; real Claude probes passed, schema/lifecycle/store/inbox/translator contracts green at 453 fast tests. Next transport/service work preserves queued reads and allows complete private replies larger than request bound. No live hook or host pointer changed.
 - 2026-10-12T09:43:33Z (design/typed-messages): parked (waiting on user, approval): User approves the prepared two-file mm vendoring refresh; controller verifies refresh, reruns ops gate and resumes Task12 worker, then executes Tasks13/14 and whole-branch review. Tasks1–11 reviewed and done; no child/check remains active.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T10:16:32Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
