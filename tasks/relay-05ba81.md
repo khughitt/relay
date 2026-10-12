@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:48Z
-updated: 2026-10-12T04:06:57Z
+updated: 2026-10-12T04:06:58Z
 started: 2026-10-12T03:55:10Z
 depends: [relay-dc8efd]
 parent: relay-f58531
@@ -26,3 +26,4 @@ step: "Task 5: The inbox: serialized operations, supersession, presence, clock"
   provenance: {"harness_session":"codex:01a12e3f-8270-7031-8d3b-602ac6af6dee","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T04:06:57Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T04:06:58Z (design/typed-messages): review: impl round 1 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6.1-sol
