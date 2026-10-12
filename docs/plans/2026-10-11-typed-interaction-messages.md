@@ -2353,7 +2353,7 @@ test('POST needs the matching origin and JSON, under 64 KiB', async (t) => {
 test('a queued answer to a question that expired while the host slept gets EXPIRED', async (t) => {
   let now = Date.now();
   const { port, q } = await setup(t, { now: () => now });
-  now += 3_600_001;
+  now = q.body.expiresAt + 1; // the expiry setup computed, not the clock captured before it
   const r = await call(port, { method: 'POST', path: `/v1/inbox/${q.id}/answer`, headers: { ...phone, origin: `https://${HOST}` }, body: answerBody() });
   assert.deepEqual([r.status, r.json.error.code, r.json.entry.state], [409, 'EXPIRED', 'expired']);
 });
