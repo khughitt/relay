@@ -1,15 +1,16 @@
 ---
 id: relay-1ad9ae
 title: Lifecycle state machine
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:46Z
-updated: 2026-10-12T03:29:00Z
+updated: 2026-10-12T03:29:01Z
 started: 2026-10-12T03:08:11Z
+completed: 2026-10-12T03:29:01Z
 depends: [relay-cb1b45]
 parent: relay-f58531
 tags: []
@@ -37,3 +38,7 @@ step: "Task 3: Lifecycle state machine"
 - 2026-10-12T03:28:59Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T03:29:00Z (design/typed-messages): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T03:29:01Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T03:29:01Z (design/typed-messages): Pure lifecycle and complete accepted-message/native-observation histories landed; stored state requires legal receipt evidence, sender/generated withdrawals stay distinguishable, and conflicting message IDs refuse. Independent scoped re-review accepted; 24 focused tests both runtimes, fast 389/389.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
