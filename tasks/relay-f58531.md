@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-12T10:17:24Z
+updated: 2026-10-12T11:54:05Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -100,3 +100,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-12T10:16:32Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T10:17:24Z (design/typed-messages): User approved the two-file mm vendoring remedy and requested tooling feedback to prevent downstream implementation blocking. Follow-up added to ops-80d482 via feedback recurrence; mm-809ab0 started by delegated worker in its own worktree. Controller owns verification/review and resuming Task12; no new design required for comments/README refresh.
+- 2026-10-12T11:54:05Z (design/typed-messages): review: impl round 1 — verdict: revise; findings: Important 3, Minor 4; reviewer: codex/gpt-6-astra
