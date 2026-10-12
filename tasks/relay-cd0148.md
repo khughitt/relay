@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-12T11:57:31Z
-updated: 2026-10-12T11:57:31Z
+updated: 2026-10-12T12:00:14Z
 depends: []
 parent: relay-f58531
 tags: []
@@ -16,3 +16,7 @@ agent: codex
 ---
 
 Whole-branch review found three Important gaps before overall close: preserve winning answer/surface/time in actual desk CLI conflict output, durably publish recursive state-directory ancestry including retries, and reject malformed paid-probe CLI arguments before any external action. One corrective pass, real focused RED/GREEN and both-runtime green suite, fresh scoped re-review; no live activation or deferred-minor cleanup.
+
+## Notes
+
+- 2026-10-12T12:00:14Z (design/typed-messages): concerns: relay-b14337 defect — final CLI conflict formatting discarded the saved winning answer, surface and time retained by the desk runner.
