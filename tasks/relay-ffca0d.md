@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:49Z
-updated: 2026-10-12T04:26:53Z
+updated: 2026-10-12T04:27:38Z
 started: 2026-10-12T04:17:57Z
 depends: [relay-05ba81]
 parent: relay-f58531
@@ -30,3 +30,5 @@ step: "Task 6: Claude Code route translation"
 - 2026-10-12T04:26:52Z (design/typed-messages): Ruling F18: reject duplicate question text as unrepresentable on Claude route, preserving distinct item answers rather than overwriting native map keys; add RED/GREEN regression. Unsupported input remains hook passthrough per route contract.
 - 2026-10-12T04:26:52Z (design/typed-messages): parked (waiting on agent): Implementer task_6: reject duplicate native question text in .worktrees/typed-messages with covering RED/GREEN test, then park for controller scoped re-review
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T04:27:38Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12e54-1e8d-7c41-9790-5ec1e5fd7107","harness_session_source":"CODEX_THREAD_ID"}
