@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:50Z
-updated: 2026-10-12T05:14:30Z
+updated: 2026-10-12T05:14:41Z
 started: 2026-10-12T04:41:27Z
 depends: [relay-ffca0d]
 parent: relay-f58531
@@ -34,3 +34,5 @@ step: "Task 7: Local socket, client, and the service process"
 - 2026-10-12T05:06:53Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12e69-8f7e-7041-ac60-2b3fa6526d82","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T05:14:30Z (design/typed-messages): fix round 1: F22 compares ask waiter with durable entry route before accepting socket ownership, preserving ID_CONFLICT precedence and same-handle reconnect. F23 recovery uses queued snapshots to settle provisional asks, recognizes accepted live owners, rechecks shutdown after awaits, and is tracked by close. RED 41 tests/4 failures; GREEN focused 42/42 Node22/26 and fast495/495 Node26.
+- 2026-10-12T05:14:41Z (design/typed-messages): parked (waiting on agent, review): Controller: run fresh scoped re-review of fix round 1 commit ed77030 against I1/I2 and the appended .worktrees/typed-messages/.superpowers/sdd/2026-10-11-typed-interaction-messages/task-7-report.md; resume relay-aa889d in .worktrees/typed-messages before edits or closure.
+  provenance: {"harness_session":"codex:01a12e69-8f7e-7041-ac60-2b3fa6526d82","harness_session_source":"CODEX_THREAD_ID"}
