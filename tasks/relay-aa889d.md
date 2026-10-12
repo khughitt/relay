@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:50Z
-updated: 2026-10-12T05:06:28Z
+updated: 2026-10-12T05:06:29Z
 started: 2026-10-12T04:41:27Z
 depends: [relay-ffca0d]
 parent: relay-f58531
@@ -29,3 +29,5 @@ step: "Task 7: Local socket, client, and the service process"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T05:03:27Z (design/typed-messages): review: impl round 1 — verdict: revise; findings: Important 2; reviewer: codex/gpt-6-astra
 - 2026-10-12T05:06:28Z (design/typed-messages): Rulings F22/F23: different-handle replay refuses before socket ownership is accepted, preserving recorded waiter; startup recovery settles queued requests and recognizes accepted live bindings only, so provisional conflicts do not mask confirmed-dead originals. Same-handle reattach and shutdown suppression remain.
+- 2026-10-12T05:06:29Z (design/typed-messages): parked (waiting on agent): Implementer task_7: fix recorded-waiter ownership and queued startup-probe races in .worktrees/typed-messages with RED/GREEN regressions, then park for scoped re-review
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
