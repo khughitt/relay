@@ -1,15 +1,16 @@
 ---
 id: relay-dc8efd
 title: Durable inbox store
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:47Z
-updated: 2026-10-12T03:52:53Z
+updated: 2026-10-12T03:52:54Z
 started: 2026-10-12T03:30:41Z
+completed: 2026-10-12T03:52:53Z
 depends: [relay-1ad9ae]
 parent: relay-f58531
 tags: []
@@ -39,3 +40,7 @@ step: "Task 4: Durable inbox store"
 - 2026-10-12T03:52:52Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T03:52:53Z (design/typed-messages): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T03:52:53Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T03:52:53Z (design/typed-messages): Durable store and crash recovery landed with preserved sequence high-water mark, corrupt-byte quarantine, retained supersession predecessors, strict private entry frames and durable initialization/retry. Independent scoped review accepted; focused 50/50 Node22/26 and fast 415/415.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
