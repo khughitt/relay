@@ -1,13 +1,15 @@
 ---
 id: relay-1e92bf
 title: "HTTP surface, tailnet guard and event stream"
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: design/typed-messages
 created: 2026-10-11T22:48:51Z
-updated: 2026-10-11T22:48:52Z
+updated: 2026-10-12T05:25:23Z
+started: 2026-10-12T05:25:23Z
 depends: [relay-aa889d]
 parent: relay-f58531
 tags: []
@@ -15,3 +17,8 @@ agent: claude-code/claude-opus-5-5
 plan: docs/plans/2026-10-11-typed-interaction-messages.md
 step: "Task 8: HTTP surface, tailnet guard and event stream"
 ---
+
+## Notes
+
+- 2026-10-12T05:25:23Z (design/typed-messages): started
+  provenance: {"harness_session":"codex:01a12e91-ce57-7650-843d-ea5dcd0396a6","harness_session_source":"CODEX_THREAD_ID"}
