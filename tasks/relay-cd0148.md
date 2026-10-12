@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-12T11:57:31Z
-updated: 2026-10-12T12:20:20Z
+updated: 2026-10-12T12:27:33Z
 started: 2026-10-12T12:03:21Z
 depends: []
 parent: relay-f58531
@@ -32,3 +32,4 @@ Whole-branch review found three Important gaps before overall close: preserve wi
   provenance: {"harness_session":"codex:01a12ffd-2aa7-7d80-94e1-0b25e34bba89","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T12:20:20Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T12:27:33Z (design/typed-messages): Fresh scoped whole-branch review accepted I1/I2/I3, no new Critical/Important/Minor findings; verified dispatch codex/gpt-6.1-sol. Parent implementation review round2 recorded. All576 tests both runtimes passed with documented all-test file-serialization override; default fixture issues remain deferred.
