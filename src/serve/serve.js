@@ -7,17 +7,21 @@ import { relayError } from '../protocol.js';
 import { expectAnswers } from '../routes/index.js';
 import { openInbox } from './inbox.js';
 import { serveSocket } from './socket.js';
+import { serveConfig } from './config.js';
+import { serveHttp } from './http.js';
+import { readSnapshot } from '../bus/transaction.js';
 // relay serve (spec §7.1): holds the registry's lock primitive on serve.lock for its whole life,
 // so a second instance fails and a dead holder's lock is reclaimed by the reviewed path.
 export function servePaths(stateDir) { return { socketPath: join(stateDir, 'serve.sock'), lockPath: join(stateDir, 'serve.lock') }; }
 const DAY_MS = 24 * 3600 * 1000;
 export async function runServe({ env = process.env, signal, clock = Date.now, processOps = createProcessOps(),
   log = (line) => process.stderr.write(`relay serve: ${line}\n`), onCommit = () => {}, reattachMs = 10000, ready = () => {} } = {}) {
-  const { stateDir } = paths(env), sp = servePaths(stateDir);
+  const config = serveConfig(env);
+  const registryPaths = paths(env), { stateDir } = registryPaths, sp = servePaths(stateDir);
   await ensurePrivateDir(stateDir);
   const report = (error) => log(`${error.code ?? 'ERROR'}: ${error.message}`);
   async function serveUntilAborted() {
-    let inbox = null, timer = null, socket = null, daily = null, stopping = false;
+    let inbox = null, timer = null, socket = null, web = null, daily = null, stopping = false;
     const arm = () => {
       if (!inbox || stopping) return;
       clearTimeout(timer);
@@ -32,7 +36,8 @@ export async function runServe({ env = process.env, signal, clock = Date.now, pr
       await inbox.prune(); arm();
       daily = setInterval(() => inbox.prune().catch(report), DAY_MS);
       socket = await serveSocket({ inbox, socketPath: sp.socketPath, processOps, reattachMs, log });
-      ready({ socketPath: sp.socketPath, httpPort: null });
+      if (config.http) web = await serveHttp({ inbox, http: config.http, readAgents: () => readSnapshot({ paths: registryPaths }), clock, log });
+      ready({ socketPath: sp.socketPath, httpPort: web?.port ?? null });
       const stopped = new Promise((resolve) => {
         onAbort = () => resolve(null);
         if (signal?.aborted) onAbort(); else signal?.addEventListener('abort', onAbort, { once: true });
@@ -42,6 +47,7 @@ export async function runServe({ env = process.env, signal, clock = Date.now, pr
     } finally {
       stopping = true; clearTimeout(timer); clearInterval(daily);
       signal?.removeEventListener('abort', onAbort);
+      await web?.close();
       await socket?.close();
       await inbox.idle();
     }
