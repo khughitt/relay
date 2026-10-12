@@ -1,15 +1,16 @@
 ---
 id: relay-cd0148
 title: Fix final typed-interaction review findings
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-12T11:57:31Z
-updated: 2026-10-12T12:27:33Z
+updated: 2026-10-12T12:27:34Z
 started: 2026-10-12T12:03:21Z
+completed: 2026-10-12T12:27:34Z
 depends: []
 parent: relay-f58531
 tags: []
@@ -33,3 +34,7 @@ Whole-branch review found three Important gaps before overall close: preserve wi
 - 2026-10-12T12:20:20Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T12:27:33Z (design/typed-messages): Fresh scoped whole-branch review accepted I1/I2/I3, no new Critical/Important/Minor findings; verified dispatch codex/gpt-6.1-sol. Parent implementation review round2 recorded. All576 tests both runtimes passed with documented all-test file-serialization override; default fixture issues remain deferred.
+- 2026-10-12T12:27:34Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T12:27:34Z (design/typed-messages): Fixed all three Important whole-branch findings: CLI winning-entry/value/surface/time conflict output, full state ancestry publication including startup failure/retry, and strict offline-proven paid-probe argument validation. RED41/46 and GREEN46/46 both, complete576/576 both with all-test file-level serialization. Fresh scoped re-review accepted no new findings; no live host/auth/probe action. Minor fixture/whitespace issues remain deferred; Task14 pending.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
