@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-12T02:17:18Z
+updated: 2026-10-12T02:17:29Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -86,3 +86,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-12T02:10:54Z (design/typed-messages): parked (waiting on user, review): plan review round 4 (scoped to Task 8's expiry test) on .worktrees/typed-messages/docs/plans/2026-10-11-typed-interaction-messages.md; on accept the user picks an execution method and the agent starts Task 1 (relay-0f389a)
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-12T02:17:18Z (design/typed-messages): review: plan round 4 — verdict: accept; findings: none; reviewer: codex
+- 2026-10-12T02:17:29Z (design/typed-messages): Plan round 4 scoped to f8da98c: the only plan change sets Task 8's sleeping-host test clock to q.body.expiresAt + 1. The test now crosses the question's own expiry regardless of setup duration and receives HTTP 409 EXPIRED with an expired entry. The exact committed test excerpt passes through just test-one on Node 26.5.0 and Node 22.23.2; tasks check passes. Round 3's remaining P2 is resolved; plan accepted. Execution method chosen: subagent-driven, for per-task independent review of the 14 tasks' shared lifecycle and transport interfaces. Author next: start Task 1 (relay-0f389a, live probes P1/P2/P3) in .worktrees/typed-messages and follow its probe and host-use gates. No plan or implementation edits; no live probes or full-suite rerun in this scoped review.
