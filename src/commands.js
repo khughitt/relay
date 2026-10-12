@@ -8,12 +8,30 @@ export const COMMANDS = [
     args: [{ name: 'event', value: 'string', required: true }],
     options: [{ names: ['--harness'], value: 'enum', values: HARNESSES, required: true }, { names: ['--outer-ms'], value: 'int' }, { names: ['--subscribers'], value: 'path' }] },
   { path: ['install'], summary: "Plan, and with --apply write, a harness's hook installation", output: 'json',
-    options: [{ names: ['--harness'], value: 'enum', values: HARNESSES, required: true }, { names: ['--subscribers'], value: 'path', required: true }, { names: ['--target'], value: 'path' }, { names: ['--config-dir'], value: 'path' }, { names: ['--evidence'], value: 'path' }, { names: ['--retire'], value: 'enum', values: ['familiar'] }, { names: ['--artifact'], value: 'path' }, { names: ['--apply'], value: 'none' }] },
+    options: [{ names: ['--harness'], value: 'enum', values: HARNESSES, required: true }, { names: ['--subscribers'], value: 'path', required: true }, { names: ['--target'], value: 'path' }, { names: ['--config-dir'], value: 'path' }, { names: ['--evidence'], value: 'path' }, { names: ['--retire'], value: 'enum', values: ['familiar'] }, { names: ['--with'], value: 'enum', values: ['ask'] }, { names: ['--artifact'], value: 'path' }, { names: ['--apply'], value: 'none' }] },
   { path: ['rollback'], summary: 'Undo an applied installation from its artifact', output: 'none', options: [{ names: ['--artifact'], value: 'path', required: true }] },
+  { path: ['serve'], summary: 'Run the interaction service: inbox, local socket and optional HTTP surface', output: 'none' },
+  { path: ['ask'], summary: 'Route one harness question through the inbox', protocol: 'harness hook: stdout is the reply; always exits 0',
+    args: [{ name: 'event', value: 'enum', values: ['PreToolUse', 'PostToolUse'], required: true }],
+    options: [{ names: ['--harness'], value: 'enum', values: HARNESSES, required: true }, { names: ['--handback'], value: 'none' }] },
+  { path: ['inbox'], summary: 'Manage questions and notices in the inbox', output: 'none' },
+  { path: ['inbox', 'list'], summary: 'Questions and notices in the inbox', options: [{ names: ['--since'], value: 'int' }] },
+  { path: ['inbox', 'show'], summary: 'One inbox entry in full', args: [{ name: 'id', value: 'string', required: true }] },
+  { path: ['inbox', 'answer'], summary: 'Answer a pending question from this desk',
+    args: [{ name: 'id', value: 'string', required: true }, { name: 'value', value: 'string', required: false, variadic: true }],
+    options: [{ names: ['--decline'], value: 'none' }] },
+  { path: ['inbox', 'defer'], summary: 'Defer a pending question to the desktop', args: [{ name: 'id', value: 'string', required: true }] },
+  { path: ['inbox', 'withdraw'], summary: 'Withdraw a pending question', args: [{ name: 'id', value: 'string', required: true }] },
+  { path: ['presence'], summary: 'Show or set whether questions go to the inbox', args: [{ name: 'mode', value: 'enum', values: ['here', 'away'], required: false }] },
 ];
 
-export function commandAt(name) {
-  return COMMANDS.find((c) => c.path[0] === name) ?? null;
+/** The command whose path is the longest prefix of argv; rest is what follows it. */
+export function commandFor(argv) {
+  const matches = COMMANDS.filter((c) => c.path.every((w, i) => argv[i] === w)).sort((a, b) => b.path.length - a.path.length);
+  return matches.length ? { cmd: matches[0], rest: argv.slice(matches[0].path.length) } : null;
+}
+export function commandAt(...words) {
+  return COMMANDS.find((c) => c.path.length === words.length && c.path.every((w, i) => w === words[i])) ?? null;
 }
 
 /** Strip --json/--pretty from anywhere; returns { argv, mode } with mode null when unset. */
@@ -42,5 +60,5 @@ export function helpText(cmd) {
 }
 
 export function rootHelp() {
-  return `Usage: relay [--json|--pretty] <command>\n\n${COMMANDS.map((c) => `  ${c.path[0].padEnd(9)} ${c.summary}`).join('\n')}\n\nRun 'relay <command> --help' for details.\n`;
+  return `Usage: relay [--json|--pretty] <command>\n\n${COMMANDS.map((c) => `  ${c.path.join(' ').padEnd(15)} ${c.summary}`).join('\n')}\n\nRun 'relay <command> --help' for details.\n`;
 }
