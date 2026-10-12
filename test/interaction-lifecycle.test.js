@@ -203,6 +203,22 @@ test('validation rejects malformed histories, correlations and latest observatio
   ]) assert.throws(() => L.validateEntry(broken), { code: 'INVALID_ENTRY' });
 });
 
+test('validation rejects extra question, notice, route and log fields', () => {
+  const question = stamped(fresh().e), notice = stamped(L.createNotice(noticeMessage(), { now: NOW }));
+  for (const clean of [question, notice]) {
+    assert.deepEqual(L.validateEntry(clean), clean);
+    for (const broken of [
+      { ...clean, rawHarnessPayload: { transcript: 'private text' } },
+      { ...clean, log: clean.log.map((row) => ({ ...row, environment: { TOKEN: 'secret' } })) },
+    ]) assert.throws(() => L.validateEntry(broken), { code: 'INVALID_ENTRY' });
+  }
+  assert.throws(() => L.validateEntry({ ...question, route: { ...question.route, environment: { TOKEN: 'secret' } } }), { code: 'INVALID_ENTRY' });
+  assert.throws(() => L.validateEntry({ ...question, route: { ...question.route,
+    waiter: { ...question.route.waiter, environment: { TOKEN: 'secret' } } } }), { code: 'INVALID_ENTRY' });
+  assert.throws(() => L.validateEntry({ ...notice, route: question.route }), { code: 'INVALID_ENTRY' });
+  assert.throws(() => L.validateEntry({ ...question, seen: false }), { code: 'INVALID_ENTRY' });
+});
+
 test('every lifecycle state validates after persistence without losing history', () => {
   const { q, e } = fresh(), a = answerMessage(q);
   const saved = step(L.applyAnswer(e, a, T));

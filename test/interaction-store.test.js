@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
-import { join } from 'node:path';
-import { tempState } from './helpers/fixture.js';
+import { dirname, join } from 'node:path';
+import { tempState, tempPaths } from './helpers/fixture.js';
 import { loadStore, inboxPaths, RETENTION_MS, writeDurable } from '../src/interaction/store.js';
 import * as L from '../src/interaction/lifecycle.js';
 import { questionMessage, answerMessage, HANDLE, NOW, withdrawalMessage, deferMessage, noticeMessage } from './helpers/interaction.js';
@@ -160,6 +160,59 @@ test('invalid entries are refused before any durable allocation', async (t) => {
   await assert.rejects(store.put({ ...entry(), id: '../outside' }), { code: 'INVALID_ENTRY' });
   assert.equal(store.seq(), 0);
   assert.deepEqual(await fs.readdir(inboxPaths(p.stateDir).entriesDir), []);
+});
+
+test('put refuses extra raw frame data before allocation and load quarantines it', async (t) => {
+  const p = await tempState(t), { store } = await loadStore(p.stateDir);
+  const extra = { rawHarnessPayload: { transcript: 'private text' } };
+  await assert.rejects(store.put({ ...entry(), ...extra }), { code: 'INVALID_ENTRY' });
+  assert.equal(store.seq(), 0);
+  assert.deepEqual(await fs.readdir(inboxPaths(p.stateDir).entriesDir), []);
+  await assert.rejects(fs.access(inboxPaths(p.stateDir).seqPath), { code: 'ENOENT' });
+  const saved = await store.put(entry());
+  await fs.writeFile(join(inboxPaths(p.stateDir).entriesDir, `${saved.id}.json`), JSON.stringify({ ...saved, ...extra }));
+  const { store: after, rejected } = await loadStore(p.stateDir);
+  assert.equal(after.get(saved.id), null);
+  assert.deepEqual(rejected.map((r) => r.name), [`${saved.id}.json`]);
+  await fs.access(join(inboxPaths(p.stateDir).rejectedDir, `${saved.id}.json`));
+});
+
+test('new store directories sync their containing directories before the first write', async (t) => {
+  const p = await tempPaths(t), ip = inboxPaths(p.stateDir), synced = [];
+  const io = { ...fs, open: async (path, ...args) => {
+    const handle = await fs.open(path, ...args);
+    if (args[0] !== 'r') return handle;
+    return { sync: async () => { await handle.sync(); synced.push(path); }, close: () => handle.close() };
+  } };
+  const { store } = await loadStore(p.stateDir, { io });
+  assert.deepEqual(synced, [dirname(p.stateDir), p.stateDir, ip.root]);
+  const saved = await store.put(entry());
+  assert.equal(saved.seq, 1);
+  assert.deepEqual(synced.slice(0, 3), [dirname(p.stateDir), p.stateDir, ip.root]);
+  synced.length = 0;
+  await loadStore(p.stateDir, { io });
+  assert.deepEqual(synced, [dirname(p.stateDir), p.stateDir, ip.root]);
+});
+
+test('initialization sync failure rejects the load and retry syncs existing directory links', async (t) => {
+  const p = await tempPaths(t), synced = [];
+  let armed = true;
+  const io = { ...fs, open: async (path, ...args) => {
+    const handle = await fs.open(path, ...args);
+    if (args[0] !== 'r') return handle;
+    return { close: () => handle.close(), sync: async () => {
+      if (armed && path === p.stateDir) {
+        armed = false; throw Object.assign(new Error('parent sync failed'), { code: 'EIO' });
+      }
+      await handle.sync(); synced.push(path);
+    } };
+  } };
+  await assert.rejects(loadStore(p.stateDir, { io }), { code: 'IO_ERROR' });
+  await fs.access(inboxPaths(p.stateDir).root);
+  synced.length = 0;
+  const { store } = await loadStore(p.stateDir, { io });
+  assert.deepEqual(synced, [dirname(p.stateDir), p.stateDir, inboxPaths(p.stateDir).root]);
+  assert.equal((await store.put(entry())).seq, 1);
 });
 
 test('unsafe directories, entry files, seq and symlinks are refused without repair', async (t) => {

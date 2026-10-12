@@ -112,10 +112,11 @@ const answers = (v) => object(v) && Object.values(v).every((value) => typeof val
 export function validateEntry(v) {
   try {
     if (!object(v) || v.schema !== 1 || !seqOk(v.seq) || !ms(v.updatedAt) || !Array.isArray(v.log) || v.log.length === 0
-      || !v.log.every((l) => object(l) && seqOk(l.seq) && l.seq <= v.seq && ms(l.at) && typeof l.cause === 'string')
+      || !v.log.every((l) => object(l) && keys(l, ['seq', 'at', 'state', 'cause']) && seqOk(l.seq) && l.seq <= v.seq && ms(l.at) && typeof l.cause === 'string')
       || v.log.at(-1).seq !== v.seq || v.log.at(-1).at !== v.updatedAt || v.log.at(-1).state !== v.state) fail('invalid entry frame');
     if (v.kind === 'notice') {
-      if (normalized(v.notice).kind !== 'notice' || v.notice.id !== v.id || !['active', 'expired'].includes(v.state)
+      if (!keys(v, ['schema', 'id', 'kind', 'notice', 'state', 'seen', 'seq', 'updatedAt', 'log'])
+        || normalized(v.notice).kind !== 'notice' || v.notice.id !== v.id || !['active', 'expired'].includes(v.state)
         || typeof v.seen !== 'boolean' || !v.log.every((l) => ['active', 'expired'].includes(l.state))) fail('invalid notice entry');
       if (v.log[0].state !== 'active' || v.log[0].cause !== 'notice') fail('invalid notice creation');
       for (let i = 1; i < v.log.length; i++) {
@@ -126,9 +127,12 @@ export function validateEntry(v) {
       if (v.seen !== v.log.some((l) => l.cause === 'seen')) fail('seen lacks evidence');
       return v;
     }
-    if (v.kind !== 'question' || normalized(v.question).kind !== 'question' || v.question.id !== v.id
+    if (v.kind !== 'question' || !keys(v, ['schema', 'id', 'kind', 'question', 'state', 'presentation', 'route', 'answer',
+      'handedAt', 'observed', 'withdrawal', 'supersededBy', 'messages', 'observations', 'seq', 'updatedAt', 'log'])
+      || normalized(v.question).kind !== 'question' || v.question.id !== v.id
       || !QUESTION_STATES.includes(v.state) || !v.log.every((l) => QUESTION_STATES.includes(l.state))) fail('invalid question entry');
-    if (!['inbox', 'desktop'].includes(v.presentation) || !object(v.route) || typeof v.route.handback !== 'boolean') fail('invalid route');
+    if (!['inbox', 'desktop'].includes(v.presentation) || !object(v.route) || !keys(v.route, ['handback', 'waiter'])
+      || typeof v.route.handback !== 'boolean') fail('invalid route');
     if (v.route.waiter !== null && !isDeepStrictEqual(validateHandle(v.route.waiter), v.route.waiter)) fail('invalid waiter');
     if (ANSWER_HOLDING.includes(v.state) !== (v.answer !== null)) fail('answer does not match state');
     if (v.answer !== null) {
