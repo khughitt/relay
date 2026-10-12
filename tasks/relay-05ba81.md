@@ -1,15 +1,16 @@
 ---
 id: relay-05ba81
 title: "The inbox: serialized operations, supersession, presence, clock"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:48Z
-updated: 2026-10-12T04:16:03Z
+updated: 2026-10-12T04:16:04Z
 started: 2026-10-12T03:55:10Z
+completed: 2026-10-12T04:16:04Z
 depends: [relay-dc8efd]
 parent: relay-f58531
 tags: []
@@ -37,3 +38,7 @@ step: "Task 5: The inbox: serialized operations, supersession, presence, clock"
 - 2026-10-12T04:16:02Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T04:16:03Z (design/typed-messages): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T04:16:04Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T04:16:04Z (design/typed-messages): Serialized inbox, presence, atomic supersession publication, fail-stop and queued snapshots/watch registration landed. Expiry uses one operation timestamp, overdue arrivals publish expired, stale replacements preserve predecessors. Independent scoped review accepted; focused 30/30 both runtimes and fast 445/445.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
