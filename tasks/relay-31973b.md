@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:55Z
-updated: 2026-10-12T11:25:52Z
+updated: 2026-10-12T11:27:19Z
 started: 2026-10-12T11:11:22Z
 depends: [relay-b14337]
 parent: relay-f58531
@@ -26,3 +26,5 @@ step: "Task 13: Documentation, packaging and the Node 22 floor"
 - 2026-10-12T11:23:01Z (design/typed-messages): F32 controller disposition: characterize repeated unrelated SIGINT missing-D0 failure with one test-fast front-door run using per-run fast_cmd override and --test-concurrency=1, preserving all tests. Both literal default runtime gates passed 571/571; default test-fast failed twice 570/571, isolated case passed 1/1. This is not a fixture fix or proof of default reliability; retain all outputs, commit only if serial all-tests fast run is green.
 - 2026-10-12T11:25:52Z (design/typed-messages): parked (waiting on agent): Controller: start relay-31973b in .worktrees/typed-messages, independently review docs/packaging commit 4fd2e05 using task-13-report.md and retained gate/flake logs, then fix findings or close this step before Task 14 live acceptance.
   provenance: {"harness_session":"codex:01a12fce-7534-7a31-a888-cce1e88befc8","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T11:27:19Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
