@@ -8,9 +8,9 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T09:29:40Z
+updated: 2026-10-12T09:30:19Z
 started: 2026-10-12T09:29:40Z
-depends: [relay-e889bc]
+depends: [relay-e889bc, ops-342668]
 parent: relay-f58531
 tags: []
 agent: claude-code/claude-opus-5-5
