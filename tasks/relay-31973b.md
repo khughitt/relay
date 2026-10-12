@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:55Z
-updated: 2026-10-12T11:35:05Z
+updated: 2026-10-12T11:35:58Z
 started: 2026-10-12T11:11:22Z
 depends: [relay-b14337]
 parent: relay-f58531
@@ -34,3 +34,5 @@ step: "Task 13: Documentation, packaging and the Node 22 floor"
 - 2026-10-12T11:34:09Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12fce-7534-7a31-a888-cce1e88befc8","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T11:35:05Z (design/typed-messages): Superseding evidence correction (review I1 / F33): prior worker notes, F32 evidence, task-13-report.md and implementation commit 4fd2e05 incorrectly said both default test-fast runs passed 570/571 with only Darwin failure. Actual first run: 571 total, 570 pass, 1 fail (Darwin SIGINT missing D0.json). Actual unchanged retry: 571 total, 569 pass, 2 fail (OpenCode stderr bounded/timeout/diagnostic test expected INPUT_TOO_LARGE but got INPUT_TIMEOUT; Darwin SIGINT again missing D0.json). The Darwin global-marker collision is an unproved hypothesis and does not explain the OpenCode failure. Both literal default gates and authorized serial-file all-tests fast run remain 571/571. Preserve old logs/history; append corrective commit body and saved body artifact; no runtime/test changes or suite reruns.
+- 2026-10-12T11:35:58Z (design/typed-messages): parked (waiting on agent): Controller: start relay-31973b in .worktrees/typed-messages, dispatch fresh scoped I1 review of corrective metadata commit b287c80 plus task-13-report.md and saved task-13-correction-commit-message.txt against both raw fast logs; fix/rule any remaining findings before closing Task 13. Task 14 remains pending.
+  provenance: {"harness_session":"codex:01a12fce-7534-7a31-a888-cce1e88befc8","harness_session_source":"CODEX_THREAD_ID"}
