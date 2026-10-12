@@ -1,15 +1,16 @@
 ---
 id: relay-ffca0d
 title: Claude Code route translation
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:49Z
-updated: 2026-10-12T04:37:17Z
+updated: 2026-10-12T04:37:18Z
 started: 2026-10-12T04:17:57Z
+completed: 2026-10-12T04:37:18Z
 depends: [relay-05ba81]
 parent: relay-f58531
 tags: []
@@ -38,3 +39,7 @@ step: "Task 6: Claude Code route translation"
 - 2026-10-12T04:37:16Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T04:37:17Z (design/typed-messages): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T04:37:18Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T04:37:18Z (design/typed-messages): Claude question/answer/decline/reply/receipt translation landed using real P2 fixture and optional internal project seam. Duplicate native prompt texts refuse before answer loss. Independent re-review accepted; focused 8/8 both runtimes, fast 453/453.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
