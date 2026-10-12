@@ -235,3 +235,60 @@ test('history validation rejects missing or fabricated transition evidence', () 
     { ...native, observations: [...native.observations, ...native.observations] },
   ]) assert.throws(() => L.validateEntry(broken), { code: 'INVALID_ENTRY' });
 });
+
+test('derived persisted states require legal cause and state evidence', () => {
+  const saved = stamped(answered().e);
+  for (const [state, cause] of [['consumed', 'answer'], ['handed', 'answer'], ['unconfirmed', 'answer'], ['undeliverable', 'answer']]) {
+    const forged = { ...saved, state, handedAt: ['handed', 'consumed', 'unconfirmed'].includes(state) ? T : null,
+      log: saved.log.map((l, i) => i === saved.log.length - 1 ? { ...l, state, cause } : l) };
+    assert.throws(() => L.validateEntry(forged), { code: 'INVALID_ENTRY' });
+  }
+  const consumed = stamped(step(L.applyConfirm(handed().e, { matches: true, observed: {} }, T + 1)));
+  const missingHand = { ...consumed, log: consumed.log.filter((l) => l.cause !== 'handed') };
+  const unsuccessful = { ...consumed, log: consumed.log.map((l) => l.cause === 'confirm' ? { ...l, cause: 'confirm-mismatch' } : l) };
+  const wrongHandTime = { ...consumed, handedAt: T + 1 };
+  const noObservation = { ...consumed, observed: null, observations: [] };
+  const pending = stamped(fresh().e);
+  const released = { ...pending, state: 'released', log: [{ ...pending.log[0], state: 'released' }] };
+  const expired = { ...pending, state: 'expired', log: [{ ...pending.log[0], state: 'expired' }] };
+  const withdrawn = { ...pending, state: 'withdrawn', withdrawal: { reason: 'user' }, log: [{ ...pending.log[0], state: 'withdrawn' }] };
+  const window = stamped(step(L.applyClock(handed().e, T + L.CONFIRM_WINDOW_MS)));
+  const earlyWindow = { ...window, updatedAt: T + 1, log: window.log.map((l) => l.cause === 'window' ? { ...l, at: T + 1 } : l) };
+  const notice = stamped(L.createNotice(noticeMessage(), { now: NOW }));
+  const expiredNotice = { ...notice, state: 'expired', log: [{ ...notice.log[0], state: 'expired' }] };
+  for (const broken of [missingHand, unsuccessful, wrongHandTime, noObservation, released, expired, withdrawn, earlyWindow, expiredNotice]) {
+    assert.throws(() => L.validateEntry(broken), { code: 'INVALID_ENTRY' });
+  }
+});
+
+test('sender withdrawals with special reasons always require their accepted envelopes', () => {
+  for (const reason of ['asker-gone', 'superseded']) {
+    const { q, e } = fresh();
+    const result = step(L.applyWithdraw(e, withdrawalMessage(q, reason), T));
+    assert.deepEqual(roundtrip(result), stamped(result));
+    assert.throws(() => L.validateEntry({ ...stamped(result), messages: [] }), { code: 'INVALID_ENTRY' });
+  }
+});
+
+test('conflicting accepted envelope IDs are refused without changing the entry', () => {
+  const { q, e } = fresh();
+  for (const [apply, make] of [[L.applyDefer, deferMessage], [L.applyAnswer, answerMessage], [L.applyWithdraw, withdrawalMessage]]) {
+    const originalCollision = refused(apply(e, { ...make(q), id: q.id }, T), 'ID_CONFLICT');
+    assert.equal(originalCollision.entry, e);
+    const defer = deferMessage(q), deferred = step(L.applyDefer(e, defer, T));
+    assert.deepEqual(roundtrip(deferred), stamped(deferred));
+    const historyCollision = refused(apply(deferred, { ...make(q), id: defer.id, createdAt: T + 1 }, T + 1), 'ID_CONFLICT');
+    assert.equal(historyCollision.entry, deferred);
+  }
+  const defer = deferMessage(q), deferred = step(L.applyDefer(e, defer, T));
+  const altered = { ...defer, body: { surface: 'desktop' } };
+  assert.equal(refused(L.applyDefer(deferred, altered, T + 1), 'ID_CONFLICT').entry, deferred);
+  assert.equal(L.applyDefer(deferred, defer, T + 1).changed, false);
+  const answer = answerMessage(q), saved = step(L.applyAnswer(deferred, answer, T + 1));
+  assert.deepEqual(roundtrip(saved), stamped(saved));
+  assert.equal(L.applyAnswer(saved, { ...answer, id: q.id }, T + 2).changed, false);
+  refused(L.applyAnswer(saved, { ...answerMessage(q), id: q.id }, T + 2), 'ALREADY_ANSWERED');
+  refused(L.applyWithdraw(saved, { ...withdrawalMessage(q), id: q.id }, T + 2), 'ANSWERED');
+  refused(L.applyDefer(saved, { ...deferMessage(q), id: q.id }, T + 2), 'ALREADY_ANSWERED');
+  refused(L.applyAnswer(e, { ...answerMessage(q, { values: {} }), id: q.id }, T), 'INVALID_ANSWER');
+});

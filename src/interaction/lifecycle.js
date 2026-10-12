@@ -18,6 +18,7 @@ const annotate = (entry, now, cause, patch) => ({ entry: { ...entry, ...patch, u
 const sameHandle = (a, b) => a !== null && b !== null && isDeepStrictEqual(a, b);
 const sameParty = (a, b) => isDeepStrictEqual(a, b);
 const accepted = (entry, message, now) => [...entry.messages, { at: now, message }];
+const conflictingId = (entry, message) => message.id === entry.id || entry.messages.some((row) => row.message.id === message.id);
 const replayed = (entry, message) => entry.messages.some((row) => isDeepStrictEqual(row.message, message));
 
 export function createEntry(question, { handback, waiter, now }) {
@@ -37,12 +38,14 @@ export function applyAnswer(entry, message, now) {
   try { checkAnswer(q, body); } catch (error) { return refuse(entry, 'INVALID_ANSWER', { message: error.message }); }
   if (q.class === 'authorization' && body.outcome === 'answered' && !LOCAL_SURFACES.includes(body.surface)) return refuse(entry, 'LOCAL_ONLY');
   if (q.artifact !== null && body.artifactRevision !== q.artifact.revision) return refuse(entry, 'STALE', { revision: q.artifact.revision });
+  if (conflictingId(entry, message)) return refuse(entry, 'ID_CONFLICT');
   return move(entry, now, 'answered', 'answer', { answer: message, messages: accepted(entry, message, now) });
 }
 export function applyDefer(entry, message, now) {
   if (ANSWER_HOLDING.includes(entry.state)) return refuse(entry, 'ALREADY_ANSWERED', { answer: entry.answer });
   if (entry.state !== 'pending') return refuse(entry, CLOSED[entry.state]);
   if (replayed(entry, message)) return keep(entry);
+  if (conflictingId(entry, message)) return refuse(entry, 'ID_CONFLICT');
   const messages = accepted(entry, message, now);
   if (entry.route.handback) return move(entry, now, 'released', `defer:${message.body.surface}`, { messages });
   return annotate(entry, now, `defer:${message.body.surface}`, { presentation: 'desktop', messages });
@@ -50,10 +53,11 @@ export function applyDefer(entry, message, now) {
 export function applyWithdraw(entry, message, now) {
   if (ANSWER_HOLDING.includes(entry.state)) return refuse(entry, 'ANSWERED', { answer: entry.answer });
   if (entry.state !== 'pending') return refuse(entry, CLOSED[entry.state]);
+  if (conflictingId(entry, message)) return refuse(entry, 'ID_CONFLICT');
   const reason = message.body.reason;
   return move(entry, now, 'withdrawn', `withdrawal:${reason}`, { withdrawal: { reason }, messages: accepted(entry, message, now) });
 }
-export const applySuperseded = (entry, byId, now) => move(entry, now, 'withdrawn', 'withdrawal:superseded', { withdrawal: { reason: 'superseded' }, supersededBy: byId });
+export const applySuperseded = (entry, byId, now) => move(entry, now, 'withdrawn', 'superseded', { withdrawal: { reason: 'superseded' }, supersededBy: byId });
 export function checkSupersede(predecessor, replacement) {
   if (!predecessor || predecessor.kind !== 'question') return { code: 'NOT_SUPERSEDABLE' };
   if (ANSWER_HOLDING.includes(predecessor.state)) return { code: 'ANSWERED', answer: predecessor.answer };
@@ -76,7 +80,7 @@ export function applyConfirm(entry, { matches, observed }, now) {
   return move(entry, now, matches ? 'consumed' : 'unconfirmed', matches ? 'confirm' : 'confirm-mismatch', patch);
 }
 export function applyAskerGone(entry, now) {
-  if (entry.state === 'pending') return move(entry, now, 'withdrawn', 'withdrawal:asker-gone', { withdrawal: { reason: 'asker-gone' } });
+  if (entry.state === 'pending') return move(entry, now, 'withdrawn', 'asker-gone', { withdrawal: { reason: 'asker-gone' } });
   if (entry.state === 'answered') return move(entry, now, 'undeliverable', 'asker-gone');
   return keep(entry);
 }
@@ -113,6 +117,13 @@ export function validateEntry(v) {
     if (v.kind === 'notice') {
       if (normalized(v.notice).kind !== 'notice' || v.notice.id !== v.id || !['active', 'expired'].includes(v.state)
         || typeof v.seen !== 'boolean' || !v.log.every((l) => ['active', 'expired'].includes(l.state))) fail('invalid notice entry');
+      if (v.log[0].state !== 'active' || v.log[0].cause !== 'notice') fail('invalid notice creation');
+      for (let i = 1; i < v.log.length; i++) {
+        const previous = v.log[i - 1].state, row = v.log[i];
+        if (row.cause === 'seen' ? row.state !== previous
+          : row.cause !== 'expiry' || previous !== 'active' || row.state !== 'expired' || row.at < v.notice.body.expiresAt) fail('invalid notice transition');
+      }
+      if (v.seen !== v.log.some((l) => l.cause === 'seen')) fail('seen lacks evidence');
       return v;
     }
     if (v.kind !== 'question' || normalized(v.question).kind !== 'question' || v.question.id !== v.id
@@ -134,6 +145,28 @@ export function validateEntry(v) {
       if (!uuid(v.supersededBy)) fail('invalid supersededBy');
       if (v.state !== 'withdrawn' || v.withdrawal.reason !== 'superseded' || v.supersededBy === v.id) fail('invalid supersession');
     }
+    if (v.log[0].state !== 'pending' || v.log[0].cause !== 'question') fail('invalid question creation');
+    for (let i = 1; i < v.log.length; i++) {
+      const previous = v.log[i - 1].state, row = v.log[i];
+      let valid = false;
+      if (row.cause === 'answer') valid = previous === 'pending' && row.state === 'answered';
+      else if (row.cause.startsWith('defer:')) valid = previous === 'pending' && row.state === (v.route.handback ? 'released' : 'pending');
+      else if (row.cause.startsWith('withdrawal:')) valid = previous === 'pending' && row.state === 'withdrawn'
+        && WITHDRAWAL_REASONS.includes(row.cause.slice('withdrawal:'.length)) && v.withdrawal?.reason === row.cause.slice('withdrawal:'.length);
+      else if (row.cause === 'superseded') valid = previous === 'pending' && row.state === 'withdrawn'
+        && v.withdrawal?.reason === 'superseded' && v.supersededBy !== null;
+      else if (row.cause === 'asker-gone') valid = previous === 'pending' ? row.state === 'withdrawn' && v.withdrawal?.reason === 'asker-gone'
+        : previous === 'answered' && row.state === 'undeliverable';
+      else if (row.cause === 'handed') valid = previous === 'answered' && row.state === 'handed' && row.at === v.handedAt && v.route.waiter !== null;
+      else if (row.cause === 'confirm' || row.cause === 'confirm-mismatch') valid = ['handed', 'unconfirmed'].includes(previous)
+        && row.state === (row.cause === 'confirm' ? 'consumed' : 'unconfirmed');
+      else if (row.cause === 'window') valid = previous === 'handed' && row.state === 'unconfirmed' && row.at >= v.handedAt + CONFIRM_WINDOW_MS;
+      else if (row.cause === 'expiry') valid = previous === 'pending' && row.state === 'expired' && row.at >= v.question.body.expiresAt;
+      else if (row.cause === 'native-answer') valid = ['released', 'expired'].includes(previous) && row.state === previous;
+      if (!valid) fail('invalid question transition');
+    }
+    if (v.supersededBy !== null && !v.log.some((l) => l.cause === 'superseded')) fail('supersededBy lacks evidence');
+    if (v.presentation !== (!v.route.handback && v.log.some((l) => l.cause.startsWith('defer:')) ? 'desktop' : 'inbox')) fail('presentation lacks evidence');
     if (!Array.isArray(v.messages)) fail('invalid message history');
     const evidence = [...v.log];
     const consume = (at, causes) => {
@@ -166,8 +199,8 @@ export function validateEntry(v) {
         || observation.surface !== 'terminal' || !answers(observation.answers)) fail('invalid native observation');
       consume(observation.at, ['confirm', 'confirm-mismatch', 'native-answer']);
     }
-    if (evidence.some((l) => ['answer', 'confirm', 'confirm-mismatch', 'native-answer', 'withdrawal:asker', 'withdrawal:user', 'withdrawal:answered-elsewhere'].includes(l.cause)
-      || l.cause.startsWith('defer:'))) fail('transition lacks history');
+    if (evidence.some((l) => ['answer', 'confirm', 'confirm-mismatch', 'native-answer'].includes(l.cause)
+      || l.cause.startsWith('defer:') || l.cause.startsWith('withdrawal:'))) fail('transition lacks history');
     if (!isDeepStrictEqual(v.observed, v.observations.at(-1)?.answers ?? null)) fail('observed does not match history');
     return v;
   } catch (error) {
