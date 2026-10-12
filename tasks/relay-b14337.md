@@ -1,15 +1,16 @@
 ---
 id: relay-b14337
 title: "The CLI surface: rows in ops, adoption, and wiring"
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T11:09:54Z
+updated: 2026-10-12T11:09:55Z
 started: 2026-10-12T09:29:40Z
+completed: 2026-10-12T11:09:54Z
 depends: [relay-e889bc, ops-342668]
 parent: relay-f58531
 tags: []
@@ -56,3 +57,7 @@ step: "Task 12: The CLI surface: rows in ops, adoption, and wiring"
 - 2026-10-12T11:07:24Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T11:09:54Z (design/typed-messages): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T11:09:54Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T11:09:54Z (design/typed-messages): Landed independently reviewed ops CLI rows after approved mm refresh and successful ops gate; adopted paired landed snapshot b2e3f16 and wired all relay commands together. Fixed I1 ask runtime passthrough and I2 captured version-process stderr with real RED/GREEN regressions; fresh scoped review accepted. Serial full571/571 on Node22/26, no processes. Live acceptance remains Task14.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
