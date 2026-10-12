@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:50Z
-updated: 2026-10-12T04:41:27Z
+updated: 2026-10-12T04:51:17Z
 started: 2026-10-12T04:41:27Z
 depends: [relay-ffca0d]
 parent: relay-f58531
@@ -22,3 +22,4 @@ step: "Task 7: Local socket, client, and the service process"
 
 - 2026-10-12T04:41:27Z (design/typed-messages): started
   provenance: {"harness_session":"codex:01a12e69-8f7e-7041-ac60-2b3fa6526d82","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T04:51:17Z (design/typed-messages): implementation: F5 byte-caps complete/unfinished request lines; F19 private client replies uncapped internally; F20 get uses queued snapshot({since:0}); withdrawal forwards normalized full envelope. Connection-owned ask reservations preserve accepted waiter delivery, refuse conflicting ownership, and process disconnected accepted asks once after persistence. Confirm rejects non-string maps before inbox writes.
