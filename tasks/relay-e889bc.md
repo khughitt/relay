@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T09:21:22Z
+updated: 2026-10-12T09:22:16Z
 started: 2026-10-12T09:13:16Z
 depends: [relay-f33482]
 parent: relay-f58531
@@ -27,3 +27,5 @@ step: "Task 11: Installer: the ask route's bindings behind its evidence"
 - 2026-10-12T09:20:06Z (design/typed-messages): Serial retry full suites pass560/560 on Node26.5.0 and Node22.23.2; focused installer25/25 both runtimes. First559/560 dispatch short-budget failure retained; feedback relay-fc28a4 filed. Owned hang fixture PIDs2786986,2799744,2807011 terminated by exact verified identity; no owned fixtures remain.
 - 2026-10-12T09:21:22Z (design/typed-messages): parked (waiting on agent): Controller: review implementation commit8985401 in .worktrees/typed-messages and task-11-report.md, then start the task for any corrective edits or closure.
   provenance: {"harness_session":"codex:01a12f61-be56-77b1-b59d-25d138db0d51","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T09:22:16Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
