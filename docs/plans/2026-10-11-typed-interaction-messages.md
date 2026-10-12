@@ -2,6 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Accepted after plan review round 4. Tasks 1–12 implemented and independently
+reviewed; Task 13 supplies documentation, packaging and two-runtime gates. Task 14
+(user-present tailnet acceptance 7) remains pending.
+
 **Goal:** A durable question inbox in relay, served by one long-lived `relay serve`,
 answered from a phone over the tailnet. The first route is a Claude Code
 `AskUserQuestion` in an interactive terminal session.

@@ -13,13 +13,16 @@ test('package dry run and installed tarball expose only the documented runtime',
   const env={...process.env,npm_config_cache:join(temp,'cache'),RELAY_STATE_DIR:join(temp,'state'),XDG_CONFIG_HOME:join(temp,'config')};
   const run=(cmd,args,cwd=root)=>exec(cmd,args,{cwd,env,timeout:20000,maxBuffer:4*1024*1024});
   const dry=JSON.parse((await run('npm',['pack','--dry-run','--json'])).stdout)[0];const names=dry.files.map(f=>f.path);
-  for(const name of ['bin/relay.js','src/index.js','integrations/opencode/plugin.js','test/fixtures/handles.json','test/fixtures/ancestry.json','docs/api.md','docs/runbooks/registry-lock-repair.md','LICENSE'])assert.ok(names.includes(name),name);
+  for(const name of ['bin/relay.js','src/index.js','integrations/opencode/plugin.js','test/fixtures/handles.json','test/fixtures/ancestry.json','docs/api.md','docs/runbooks/registry-lock-repair.md','schemas/interaction/message.schema.json','docs/runbooks/inbox-service.md','LICENSE'])assert.ok(names.includes(name),name);
   for(const name of names)assert.ok(!/\.test\.|lock-worker|^tasks\/|^\.superpowers\/|agents\.json|subscribers\.json/.test(name),name);
   const pack=JSON.parse((await run('npm',['pack','--json','--pack-destination',temp])).stdout)[0];
   const consumer=join(temp,'consumer');await mkdir(consumer);await writeFile(join(consumer,'package.json'),'{"private":true,"type":"module"}');
   await run('npm',['install','--offline','--ignore-scripts','--no-audit','--no-fund',join(temp,pack.filename)],consumer);
   const smoke=`import assert from 'node:assert/strict'; import * as relay from 'relay'; import * as plugin from 'relay/opencode'; import {readFile} from 'node:fs/promises';
     assert.deepEqual(Object.keys(relay).sort(),${JSON.stringify(exportsExpected)});
+    const packageRoot=new URL('../',import.meta.resolve('relay'));
+    const messageSchema=JSON.parse(await readFile(new URL('schemas/interaction/message.schema.json',packageRoot),'utf8'));assert.equal(messageSchema.$schema,'https://json-schema.org/draft/2020-12/schema');
+    assert.ok((await readFile(new URL('docs/runbooks/inbox-service.md',packageRoot),'utf8')).length>0);
     assert.deepEqual(Object.keys(plugin),['Relay']);assert.equal(plugin.Relay.constructor.name,'AsyncFunction');
     const corpus=JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixtures/handles.json')),'utf8'));assert.equal(corpus.schema,1);assert.ok(corpus.starts.some(c=>c.expected==='9007199254740993'));
     const chains=JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixtures/ancestry.json')),'utf8'));assert.equal(chains.schema,1);assert.ok(chains.chains.some(c=>c.name==='background-under-systemd'));

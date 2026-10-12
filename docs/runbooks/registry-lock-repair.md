@@ -40,8 +40,9 @@ relay reap
 4. Verify the preserved snapshot and liveness results. Unknown process evidence
    remains unknown; listing/reaping does not prove guards or terminal reconciliation
    work. Restore hook configuration and begin fresh sessions only after verification.
-   R2 hook dispatch is available, but installation is not: do not enable it as a
-   live hook. The later installer/cutover task owns that step.
+   Installation is explicit and evidence-gated: follow
+   [hook install and recovery](hook-install-rollback.md) before any cutover. The
+   [inbox service runbook](inbox-service.md#recovery) covers service-lock incidents.
 
 Temporary token names are not swept by pattern. If they need cleanup, inspect and
 remove them individually under the same quiescence condition. Never use a wildcard

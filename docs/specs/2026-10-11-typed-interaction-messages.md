@@ -1,6 +1,8 @@
 # Typed interaction messages: envelope, kinds, inbox and remote delivery
 
-Status: draft for review (relay-f58531, under ops-cb50a8).
+Status: accepted after spec review round 3 (relay-f58531, under ops-cb50a8).
+Implementation Tasks 1–12 are independently reviewed; documentation and runtime gates
+are Task 13. Task 14 (user-present tailnet acceptance 7) remains pending.
 
 ## 1. Decision and scope
 
@@ -76,7 +78,10 @@ Documented, not probed (code.claude.com/docs/en/hooks): multi-select answers joi
 labels with commas; when PreToolUse hooks disagree, `deny` > `defer` > `ask` > `allow`;
 Claude Code always offers a free-text "Other" on `AskUserQuestion`.
 
-Not yet known, and probed first by the plan (§12):
+The plan probed these on Claude Code 2.1.296; all five route rows passed in
+[the evidence record](../evidence/claude-code-answer-routes.json). The observations below
+are version-specific; rerun the [probes](../runbooks/answer-route-probes.md) before
+installing the route after an upgrade:
 
 - **P1.** A hook that blocks for minutes and then exits 0 with no decision lets the
   native question appear and be answered in the terminal (the release route).
@@ -88,7 +93,9 @@ Not yet known, and probed first by the plan (§12):
   records what Claude does with the still-blocking ask hook (kills it, waits for it, or
   leaves it running) and whether PostToolUse fires.
 
-The design names its fallback where it depends on these probes.
+P1 released to the native UI. P2 observed `tool_response.answers` with matching
+`tool_use_id` after hook and terminal answers. P3 awaited the blocking hook; denial
+won and no PostToolUse fired. The design retains its fallbacks for failed future probes.
 
 mind6 already exposes a loopback server to the phone through `tailscale serve`, with a
 request guard keyed on `Tailscale-User-Login` and `Host` (mind6
@@ -412,9 +419,10 @@ one request object per line and one response per line, correlated by a client `r
 | Op | Request | Response |
 | --- | --- | --- |
 | `ask` | a question message, `waiter` (process handle) and `handback` (whether the route can return the question to the harness's UI) | the entry, then a `state` line on every later transition of the entry, until the connection closes |
-| `handed` | `{ id }`, sent by the waiter before it gives the answer to the harness; idempotent for that waiter (§9.1) | entry, or `NOT_WAITER` |
-| `confirm` | `{ harness, callId, answers }` from the route's post-call observation | entry or `NOT_FOUND` |
+| `handed` | `{ id, waiter }`, sent by the waiter before it gives the answer to the harness; idempotent for that waiter (§9.1) | entry, or `NOT_WAITER` |
+| `confirm` | `{ harness, callId, observed }` from the route's post-call observation | entry or `NOT_FOUND` |
 | `answer` / `defer` / `withdraw` | message | entry or error |
+| `notify` | notice message | entry (no v1 producer is wired) |
 | `list` | `{ since?: seq, states?: [...] }` | entries |
 | `get` | `{ id }` | entry |
 | `presence.get` / `presence.set` | `{ mode? }` | presence |
@@ -438,8 +446,9 @@ http://127.0.0.1:<port>` exposes it to the tailnet. The request guard copies min
   the configured port.
 - **Configuration.** Setting one of the two variables without the other stops the
   service at start, naming the missing one.
-- **POST requests.** A POST needs an `Origin` equal to the matched origin and an
-  `application/json` body under 64 KiB.
+- **POST and PUT requests.** Each needs an `Origin` equal to the matched origin and an
+  `application/json` body at most 64 KiB in bytes. Host and Origin include any
+  non-443 tailnet port. Any `X-Forwarded-*` header marks a request as proxied.
 
 The guard sets an answer's or defer's `surface`: `phone` for a proxied request and
 `desktop` for a local one. A value the client sent is overwritten.
@@ -453,6 +462,8 @@ The guard sets an answer's or defer's `surface`: `phone` for a proxied request a
 | `GET /v1/events` | Server-Sent Events; each event's id is its `seq`, and `Last-Event-ID` resumes |
 | `GET` / `PUT /v1/presence` | read or set presence |
 | `GET /v1/agents` | the registry snapshot's agent ids, harnesses and project labels, for display |
+
+There is no HTTP withdrawal or seen route in v1.
 
 The service also serves a single static directory read-only at `/` when
 `RELAY_CLIENT_DIR` is set, so that a client built elsewhere (ops-dba151) shares the

@@ -24,6 +24,8 @@
     "test/fixtures/ancestry.json",
     "docs/api.md",
     "docs/runbooks/registry-lock-repair.md",
+    "schemas/",
+    "docs/runbooks/inbox-service.md",
     "LICENSE"
   ],
   "bin": {
