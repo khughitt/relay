@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-12T01:51:17Z
+updated: 2026-10-12T01:51:36Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -78,3 +78,5 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
   provenance: {"harness_session":"claude-code:e0144e6c-a368-496f-bdd1-a0377f1e66b2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-12T01:51:03Z (design/typed-messages): review: plan round 3 — verdict: revise; findings: P2 1; reviewer: codex
 - 2026-10-12T01:51:17Z (design/typed-messages): Plan round 3 on 1f75a03 (plan revision da31926): round 2 queued-watch listener leak is resolved. Socket reserves ownership before awaiting watch and unsubscribes if already destroyed; HTTP has the matching guard. Both disconnect regressions fail with their cleanup guards removed and pass restored; a separate concurrent-watch check registers once. One new P2 in Task 8 lines 2354-2358: the expiry test records its fake now before setup but setup computes expiresAt from a later Date.now after fsynced writes. Adding 3600001 ms leaves the clock before expiry (27 ms in the reproduction), so HTTP returns a saved answer and the expected EXPIRED assertion crashes. Set now = q.body.expiresAt + 1. The unmodified planned tests ran 32/33; with that one-line correction only in an isolated copy, all 33 neighboring tests plus the concurrent-watch check pass on Node 26.5.0 and Node 22.23.2. tasks check passes. Plan and implementation unchanged; no live Claude/phone probes or full repository suite run. Author next: correct the planned expiry test and rerun the focused checks before plan review round 4.
+- 2026-10-12T01:51:36Z (design/typed-messages): parked (waiting on agent): Author: set the Task 8 expiry test clock to q.body.expiresAt + 1 in .worktrees/typed-messages/docs/plans/2026-10-11-typed-interaction-messages.md, rerun the focused isolated checks, then request plan review round 4
+  provenance: {"harness_session":"codex:01a12dc7-d9ad-7a93-9f5d-7a8f238cb051","harness_session_source":"CODEX_THREAD_ID"}
