@@ -177,6 +177,45 @@ test('put refuses extra raw frame data before allocation and load quarantines it
   await fs.access(join(inboxPaths(p.stateDir).rejectedDir, `${saved.id}.json`));
 });
 
+test('nested missing state ancestors are published in order, including after earlier mkdir', async (t) => {
+  for (const precreated of [false, true]) {
+    const p = await tempState(t), stateDir = join(p.stateDir, 'a', 'b', 'state'), synced = [];
+    if (precreated) await fs.mkdir(stateDir, { recursive: true, mode: 0o700 });
+    const io = { ...fs, open: async (path, ...args) => {
+      const handle = await fs.open(path, ...args);
+      if (args[0] !== 'r') return handle;
+      return { close: () => handle.close(), sync: async () => { await handle.sync(); synced.push(path); } };
+    } };
+    const { store } = await loadStore(stateDir, { io });
+    assert.deepEqual(synced.filter((path) => path.startsWith(p.stateDir)), [
+      p.stateDir, join(p.stateDir, 'a'), join(p.stateDir, 'a', 'b'), stateDir, join(stateDir, 'inbox'),
+    ]);
+    assert.equal(synced[0], '/');
+    for (let i = 1; i < synced.length; i++) assert.equal(dirname(synced[i]), synced[i - 1]);
+    assert.equal((await store.put(entry())).seq, 1);
+  }
+});
+
+test('failed nested ancestor sync prevents loading and retry publishes already-created links', async (t) => {
+  const p = await tempState(t), a = join(p.stateDir, 'a'), stateDir = join(a, 'b', 'state'), synced = [];
+  let armed = true;
+  const io = { ...fs, open: async (path, ...args) => {
+    const handle = await fs.open(path, ...args);
+    if (args[0] !== 'r') return handle;
+    return { close: () => handle.close(), sync: async () => {
+      if (armed && path === a) { armed = false; throw Object.assign(new Error('ancestor sync failed'), { code: 'EIO' }); }
+      await handle.sync(); synced.push(path);
+    } };
+  } };
+  await assert.rejects(loadStore(stateDir, { io }), (error) => error.code === 'IO_ERROR' && error.cause.code === 'EIO');
+  await fs.access(join(stateDir, 'inbox', 'entries'));
+  await assert.rejects(fs.access(inboxPaths(stateDir).seqPath), { code: 'ENOENT' });
+  synced.length = 0;
+  const { store } = await loadStore(stateDir, { io });
+  assert.deepEqual(synced.filter((path) => path.startsWith(p.stateDir)), [p.stateDir, a, join(a, 'b'), stateDir, join(stateDir, 'inbox')]);
+  assert.equal((await store.put(entry())).seq, 1);
+});
+
 test('new store directories sync their containing directories before the first write', async (t) => {
   const p = await tempPaths(t), ip = inboxPaths(p.stateDir), synced = [];
   const io = { ...fs, open: async (path, ...args) => {
@@ -185,13 +224,14 @@ test('new store directories sync their containing directories before the first w
     return { sync: async () => { await handle.sync(); synced.push(path); }, close: () => handle.close() };
   } };
   const { store } = await loadStore(p.stateDir, { io });
-  assert.deepEqual(synced, [dirname(p.stateDir), p.stateDir, ip.root]);
+  assert.deepEqual(synced.slice(-3), [dirname(p.stateDir), p.stateDir, ip.root]);
+  const initialized = synced.length;
   const saved = await store.put(entry());
   assert.equal(saved.seq, 1);
-  assert.deepEqual(synced.slice(0, 3), [dirname(p.stateDir), p.stateDir, ip.root]);
+  assert.deepEqual(synced.slice(initialized - 3, initialized), [dirname(p.stateDir), p.stateDir, ip.root]);
   synced.length = 0;
   await loadStore(p.stateDir, { io });
-  assert.deepEqual(synced, [dirname(p.stateDir), p.stateDir, ip.root]);
+  assert.deepEqual(synced.slice(-3), [dirname(p.stateDir), p.stateDir, ip.root]);
 });
 
 test('initialization sync failure rejects the load and retry syncs existing directory links', async (t) => {
@@ -211,7 +251,7 @@ test('initialization sync failure rejects the load and retry syncs existing dire
   await fs.access(inboxPaths(p.stateDir).root);
   synced.length = 0;
   const { store } = await loadStore(p.stateDir, { io });
-  assert.deepEqual(synced, [dirname(p.stateDir), p.stateDir, inboxPaths(p.stateDir).root]);
+  assert.deepEqual(synced.slice(-3), [dirname(p.stateDir), p.stateDir, inboxPaths(p.stateDir).root]);
   assert.equal((await store.put(entry())).seq, 1);
 });
 

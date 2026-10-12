@@ -10,18 +10,19 @@ import { serveSocket } from '../src/serve/socket.js';
 import { expectAnswers } from '../src/routes/index.js';
 import { createProcessOps } from '../src/bus/proc.js';
 import { parseValues, runInbox, runPresence } from '../src/cli/desk.js';
-import { HANDLE, NOW, questionMessage } from './helpers/interaction.js';
+import { runCli } from './helpers/cli-interaction.js';
+import { HANDLE, NOW, questionMessage, answerMessage } from './helpers/interaction.js';
 
 const worker = new URL('./fixtures/serve-worker.js', import.meta.url).pathname;
 const waiterFile = new URL('./fixtures/socket-waiter.js', import.meta.url).pathname;
-async function setup(t) {
+async function setup(t, body = {}) {
   const p = await tempState(t), w = spawnLines(t, worker, [], { env: { RELAY_STATE_DIR: p.stateDir } });
   const { socketPath } = await w.next((m) => m.type === 'ready');
   await runPresence({ mode: 'away', socketPath });
-  const q = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000 } });
+  const q = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000, ...body } });
   const file = join(p.stateDir, 'q.json'); await fs.writeFile(file, JSON.stringify(q));
   const asker = spawnLines(t, waiterFile, [socketPath, file]); await asker.next((m) => m.op === 'ask');
-  return { socketPath, q, asker };
+  return { p, socketPath, q, asker };
 }
 test('parseValues follows the grammar and refuses what does not fit', () => {
   const q = questionMessage(), entry = { question: q };
@@ -97,15 +98,55 @@ test('undeliverable output includes the saved answer and recorded reason', { tim
   assert.match(result.text, /"answerId"/);
 });
 test('defer, withdraw, decline, and presence', { timeout: 30000 }, async (t) => {
-  const { socketPath, q } = await setup(t);
+  const { p, socketPath, q } = await setup(t);
   assert.equal((await runInbox({ action: 'defer', args: [q.id], socketPath })).json.entry.presentation, 'desktop');
   assert.equal((await runInbox({ action: 'answer', args: [q.id], decline: true, socketPath })).json.entry.answer.body.outcome, 'declined');
   await assert.rejects(runInbox({ action: 'answer', args: [q.id, 'q1=o1'], decline: true, socketPath }), { code: 'USAGE' });
   await assert.rejects(runInbox({ action: 'withdraw', args: [q.id], socketPath }), { code: 'ANSWERED' });
+  const refused = runCli(p, ['--pretty', 'inbox', 'withdraw', q.id]);
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /Winning answer from cli saved at .*: declined \{\}/);
   assert.equal((await runPresence({ mode: null, socketPath })).json.presence.mode, 'away');
   assert.equal((await runPresence({ mode: 'here', socketPath })).text, 'here\n');
 });
 test('no service is SERVE_UNAVAILABLE', async (t) => {
   const p = await tempState(t);
   await assert.rejects(runPresence({ mode: null, socketPath: join(p.stateDir, 'serve.sock') }), { code: 'SERVE_UNAVAILABLE' });
+});
+
+test('real CLI conflict errors retain and explain the saved phone answer', { timeout: 30000 }, async (t) => {
+  const item = questionMessage().body.items[0];
+  const { p, socketPath, q } = await setup(t, { items: [item,
+    { ...item, id: 'q2', type: 'boolean', options: [], allowOther: false },
+    { ...item, id: 'q3', type: 'text', options: [], allowOther: false },
+    { ...item, id: 'q4', type: 'multi' },
+  ] });
+  const conn = await connectSocket(socketPath);
+  let saved;
+  try { saved = (await conn.request('answer', { message: answerMessage(q, { values: {
+    q1: { type: 'choice', optionIds: ['o2'] }, q2: { type: 'boolean', value: false },
+    q3: { type: 'text', text: 'saved text' }, q4: { type: 'other', text: 'Triangle' },
+  } }) })).entry; }
+  finally { conn.close(); }
+  const savedAt = saved.log.find((row) => row.cause === 'answer').at;
+  for (const [action, args, code] of [
+    ['answer', ['q1=o1', 'q2=true', 'q3=text:loser', 'q4=o1'], 'ALREADY_ANSWERED'], ['defer', [], 'ALREADY_ANSWERED'], ['withdraw', [], 'ANSWERED'],
+  ]) {
+    const json = runCli(p, ['--json', 'inbox', action, q.id, ...args]);
+    assert.equal(json.status, 1, json.stderr);
+    assert.equal(json.stdout, '');
+    assert.deepEqual(JSON.parse(json.stderr).error, {
+      kind: `inbox-${action}_failed`, detail: `${code}: ${code}`, entry: saved,
+    });
+    const pretty = runCli(p, ['--pretty', 'inbox', action, q.id, ...args]);
+    assert.equal(pretty.status, 1, pretty.stderr);
+    assert.equal(pretty.stdout, '');
+    assert.match(pretty.stderr, new RegExp(`^relay: ${code}: ${code}\\n`));
+    assert.match(pretty.stderr, /Square/);
+    assert.match(pretty.stderr, /"q2":false/);
+    assert.match(pretty.stderr, /saved text/);
+    assert.match(pretty.stderr, /Triangle/);
+    assert.match(pretty.stderr, /phone/);
+    assert.ok(pretty.stderr.includes(new Date(savedAt).toISOString()), pretty.stderr);
+  }
 });

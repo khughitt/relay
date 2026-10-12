@@ -99,3 +99,26 @@ test('clean shutdown preserves connected live waiters for restart', { timeout: 1
   await new Promise((r) => setTimeout(r, 50));
   assert.equal((await b.client.request('get', { id: q.id })).entry.state, 'handed');
 });
+
+test('service startup publishes precreated nested ancestors and refuses a failed sync before ready', async (t) => {
+  const p = await tempState(t), a = join(p.stateDir, 'a'), stateDir = join(a, 'b', 'state'), synced = [];
+  let armed = true, ready = false;
+  const io = { ...fs, open: async (path, ...args) => {
+    const handle = await fs.open(path, ...args);
+    if (args[0] !== 'r') return handle;
+    return { close: () => handle.close(), sync: async () => {
+      if (armed && path === a) { armed = false; throw Object.assign(new Error('ancestor sync failed'), { code: 'EIO' }); }
+      await handle.sync(); synced.push(path);
+    } };
+  } };
+  await assert.rejects(runServe({ env: { RELAY_STATE_DIR: stateDir }, io, signal: AbortSignal.timeout(1000), ready: () => { ready = true; } }), { code: 'IO_ERROR' });
+  assert.equal(ready, false);
+  await fs.access(join(stateDir, 'inbox', 'entries'));
+  synced.length = 0;
+  const controller = new AbortController();
+  await runServe({ env: { RELAY_STATE_DIR: stateDir }, io, signal: controller.signal, ready: () => { ready = true; controller.abort(); } });
+  assert.equal(ready, true);
+  assert.deepEqual(synced.filter((path) => path.startsWith(p.stateDir)), [p.stateDir, a, join(a, 'b'), stateDir, join(stateDir, 'inbox')]);
+  await assert.rejects(fs.access(join(stateDir, 'serve.sock')), { code: 'ENOENT' });
+  await assert.rejects(fs.access(join(stateDir, 'serve.lock')), { code: 'ENOENT' });
+});

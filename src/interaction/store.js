@@ -39,8 +39,13 @@ async function readSeq(path, io) {
 export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
   const p = inboxPaths(stateDir);
   for (const dir of [stateDir, p.root, p.entriesDir, p.rejectedDir]) await ensurePrivateDir(dir, { io });
-  // Sync existing links too: a prior initialization may have failed after mkdir.
-  try { for (const dir of [dirname(stateDir), stateDir, p.root]) await syncDir(dir, io); }
+  // Sync the whole chain, including existing links: service startup or a failed prior load may have created them.
+  const directories = [p.root];
+  for (let dir = stateDir; ; dir = dirname(dir)) {
+    directories.unshift(dir);
+    if (dirname(dir) === dir) break;
+  }
+  try { for (const dir of directories) await syncDir(dir, io); }
   catch (cause) { throw relayError('IO_ERROR', 'cannot publish inbox directories', cause); }
   const persisted = await readSeq(p.seqPath, io);
   const entries = new Map(), rejected = [];

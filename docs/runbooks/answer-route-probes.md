@@ -14,6 +14,10 @@ node tools/answer-probe/run.mjs --out /tmp/answer-probe-under-denial --only unde
 ```
 
 Use fresh output directories. Without `--only`, the driver runs all four scenarios.
+The driver accepts only `--out DIR` and `--only NAME`, each at most once; a missing,
+empty or flag-shaped value, unknown flag or unknown scenario is refused before
+external tools run or output directories are created. Without `--out`, a fresh
+temporary output directory is generated.
 The private tmux server (`tmux -L relay-probe`) opens no desktop window and takes no
 focus. The driver refuses an existing server, uses scratch `--settings` files and
 reaps its Claude/hook processes on exit, SIGINT and SIGTERM. Check `cleanup` in the

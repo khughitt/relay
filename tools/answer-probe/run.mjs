@@ -10,12 +10,18 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
-const args = process.argv.slice(2), opt = (name) => { const i = args.indexOf(name); return i === -1 ? null : args[i + 1]; };
-const out = resolve(opt('--out') ?? mkdtempSync(join(tmpdir(), 'answer-probe-'))), only = opt('--only');
+const options = {};
+const args = process.argv.slice(2);
+for (let i = 0; i < args.length; i += 2) {
+  const name = args[i], value = args[i + 1];
+  if (!['--out', '--only'].includes(name) || Object.hasOwn(options, name)) throw new Error(`invalid or repeated flag ${JSON.stringify(name)}`);
+  if (!value?.trim() || value.startsWith('-')) throw new Error(`${name} requires a non-empty value`);
+  options[name] = value;
+}
+const only = options['--only'];
 const hook = fileURLToPath(new URL('./hook.mjs', import.meta.url)), node = process.execPath;
 const SOCKET = 'relay-probe';
 const tmux = (...a) => execFileSync('tmux', ['-L', SOCKET, ...a], { encoding: 'utf8' });
-if (spawnSync('tmux', ['-L', SOCKET, 'list-sessions'], { stdio: 'ignore' }).status === 0) throw new Error('relay-probe tmux server already exists; refusing to reuse it');
 const owned = new Set();
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { if (e.code === 'ESRCH') return false; throw e; } };
 const track = () => {
@@ -32,8 +38,6 @@ const cleanup = () => {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
   for (const pid of owned) if (alive(pid)) { try { process.kill(pid, 'SIGKILL'); } catch (e) { if (e.code !== 'ESRCH') throw e; } }
 };
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { cleanup(); process.exit(130); });
-process.on('exit', cleanup);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PROMPT = 'Use the AskUserQuestion tool to ask me exactly one question: which shape do I prefer, with the two options Circle and Square. After I answer, reply with exactly CHOSEN=<the label I chose> and nothing else.';
 const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
@@ -60,13 +64,17 @@ async function waitFor(name, pattern, ms) {
   return null;
 }
 const events = (log) => existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+if (only !== undefined && !Object.hasOwn(scenarios, only)) throw new Error(`unknown scenario ${only}`);
+const out = resolve(options['--out'] ?? mkdtempSync(join(tmpdir(), 'answer-probe-')));
+if (spawnSync('tmux', ['-L', SOCKET, 'list-sessions'], { stdio: 'ignore' }).status === 0) throw new Error('relay-probe tmux server already exists; refusing to reuse it');
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { cleanup(); process.exit(130); });
+process.on('exit', cleanup);
 const version = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim().split(/\s+/)[0];
 const summary = { version, out, scenarios: {} };
-if (only && !Object.hasOwn(scenarios, only)) throw new Error(`unknown scenario ${only}`);
 mkdirSync(out, { recursive: true, mode: 0o700 });
 const save = (file, value) => writeFileSync(file, value, { mode: 0o600 });
 for (const [name, settingsFor] of Object.entries(scenarios)) {
-  if (only && only !== name) continue;
+  if (only !== undefined && only !== name) continue;
   const dir = join(out, name), ws = join(dir, 'ws'), log = join(dir, 'hook.log');
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   mkdirSync(ws, { mode: 0o700 });

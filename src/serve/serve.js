@@ -1,3 +1,4 @@
+import * as fs from 'node:fs/promises';
 import { join } from 'node:path';
 import { paths } from '../bus/paths.js';
 import { withLock } from '../bus/lock.js';
@@ -14,11 +15,11 @@ import { readSnapshot } from '../bus/transaction.js';
 // so a second instance fails and a dead holder's lock is reclaimed by the reviewed path.
 export function servePaths(stateDir) { return { socketPath: join(stateDir, 'serve.sock'), lockPath: join(stateDir, 'serve.lock') }; }
 const DAY_MS = 24 * 3600 * 1000;
-export async function runServe({ env = process.env, signal, clock = Date.now, processOps = createProcessOps(),
+export async function runServe({ env = process.env, signal, io = fs, clock = Date.now, processOps = createProcessOps(),
   log = (line) => process.stderr.write(`relay serve: ${line}\n`), onCommit = () => {}, reattachMs = 10000, ready = () => {} } = {}) {
   const config = serveConfig(env);
   const registryPaths = paths(env), { stateDir } = registryPaths, sp = servePaths(stateDir);
-  await ensurePrivateDir(stateDir);
+  await ensurePrivateDir(stateDir, { io });
   const report = (error) => log(`${error.code ?? 'ERROR'}: ${error.message}`);
   async function serveUntilAborted() {
     let inbox = null, timer = null, socket = null, web = null, daily = null, stopping = false;
@@ -28,7 +29,7 @@ export async function runServe({ env = process.env, signal, clock = Date.now, pr
       const at = inbox.nextDeadline();
       if (at !== null) timer = setTimeout(() => inbox.sweep().then(arm, report), Math.min(Math.max(0, at - clock()), 2 ** 31 - 1));
     };
-    const opened = await openInbox({ stateDir, clock, expectAnswers, onCommit: (entry) => { onCommit(entry); queueMicrotask(arm); } });
+    const opened = await openInbox({ stateDir, io, clock, expectAnswers, onCommit: (entry) => { onCommit(entry); queueMicrotask(arm); } });
     inbox = opened.inbox;
     for (const r of opened.rejected) log(`INVALID_ENTRY: quarantined ${r.name}: ${r.reason}`);
     let onAbort;

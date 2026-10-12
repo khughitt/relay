@@ -211,8 +211,21 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
   } catch (error) {
     if (error.code === 'USAGE') { await emit(stderr, `relay: ${error.message}\n`); return 2; }
     const kind = `${cmdName ?? 'relay'}_failed`, detail = error.code ? `${error.code}: ${error.message}` : 'relay operation failed';
-    if (mode === 'json') await emit(stderr, `${JSON.stringify({ error: { kind, detail } })}\n`);
-    else await emit(stderr, `relay: ${detail}\n`);
+    const entry = ['ALREADY_ANSWERED', 'ANSWERED'].includes(error.code) && error.entry?.answer ? error.entry : null;
+    if (mode === 'json') await emit(stderr, `${JSON.stringify({ error: { kind, detail, ...(entry ? { entry } : {}) } })}\n`);
+    else {
+      await emit(stderr, `relay: ${detail}\n`);
+      if (entry) {
+        const answer = entry.answer.body, values = {};
+        for (const item of entry.question.body.items) {
+          const value = answer.values[item.id];
+          if (value) values[item.id] = value.type === 'choice' ? value.optionIds.map((id) => item.options.find((option) => option.id === id).label)
+            : value.type === 'boolean' ? value.value : value.text;
+        }
+        const at = entry.log.find((row) => row.cause === 'answer').at;
+        await emit(stderr, `Winning answer from ${answer.surface} saved at ${new Date(at).toISOString()}: ${answer.outcome} ${JSON.stringify(values)}\n`);
+      }
+    }
     return 1;
   }
 }

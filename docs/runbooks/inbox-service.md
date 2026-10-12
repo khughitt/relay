@@ -119,7 +119,9 @@ The phone can read `GET /v1/presence` and set `PUT /v1/presence` with JSON
 `relay inbox` alone is a usage error. `--since SEQ` is an integer durable sequence,
 not a date. `--json` preserves machine states; human output distinguishes “answer
 saved”, “handed to the agent”, “the agent received it” and “handed, receipt not
-confirmed”. Only consumed means confirmed receipt.
+confirmed”. Only consumed means confirmed receipt. If answer, defer or withdraw
+loses to a saved answer, exit 1 shows the winner's values, surface and save time;
+JSON preserves the usual error kind/detail and adds the saved entry at `error.entry`.
 
 ## Recovery
 
@@ -130,7 +132,10 @@ the rejection. Terminal entries older than 30 days are pruned separately, except
 predecessors referenced by nonterminal replacements.
 
 `STORE_FAILED` stops the service after a failed durable write; restart reconciles
-what reached disk before accepting clients. Every acknowledged write is durable.
+what reached disk before accepting clients. Startup syncs the full ancestor chain
+of the configured absolute state path, including recursively created directories
+and links left by interrupted initialization. A sync failure refuses startup.
+Every acknowledged write is durable.
 Preserve `inbox/seq`, entries, rejected files and presence during recovery; never
 reset the counter or treat a published answer as rolled back.
 

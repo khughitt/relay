@@ -637,7 +637,9 @@ another answer or defer gets `ALREADY_ANSWERED` with the winner, and withdrawal 
 See [spec §5.1–5.2](specs/2026-10-11-typed-interaction-messages.md#51-states)
 for the full transition table and validation/revision ordering.
 
-`relay serve` is the only inbox writer. It fsyncs files and directories and allocates
+`relay serve` is the only inbox writer. Startup fsyncs the full directory ancestor
+chain through the inbox, including existing links after interrupted initialization.
+A failure refuses startup before accepting clients. It fsyncs files and directories and allocates
 `inbox/seq` before publishing entries, preserving monotonic sequence numbers across
 crashes and pruning. Point reads, snapshots and watch registration queue behind writes.
 Terminal entries older than 30 days are pruned at startup and daily; a predecessor
@@ -721,7 +723,10 @@ shutdown as 503 `UNAVAILABLE`. Host sleep serves nothing; retry with the same
 
 `relay inbox` alone is usage error (exit 2); it is a parent command, not an executable
 listing alias. `--json` emits raw machine states and full entries; `--pretty` emits
-human labels. Boolean tokens are `ITEM=true`/`false`; choice tokens use option ids
+human labels. Answer/defer/withdraw conflicts still exit 1 and retain `error.kind`
+and `error.detail`; JSON adds the saved winning entry as `error.entry`, while pretty
+output shows the winning values (choice labels), surface and durable save time.
+Boolean tokens are `ITEM=true`/`false`; choice tokens use option ids
 (`ITEM=o1`, multi `ITEM=o1,o2`); free text uses quoted `ITEM=other:text` or
 `ITEM=text:text`. Inbox/presence use the socket and fail `SERVE_UNAVAILABLE` if absent.
 Away routes new questions into the inbox; here passes new questions to the native UI.
