@@ -12,6 +12,8 @@ export function toQuestion(payload, { now, id, project = null }) {
   }
   const questions = payload.tool_input?.questions;
   if (!Array.isArray(questions)) throw relayError('INVALID_INPUT', 'AskUserQuestion carries no questions');
+  const prompts = questions.map((question) => question?.question).filter((prompt) => typeof prompt === 'string');
+  if (new Set(prompts).size !== prompts.length) throw relayError('INVALID_INPUT', 'AskUserQuestion carries duplicate question text');
   const items = questions.map((q, i) => ({ id: `q${i + 1}`, header: q?.header, prompt: q?.question,
     type: q?.multiSelect === true ? 'multi' : 'single',
     options: Array.isArray(q?.options) ? q.options.map((o, j) => ({ id: `o${j + 1}`, label: o?.label, description: o?.description ?? null })) : null,

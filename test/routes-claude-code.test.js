@@ -27,10 +27,18 @@ test('a registry-resolved project is explicit and payload fields cannot spoof it
   assert.equal(toQuestion(payload, { now: NOW, id: uuid() }).context.project, null);
   assert.equal(toQuestion(payload, { now: NOW, id: uuid(), project: 'known-project' }).context.project, 'known-project');
 });
+test('duplicate prompts are refused while distinct prompts remain answerable', () => {
+  const one = prePayload().tool_input.questions[0];
+  const duplicate = prePayload([{ ...one, header: 'Shape 1' }, { ...one, header: 'Shape 2' }]);
+  assert.throws(() => toQuestion(duplicate, { now: NOW, id: uuid() }), { code: 'INVALID_INPUT' });
+  const distinct = prePayload([{ ...one, header: 'Shape' }, { ...one, header: 'Size', question: 'Which size?' }]);
+  assert.equal(toQuestion(distinct, { now: NOW, id: uuid() }).body.items.length, 2);
+});
 test('out-of-schema calls are refused, never trimmed', () => {
   const one = prePayload().tool_input.questions[0];
   assert.throws(() => toQuestion(prePayload([one, one, one, one, one].map((q, i) => ({ ...q, question: `Q${i}` }))), { now: NOW, id: uuid() }), { code: 'INVALID_MESSAGE' });
   assert.throws(() => toQuestion(prePayload([{ ...one, header: 'x'.repeat(17) }]), { now: NOW, id: uuid() }), { code: 'INVALID_MESSAGE' });
+  assert.throws(() => toQuestion(prePayload([null]), { now: NOW, id: uuid() }), { code: 'INVALID_MESSAGE' });
   assert.throws(() => toQuestion({ ...prePayload(), tool_name: 'Bash' }, { now: NOW, id: uuid() }), { code: 'INVALID_INPUT' });
   assert.throws(() => toQuestion({ ...prePayload(), tool_use_id: undefined }, { now: NOW, id: uuid() }), { code: 'INVALID_INPUT' });
 });
