@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:46Z
-updated: 2026-10-12T03:21:48Z
+updated: 2026-10-12T03:25:39Z
 started: 2026-10-12T03:08:11Z
 depends: [relay-cb1b45]
 parent: relay-f58531
@@ -31,4 +31,6 @@ step: "Task 3: Lifecycle state machine"
 - 2026-10-12T03:21:21Z (design/typed-messages): parked (waiting on agent): Implementer task_3: fix all three Important lifecycle review findings in .worktrees/typed-messages, then return covering RED/GREEN evidence and park for controller re-review
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T03:21:48Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12e13-f2d9-7bd2-ae5d-2d3ba3ae1289","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T03:25:39Z (design/typed-messages): parked (waiting on agent): Controller: scoped re-review fix round 1 commit 983e8f8 and appended task-3-report.md in .worktrees/typed-messages; close relay-1ad9ae after acceptance
   provenance: {"harness_session":"codex:01a12e13-f2d9-7bd2-ae5d-2d3ba3ae1289","harness_session_source":"CODEX_THREAD_ID"}
