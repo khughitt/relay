@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T10:48:13Z
+updated: 2026-10-12T10:51:00Z
 started: 2026-10-12T09:29:40Z
 depends: [relay-e889bc, ops-342668]
 parent: relay-f58531
@@ -42,3 +42,5 @@ step: "Task 12: The CLI surface: rows in ops, adoption, and wiring"
 - 2026-10-12T10:47:13Z (design/typed-messages): Phase B wiring verified: focused real CLI/install/surface 27/27 on Node26.5.0 and Node22.23.2; serial full Node26 test-fast and Node22 gate each 568/568, no skips/failures/flakes. Landed table/helper bytes and modes match chosen ops b2e3f1646e29c04d8833ec32e4d2e76b661f35bd. Self-review covers strict usage checks, F27 grouping, F28 sequence cursor, SIGTERM/SIGINT teardown and fixture-only installedversion/evidence/apply/rollback. No live installation or state changes.
 - 2026-10-12T10:48:13Z (design/typed-messages): parked (waiting on agent): Controller: review Task12 implementation from 7a3739ce222a53bf5c7d3652f9b6a34ef88c5418 through 98d7f98ef0fead357b2359390be056c6e77fa64d in .worktrees/typed-messages, using task-12-report.md and saved RED/GREEN/full-suite evidence; resume worker for any corrective findings, then close the step after acceptance.
   provenance: {"harness_session":"codex:01a12f71-1e6b-75e2-86ea-0d3e6f283caf","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T10:51:00Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
