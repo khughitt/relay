@@ -1,15 +1,16 @@
 ---
 id: relay-aa889d
 title: "Local socket, client, and the service process"
-status: doing
+status: done
 priority: 2
 size: m
 complexity: high
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:50Z
-updated: 2026-10-12T05:21:31Z
+updated: 2026-10-12T05:21:32Z
 started: 2026-10-12T04:41:27Z
+completed: 2026-10-12T05:21:32Z
 depends: [relay-ffca0d]
 parent: relay-f58531
 tags: []
@@ -39,3 +40,7 @@ step: "Task 7: Local socket, client, and the service process"
 - 2026-10-12T05:21:30Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T05:21:31Z (design/typed-messages): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T05:21:32Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T05:21:32Z (design/typed-messages): Unix socket/client/service and real process recovery landed. Byte-bounded requests, full private replies, queued reads/watch cleanup, recorded-waiter ownership and settled startup recovery reviewed; shutdown drains tracked work. Focused 42/42 both runtimes and fast 495/495, no processes left.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
