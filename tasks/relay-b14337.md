@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T10:31:49Z
+updated: 2026-10-12T10:33:58Z
 started: 2026-10-12T09:29:40Z
 depends: [relay-e889bc, ops-342668]
 parent: relay-f58531
@@ -38,3 +38,4 @@ step: "Task 12: The CLI surface: rows in ops, adoption, and wiring"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T10:31:49Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12f71-1e6b-75e2-86ea-0d3e6f283caf","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T10:33:58Z (design/typed-messages): Reviewed ops source landed on default b2e3f1646e29c04d8833ec32e4d2e76b661f35bd; chose this compatible snapshot after comparing all relay rows against existing commands plus Task12/F27 additions. Paired vendored adopt --at b2e3f1646e29c04d8833ec32e4d2e76b661f35bd cli.toml cli_surface.py completed; adoption and all implementation will be one relay commit. Ops gate 1461 OK skipped1, task done on branch then ff-only merged; own ops worktree harvested/checked/unlocked/removed, branch kept.
