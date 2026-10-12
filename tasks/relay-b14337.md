@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T09:36:37Z
+updated: 2026-10-12T09:41:17Z
 started: 2026-10-12T09:29:40Z
 depends: [relay-e889bc, ops-342668]
 parent: relay-f58531
@@ -27,3 +27,5 @@ step: "Task 12: The CLI surface: rows in ops, adoption, and wiring"
 - 2026-10-12T09:36:36Z (design/typed-messages): Phase A source commit ops 8ba6f2d in ops .worktrees/relay-cli-rows is ready for controller independent source review. Ops focused 18 tests and test-fast 1461 tests pass skipped 1; ops just gate blocked by unrelated consumer vendored drift. No adoption or relay implementation started.
 - 2026-10-12T09:36:36Z (design/typed-messages): parked (waiting on agent, dependency): Controller: independently review ops-342668 source in ops .worktrees/relay-cli-rows, settle ops gate dependency and rerun gate before integration; then resume this worker for Task 12 Phase B in .worktrees/typed-messages using reviewed landed compatible ops snapshot.
   provenance: {"harness_session":"codex:01a12f71-1e6b-75e2-86ea-0d3e6f283caf","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T09:41:17Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
