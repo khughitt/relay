@@ -45,6 +45,10 @@ setup_cmd := "just work-link .worktrees && npm ci && attr -s com.dropbox.ignored
 test-fast:
     {{tt}} test-fast -- sh -c '{{fast_cmd}}'
 
+# One test file or pattern: the inner loop while writing it. Recorded like the others.
+test-one *args:
+    {{tt}} test-one -- node --test {{args}}
+
 # The full suite.
 test:
     {{tt}} test -- sh -c '{{test_cmd}}'
