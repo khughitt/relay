@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T09:30:19Z
+updated: 2026-10-12T09:32:12Z
 started: 2026-10-12T09:29:40Z
 depends: [relay-e889bc, ops-342668]
 parent: relay-f58531
@@ -22,3 +22,4 @@ step: "Task 12: The CLI surface: rows in ops, adoption, and wiring"
 
 - 2026-10-12T09:29:40Z (design/typed-messages): started
   provenance: {"harness_session":"codex:01a12f71-1e6b-75e2-86ea-0d3e6f283caf","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T09:32:12Z (design/typed-messages): Ruling F27: add matching inbox parent metadata with summary Manage questions and notices in the inbox to source table and relay COMMANDS; bare or unknown inbox remains usage exit 2. Shared parent validation unchanged.
