@@ -107,3 +107,14 @@ test('ask preserves hook passthrough on missing service and malformed input', as
   assert.deepEqual([bad.status, bad.stdout], [0, '']);
   assert.match(bad.stderr, /INVALID_INPUT/);
 });
+
+test('ask configuration failures pass through while invalid argv still exits 2', async (t) => {
+  const p = await tempState(t), env = { RELAY_STATE_DIR: 'relative-path' };
+  for (const flags of [[], ['--json']]) {
+    const r = runCli(p, [...flags, 'ask', '--harness', 'claude-code', 'PreToolUse'], preInput(), env);
+    assert.deepEqual([r.status, r.stdout], [0, '']);
+    assert.match(r.stderr, /^relay ask: INVALID_INPUT: expected absolute directory\n$/);
+  }
+  const invalid = runCli(p, ['ask', '--harness', 'claude-code', 'Stop'], preInput(), env);
+  assert.equal(invalid.status, 2, invalid.stderr);
+});

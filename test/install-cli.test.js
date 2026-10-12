@@ -110,3 +110,31 @@ test('install --with is restricted to ask on claude-code', async (t) => {
     assert.equal(s.run(args).status, 2, args.join(' '));
   }
 });
+
+test('Claude version failures emit only the formatted install error', async (t) => {
+  const s = await askInstall(t), before = await readFile(s.target, 'utf8');
+  await writeFile(s.claude, '#!/bin/sh\nprintf "%s\\n" "raw version failure" >&2\nexit 3\n', { mode: 0o700 });
+  const failed = s.run();
+  assert.equal(failed.status, 1);
+  assert.equal(failed.stdout, '');
+  assert.doesNotThrow(() => JSON.parse(failed.stderr));
+  const error = JSON.parse(failed.stderr).error;
+  assert.equal(error.kind, 'install_failed');
+  assert.match(error.detail, /^HARNESS_UNAVAILABLE/);
+  assert.doesNotMatch(failed.stderr, /raw version failure/);
+  const pretty = s.run(['--pretty', ...s.args]);
+  assert.equal(pretty.status, 1);
+  assert.match(pretty.stderr, /^relay: HARNESS_UNAVAILABLE: [^\n]+\n$/);
+  assert.doesNotMatch(pretty.stderr, /raw version failure/);
+  assert.equal(await readFile(s.target, 'utf8'), before);
+});
+
+test('successful Claude version checks do not leak subprocess stderr', async (t) => {
+  const s = await askInstall(t), before = await readFile(s.target, 'utf8');
+  await writeFile(s.claude, '#!/bin/sh\nprintf "%s\\n" "raw version success" >&2\nprintf "%s\\n" "2.1.296 (Claude Code)"\n', { mode: 0o700 });
+  const success = s.run();
+  assert.equal(success.status, 0, success.stderr);
+  assert.equal(success.stderr, '');
+  assert.equal(JSON.parse(success.stdout).harness, 'claude-code');
+  assert.equal(await readFile(s.target, 'utf8'), before);
+});

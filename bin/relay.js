@@ -144,9 +144,14 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
       const handback = tail[0] === '--handback';
       if (handback) tail.shift();
       if (tail.length !== 1 || !['PreToolUse', 'PostToolUse'].includes(tail[0])) throw usage('ask requires [--handback] then exactly one EVENT: PreToolUse or PostToolUse');
-      const r = await runAsk({ nativeEvent: tail[0], handback, stdin, socketPath: servePaths(paths().stateDir).socketPath });
-      await emit(stdout, r.stdout); await emit(stderr, r.stderr);
-      return r.exitCode;
+      try {
+        const r = await runAsk({ nativeEvent: tail[0], handback, stdin, socketPath: servePaths(paths().stateDir).socketPath });
+        await emit(stdout, r.stdout); await emit(stderr, r.stderr);
+        return r.exitCode;
+      } catch (error) {
+        await emit(stderr, `relay ask: ${error?.code ?? 'ERROR'}: ${error?.message ?? String(error)}\n`);
+        return 0;
+      }
     }
     if (cmd.path[0] === 'inbox') {
       const action = cmd.path[1], args = [], f = flags(rest, cmd, args);
@@ -184,7 +189,7 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
       const relayBin = realpathSync(process.argv[1]); let artifact;
       let installedVersion;
       if (withAsk) {
-        try { installedVersion = execFileSync('claude', ['--version'], { encoding: 'utf8', timeout: 10000 }).trim().split(/\s+/, 1)[0]; }
+        try { installedVersion = execFileSync('claude', ['--version'], { encoding: 'utf8', timeout: 10000, stdio: 'pipe' }).trim().split(/\s+/, 1)[0]; }
         catch (error) { throw relayError('HARNESS_UNAVAILABLE', 'cannot read the installed Claude Code version', error); }
       }
       if (harness === 'claude-code') artifact = (await import('../src/install/claude-code.js')).planClaudeCode({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin: process.execPath, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'], withAsk, installedVersion });
