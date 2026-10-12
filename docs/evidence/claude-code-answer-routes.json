@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "harness": "claude-code",
+  "version": "2.1.296",
+  "probes": [],
+  "routes": [
+    {
+      "name": "answer-hook-terminal",
+      "passed": true,
+      "note": "One PreToolUse fired and returned allow after 30 s with Square; terminal replied CHOSEN=Square (rechecks hq-d85ede)."
+    },
+    {
+      "name": "answer-hook-deny-stops",
+      "passed": true,
+      "note": "Deny returned after 5 s; no chosen label or second PreToolUse through 124.714 s after denial; terminal returned to prompt (rechecks hq-d85ede)."
+    },
+    {
+      "name": "answer-release-native",
+      "passed": true,
+      "note": "Release exited with no decision after 120 s; native question observed 92 ms later; Down, Enter selected Square and terminal replied CHOSEN=Square."
+    },
+    {
+      "name": "answer-receipt-observed",
+      "passed": true,
+      "note": "Matching Pre/PostToolUse tool_use_id and tool_response.answers mapping question text to Square in both cases; hook-answer return-to-receipt 52 ms, native release return-to-receipt 658 ms."
+    },
+    {
+      "name": "answer-hook-under-denial",
+      "passed": true,
+      "note": "awaited: blocking answer hook returned allow 120094 ms after immediate deny; denial won; PostToolUse did not fire; no chosen label."
+    }
+  ]
+}
