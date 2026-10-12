@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-12T00:40:45Z
-updated: 2026-10-12T00:40:45Z
+updated: 2026-10-12T01:04:03Z
 depends: []
 tags: [tooling]
 agent: claude-code/claude-opus-5-5
@@ -25,3 +25,7 @@ Approach (settled 2026-10-11 in the relay-f58531 session):
 Done: just check runs tsc and passes on main; every src/ and bin/ file is checked; AGENTS.md states the dependency rule; the Node 22 gate still passes.
 
 Ordering with relay-f58531: independent. If it lands before that plan's Task 2, the plan's new modules carry JSDoc types from the start; if after, it types them with the rest.
+
+## Notes
+
+- 2026-10-12T01:04:03Z (main): piece of ops-a66936 (type-check every JS/TS project); this is the pilot: its tsconfig and check_cmd line inform ops-17cd42, which fam, forge and prism wait on
