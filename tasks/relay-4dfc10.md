@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-12T11:53:25Z
+updated: 2026-10-12T11:53:37Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -23,3 +23,5 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-12T11:46:49Z (design/typed-messages): started
   provenance: {"harness_session":"codex:01a12fee-d4d1-7122-802a-3f3052597ba3","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T11:53:25Z (design/typed-messages): Task14 preparation only: private scratch /mnt/ssd3/tmp/relay-task14-iqxnxjxr; settings artifact generated and applied with existing installer, ask-only Pre/Post hooks verified; Claude2.1.296 matches evidence; Serve8443 unset and 127.0.0.1:3341 available at read-only preflight. No live session/service/auth/exposure or host pointer. Report .worktrees/typed-messages/.superpowers/sdd/2026-10-11-typed-interaction-messages/task-14-prep-report.md; exact proposed commands/environment in scratch acceptance-commands.md and environment.sh. Controller must finish wholebranchreview before asking person phone readiness and explicit Serveapproval.
+- 2026-10-12T11:53:37Z (design/typed-messages): parked (waiting on agent, review): Controller: finish whole-branch review, then ask person for phone readiness and explicit Serve8443 approval; inspect .worktrees/typed-messages/.superpowers/sdd/2026-10-11-typed-interaction-messages/task-14-prep-report.md and /mnt/ssd3/tmp/relay-task14-iqxnxjxr/acceptance-commands.md, resume relay-4dfc10 in .worktrees/typed-messages, recheck version/ports and private auth/isolation, then run live acceptance. No services or host pointers active.
+  provenance: {"harness_session":"codex:01a12fee-d4d1-7122-802a-3f3052597ba3","harness_session_source":"CODEX_THREAD_ID"}
