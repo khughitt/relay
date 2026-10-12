@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T11:04:50Z
+updated: 2026-10-12T11:05:29Z
 started: 2026-10-12T09:29:40Z
 depends: [relay-e889bc, ops-342668]
 parent: relay-f58531
@@ -51,3 +51,5 @@ step: "Task 12: The CLI surface: rows in ops, adoption, and wiring"
   provenance: {"harness_session":"codex:01a12f71-1e6b-75e2-86ea-0d3e6f283caf","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T11:00:23Z (design/typed-messages): Fix round 1 root causes verified: I1 paths() evaluates outside the runAsk catch; valid argv plus relative state dir exits 1. I2 Node execFileSync implementation auto-writes captured child stderr when options.stdio is absent, leaking success diagnostics and corrupting failure JSON. F29/F30 govern the minimal wrapper boundary/capture fixes; regression tests added before code changes.
 - 2026-10-12T11:04:50Z (design/typed-messages): Fix round 1 I1/I2 implemented with minimal CLI boundary changes. RED regressions on Node26 and Node22: 14 tests, 11 pass/3 expected failures. GREEN Node26 ask6/6 + install8/8; Node22 paired14/14. Serial test-fast on both runtimes 571/571, no skips/failures/cancellations. Scoped test-filter infrastructure failures are preserved separately and filed as ops-f17995; not counted as RED. Self-review: argv errors remain outside ask runtime catch; execFileSync stdio pipe suppresses raw stderr while HARNESS_UNAVAILABLE retains JSON/pretty formatting.
+- 2026-10-12T11:05:29Z (design/typed-messages): parked (waiting on agent): Controller: run fresh scoped review of fix round 1 from 1577cdfec7eb55f0de02dfeec27389ea1733915b through 3ee56e40497f53b1906346c0f5e1924d9c31c0ef in .worktrees/typed-messages for I1 ask runtime passthrough and I2 version subprocess stderr capture; use task-12-report.md fix evidence, resume worker for any new Important/Critical finding, then close after acceptance.
+  provenance: {"harness_session":"codex:01a12f71-1e6b-75e2-86ea-0d3e6f283caf","harness_session_source":"CODEX_THREAD_ID"}
