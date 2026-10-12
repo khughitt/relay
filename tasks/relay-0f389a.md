@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:45Z
-updated: 2026-10-12T02:46:28Z
+updated: 2026-10-12T02:51:10Z
 started: 2026-10-12T02:29:51Z
 depends: []
 parent: relay-f58531
@@ -27,3 +27,4 @@ step: "Task 1: Live probes P1, P2 and P3, and the route evidence record"
   provenance: {"harness_session":"codex:01a12df0-75d9-70e0-b67d-9c928255e991","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T02:46:28Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T02:51:10Z (design/typed-messages): review: impl round 1 — verdict: accept; findings: Minor 1; reviewer: codex/gpt-6.1-sol
