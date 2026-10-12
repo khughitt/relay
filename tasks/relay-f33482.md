@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:53Z
-updated: 2026-10-12T06:18:34Z
+updated: 2026-10-12T06:25:16Z
 started: 2026-10-12T06:18:34Z
 depends: [relay-e1ec53]
 parent: relay-f58531
@@ -21,4 +21,6 @@ step: "Task 10: Desk commands: inbox and presence"
 ## Notes
 
 - 2026-10-12T06:18:34Z (design/typed-messages): started
+  provenance: {"harness_session":"codex:01a12ec2-f0ff-7b00-8436-c3f448956733","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T06:25:16Z (design/typed-messages): parked (waiting on agent, review): Controller reviews commit 1d5f1a5; after review, resolve findings and verify Task 10 release.
   provenance: {"harness_session":"codex:01a12ec2-f0ff-7b00-8436-c3f448956733","harness_session_source":"CODEX_THREAD_ID"}
