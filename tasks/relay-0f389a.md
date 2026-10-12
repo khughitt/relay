@@ -1,15 +1,16 @@
 ---
 id: relay-0f389a
 title: "Live probes P1, P2 and P3, and the route evidence record"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:45Z
-updated: 2026-10-12T02:51:10Z
+updated: 2026-10-12T02:51:11Z
 started: 2026-10-12T02:29:51Z
+completed: 2026-10-12T02:51:10Z
 depends: []
 parent: relay-f58531
 tags: []
@@ -28,3 +29,7 @@ step: "Task 1: Live probes P1, P2 and P3, and the route evidence record"
 - 2026-10-12T02:46:28Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T02:51:10Z (design/typed-messages): review: impl round 1 — verdict: accept; findings: Minor 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T02:51:10Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T02:51:10Z (design/typed-messages): Live Claude 2.1.296 probes and independent review passed: hook answer, deny-stop, native release and receipt; P3 awaited blocking hook under deny. Node26 and Node22 fast suites 352/352. Minor CLI missing-value validation deferred in SDD ledger.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
