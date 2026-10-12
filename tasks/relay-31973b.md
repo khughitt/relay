@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:55Z
-updated: 2026-10-12T11:32:32Z
+updated: 2026-10-12T11:33:33Z
 started: 2026-10-12T11:11:22Z
 depends: [relay-b14337]
 parent: relay-f58531
@@ -29,3 +29,5 @@ step: "Task 13: Documentation, packaging and the Node 22 floor"
 - 2026-10-12T11:27:19Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T11:32:32Z (design/typed-messages): review: impl round 1 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T11:33:33Z (design/typed-messages): parked (waiting on agent): Original Task13 worker corrects Important disclosure mismatch against retained raw logs: first570/571, retry569/571 two distinct failures; correct report, append superseding task evidence and corrective commit-body record, no runtime edits or suite reruns, then park for fresh scoped review.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
