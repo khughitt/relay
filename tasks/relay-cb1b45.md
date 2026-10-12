@@ -1,15 +1,16 @@
 ---
 id: relay-cb1b45
 title: Message schema and validators
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:45Z
-updated: 2026-10-12T03:05:52Z
+updated: 2026-10-12T03:05:53Z
 started: 2026-10-12T02:52:36Z
+completed: 2026-10-12T03:05:52Z
 depends: [relay-0f389a]
 parent: relay-f58531
 tags: []
@@ -37,3 +38,7 @@ step: "Task 2: Message schema and validators"
 - 2026-10-12T03:05:51Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T03:05:52Z (design/typed-messages): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T03:05:52Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T03:05:52Z (design/typed-messages): Message schema, normalized validators, answer cross-field checks and focused test front door landed; independent re-review accepted Unicode and nil UUID corrections. Focused 13/13 on Node22/26 and fast 365/365.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
