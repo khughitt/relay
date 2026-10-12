@@ -1,15 +1,16 @@
 ---
 id: relay-1e92bf
 title: "HTTP surface, tailnet guard and event stream"
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:51Z
-updated: 2026-10-12T05:52:37Z
+updated: 2026-10-12T05:52:54Z
 started: 2026-10-12T05:25:23Z
+completed: 2026-10-12T05:52:54Z
 depends: [relay-aa889d]
 parent: relay-f58531
 tags: []
@@ -28,3 +29,7 @@ step: "Task 8: HTTP surface, tailnet guard and event stream"
 - 2026-10-12T05:51:01Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T05:52:37Z (design/typed-messages): review: impl round 1 — verdict: accept; findings: Minor 1; reviewer: codex/gpt-6-astra
+- 2026-10-12T05:52:54Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T05:52:54Z (design/typed-messages): Implemented guarded loopback HTTP, readonly static/agents, queued reads and SSE with owned shutdown. Independent spec and quality review accepted; HTTP 27/27 and full 522/522 on Node 22 and 26. Existing timing flake tracked relay-ef98dc; live tailnet acceptance remains Task 14.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
