@@ -1,15 +1,16 @@
 ---
 id: relay-31973b
 title: "Documentation, packaging and the Node 22 floor"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:55Z
-updated: 2026-10-12T11:40:46Z
+updated: 2026-10-12T11:40:47Z
 started: 2026-10-12T11:11:22Z
+completed: 2026-10-12T11:40:47Z
 depends: [relay-b14337]
 parent: relay-f58531
 tags: []
@@ -39,3 +40,7 @@ step: "Task 13: Documentation, packaging and the Node 22 floor"
 - 2026-10-12T11:37:41Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T11:40:46Z (design/typed-messages): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-12T11:40:47Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T11:40:47Z (design/typed-messages): Documented actual message/entry/socket/HTTP/CLI contracts, operator runbook, installed schema/runbook packaging; no new root exports. Both literal Node26/22 gates571/571, pack1/1 and authorized serializedfast571/571. Explicit corrected disclosure: first defaultfast570/571, retry569/571 two failures; history superseded by b287c80 and fresh scoped review accepted. Default runner reliability unresolved, feedback retained; Task14 acceptance pending.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
