@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:48Z
-updated: 2026-10-12T04:08:40Z
+updated: 2026-10-12T04:11:31Z
 started: 2026-10-12T03:55:10Z
 depends: [relay-dc8efd]
 parent: relay-f58531
@@ -31,4 +31,6 @@ step: "Task 5: The inbox: serialized operations, supersession, presence, clock"
 - 2026-10-12T04:08:18Z (design/typed-messages): parked (waiting on agent): Implementer task_5: fix before-write/new-entry expiry and timestamp race in .worktrees/typed-messages, return RED/GREEN covering evidence then park for controller scoped re-review
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T04:08:40Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12e3f-8270-7031-8d3b-602ac6af6dee","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T04:11:31Z (design/typed-messages): parked (waiting on agent): Controller: scoped re-review Important I1/F17 fix 68a341d in .worktrees/typed-messages, then close Task 5 if accepted
   provenance: {"harness_session":"codex:01a12e3f-8270-7031-8d3b-602ac6af6dee","harness_session_source":"CODEX_THREAD_ID"}
