@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-12T11:57:31Z
-updated: 2026-10-12T12:00:14Z
+updated: 2026-10-12T12:00:15Z
 depends: []
 parent: relay-f58531
 tags: []
@@ -20,3 +20,4 @@ Whole-branch review found three Important gaps before overall close: preserve wi
 ## Notes
 
 - 2026-10-12T12:00:14Z (design/typed-messages): concerns: relay-b14337 defect — final CLI conflict formatting discarded the saved winning answer, surface and time retained by the desk runner.
+- 2026-10-12T12:00:15Z (design/typed-messages): concerns: relay-dc8efd defect — initialization fsynced a fixed parent list and missed recursively created state ancestors, leaving acknowledged durability incomplete.
