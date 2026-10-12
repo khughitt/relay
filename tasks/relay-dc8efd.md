@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:47Z
-updated: 2026-10-12T03:43:26Z
+updated: 2026-10-12T03:43:51Z
 started: 2026-10-12T03:30:41Z
 depends: [relay-1ad9ae]
 parent: relay-f58531
@@ -31,3 +31,5 @@ step: "Task 4: Durable inbox store"
 - 2026-10-12T03:43:25Z (design/typed-messages): Rulings F15/F16: enforce allowed frame/route/log keys in shared validateEntry at durable store boundary, reject before allocation and quarantine invalid saved bytes; fsync parents of newly created private directories before publishing store. Cross-task validator edit is necessary to enforce store privacy once, without a duplicate store whitelist.
 - 2026-10-12T03:43:25Z (design/typed-messages): parked (waiting on agent): Implementer task_4: fix store review privacy and initial-directory durability gaps in .worktrees/typed-messages, return covering RED/GREEN evidence, then park for controller scoped re-review
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T03:43:51Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12e28-9857-75f0-8e97-2fc2d4eecd09","harness_session_source":"CODEX_THREAD_ID"}
