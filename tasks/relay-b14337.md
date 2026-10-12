@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T10:58:24Z
+updated: 2026-10-12T11:00:23Z
 started: 2026-10-12T09:29:40Z
 depends: [relay-e889bc, ops-342668]
 parent: relay-f58531
@@ -49,3 +49,4 @@ step: "Task 12: The CLI surface: rows in ops, adoption, and wiring"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T10:58:24Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12f71-1e6b-75e2-86ea-0d3e6f283caf","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T11:00:23Z (design/typed-messages): Fix round 1 root causes verified: I1 paths() evaluates outside the runAsk catch; valid argv plus relative state dir exits 1. I2 Node execFileSync implementation auto-writes captured child stderr when options.stdio is absent, leaking success diagnostics and corrupting failure JSON. F29/F30 govern the minimal wrapper boundary/capture fixes; regression tests added before code changes.
