@@ -10,13 +10,18 @@ export const WITHDRAWAL_REASONS = Object.freeze(['asker', 'user', 'asker-gone', 
 
 const HARNESSES = ['claude-code', 'codex', 'opencode'];
 const ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const fail = (message) => { throw relayError('INVALID_MESSAGE', message); };
 const bad = (message) => { throw relayError('INVALID_ANSWER', message); };
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const uuid = (v) => typeof v === 'string' && UUID.test(v);
 const ms = (v) => Number.isSafeInteger(v) && v >= 0;
-const str = (v, min, max) => typeof v === 'string' && v.length >= min && v.length <= max;
+const characters = (v) => Array.from(v).length;
+const str = (v, min, max) => {
+  if (typeof v !== 'string') return false;
+  const length = characters(v);
+  return length >= min && length <= max;
+};
 const orNull = (v, check) => v === null || check(v);
 const isId = (v) => typeof v === 'string' && ID.test(v);
 const unique = (ids, what) => { if (new Set(ids).size !== ids.length) fail(`duplicate ${what} id`); };
@@ -121,7 +126,7 @@ export function checkAnswer(q, a) {
   for (const item of q.items) {
     const v = a.values[item.id];
     if (item.type === 'boolean') { if (v.type !== 'boolean') bad(`${item.id} takes a boolean`); continue; }
-    if (item.type === 'text') { if (v.type !== 'text' || v.text.length > (item.maxLength ?? 2000)) bad(`${item.id} takes text within its limit`); continue; }
+    if (item.type === 'text') { if (v.type !== 'text' || characters(v.text) > (item.maxLength ?? 2000)) bad(`${item.id} takes text within its limit`); continue; }
     if (v.type === 'other') { if (!item.allowOther) bad(`${item.id} allows no other`); continue; }
     if (v.type !== 'choice' || (item.type === 'single' && v.optionIds.length !== 1)
         || !v.optionIds.every((id) => item.options.some((o) => o.id === id))) bad(`${item.id} takes options of its own`);

@@ -29,6 +29,25 @@ test('ids, parties and context are checked', () => {
   assert.deepEqual(validateMessage(questionMessage({ context: { project: '', taskId: null, cwd: '' } })).context,
     { project: '', taskId: null, cwd: '' });
 });
+test('schema string bounds count Unicode code points', () => {
+  const item = questionMessage().body.items[0];
+  const withHeader = (header) => questionMessage({ body: { items: [{ ...item, header }] } });
+  assert.ok(validateMessage(withHeader('😀'.repeat(9))));
+  invalid(withHeader('😀'.repeat(17)));
+});
+
+test('answer text maxLength counts Unicode code points', () => {
+  const item = questionMessage().body.items[0];
+  const q = questionMessage({ body: { items: [{ ...item, type: 'text', options: [], allowOther: false, maxLength: 1 }] } });
+  checkAnswer(q.body, answerMessage(q, { values: { q1: { type: 'text', text: '😀' } } }).body);
+  badAnswer(q, answerMessage(q, { values: { q1: { type: 'text', text: '😀😀' } } }).body);
+});
+test('UUID text accepts the nil UUID and still rejects malformed values', () => {
+  const nil = '00000000-0000-0000-0000-000000000000';
+  assert.equal(validateMessage(questionMessage({ id: nil })).id, nil);
+  const malformed = '00000000-0000-0000-0000-00000000000g';
+  invalid({ ...questionMessage(), id: malformed, correlationId: malformed });
+});
 test('items: 1 to 4, unique ids, option counts by type, limits', () => {
   const item = questionMessage().body.items[0];
   const withItems = (items) => questionMessage({ body: { items } });
