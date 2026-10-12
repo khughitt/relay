@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:54Z
-updated: 2026-10-12T09:41:17Z
+updated: 2026-10-12T09:43:32Z
 started: 2026-10-12T09:29:40Z
 depends: [relay-e889bc, ops-342668]
 parent: relay-f58531
@@ -29,3 +29,4 @@ step: "Task 12: The CLI surface: rows in ops, adoption, and wiring"
   provenance: {"harness_session":"codex:01a12f71-1e6b-75e2-86ea-0d3e6f283caf","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T09:41:17Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-12T09:43:32Z (design/typed-messages): Ops source review accepted (ops-342668), focused18/18 and full1461 OK skipped1. Integration stopped on unrelated global vendored drift. Prepared two-file mm patch changes only timing-wrapper version/provenance comments plus tools README; user approval requested for this action outside plan repositories. No mm changes, ops merge or relay adoption/wiring yet.
