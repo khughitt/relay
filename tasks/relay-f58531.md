@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-13T10:03:48Z
+updated: 2026-10-13T10:18:49Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -135,4 +135,6 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-13T10:01:43Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T10:03:48Z (design/typed-messages): parked (waiting on user, review): User: create fresh final test question in isolated Claude and report waiting; controller: run desk withdrawal, verify denial/no-reask, restore temporary Serve8443 from http://127.0.0.1:3341 to none with /usr/bin/tailscale serve --https=8443 off, record/review acceptance and integrate. Cases1/2 passed; case3 not run. Tracked Node3313360 / exec5549, two-hour timeout; kill -TERM 3313360 stops service and removes mapping via trap. User-owned Claude PID2058061 remains open; /exit closes it.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T10:18:49Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
