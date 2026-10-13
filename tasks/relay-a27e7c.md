@@ -7,7 +7,7 @@ size: m
 complexity: high
 process: planned
 created: 2026-10-13T17:29:20Z
-updated: 2026-10-13T17:29:20Z
+updated: 2026-10-13T17:31:22Z
 depends: [relay-f58531]
 tags: []
 source: "relay-f58531:codex-question-connector"
@@ -21,3 +21,7 @@ Approach: start from the accepted typed-interaction spec section 9.3 and the exi
 Done: the connector maps native item/turn ids and stable option ids, delivers answers and confirms native receipt, supports defer to the native desktop, preserves first-answer-wins and idempotent retry, and rejects late answers after daemon recovery/re-ask. Meaningful unit/IPC checks pass through the front door on Node22 and the development runtime; installed-version evidence and a user-present phone answer/defer run are recorded, with temporary state/settings isolated and cleanup verified. No authorization semantics, new root library export or public-host exposure.
 
 Where: relay docs/specs/2026-10-11-typed-interaction-messages.md section 9.3, src/serve, src/routes, and hq answer-route facts; hq-25665e.
+
+## Notes
+
+- 2026-10-13T17:31:22Z (main): concerns: relay-f58531 extension — implement the specified Codex connector for the second-harness milestone.
