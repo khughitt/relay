@@ -12,6 +12,7 @@ import { expectAnswers } from '../src/routes/index.js';
 import { createProcessOps } from '../src/bus/proc.js';
 import { questionMessage, answerMessage, deferMessage, withdrawalMessage, noticeMessage, HANDLE, OTHER_HANDLE } from './helpers/interaction.js';
 import { EXPIRY_MS } from '../src/routes/claude-code.js';
+import { until, nextCall } from './helpers/wait.js';
 
 const waiterFile = new URL('./fixtures/socket-waiter.js', import.meta.url).pathname;
 async function setup(t, { io } = {}) {
@@ -93,8 +94,31 @@ test('watch replays since a seq and then pushes changes and presence', async (t)
   pushes.length = 0;
   await ctx.client.request('presence.set', { mode: 'here' });
   await ctx.client.request('withdraw', { message: { ...answerMessage(q), kind: 'withdrawal', body: { reason: 'user' } } });
-  await new Promise((r) => setTimeout(r, 50));
+  await watcher.request('presence.get'); // its reply follows every push the service sent before it
   assert.deepEqual(pushes.map((m) => m.type), ['presence', 'entry']);
+});
+// Spec §7.2: a watch resumes after its cursor. The cursor must exclude a non-terminal entry (kept)
+// and a terminal one (closed), each last changed at or before it; the replay is exactly the newer
+// entries in order, pushed before the watch reply, and live changes follow.
+test('watch resumes after its cursor, replaying exactly the newer entries before live ones', async (t) => {
+  const ctx = await setup(t), { inbox } = ctx;
+  const fresh = () => questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000 } });
+  const ask = (q) => inbox.ask(q, { handback: false, waiter: HANDLE });
+  const older = fresh(), kept = fresh(), closed = fresh(), later = fresh();
+  await ask(older); await ask(kept); await ask(closed); await inbox.withdraw(closed.id, withdrawalMessage(closed));
+  const mark = inbox.seq();
+  assert.deepEqual([inbox.get(older.id).seq, inbox.get(kept.id).seq, inbox.get(closed.id).seq], [1, 2, mark]);
+  await ask(later); await inbox.answer(older.id, answerMessage(older));
+  const watcher = await connectSocket(ctx.socketPath); t.after(() => watcher.close());
+  const pushes = []; watcher.onPush((m) => { if (m.type === 'entry') pushes.push([m.entry.seq, m.entry.id, m.entry.state]); });
+  const watching = await watcher.request('watch', { since: mark });
+  assert.deepEqual([watching.ok, watching.seq], [true, mark + 2]);
+  assert.deepEqual(pushes, [[mark + 1, later.id, 'pending'], [mark + 2, older.id, 'answered']]);
+  await inbox.withdraw(later.id, withdrawalMessage(later));
+  await watcher.request('presence.get'); // its reply follows every push the service sent before it
+  assert.deepEqual(pushes.slice(2), [[mark + 3, later.id, 'withdrawn']]);
+  const listed = await ctx.client.request('list', { since: mark });
+  assert.deepEqual(listed.entries.map((e) => [e.seq, e.id]), [[2, kept.id], [mark + 2, older.id], [mark + 3, later.id]]);
 });
 test('watch refuses a present cursor that is not a nonnegative safe integer, and the connection can still watch', async (t) => {
   const ctx = await setup(t), baseline = ctx.inbox.subscribers();

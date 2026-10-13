@@ -13,7 +13,8 @@ import { serveHttp } from '../src/serve/http.js';
 import { classify } from '../src/serve/guard.js';
 import { serveConfig } from '../src/serve/config.js';
 import { expectAnswers } from '../src/routes/index.js';
-import { questionMessage, withdrawalMessage, HANDLE, uuid } from './helpers/interaction.js';
+import { questionMessage, answerMessage, withdrawalMessage, HANDLE, uuid } from './helpers/interaction.js';
+import { until, nextCall, turn } from './helpers/wait.js';
 
 const LOGIN = 'me@example.com', HOST = 'desk.tail1234.ts.net';
 async function setup(t, { clientDir = null, serveHost = HOST, now = Date.now, io, question = {}, readAgents = async () => ({ agents: {} }) } = {}) {
@@ -123,30 +124,50 @@ test('an event stream closed while its registration is queued leaves no listener
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(inbox.subscribers(), baseline);
 });
-test('events: Last-Event-ID replays newer entries, then streams', { timeout: 10000 }, async (t) => {
-  const { port, q, inbox } = await setup(t), mark = inbox.seq(), events = [];
-  const req = http.request({ host: '127.0.0.1', port, path: '/v1/events', headers: { ...phone, 'last-event-id': String(mark - 1) }, agent: false });
-  t.after(() => req.destroy());
-  let first, done;
-  const replay = new Promise((r) => { first = r; }), streamed = new Promise((r) => { done = r; });
+// An SSE client that keeps every entry event it receives, as [id, entry id, state].
+function eventStream(t, port, { path = '/v1/events', headers = {} } = {}) {
+  const events = [], req = http.request({ host: '127.0.0.1', port, path, headers: { ...phone, ...headers }, agent: false });
+  t.after(() => req.destroy()); req.on('error', () => {});
   req.on('response', (res) => {
     assert.equal(res.headers['content-type'], 'text/event-stream'); res.setEncoding('utf8');
     let data = '';
     res.on('data', (chunk) => {
       data += chunk;
-      let end;
-      while ((end = data.indexOf('\n\n')) !== -1) {
+      for (let end = data.indexOf('\n\n'); end !== -1; end = data.indexOf('\n\n')) {
         const block = data.slice(0, end); data = data.slice(end + 2);
-        if (block.startsWith('id:')) events.push(Number(/^id: (\d+)/.exec(block)[1]));
+        const fields = Object.fromEntries(block.split('\n').filter((line) => !line.startsWith(':')).map((line) => [line.slice(0, line.indexOf(': ')), line.slice(line.indexOf(': ') + 2)]));
+        if (fields.event !== 'entry') continue;
+        const entry = JSON.parse(fields.data);
+        assert.equal(Number(fields.id), entry.seq);
+        events.push([entry.seq, entry.id, entry.state]);
       }
-      if (events.length >= 1) first();
-      if (events.length >= 2) { req.destroy(); done(); }
     });
   });
-  req.end(); await replay;
-  await inbox.withdraw(q.id, withdrawalMessage(q)); await streamed;
-  assert.deepEqual(events, [mark, mark + 1]);
-});
+  req.end();
+  return { events, count: (n) => until(() => events.length >= n, { what: `${n} events on ${path}` }) };
+}
+// Spec §7.3 and acceptance 5: a resumed stream replays exactly the entries changed after its cursor,
+// in order, then streams live changes. The cursor must exclude a non-terminal entry (kept) and a
+// terminal one (closed), each last changed at or before it.
+for (const [how, cursor] of [['Last-Event-ID', (mark) => ({ headers: { 'last-event-id': String(mark) } })], ['?since=', (mark) => ({ path: `/v1/events?since=${mark}` })]]) {
+  test(`events: ${how} resumes after its cursor, replaying exactly the newer entries before live ones`, { timeout: 15000 }, async (t) => {
+    const { port, q: older, inbox } = await setup(t);
+    const fresh = () => questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000 } });
+    const ask = (q) => inbox.ask(q, { handback: false, waiter: HANDLE });
+    const kept = fresh(), closed = fresh(), later = fresh();
+    await ask(kept); await ask(closed); await inbox.withdraw(closed.id, withdrawalMessage(closed));
+    const mark = inbox.seq();
+    assert.deepEqual([inbox.get(older.id).seq, inbox.get(kept.id).seq, inbox.get(closed.id).seq], [1, 2, mark]);
+    await ask(later); await inbox.answer(older.id, answerMessage(older));
+    const stream = eventStream(t, port, cursor(mark));
+    await stream.count(2); // the replay is written in the same queued step that subscribes the stream
+    await inbox.withdraw(later.id, withdrawalMessage(later));
+    await stream.count(3);
+    assert.deepEqual(stream.events, [[mark + 1, later.id, 'pending'], [mark + 2, older.id, 'answered'], [mark + 3, later.id, 'withdrawn']]);
+    const listed = await call(port, { path: `/v1/inbox?since=${mark}`, headers: phone });
+    assert.deepEqual(listed.json.entries.map((e) => [e.seq, e.id]), [[2, kept.id], [mark + 2, older.id], [mark + 3, later.id]]);
+  });
+}
 
 test('configuration rejects lone, empty, malformed and explicitly invalid values before creating state', async (t) => {
   for (const env of [{ RELAY_SERVE_HOST: HOST }, { RELAY_SERVE_LOGIN: LOGIN }]) {
