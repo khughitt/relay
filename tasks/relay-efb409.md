@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-13T11:02:03Z
-updated: 2026-10-13T11:07:04Z
+updated: 2026-10-13T11:10:48Z
 started: 2026-10-13T11:03:42Z
 depends: []
 parent: relay-f58531
@@ -25,3 +25,5 @@ After all three user-present acceptance cases passed and the Task14 record was i
   provenance: {"harness_session":"codex:01a134ed-f2e1-7850-8120-0f399d750326","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T11:07:04Z (design/typed-messages): parked (waiting on agent): Controller: independently review commit 2b54ded in .worktrees/typed-messages, then close relay-efb409 on this branch before parent integration.
   provenance: {"harness_session":"codex:01a134ed-f2e1-7850-8120-0f399d750326","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T11:10:48Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
