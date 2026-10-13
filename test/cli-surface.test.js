@@ -146,3 +146,25 @@ test('every command without a declared output row emits one JSON value under --j
   assert.equal(withdrawn.stdout, '');
   assert.match(JSON.parse(withdrawn.stderr).error.detail, /^ANSWERED/);
 });
+
+// Protocol rows speak the harness's hook protocol: stdout is the reply and the exit code is
+// the harness's. RELAY_FORMAT selects relay's own output format, which they never print, so a
+// value outside json|pretty must not turn a hook into an exit-2 usage error (Claude Code
+// blocks the tool on a PreToolUse exit 2).
+test('protocol rows ignore RELAY_FORMAT', (t) => {
+  const { subscribers } = fixture(t);
+  const pre = JSON.stringify({ session_id: 's', cwd: '/tmp', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'ls' } });
+  const ask = JSON.stringify({ session_id: 's', cwd: '/tmp', hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', tool_use_id: 'toolu_fmt',
+    tool_input: { questions: [{ question: 'Which?', header: 'Pick', multiSelect: false, options: [{ label: 'A' }, { label: 'B' }] }] } });
+  const cases = {
+    hook: [['hook', '--harness', 'claude-code', '--subscribers', subscribers, 'PreToolUse'], pre],
+    ask: [['ask', '--harness', 'claude-code', '--handback', 'PreToolUse'], ask],
+  };
+  assert.deepEqual(COMMANDS.filter((cmd) => cmd.protocol).map((cmd) => cmd.path.join(' ')).sort(), Object.keys(cases).sort());
+  for (const [name, [args, input]] of Object.entries(cases)) {
+    const plain = run(args, {}, input), odd = run(args, { RELAY_FORMAT: 'yaml' }, input);
+    assert.equal(plain.status, 0, `${name}: ${plain.stderr}`);
+    assert.deepEqual([odd.status, odd.stdout], [plain.status, plain.stdout], `${name}: ${odd.stderr}`);
+    assert.doesNotMatch(odd.stderr, /RELAY_FORMAT/, name);
+  }
+});

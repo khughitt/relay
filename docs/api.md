@@ -427,7 +427,8 @@ The CLI's commands are `relay list`, `relay reap [--outer-ms N]`,
 `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--evidence FILE]
 [--retire familiar] [--apply --artifact FILE]`, and `relay rollback --artifact FILE`; `relay --help`,
 `relay help [<command>]`, `relay <command> --help`, and `relay --version` round it out. `--json` and
-`--pretty` are global and mutually exclusive, `RELAY_FORMAT` sets the default, and `install` is JSON
+`--pretty` are global and mutually exclusive, `RELAY_FORMAT` sets the default (the protocol rows
+`hook` and `ask` ignore it, since they print only the harness reply), and `install` is JSON
 by default (its value is the installation artifact). Each hook command it writes runs
 relay.js through the installer's own node (`process.execPath`, absolute and quoted), because a
 harness launched from the macOS GUI inherits launchd's `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`),

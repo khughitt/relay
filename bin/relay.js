@@ -96,7 +96,9 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     if (cmdName === 'inbox' && !(rest.length === 1 && hasHelp(rest))) throw usage('inbox requires one of list, show, answer, defer, withdraw');
     if (hasHelp(rest)) { await emit(stdout, helpText(cmd)); return 0; }
 
-    const resolved = resolveMode(flagMode, process.env, cmd, usage);
+    // Protocol rows (hook, ask) print only the harness reply, so RELAY_FORMAT does not apply:
+    // reading it would turn a bad value into an exit-2 usage error, which blocks the tool.
+    const resolved = cmd.protocol ? { mode: flagMode ?? 'pretty', silent: false } : resolveMode(flagMode, process.env, cmd, usage);
     mode = resolved.mode;
     const { silent } = resolved;
 
