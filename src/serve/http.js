@@ -13,10 +13,11 @@ const json = (res, status, value) => {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(value));
 };
 const fail = (res, status, code, message, extra = {}) => json(res, status, { error: { code, message }, ...extra });
-// A sequence cursor in a query or header: a present value that is not a nonnegative safe integer is refused.
+// A sequence cursor in a query or header is plain decimal text: Number() alone would read '' as 0
+// and '0x10' or '1e3' as other sequences. Any other present value is refused.
 function sequence(text, name) {
-  const value = Number(text);
-  if (!Number.isSafeInteger(value) || value < 0) throw relayError('INVALID_INPUT', `${name} must be a nonnegative sequence`);
+  const value = /^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : NaN;
+  if (!Number.isSafeInteger(value)) throw relayError('INVALID_INPUT', `${name} must be a nonnegative sequence`);
   return value;
 }
 async function readBody(req) {

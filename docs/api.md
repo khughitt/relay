@@ -697,7 +697,7 @@ case are significant. Mutation JSON bodies are capped at 64 KiB in bytes.
 
 | Method and path | Request / response |
 | --- | --- |
-| `GET /v1/inbox?since=<seq>` | `{seq,entries}`; same snapshot selection as socket list; invalid negative/noninteger since is 400. |
+| `GET /v1/inbox?since=<seq>` | `{seq,entries}`; same snapshot selection as socket list; a `since` that is not plain decimal digits (empty included) is 400 `INVALID_INPUT`. |
 | `GET /v1/inbox/<id>` | `{entry}`, including terminal entries; 404 if absent. |
 | `POST /v1/inbox/<id>/answer` | `AnswerBody`; 200 `{entry}`, or 409 `{error:{code,message},entry}` plus saved `answer`/expected `revision` when applicable. |
 | `POST /v1/inbox/<id>/defer` | `DeferBody`; same result shape. |

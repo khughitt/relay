@@ -260,7 +260,10 @@ test('an invalid SSE cursor is refused with 400 INVALID_INPUT instead of replayi
   const { port, inbox } = await setup(t), baseline = inbox.subscribers();
   for (const [path, headers] of [['/v1/events', { 'last-event-id': 'abc' }], ['/v1/events', { 'last-event-id': '-1' }],
     ['/v1/events', { 'last-event-id': '1.5' }], ['/v1/events?since=abc', {}], ['/v1/events?since=-2', {}],
-    ['/v1/events?since=0', { 'last-event-id': 'x' }]]) {
+    ['/v1/events?since=0', { 'last-event-id': 'x' }],
+    // Only plain decimal text is a cursor: Number() would read these as 0 or as another sequence.
+    ...['', ' ', '0x10', '1e3', '+5', '5.0', '01'].flatMap((text) => [['/v1/events', { 'last-event-id': text }],
+      [`/v1/events?since=${encodeURIComponent(text)}`, {}], [`/v1/inbox?since=${encodeURIComponent(text)}`, {}]])]) {
     const r = await call(port, { path, headers: { ...phone, ...headers } });
     assert.deepEqual([r.status, r.json?.error.code], [400, 'INVALID_INPUT'], `${path} ${JSON.stringify(headers)}`);
   }
