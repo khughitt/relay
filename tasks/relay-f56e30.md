@@ -4,8 +4,9 @@ title: The Codex adapter does not register SubagentStart/SubagentStop worker ide
 status: idea
 priority: 2
 created: 2026-10-06T17:25:24Z
-updated: 2026-10-06T17:25:24Z
+updated: 2026-10-13T01:33:54Z
 depends: []
+parent: relay-eaca0e
 tags: [feedback, gap, "from:tasks"]
 agent: codex
 ---
