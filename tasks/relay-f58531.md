@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-13T00:26:26Z
+updated: 2026-10-13T00:29:22Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -105,4 +105,6 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-12T12:33:48Z (design/typed-messages): parked (waiting on user, review): User approves Task14 phone/private-auth acceptance and temporary Serve8443 mapping; controller resumes relay-4dfc10, runs/records/restores and reviews acceptance, runs final integration gate, closes goal on branch and integrates locally. Tasks1–13 plus whole-branch corrective review complete; no child/check/process active. Branch/worktree and ledger retained.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T00:26:26Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T00:29:22Z (design/typed-messages): parked (waiting on user, review): User completes Task14 private Claude sign-in; controller resumes relay-4dfc10, verifies isolation, guides service/phone answer/defer/withdraw acceptance, restores mapping/processes, records/reviews results and finishes integration. Preflight passed; no service, mapping or check is running.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
