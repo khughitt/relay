@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T00:45:35Z
+updated: 2026-10-13T00:47:11Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -39,3 +39,5 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T00:42:31Z (design/typed-messages): User completed private sign-in; clean env auth status confirms loggedIn true with claude.ai (no inherited API key). Explicit settings contain only ask Pre/Post, private user hook/plugin settings absent and local managed configs absent. Continue the guided run and previously proposed temporary Serve8443 mapping; runtime hook isolation still checked when Claude starts.
 - 2026-10-13T00:43:22Z (design/typed-messages): host pointer: Tailscale Serve HTTPS8443, from none, to http://127.0.0.1:3341; activated for the user-requested guided acceptance. Restore: /usr/bin/tailscale serve --https=8443 off. Tracked service PID1892784, exec session1227, 1h timeout with cleanup trap; private state only, presence away. Keep this live pointer visible until restore; no global settings or launchers changed.
 - 2026-10-13T00:45:35Z (design/typed-messages): Local tailnet HTTPS inbox GET returned200 with seq0/entries empty after activation. Await actual phone GET; local success is not phone acceptance. Live pointer remains ServeHTTPS8443 none->127.0.0.1:3341, restore tailscale serve --https=8443 off; tracked NodePID1892784/session1227, timeout3600 and cleanup trap removes mapping on service exit. User-requested guided session intentionally retains this temporary endpoint across the next human interaction.
+- 2026-10-13T00:47:11Z (design/typed-messages): parked (waiting on user, review): User opens https://<tailnet-host>:8443/v1/inbox on the phone and reports JSON/error plus curl availability; controller resumes for the three live cases and restoration. LIVE approved test pointer: ServeHTTPS8443 from none to127.0.0.1:3341, restore tailscale serve --https=8443 off. Tracked NodePID1892784/session1227, 1h timeout; kill -TERM1892784 stops service and cleanup trap removes mapping. Private Claude sign-in verified; no live question yet.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
