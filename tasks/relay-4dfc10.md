@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T10:47:18Z
+updated: 2026-10-13T10:48:22Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -85,3 +85,5 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T10:43:57Z (design/typed-messages): Case3 PASS: human supplies last actual Claude output: PreToolUse AskUserQuestion hook error says question withdrawn by user, do not wait for answer; Claude final says hook withdrew question and no choice to report. Combined with durable withdrawn(user), hook exit and60041ms no new inbox question, all three live cases now pass. User explicitly authorizes autonomous continuation while AFK4-5h. Private human confirmation/checkpoint saved; service/mapping remain stopped. Remaining controller-owned record, independent read-only review, checks and personal local integration.
 - 2026-10-13T10:47:18Z (design/typed-messages): parked (waiting on agent): Implementation handoff to Task14 record worker: start/arm child, write evidence-derived acceptance runbook, verify/commit and return report; controller then generates review package, dispatches read-only reviewer, closes Task14 after acceptance and runs integration gate. All three actual live cases passed; test services/mapping stopped/restored. Private evidence retained.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T10:48:22Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a134e0-343a-71d0-b791-7b788547f6ca","harness_session_source":"CODEX_THREAD_ID"}
