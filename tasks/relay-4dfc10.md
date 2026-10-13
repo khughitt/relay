@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-12T12:33:47Z
+updated: 2026-10-13T00:26:27Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -28,4 +28,6 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-12T12:27:35Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-12T12:33:47Z (design/typed-messages): parked (waiting on user, review): User confirms phone readiness and approves temporary tailscale serve --bg --https=8443 http://127.0.0.1:3341 with restore --https=8443 off; controller rechecks versions/ports, guides private Claude sign-in and hook isolation, runs tracked service plus three phone/native cases, restores all live state, records/reviews acceptance and runs integration gate.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T00:26:27Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
