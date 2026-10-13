@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/typed-messages-review
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T18:31:24Z
+updated: 2026-10-13T18:50:54Z
 started: 2026-10-13T18:30:55Z
 depends: []
 tags: []
@@ -44,3 +44,4 @@ Where: src/serve/inbox.js, src/serve/socket.js, src/serve/http.js, src/interacti
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-13T18:31:24Z (fix/typed-messages-review): resumed
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T18:50:54Z (fix/typed-messages-review): uuid case: refuse uppercase with INVALID_MESSAGE (not normalize), for every interaction UUID field (id, correlationId, supersedes, answerId); normalizing would change the sender's id and break resent-message identity. One lowercase rule (message.js isUuid) now backs validateMessage and validateEntry; schema uuid def gains the same pattern.
