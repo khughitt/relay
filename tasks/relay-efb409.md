@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-13T11:02:03Z
-updated: 2026-10-13T11:11:26Z
+updated: 2026-10-13T18:26:16Z
 started: 2026-10-13T11:03:42Z
 completed: 2026-10-13T11:11:26Z
 depends: []
@@ -34,3 +34,4 @@ After all three user-present acceptance cases passed and the Task14 record was i
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T11:11:26Z (design/typed-messages): Updated five acceptance status paragraphs across README, API, accepted spec and approved plan with completed live-record links and current576-test file-concurrency1 disclosure. Exact edits and links independently reviewed C0 I0 M0; both focused pack checks1/1, just check/tasks checks clean. Docs-only2b54ded; all runtime/release gates preserved.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T18:26:16Z (main): history: commit 2b54ded cited in the 11:07:04Z park note is now 0ed3fd3 after the 2026-10-13 hostname-redaction rewrite (see relay-f58531)
