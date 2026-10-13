@@ -1,15 +1,16 @@
 ---
 id: relay-f58531
 title: "Design typed interaction messages: envelope, question, answer and notice kinds, a durable inbox with expiry and withdrawal, and remote delivery over the tailnet"
-status: doing
+status: done
 priority: 2
 size: l
 complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-13T10:43:54Z
+updated: 2026-10-13T11:11:27Z
 started: 2026-10-11T20:39:50Z
+completed: 2026-10-13T11:11:27Z
 depends: [hq-d85ede]
 tags: [cross-project]
 agent: claude-code/claude-fable-5-1
@@ -141,4 +142,8 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-13T10:22:33Z (design/typed-messages): parked (waiting on user, review): User: confirm Claude final withdrawal response and no re-ask; controller: finish Task14 record/review, required integration gates, task/goal closure on branch and personal local integration. All server-side live checks done; final human terminal observation missing. Service3313360/exec5549 and re-ask check stopped/reaped; Serve8443 restored to none, no host pointer or agent check remains. User-owned isolated Claude PID2058061 idle; /exit closes it. Prior reviewed source and deferred-minor ledger retained.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T10:43:54Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T11:11:27Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T11:11:27Z (design/typed-messages): Reviewed spec and plan implemented through all14 independently reviewed tasks, plus accepted documentation status closeout. Claude2.1.296 actual Android tailnet phone answer consumed/native Square, phone defer released/native Square, desk withdrawal withdrawn(user)/denial and60041ms no new question; all human-confirmed, recorded7e55fca. Final whole-source review Important3 fixed658e342 and scoped re-review accepted; no open Critical/Important. Current full Node26 and Node22 suites576/576 with disclosed file-concurrency1, packchecks1/1 both; default fixture timing/markers and known subscriber leak remain tracked. All test services/hooks/isolated Claude and owned leaked fixture stopped/reaped, temporary8443mapping removed, real state/settings unchanged. Final decision/review evidence retained; personal local integration follows, external publication separate.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
