@@ -6,9 +6,9 @@ priority: 2
 size: m
 complexity: mid
 process: direct
-owner: main
+owner: fix/typed-messages-review
 created: 2026-10-13T18:16:05Z
-updated: 2026-10-13T18:30:55Z
+updated: 2026-10-13T18:31:25Z
 started: 2026-10-13T18:30:55Z
 depends: []
 tags: [testing]
@@ -53,4 +53,6 @@ Related: relay-a7aea1, relay-ef98dc, relay-fc28a4, relay-7c134c, relay-4d07f6.
 
 - 2026-10-13T18:16:27Z (main): concerns: relay-f58531 defect — spec acceptance 2 and 5 coverage missing; timing-dependent assertions under default concurrency
 - 2026-10-13T18:30:55Z (main): started
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T18:31:25Z (fix/typed-messages-review): resumed
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
