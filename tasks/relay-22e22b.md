@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/typed-messages-review
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T20:04:46Z
+updated: 2026-10-13T20:08:09Z
 started: 2026-10-13T18:30:55Z
 depends: []
 tags: []
@@ -52,3 +52,4 @@ Where: src/serve/inbox.js, src/serve/socket.js, src/serve/http.js, src/interacti
 - 2026-10-13T19:03:05Z (fix/typed-messages-review): ancestor sync: rule implemented is 'sync an ancestor iff its child on the chain is owned by the current uid AND the ancestor is writable by that uid (stat mode bits: owner/group/other, root always), plus always the state dir and inbox root'; nothing is caught. This refines the brief's 'sync only owned ancestors' because the link of a relay-created dir lives in its PARENT: owned-only would leave unsynced a dir relay creates inside another user's writable dir (sticky /tmp-style, group-shared), breaking F35; child-owned alone would still open root's 0711 /home. Uses io.stat (follows symlinks, like open). Known limit: ACL-only write grants are judged by mode bits. If owned-only is preferred, it is a one-line filter change plus dropping the foreign-writable guard test.
 - 2026-10-13T20:02:34Z (fix/typed-messages-review): review: impl round 1 — verdict: revise; findings: Important 1, Minor 3; reviewer: claude-code
 - 2026-10-13T20:04:46Z (fix/typed-messages-review): minor (deferred): undeliverable on hook reattach, upgrade effect on persisted state, doc nits -> relay-0811af
+- 2026-10-13T20:08:09Z (fix/typed-messages-review): review: impl round 2 — verdict: accept; findings: Minor 3; reviewer: claude-code
