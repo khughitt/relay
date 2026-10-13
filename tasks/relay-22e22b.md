@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T18:15:49Z
+updated: 2026-10-13T18:16:26Z
 depends: []
 tags: []
 source: "review:89cdecb"
@@ -34,3 +34,7 @@ Done:
 - `just test-fast` passes on Node 22 and the dev runtime.
 
 Where: src/serve/inbox.js, src/serve/socket.js, src/serve/http.js, src/interaction/lifecycle.js, src/interaction/message.js, src/interaction/store.js, docs/specs/2026-10-11-typed-interaction-messages.md, docs/api.md.
+
+## Notes
+
+- 2026-10-13T18:16:26Z (main): concerns: relay-f58531 defect — spec §5.4 expiry clamp unimplemented plus inbox lifecycle and validation gaps
