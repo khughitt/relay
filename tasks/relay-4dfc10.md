@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T10:49:31Z
+updated: 2026-10-13T10:51:56Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -88,3 +88,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T10:48:22Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a134e0-343a-71d0-b791-7b788547f6ca","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T10:49:31Z (design/typed-messages): Task14 acceptance record derived from named private entries and summaries: all three live outcomes corroborated, creation offsets separated from answer-save timings, withdrawal bounded to 60041ms; documentation only, no new live calls or runtime changes.
+- 2026-10-13T10:51:56Z (design/typed-messages): Task14 record checks on Node26.5.0: just test-one test/pack.test.js passed 1/1; authorized F32 timeout 300s just --set fast_cmd 'node --test --test-concurrency=1 test/*.test.js integrations/opencode/*.test.mjs' test-fast passed 576/576, no failures/skips (94958.594957ms). Raw logs in ignored task-14-pack.log and task-14-test-fast.log. Updated controller checkpoint confirms isolated Claude stopped; Node22 integration gate remains controller-owned.
