@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T00:39:56Z
+updated: 2026-10-13T00:42:31Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -36,3 +36,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T00:39:56Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T00:42:31Z (design/typed-messages): User completed private sign-in; clean env auth status confirms loggedIn true with claude.ai (no inherited API key). Explicit settings contain only ask Pre/Post, private user hook/plugin settings absent and local managed configs absent. Continue the guided run and previously proposed temporary Serve8443 mapping; runtime hook isolation still checked when Claude starts.
