@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T01:55:39Z
+updated: 2026-10-13T01:55:40Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -67,3 +67,5 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T01:45:18Z (design/typed-messages): parked (waiting on user, review): User: POST defer for the second question from Android Termux, select Square in Claude native question, and report phone response plus Claude reply; controller: verify released/native observation and transition timing, then guide fresh desk withdrawal and record acceptance. Approved Serve HTTPS8443 remains from none to http://127.0.0.1:3341; restore /usr/bin/tailscale serve --https=8443 off. Tracked Node PID 2071814 / exec session 7732, two-hour timeout; kill -TERM 2071814 stops service and trap removes mapping. Case 1 passed; case 2 pending.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T01:55:39Z (design/typed-messages): Case 2 PASS: human phone defer HTTP200; actual point read released with native observed Square and terminal observation/history; human confirms chosen=square. Times relative creation: pending5ms, defer/released426066ms, native-answer512091ms (86025ms after defer includes manual selection). Cases 1 and 2 private evidence/checkpoint saved; case 3 not run. User requests pause while AFK ~6h. Cleanup complete: Serve HTTPS8443 restored from http://127.0.0.1:3341 to none, existing HTTPS443 retained; verified Node2071814 SIGTERMed/reaped, exec7732 exit0, /proc absent, port3341 closed, owned marker removed. User-owned Claude terminal idle PID2058061 remains open; /exit closes it. No agent check/service remains running.
+- 2026-10-13T01:55:39Z (design/typed-messages): parked (waiting on user, review): User: return and confirm readiness for the withdrawal case after AFK; controller: restart same private state with two-hour tracked cleanup and renew approved Serve8443 mapping, guide fresh question and desk withdrawal, verify denial/no-reask, restore and dispatch acceptance record/review. Cases 1 and 2 passed; case 3 not run. Test service stopped/reaped and temporary Serve8443 restored to none; no host pointer into worktree remains. Private checkpoint and auth/state retained. User-owned isolated Claude terminal idle PID2058061 may remain open; /exit closes it.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
