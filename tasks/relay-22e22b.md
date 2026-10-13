@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/typed-messages-review
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T20:08:09Z
+updated: 2026-10-13T20:08:10Z
 started: 2026-10-13T18:30:55Z
 depends: []
 tags: []
@@ -53,3 +53,4 @@ Where: src/serve/inbox.js, src/serve/socket.js, src/serve/http.js, src/interacti
 - 2026-10-13T20:02:34Z (fix/typed-messages-review): review: impl round 1 — verdict: revise; findings: Important 1, Minor 3; reviewer: claude-code
 - 2026-10-13T20:04:46Z (fix/typed-messages-review): minor (deferred): undeliverable on hook reattach, upgrade effect on persisted state, doc nits -> relay-0811af
 - 2026-10-13T20:08:09Z (fix/typed-messages-review): review: impl round 2 — verdict: accept; findings: Minor 3; reviewer: claude-code
+- 2026-10-13T20:08:10Z (fix/typed-messages-review): minor (deferred): api.md /v1/inbox cursor wording (leading zeros, safe-integer bound) and commit-message CLI comparison; refusal test should list /v1/inbox cases first so a regression names its input; duplicate ' ' header case -> relay-0811af
