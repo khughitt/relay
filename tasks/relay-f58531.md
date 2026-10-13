@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-13T10:22:33Z
+updated: 2026-10-13T10:43:54Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -139,4 +139,6 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-13T10:18:49Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T10:22:33Z (design/typed-messages): parked (waiting on user, review): User: confirm Claude final withdrawal response and no re-ask; controller: finish Task14 record/review, required integration gates, task/goal closure on branch and personal local integration. All server-side live checks done; final human terminal observation missing. Service3313360/exec5549 and re-ask check stopped/reaped; Serve8443 restored to none, no host pointer or agent check remains. User-owned isolated Claude PID2058061 idle; /exit closes it. Prior reviewed source and deferred-minor ledger retained.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T10:43:54Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
