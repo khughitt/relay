@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-13T18:16:05Z
-updated: 2026-10-13T18:16:05Z
+updated: 2026-10-13T18:16:27Z
 depends: []
 tags: [testing]
 source: "review:89cdecb"
@@ -46,3 +46,7 @@ Done:
 - Five consecutive default-concurrency `just test-fast` runs pass on Node 22 and on the dev runtime, and none leaves a fixture process.
 
 Related: relay-a7aea1, relay-ef98dc, relay-fc28a4, relay-7c134c, relay-4d07f6.
+
+## Notes
+
+- 2026-10-13T18:16:27Z (main): concerns: relay-f58531 defect — spec acceptance 2 and 5 coverage missing; timing-dependent assertions under default concurrency
