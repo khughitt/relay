@@ -737,8 +737,9 @@ The [capability record](evidence/claude-code-answer-routes.json) has five passin
 for Claude Code 2.1.296. Installation requires terminal-answer and deny-stops rows;
 receipt gates PostToolUse, release enables handback, and under-denial gates nothing.
 An upgraded/unknown version needs new [probes](runbooks/answer-route-probes.md) before
-installation. This is local implementation evidence: the user-present tailnet acceptance
-(Task 14 / spec acceptance 7) is still pending. No live hook is installed by this package.
+installation. The user-present tailnet [acceptance run](runbooks/inbox-e2e-2026-10.md)
+(Task 14 / spec acceptance 7) passed phone answer, phone defer and desk withdrawal
+with this version. No live hook is installed by this package.
 
 Interaction error codes (ordinary errors carry `code`, with optional internal cause):
 

@@ -1,8 +1,9 @@
 # Typed interaction messages: envelope, kinds, inbox and remote delivery
 
 Status: accepted after spec review round 3 (relay-f58531, under ops-cb50a8).
-Implementation Tasks 1–12 are independently reviewed; documentation and runtime gates
-are Task 13. Task 14 (user-present tailnet acceptance 7) remains pending.
+Implementation Tasks 1–14 are complete and independently reviewed. The user-present
+tailnet acceptance (spec acceptance 7) passed phone answer, phone defer and desk
+withdrawal; see the [run record](../runbooks/inbox-e2e-2026-10.md).
 
 ## 1. Decision and scope
 
