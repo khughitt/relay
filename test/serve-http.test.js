@@ -14,9 +14,13 @@ import { classify } from '../src/serve/guard.js';
 import { serveConfig } from '../src/serve/config.js';
 import { expectAnswers } from '../src/routes/index.js';
 import { questionMessage, answerMessage, withdrawalMessage, HANDLE, uuid } from './helpers/interaction.js';
-import { until, nextCall, turn } from './helpers/wait.js';
+import { until, nextCall, settledYet, turn } from './helpers/wait.js';
 
 const LOGIN = 'me@example.com', HOST = 'desk.tail1234.ts.net';
+// How long close() may take before a test calls it retained. Node holds a connection with an
+// incomplete request until its headers timeout (60 s, checked every 30 s), so this still separates a
+// retained connection from a prompt close, without failing a close that a loaded host made slow.
+const CLOSE_DEADLINE_MS = 5000;
 async function setup(t, { clientDir = null, serveHost = HOST, now = Date.now, io, question = {}, readAgents = async () => ({ agents: {} }) } = {}) {
   const p = await tempState(t);
   const { inbox } = await openInbox({ stateDir: p.stateDir, clock: now, expectAnswers, ...(io ? { io } : {}) });
@@ -117,12 +121,14 @@ test('an event stream closed while its registration is queued leaves no listener
   await hit;
   const req = http.request({ host: '127.0.0.1', port, path: '/v1/events', headers: phone, agent: false });
   t.after(() => req.destroy()); req.on('error', () => {});
+  // The response arrives after the service flushed its headers and queued the registration.
   const registered = new Promise((resolve) => req.on('response', () => resolve())); req.end();
+  // The HTTP surface shows nothing when it sees the close, so 30 ms only favours the close-while-queued
+  // path; the assertion below holds on either path and waits for it.
   try { await registered; req.destroy(); await new Promise((r) => setTimeout(r, 30)); }
   finally { paused.release(); }
   await withdrawing; await inbox.idle();
-  await new Promise((r) => setTimeout(r, 20));
-  assert.equal(inbox.subscribers(), baseline);
+  await until(() => inbox.subscribers() === baseline, { what: 'the closed stream to leave no listener' });
 });
 // An SSE client that keeps every entry event it receives, as [id, entry id, state].
 function eventStream(t, port, { path = '/v1/events', headers = {} } = {}) {
@@ -285,9 +291,12 @@ test('point GET waits for a queued supersession to commit both entries', { timeo
   const reached = paused.pause(), replacing = inbox.ask(replacement, { handback: false, waiter: HANDLE });
   await reached;
   let finished = false;
+  const read = nextCall(inbox, 'snapshot');
   const pending = call(port, { path: `/v1/inbox/${q.id}`, headers: phone }).then((r) => { finished = true; return r; });
-  try { await new Promise((r) => setTimeout(r, 40)); assert.equal(finished, false); }
-  finally { paused.release(); }
+  try {
+    const { result } = await read; // the GET has reached the inbox, behind the half-committed supersession
+    assert.equal(await settledYet(result), false); assert.equal(finished, false);
+  } finally { paused.release(); }
   await replacing;
   assert.equal((await pending).json.entry.state, 'withdrawn');
 });
@@ -297,12 +306,13 @@ test('close ends SSE and drains an accepted write before returning; repeated clo
   const { port, q, inbox, srv } = await setup(t, { io: paused.io });
   const req = http.request({ host: '127.0.0.1', port, path: '/v1/events', headers: phone, agent: false });
   t.after(() => req.destroy()); req.on('error', () => {});
-  const streaming = new Promise((resolve) => req.on('response', (res) => { res.resume(); resolve(); })); req.end(); await streaming;
+  let ended; const streamEnded = new Promise((resolve) => { ended = resolve; });
+  const streaming = new Promise((resolve) => req.on('response', (res) => { res.once('end', ended); res.resume(); resolve(); })); req.end(); await streaming;
   const reached = paused.pause();
   const answering = call(port, { method: 'POST', path: `/v1/inbox/${q.id}/answer`, headers: { ...phone, origin: `https://${HOST}` }, body: answerBody() });
   await reached;
   let closed = false; const closing = srv.close().then(() => { closed = true; });
-  try { await new Promise((r) => setTimeout(r, 30)); assert.equal(closed, false); }
+  try { await streamEnded; await turn(); await turn(); assert.equal(closed, false); } // close has ended the stream, and still waits for the write
   finally { paused.release(); }
   assert.equal((await answering).status, 200); await closing; await srv.close();
   assert.equal(inbox.subscribers(), 0); assert.equal(inbox.get(q.id).state, 'answered');
@@ -310,9 +320,15 @@ test('close ends SSE and drains an accepted write before returning; repeated clo
 
 test('close releases a half-written request without a mutation', { timeout: 10000 }, async (t) => {
   const { port, inbox, srv } = await setup(t);
-  const req = http.request({ host: '127.0.0.1', port, method: 'PUT', path: '/v1/presence', headers: { ...phone, origin: `https://${HOST}`, 'content-type': 'application/json' }, agent: false });
-  t.after(() => req.destroy()); req.on('error', () => {}); req.write('{');
-  await new Promise((r) => setTimeout(r, 30)); await srv.close();
+  const req = http.request({ host: '127.0.0.1', port, method: 'PUT', path: '/v1/presence',
+    headers: { ...phone, origin: `https://${HOST}`, 'content-type': 'application/json', expect: '100-continue' }, agent: false });
+  t.after(() => req.destroy()); req.on('error', () => {});
+  // The service answers 100 Continue as it dispatches the request, so it is reading the body when it closes.
+  const reading = new Promise((resolve) => req.once('continue', resolve)); req.flushHeaders();
+  await reading; req.write('{');
+  const closed = srv.close(); let timer;
+  try { await Promise.race([closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained a half-written request')), CLOSE_DEADLINE_MS); })]); }
+  finally { clearTimeout(timer); req.destroy(); await closed; }
   assert.equal(inbox.presence().mode, 'away');
 });
 
@@ -360,7 +376,7 @@ test('close owns TCP connections even before a complete HTTP request arrives', {
   const closed = srv.close();
   // On failure release the connections immediately rather than trapping the teardown.
   let timer;
-  try { await Promise.race([closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained an incomplete connection')), 200); })]); }
+  try { await Promise.race([closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained an incomplete connection')), CLOSE_DEADLINE_MS); })]); }
   finally { clearTimeout(timer); for (const socket of sockets) socket.destroy(); await closed; }
 });
 
@@ -409,12 +425,13 @@ test('close drains a complete request before disposing its incomplete pipelined 
   const disconnected = new Promise((r) => socket.once('close', r));
   let data = ''; socket.on('data', (chunk) => { data += chunk; });
   await new Promise((r) => socket.once('connect', r));
+  const read = nextCall(inbox, 'snapshot');
   socket.write(`GET /v1/inbox/${q.id} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: keep-alive\r\n\r\nGET /v1/inbox HTTP/1.1\r\nHost:`);
-  await new Promise((r) => setTimeout(r, 30));
+  await read; await turn(); // the first request is parsed and waits in the inbox queue; its successor is still incomplete
   const closing = srv.close(); let timer;
   try {
     paused.release(); await withdrawing;
-    await Promise.race([closing, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained an incomplete pipelined request')), 200); })]);
+    await Promise.race([closing, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained an incomplete pipelined request')), CLOSE_DEADLINE_MS); })]);
     await disconnected;
     assert.match(data, /HTTP\/1\.1 200/); assert.match(data, /"state":"withdrawn"/); assert.match(data, /\r\n0\r\n\r\n$/);
   } finally { clearTimeout(timer); paused.release(); socket.destroy(); await closing; }

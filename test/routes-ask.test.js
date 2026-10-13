@@ -13,6 +13,7 @@ import { tempState } from './helpers/fixture.js';
 import { spawnLines } from './helpers/spawn-lines.js';
 import { connectSocket } from '../src/serve/client.js';
 import { uuid } from './helpers/interaction.js';
+import { until } from './helpers/wait.js';
 
 const worker = new URL('./fixtures/serve-worker.js', import.meta.url).pathname;
 const hook = new URL('./fixtures/ask-hook.js', import.meta.url).pathname;
@@ -120,8 +121,9 @@ test('a hook killed mid-wait withdraws its question', { timeout: 30000 }, async 
   await client.request('presence.set', { mode: 'away' });
   const h = runHook(t, p, 'PreToolUse', pre()), e = await entryFor(client);
   h.child.kill('SIGKILL'); await h.exited;
-  await new Promise((r) => setTimeout(r, 200));
-  assert.equal((await client.request('get', { id: e.id })).entry.withdrawal.reason, 'asker-gone');
+  const gone = await until(async () => { const { entry } = await client.request('get', { id: e.id }); return entry.state !== 'pending' && entry; },
+    { what: 'the service to handle the hook death' });
+  assert.deepEqual([gone.state, gone.withdrawal], ['withdrawn', { reason: 'asker-gone' }]);
 });
 for (const late of [false, true]) {
   test(`service crash between handed and its ack: the hook replies once after reattach (${late ? 'late' : 'early'})`, { timeout: 60000 }, async (t) => {

@@ -66,10 +66,13 @@ test('after a restart, a live waiter keeps its question and a dead one is withdr
   a.w.child.kill('SIGKILL'); await a.w.exited;
   dead.w.child.kill('SIGKILL'); await dead.w.exited;
   const b = await start(t, p, { REATTACH_MS: '200' });
-  await new Promise((r) => setTimeout(r, 800));
-  assert.equal((await b.client.request('get', { id: live.q.id })).entry.state, 'pending');
-  const gone = (await b.client.request('get', { id: dead.q.id })).entry;
+  const gone = await until(async () => { const { entry } = await b.client.request('get', { id: dead.q.id }); return entry.state !== 'pending' && entry; },
+    { what: 'the grace recheck to withdraw the dead waiter' });
   assert.deepEqual([gone.state, gone.withdrawal], ['withdrawn', { reason: 'asker-gone' }]);
+  // The recheck probes waiters in seq order, so the live one, asked first, was probed before the dead
+  // one was withdrawn.
+  const kept = (await b.client.request('get', { id: live.q.id })).entry;
+  assert.deepEqual([kept.state, kept.seq < gone.log[0].seq], ['pending', true]);
 });
 
 
@@ -97,8 +100,17 @@ test('clean shutdown preserves connected live waiters for restart', { timeout: 1
   assert.equal((await b.client.request('answer', { message: answerMessage(q) })).ok, true);
   await w.next((m) => m.type === 'state' && m.entry.state === 'answered');
   w.send('handed'); await w.next((m) => m.op === 'handed');
+  // A second question on the waiter's connection makes the service's handling of its death visible:
+  // the close handler reports each of the connection's askers gone, in the order asked, and only the
+  // sentinel's report changes anything.
+  const sentinel = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000,
+    native: { harness: 'claude-code', sessionId: 's1', callId: 'toolu_sentinel' } } });
+  const file = join(p.stateDir, `${sentinel.id}.msg.json`); await fs.writeFile(file, JSON.stringify(sentinel));
+  w.send(`ask ${file}`); assert.equal((await w.next((m) => m.op === 'ask-more')).ok, true);
   w.child.kill('SIGKILL'); await w.exited;
-  await new Promise((r) => setTimeout(r, 50));
+  const reported = await until(async () => { const { entry } = await b.client.request('get', { id: sentinel.id }); return entry.state !== 'pending' && entry; },
+    { what: 'the service to handle the waiter death' });
+  assert.deepEqual([reported.state, reported.withdrawal], ['withdrawn', { reason: 'asker-gone' }]);
   assert.equal((await b.client.request('get', { id: q.id })).entry.state, 'handed');
 });
 

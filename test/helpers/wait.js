@@ -29,3 +29,12 @@ export function nextCall(object, method, match = () => true) {
 
 // One full turn of the event loop: whatever I/O callback is running now has finished.
 export const turn = () => new Promise((resolve) => setImmediate(resolve));
+
+// Whether promise has settled, judged after one event-loop turn, so a promise that was already
+// resolved has had its callbacks run. For a negative check that something is still waiting.
+export async function settledYet(promise) {
+  let settled = false;
+  promise.then(() => { settled = true; }, () => { settled = true; });
+  await turn();
+  return settled;
+}
