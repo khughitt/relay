@@ -7,14 +7,14 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-13T18:16:14Z
-updated: 2026-10-13T18:16:27Z
+updated: 2026-10-13T18:26:01Z
 depends: []
 tags: []
-source: "review:89cdecb"
+source: "review:bc4ef2f"
 agent: claude-code/claude-opus-5-5
 ---
 
-Why: the post-merge review of 89cdecb (2026-10-13) found these doc, help and cleanup items. Each one was checked against the code.
+Why: the post-merge review of bc4ef2f (2026-10-13) found these doc, help and cleanup items. Each one was checked against the code.
 
 1. **Acceptance shown as pending.** docs/runbooks/inbox-service.md:4-6, which ships in the npm tarball, says the Task 14 acceptance "is still pending", and docs/api.md:474-478 lists "user-present tailnet acceptance" among the separate gates. Both contradict docs/api.md:738-742, the README, and the acceptance record docs/runbooks/inbox-e2e-2026-10.md. The relay-efb409 status update missed these two places.
 2. **"Always exits 0" is inaccurate.** The `ask` protocol text says "always exits 0" (src/commands.js:14, tools/cli.toml:2674, docs/api.md:715), but argv usage errors exit 2 (bin/relay.js). Say: "exits 0 on runtime failures; usage errors exit 2".
