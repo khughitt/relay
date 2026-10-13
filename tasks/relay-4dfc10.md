@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T01:37:40Z
+updated: 2026-10-13T01:41:02Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -59,3 +59,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T01:37:39Z (design/typed-messages): First actual live AskUserQuestion reached the phone inbox and host point read: state pending, presentation inbox, handback true, q1 o2 label Square. Private case-1-before.json and a fresh stable case-1-answer-request.json saved; controller has not POSTed from the desktop. User owns phone answer submission, then reporting Claude output. Original tracked service is 54 minutes into its one-hour timeout; renew only after this question finishes, never interrupt the pending handback.
 - 2026-10-13T01:37:40Z (design/typed-messages): parked (waiting on user, review): User: POST the prepared Square answer from Android Termux and report phone response plus Claude output; controller: collect consumed/native observation evidence, renew the isolated service between cases if necessary, then guide defer and withdrawal. Approved Serve HTTPS8443 remains from none to http://127.0.0.1:3341; restore /usr/bin/tailscale serve --https=8443 off. Tracked Node PID 1892784 / exec session 1227, original one-hour timeout (about five minutes left); kill -TERM 1892784 stops it and trap removes mapping. Actual question is pending; no answer submitted yet.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T01:41:02Z (design/typed-messages): Human requested longer than five minutes. Verified and SIGTERMed old owned Node PID 1892784; exec session 1227 exited 0 and its cleanup restored Serve HTTPS8443 to none. Restarted same private state and explicit worktree code under tracked two-hour timeout: Node PID 2071814, exec session 7732. Approved temporary host pointer restored from none to http://127.0.0.1:3341 on HTTPS8443; remove with /usr/bin/tailscale serve --https=8443 off. New supervisor traps EXIT/TERM/INT, kills/reaps Node and removes owned mapping. New stop command kill -TERM 2071814. User phone POST returned HTTP200 answered with surface phone during the renewal; verifying final state and waiter reconnect next.
