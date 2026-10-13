@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T01:15:01Z
+updated: 2026-10-13T01:28:53Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -53,3 +53,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T01:15:00Z (design/typed-messages): Phone curl readiness passed by human report: seq 0, entries empty. Host recheck HTTP 200; tracked service PID 1892784 alive after 31 minutes. Isolated Claude version rechecked 2.1.296 and private clean-environment auth loggedIn true via claude.ai. Scratch settings retain exactly two AskUserQuestion command hooks. Effective interactive hooks inspection and all three live cases remain pending.
 - 2026-10-13T01:15:01Z (design/typed-messages): parked (waiting on user, review): User: launch private Claude with prepared isolation flags, inspect /hooks and report configured commands; controller: confirm isolation, guide phone answer/defer and desk withdrawal, then record and clean up. Approved Serve HTTPS8443 remains from none to http://127.0.0.1:3341; restore /usr/bin/tailscale serve --https=8443 off. Tracked service Node PID 1892784, exec session 1227, one-hour timeout; kill -TERM 1892784 stops service and removes mapping via trap. Phone curl readiness passed; live question cases not yet run.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T01:28:53Z (design/typed-messages): Resolved missing /hooks display without changing settings: actual interactive argv/environment/trust verified; owned startup diagnostic reproduced empty menu then exited. Clean-env control API with identical flags confirms effective settings exactly match scratch file and lists exactly 2 enabled flagSettings AskUserQuestion hooks, all disabling policy flags false. Private evidence hooks-sdk-verification.json, 0 model prompts. Upstream open/closed issues/PRs, default/development branch names and main changelog searched; old related https://github.com/anthropics/claude-code/issues/8264 closed completed, no targeted current fix found. Feedback hq-da1015. No actual live question yet; actual inbox still seq 0 empty.
