@@ -7,16 +7,16 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-13T18:15:17Z
-updated: 2026-10-13T18:16:25Z
+updated: 2026-10-13T18:25:59Z
 depends: []
 tags: []
-source: "review:89cdecb"
+source: "review:bc4ef2f"
 agent: claude-code/claude-opus-5-5
 ---
 
-Why: `resolveMode` (src/commands.js:50-54) runs at bin/relay.js:93, before the `ask` and `hook` branches. When RELAY_FORMAT is anything other than json or pretty, it throws USAGE and both hook commands exit 2. Claude Code treats a PreToolUse exit 2 as a blocking error. So a stray RELAY_FORMAT blocks every AskUserQuestion under `relay ask`, whose contract is "exits 0 on its own runtime failures" (spec §9.1; ruling F29 moved socket-path errors under the passthrough boundary for the same reason). It also blocks every tool behind `relay hook`. The `hook` case predates 89cdecb.
+Why: `resolveMode` (src/commands.js:50-54) runs at bin/relay.js:93, before the `ask` and `hook` branches. When RELAY_FORMAT is anything other than json or pretty, it throws USAGE and both hook commands exit 2. Claude Code treats a PreToolUse exit 2 as a blocking error. So a stray RELAY_FORMAT blocks every AskUserQuestion under `relay ask`, whose contract is "exits 0 on its own runtime failures" (spec §9.1; ruling F29 moved socket-path errors under the passthrough boundary for the same reason). It also blocks every tool behind `relay hook`. The `hook` case predates bc4ef2f.
 
-Reproduced on main d770ced, 2026-10-13:
+Reproduced on main ac483e8, 2026-10-13:
 - `echo '{}' | RELAY_FORMAT=yaml node bin/relay.js ask --harness claude-code --handback PreToolUse` exits 2.
 - `echo '{}' | RELAY_FORMAT=yaml node bin/relay.js hook --harness claude-code PreToolUse` exits 2.
 
