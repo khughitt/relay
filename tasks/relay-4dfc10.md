@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T10:48:22Z
+updated: 2026-10-13T10:49:31Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -87,3 +87,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T10:48:22Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a134e0-343a-71d0-b791-7b788547f6ca","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T10:49:31Z (design/typed-messages): Task14 acceptance record derived from named private entries and summaries: all three live outcomes corroborated, creation offsets separated from answer-save timings, withdrawal bounded to 60041ms; documentation only, no new live calls or runtime changes.
