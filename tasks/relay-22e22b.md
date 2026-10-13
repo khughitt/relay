@@ -6,9 +6,9 @@ priority: 2
 size: m
 complexity: mid
 process: direct
-owner: main
+owner: fix/typed-messages-review
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T18:30:55Z
+updated: 2026-10-13T18:31:24Z
 started: 2026-10-13T18:30:55Z
 depends: []
 tags: []
@@ -41,4 +41,6 @@ Where: src/serve/inbox.js, src/serve/socket.js, src/serve/http.js, src/interacti
 
 - 2026-10-13T18:16:26Z (main): concerns: relay-f58531 defect — spec §5.4 expiry clamp unimplemented plus inbox lifecycle and validation gaps
 - 2026-10-13T18:30:55Z (main): started
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T18:31:24Z (fix/typed-messages-review): resumed
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
