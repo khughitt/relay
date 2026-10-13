@@ -59,8 +59,49 @@ test('defer: release with handback, desktop presentation without', () => {
   const d2 = step(L.applyDefer(d, second, T + 1));
   assert.equal(d2.messages.length, 2);
   assert.equal(L.applyDefer(d2, second, T + 2).changed, false);
-  const { q, e } = answered();
-  refused(L.applyDefer(e, deferMessage(q), T), 'ALREADY_ANSWERED');
+  const { q, a, e } = answered();
+  assert.deepEqual(refused(L.applyDefer(e, deferMessage(q), T), 'ALREADY_ANSWERED').error.answer, a);
+});
+// Spec §5.2, one row per (state, event): the entry is unchanged and the sender gets the code, with
+// the winning answer wherever one is saved.
+test('§5.2: every answer-holding state refuses another answerId, a defer and a withdrawal, returning the winner', () => {
+  const { q, a, e } = answered(), h = step(L.applyHanded(e, HANDLE, T));
+  const states = {
+    answered: e,
+    handed: h,
+    consumed: step(L.applyConfirm(h, { matches: true, observed: {} }, T + 1)),
+    unconfirmed: step(L.applyClock(h, T + L.CONFIRM_WINDOW_MS)),
+    undeliverable: step(L.applyAskerGone(e, T)),
+  };
+  assert.deepEqual(Object.keys(states).sort(), [...L.ANSWER_HOLDING].sort());
+  const events = [
+    ['another answerId', (entry) => L.applyAnswer(entry, answerMessage(q), T + L.CONFIRM_WINDOW_MS + 1), 'ALREADY_ANSWERED'],
+    ['a defer', (entry) => L.applyDefer(entry, deferMessage(q), T + L.CONFIRM_WINDOW_MS + 1), 'ALREADY_ANSWERED'],
+    ['a withdrawal', (entry) => L.applyWithdraw(entry, withdrawalMessage(q), T + L.CONFIRM_WINDOW_MS + 1), 'ANSWERED'],
+  ];
+  for (const [state, entry] of Object.entries(states)) {
+    assert.equal(entry.state, state);
+    for (const [event, apply, code] of events) {
+      const r = apply(entry), row = `${event} on ${state}`;
+      assert.deepEqual([r.changed, r.error?.code, r.entry], [false, code, entry], row);
+      assert.deepEqual(r.error.answer, a, `${row} returns the winning answer`);
+    }
+  }
+});
+test('§5.2: released, withdrawn and expired refuse an answer and a defer, naming the closure', () => {
+  const closures = {
+    released: ({ q, e }) => step(L.applyDefer(e, deferMessage(q), T)),
+    withdrawn: ({ q, e }) => step(L.applyWithdraw(e, withdrawalMessage(q), T)),
+    expired: ({ q, e }) => step(L.applyClock(e, q.body.expiresAt)),
+  };
+  for (const [state, close] of Object.entries(closures)) {
+    const s = fresh({ handback: true }), entry = close(s);
+    assert.equal(entry.state, state);
+    for (const [event, apply] of [['an answer', (x) => L.applyAnswer(x, answerMessage(s.q), T + 1)], ['a defer', (x) => L.applyDefer(x, deferMessage(s.q), T + 1)]]) {
+      const r = apply(entry);
+      assert.deepEqual([r.changed, r.error?.code, r.entry], [false, state.toUpperCase(), entry], `${event} on ${state}`);
+    }
+  }
 });
 test('withdrawal: pending withdraws, answered returns ANSWERED with the answer', () => {
   const { q, e } = fresh();
@@ -120,12 +161,27 @@ test('clock: expiry, window, deadlines, notices', () => {
   assert.equal(L.applyClock(e, q.body.expiresAt - 1).changed, false);
   assert.equal(L.nextDeadline(e), q.body.expiresAt);
   assert.equal(L.nextDeadline(handed().e), T + L.CONFIRM_WINDOW_MS);
-  assert.equal(L.nextDeadline(answered().e), null);
+  assert.equal(L.nextDeadline(answered().e), answered().e.question.body.expiresAt);
   const n = L.createNotice(noticeMessage(), { now: NOW });
   assert.equal(n.state, 'active'); assert.equal(L.isTerminal(n), false);
   const x = step(L.applyClock(n, n.notice.body.expiresAt));
   assert.equal(x.state, 'expired'); assert.equal(L.isTerminal(x), true);
   assert.equal(step(L.applySeen(n, T)).seen, true);
+});
+test('an answer no route took by expiresAt becomes undeliverable, keeps the answer and validates', () => {
+  const { a, e } = answered(), at = e.question.body.expiresAt;
+  assert.equal(L.applyClock(e, at - 1).changed, false);
+  const late = step(L.applyClock(e, at));
+  assert.deepEqual([late.state, late.answer, late.log.at(-1)], ['undeliverable', a, { seq: null, at, state: 'undeliverable', cause: 'expiry' }]);
+  assert.equal(L.nextDeadline(late), null);
+  assert.deepEqual(roundtrip(late), stamped(late));
+  const replay = L.applyAnswer(late, a, at + 1);
+  assert.deepEqual([replay.error, replay.changed], [null, false]);
+  const early = stamped(late);
+  early.log = early.log.map((l) => l.cause === 'expiry' ? { ...l, at: at - 1 } : l); early.updatedAt = at - 1;
+  assert.throws(() => L.validateEntry(early), { code: 'INVALID_ENTRY' });
+  const handedLate = step(L.applyHanded(e, HANDLE, T));
+  assert.equal(L.applyClock(handedLate, at).entry.state, 'unconfirmed');
 });
 test('validateEntry rejects inconsistent entries', () => {
   const { e } = answered();
@@ -277,6 +333,12 @@ test('derived persisted states require legal cause and state evidence', () => {
   }
 });
 
+test('persisted entries refuse uppercase UUID text, as messages do', () => {
+  const { e } = fresh(), by = questionMessage().id;
+  const superseded = stamped(step(L.applySuperseded(e, by, T)));
+  assert.equal(L.validateEntry(superseded).supersededBy, by);
+  assert.throws(() => L.validateEntry({ ...superseded, supersededBy: by.toUpperCase() }), { code: 'INVALID_ENTRY' });
+});
 test('sender withdrawals with special reasons always require their accepted envelopes', () => {
   for (const reason of ['asker-gone', 'superseded']) {
     const { q, e } = fresh();

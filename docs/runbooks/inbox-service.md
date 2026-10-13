@@ -87,6 +87,25 @@ relay install --harness claude-code --subscribers /path/to/subscribers.json --ta
 relay install --harness claude-code --subscribers /path/to/subscribers.json --target /path/to/settings.json --evidence docs/evidence/claude-code-answer-routes.json --with ask --apply --artifact /path/to/ask-install-applied.json
 ```
 
+`--evidence` names one record for the installed Claude Code version. The committed
+route record holds only the route rows (`probes: []`), which is enough while no guard
+subscriber matches PreToolUse. With a guard subscriber, the same record must also hold
+the passed dispatch probes for that version (`refuse` and `context` on PreToolUse at the
+installed budget, from the guard probe's evidence record). Combine the two records,
+refusing a harness or version mismatch, and pass the result as `--evidence`:
+
+```sh
+jq -s 'if .[0].harness != .[1].harness or .[0].version != .[1].version
+  then error("evidence records differ in harness or version")
+  else .[0] + {routes: .[1].routes} end' \
+  /path/to/dispatch-evidence.json docs/evidence/claude-code-answer-routes.json > /path/to/evidence.json
+```
+
+Every `relay install --harness claude-code` reconciles the route. Without `--with ask`
+the plan removes the relay `ask` entries installed before, and keeps the dispatch hooks.
+After a Claude Code upgrade, `--with ask` refuses until fresh route evidence is
+recorded; run the install without it to take the unprobed route out in the meantime.
+
 Run these from the checkout so the evidence path resolves. Apply with no live harness
 session after artifact inspection. The subscriber file must be a 0600 regular file
 in a privately owned 0700 directory. The route is supported only for Claude's
@@ -132,9 +151,13 @@ the rejection. Terminal entries older than 30 days are pruned separately, except
 predecessors referenced by nonterminal replacements.
 
 `STORE_FAILED` stops the service after a failed durable write; restart reconciles
-what reached disk before accepting clients. Startup syncs the full ancestor chain
-of the configured absolute state path, including recursively created directories
-and links left by interrupted initialization. A sync failure refuses startup.
+what reached disk before accepting clients. Startup syncs every directory on the
+configured absolute state path that can hold a link relay created, including
+recursively created directories and links left by interrupted initialization: the
+state directory, the inbox, and each ancestor whose child on the path is owned by the
+service's uid and which that uid may write. An ancestor relay could not have written
+into, such as another user's 0711 directory, is never opened. A sync failure refuses
+startup.
 Every acknowledged write is durable.
 Preserve `inbox/seq`, entries, rejected files and presence during recovery; never
 reset the counter or treat a published answer as rolled back.

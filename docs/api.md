@@ -427,7 +427,8 @@ The CLI's commands are `relay list`, `relay reap [--outer-ms N]`,
 `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--evidence FILE]
 [--retire familiar] [--apply --artifact FILE]`, and `relay rollback --artifact FILE`; `relay --help`,
 `relay help [<command>]`, `relay <command> --help`, and `relay --version` round it out. `--json` and
-`--pretty` are global and mutually exclusive, `RELAY_FORMAT` sets the default, and `install` is JSON
+`--pretty` are global and mutually exclusive, `RELAY_FORMAT` sets the default (the protocol rows
+`hook` and `ask` ignore it, since they print only the harness reply), and `install` is JSON
 by default (its value is the installation artifact). Each hook command it writes runs
 relay.js through the installer's own node (`process.execPath`, absolute and quoted), because a
 harness launched from the macOS GUI inherits launchd's `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`),
@@ -488,7 +489,9 @@ covers operation. Node >=22 remains the runtime floor.
 
 ### Messages and entries
 
-Times are Unix milliseconds; message ids and `answerId` are sender-generated UUIDs.
+Times are Unix milliseconds; message ids and `answerId` are sender-generated UUIDs,
+written in lowercase. Uppercase UUID text is refused with `INVALID_MESSAGE`, because ids
+are compared exactly and name entry files.
 `Harness` is `claude-code | codex | opencode`. These message types follow
 [spec §4](specs/2026-10-11-typed-interaction-messages.md#4-envelope-and-kinds):
 
@@ -625,7 +628,8 @@ changing that terminal state.
 
 Defer releases a handback route; otherwise it leaves pending with desktop presentation.
 Withdrawal, expiry, asker loss or supersession closes a pending question. Asker loss
-with an answer saved yields undeliverable. Sender withdrawals log `withdrawal:<reason>`;
+with an answer saved yields undeliverable, and so does reaching `expiresAt` while the
+answer is still `answered` (logged `expiry`). Sender withdrawals log `withdrawal:<reason>`;
 service-generated loss and supersession log distinct `asker-gone` and `superseded` causes.
 Consumed, unconfirmed, undeliverable, released, withdrawn and expired are terminal,
 except that unconfirmed can still receive confirmation. Notices are active until expiry
@@ -637,9 +641,11 @@ another answer or defer gets `ALREADY_ANSWERED` with the winner, and withdrawal 
 See [spec §5.1–5.2](specs/2026-10-11-typed-interaction-messages.md#51-states)
 for the full transition table and validation/revision ordering.
 
-`relay serve` is the only inbox writer. Startup fsyncs the full directory ancestor
-chain through the inbox, including existing links after interrupted initialization.
-A failure refuses startup before accepting clients. It fsyncs files and directories and allocates
+`relay serve` is the only inbox writer. Startup fsyncs every directory that can hold a
+link relay created, including existing links after interrupted initialization: the
+state directory, the inbox, and each ancestor whose child on the path is owned by the
+current uid and which that uid may write. Other ancestors (another user's 0711 home,
+`/`) are never opened. A failure refuses startup before accepting clients. It fsyncs files and directories and allocates
 `inbox/seq` before publishing entries, preserving monotonic sequence numbers across
 crashes and pruning. Point reads, snapshots and watch registration queue behind writes.
 Terminal entries older than 30 days are pruned at startup and daily; a predecessor
@@ -658,19 +664,20 @@ replies have no line cap so full retained histories can be read.
 
 | Op | Fields | Result / pushes |
 | --- | --- | --- |
-| `ask` | `message` (question), `waiter` (Handle), `handback` (boolean) | `entry`, or `passthrough:true` while here; `{type:"state",entry}` on later transitions for the attached waiter. |
+| `ask` | `message` (question), `waiter` (Handle), `handback` (boolean) | `entry`, or `passthrough:true` while here; `{type:"state",entry}` on later transitions for the attached waiter. `expiresAt` is stored lowered to `createdAt` plus the route maximum (23 h for `claude-code`), and an identical resend reattaches; a question with no v1 route (`native` null or another harness) is `UNSUPPORTED_ROUTE`. |
 | `handed` | `id`, `waiter` (Handle) | `entry`; only the recorded waiter may take the answer; replay is idempotent. |
 | `confirm` | `harness`, `callId`, `observed` (native answers map) | `entry`. |
 | `answer` / `defer` / `withdraw` | `message` of the matching kind | `entry`; socket withdrawal permits only user/asker reasons. |
-| `notify` | `message` (notice) | `entry`; no v1 producer is wired. |
-| `list` | optional `since` and `states` | `{seq,entries}`: nonterminal entries plus terminal entries changed after `since`, filtered by states. |
+| `notify` | `message` (notice) | `entry`; resending the identical notice returns it unchanged, and any other entry under that id is `ID_CONFLICT` with the existing entry, as for `ask`. No v1 producer is wired. |
+| `list` | optional `since` and `states` | `{seq,entries}`: nonterminal entries plus terminal entries changed after `since`, filtered by states. `since` must be a nonnegative safe integer and `states` an array of entry states; any other present value is `INVALID_INPUT`. |
 | `get` | `id` | `entry`, including terminal entries. |
 | `presence.get` / `presence.set` | none / `mode` | `presence`. |
-| `watch` | optional `since` | Replay `{type:"entry",entry}` changes then subscribe atomically; response contains `seq`; live entry/presence pushes follow. |
+| `watch` | optional `since` | Replay `{type:"entry",entry}` changes then subscribe atomically; response contains `seq`; live entry/presence pushes follow. An absent `since` is 0; a present one that is not a nonnegative safe integer is `INVALID_INPUT`. |
 
 `since` is a durable integer sequence, never a date. Restart grants recorded waiters
 10 seconds to reattach; confirmed-dead waiters withdraw pending questions or make
-saved answers undeliverable. Unknown liveness is not death. Closing an attached
+saved answers undeliverable. Unknown liveness is not death; an answer that no waiter
+has taken by the question's `expiresAt` becomes undeliverable. Closing an attached
 waiter connection while the service runs records asker loss; service shutdown does not.
 
 ### HTTP protocol and guard
@@ -690,11 +697,11 @@ case are significant. Mutation JSON bodies are capped at 64 KiB in bytes.
 
 | Method and path | Request / response |
 | --- | --- |
-| `GET /v1/inbox?since=<seq>` | `{seq,entries}`; same snapshot selection as socket list; invalid negative/noninteger since is 400. |
+| `GET /v1/inbox?since=<seq>` | `{seq,entries}`; same snapshot selection as socket list; a `since` that is not plain decimal digits (empty included) is 400 `INVALID_INPUT`. |
 | `GET /v1/inbox/<id>` | `{entry}`, including terminal entries; 404 if absent. |
 | `POST /v1/inbox/<id>/answer` | `AnswerBody`; 200 `{entry}`, or 409 `{error:{code,message},entry}` plus saved `answer`/expected `revision` when applicable. |
 | `POST /v1/inbox/<id>/defer` | `DeferBody`; same result shape. |
-| `GET /v1/events` | SSE `entry` events carry full entries with id `seq`; `Last-Event-ID` (or `?since=`) resumes retained entries; presence events have no id. |
+| `GET /v1/events` | SSE `entry` events carry full entries with id `seq`; `Last-Event-ID` (or `?since=`) resumes retained entries, and with neither the stream replays from 0; an invalid cursor is 400 `INVALID_INPUT`, as for `/v1/inbox`. Presence events have no id. |
 | `GET /v1/presence` | `{presence}`. |
 | `PUT /v1/presence` | `{mode:"here"\|"away"}` → `{presence}`. |
 | `GET /v1/agents` | `{agents:[{id,harness,project,state}]}` for display. |
@@ -719,7 +726,7 @@ shutdown as 503 `UNAVAILABLE`. Host sleep serves nothing; retry with the same
 | `relay inbox answer ID --decline` | Decline, with no values. |
 | `relay inbox defer ID` / `relay inbox withdraw ID` | Defer to desktop/native UI, or withdraw. |
 | `relay presence [here\|away]` | Read/set durable presence; here is the initial default. |
-| `relay install --harness claude-code --subscribers FILE --target FILE --evidence FILE --with ask [--apply --artifact FILE]` | Plan/apply the evidence-gated route. |
+| `relay install --harness claude-code --subscribers FILE --target FILE --evidence FILE --with ask [--apply --artifact FILE]` | Plan/apply the evidence-gated route. Every Claude install reconciles the route: without `--with ask` it removes relay's own `ask` entries. |
 
 `relay inbox` alone is usage error (exit 2); it is a parent command, not an executable
 listing alias. `--json` emits raw machine states and full entries; `--pretty` emits
@@ -737,7 +744,11 @@ The [capability record](evidence/claude-code-answer-routes.json) has five passin
 for Claude Code 2.1.296. Installation requires terminal-answer and deny-stops rows;
 receipt gates PostToolUse, release enables handback, and under-denial gates nothing.
 An upgraded/unknown version needs new [probes](runbooks/answer-route-probes.md) before
-installation. The user-present tailnet [acceptance run](runbooks/inbox-e2e-2026-10.md)
+installation; until then `--with ask` refuses, and an install without it removes the
+route. `--evidence` names one record per harness version: a guard subscriber also needs
+the dispatch `probes` in that same record, beside the route rows (see the
+[service runbook](runbooks/inbox-service.md#installing-the-question-route)).
+The user-present tailnet [acceptance run](runbooks/inbox-e2e-2026-10.md)
 (Task 14 / spec acceptance 7) passed phone answer, phone defer and desk withdrawal
 with this version. No live hook is installed by this package.
 

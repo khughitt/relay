@@ -1,15 +1,16 @@
 ---
 id: relay-cb8a44
 title: "The installed ask route survives a Claude Code upgrade with no way to remove it, and its evidence cannot be combined with guard dispatch probes"
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: direct
-owner: main
+owner: fix/typed-messages-review
 created: 2026-10-13T18:15:32Z
-updated: 2026-10-13T18:30:54Z
+updated: 2026-10-13T20:08:48Z
 started: 2026-10-13T18:30:54Z
+completed: 2026-10-13T20:08:48Z
 depends: []
 tags: []
 source: "review:bc4ef2f"
@@ -38,4 +39,13 @@ Where: src/install/hooks.js:62-104, src/install/claude-code.js, bin/relay.js:186
 
 - 2026-10-13T18:16:26Z (main): concerns: relay-f58531 defect — ask-route install cannot be removed after a harness upgrade and its evidence file conflicts with guard dispatch probes
 - 2026-10-13T18:30:54Z (main): started
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T18:31:24Z (fix/typed-messages-review): resumed
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T18:41:45Z (fix/typed-messages-review): decision: kept one --evidence record (its format already holds probes and routes) and documented a version-checked jq merge, plus an error hint naming it; rejected a --route-evidence flag because it needs an ops cli.toml change first and vendored adoption (ops-80d482 friction) for a convenience. Plain install now reconciles the route to no rows, removing relay's ask entries; this reverses the plan's 'left untouched' (plan Task 9) and spec §11 now says so
+- 2026-10-13T20:02:33Z (fix/typed-messages-review): review: impl round 1 — verdict: accept; findings: Minor 2; reviewer: claude-code
+- 2026-10-13T20:04:47Z (fix/typed-messages-review): minor (deferred): Codex-misleading probe hint, opaque uncoded installer errors -> relay-0811af
+- 2026-10-13T20:08:48Z (fix/typed-messages-review): done
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T20:08:48Z (fix/typed-messages-review): every Claude install reconciles the ask route (plain install removes relay ask entries, so a stale route is removable after an upgrade); guard-probe refusal names the documented version-checked evidence merge; spec §11, api.md, runbook updated; 7f3ac9d
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

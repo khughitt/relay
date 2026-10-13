@@ -98,7 +98,7 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
       if (socket.watching) throw relayError('INVALID_REQUEST', 'this connection already watches');
       socket.watching = true;
       let registration;
-      try { registration = await inbox.watch(Number.isSafeInteger(req.since) ? req.since : 0, (event) => send(socket, event)); }
+      try { registration = await inbox.watch(req.since === undefined ? 0 : req.since, (event) => send(socket, event)); }
       catch (error) { socket.watching = false; throw error; }
       const { seq, unsubscribe } = registration;
       if (socket.destroyed) { unsubscribe(); return { seq }; }

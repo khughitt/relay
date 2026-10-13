@@ -17,7 +17,8 @@ export function spawnLines(t, file, args = [], { env = {}, input } = {}) {
     if (w) { waiters.splice(waiters.indexOf(w), 1); clearTimeout(w.timer); w.resolve(value); } else unclaimed.push(value);
   });
   if (input !== undefined) child.stdin.end(input);
-  const exited = new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
+  // 'close', not 'exit': stdout and stderr are drained by then, so stderr() and every line are complete.
+  const exited = new Promise((resolve) => child.once('close', (code, signal) => resolve({ code, signal })));
   return {
     child, exited, stderr: () => stderr,
     send: (line) => child.stdin.write(`${line}\n`),

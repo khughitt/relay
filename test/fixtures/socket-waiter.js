@@ -1,5 +1,6 @@
 // A stand-in for a hook: asks one question and echoes every line it receives. stdin commands:
-// "handed" sends handed for its own entry; "reattach" reconnects and asks again with the same id.
+// "handed" sends handed for its own entry; "reattach" reconnects and asks again with the same id;
+// "ask <file>" asks the question in file on the current connection too (reply op "ask-more").
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { connectSocket } from '../../src/serve/client.js';
@@ -19,4 +20,8 @@ await attach();
 for await (const line of createInterface({ input: process.stdin })) {
   if (line === 'handed') conn.request('handed', { id: message.id, waiter }).then((r) => out({ type: 'response', op: 'handed', ...r }), (e) => out({ type: 'error', op: 'handed', code: e.code }));
   if (line === 'reattach') await attach().catch((e) => out({ type: 'error', op: 'ask', code: e.code }));
+  if (line.startsWith('ask ')) {
+    const more = JSON.parse(readFileSync(line.slice(4), 'utf8'));
+    conn.request('ask', { message: more, waiter, handback: false }).then((r) => out({ type: 'response', op: 'ask-more', ...r }), (e) => out({ type: 'error', op: 'ask-more', code: e.code }));
+  }
 }

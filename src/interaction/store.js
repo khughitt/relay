@@ -39,14 +39,24 @@ async function readSeq(path, io) {
 export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
   const p = inboxPaths(stateDir);
   for (const dir of [stateDir, p.root, p.entriesDir, p.rejectedDir]) await ensurePrivateDir(dir, { io });
-  // Sync the whole chain, including existing links: service startup or a failed prior load may have created them.
-  const directories = [p.root];
+  // Publish every directory link relay may have created, including links from service startup or a
+  // failed prior load (ruling F35, refined). Relay creates directories only as the current uid and only
+  // where that uid can write, so an ancestor is synced exactly when its child on the chain is owned by
+  // this uid and the ancestor is writable by it. Any other ancestor holds no relay link and is never
+  // opened, so another user's 0711 directory cannot stop startup. The state and inbox dirs are relay's.
+  const uid = process.getuid(), groups = new Set([process.getegid(), ...process.getgroups()]);
+  const writable = (info) => uid === 0 || (info.mode & (info.uid === uid ? 0o200 : groups.has(info.gid) ? 0o020 : 0o002)) !== 0;
+  const chain = [];
   for (let dir = stateDir; ; dir = dirname(dir)) {
-    directories.unshift(dir);
+    chain.unshift(dir);
     if (dirname(dir) === dir) break;
   }
-  try { for (const dir of directories) await syncDir(dir, io); }
-  catch (cause) { throw relayError('IO_ERROR', 'cannot publish inbox directories', cause); }
+  try {
+    const infos = [];
+    for (const dir of chain) infos.push(await io.stat(dir));
+    const directories = chain.slice(0, -1).filter((dir, i) => infos[i + 1].uid === uid && writable(infos[i]));
+    for (const dir of [...directories, stateDir, p.root]) await syncDir(dir, io);
+  } catch (cause) { throw relayError('IO_ERROR', 'cannot publish inbox directories', cause); }
   const persisted = await readSeq(p.seqPath, io);
   const entries = new Map(), rejected = [];
   const quarantine = async (name, reason) => {

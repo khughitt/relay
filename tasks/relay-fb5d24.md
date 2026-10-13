@@ -1,15 +1,16 @@
 ---
 id: relay-fb5d24
 title: "relay ask and relay hook exit 2 on an invalid RELAY_FORMAT, which Claude Code treats as a blocking hook error"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
-owner: main
+owner: fix/typed-messages-review
 created: 2026-10-13T18:15:17Z
-updated: 2026-10-13T18:30:53Z
+updated: 2026-10-13T20:08:47Z
 started: 2026-10-13T18:30:53Z
+completed: 2026-10-13T20:08:47Z
 depends: []
 tags: []
 source: "review:bc4ef2f"
@@ -34,4 +35,11 @@ Where: bin/relay.js:93-95, src/commands.js:50, test/cli-surface.test.js or test/
 
 - 2026-10-13T18:16:25Z (main): concerns: relay-f58531 defect — relay ask exits 2 on an invalid RELAY_FORMAT despite its exit-0 hook contract (relay hook shares the pre-existing cause)
 - 2026-10-13T18:30:53Z (main): started
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T18:31:23Z (fix/typed-messages-review): resumed
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T20:02:32Z (fix/typed-messages-review): review: impl round 1 — verdict: accept; findings: none; reviewer: claude-code
+- 2026-10-13T20:08:47Z (fix/typed-messages-review): done
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T20:08:47Z (fix/typed-messages-review): protocol rows hook and ask ignore RELAY_FORMAT (explicit --json/--pretty still apply); test covers both rows; 8cecb2b
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

@@ -10,11 +10,13 @@ export const WITHDRAWAL_REASONS = Object.freeze(['asker', 'user', 'asker-gone', 
 
 const HARNESSES = ['claude-code', 'codex', 'opencode'];
 const ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
-const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+// Lowercase only: ids are compared exactly and name entry files, so two spellings of one UUID
+// would be two entries that overwrite each other on a case-insensitive filesystem.
+const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 const fail = (message) => { throw relayError('INVALID_MESSAGE', message); };
 const bad = (message) => { throw relayError('INVALID_ANSWER', message); };
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const uuid = (v) => typeof v === 'string' && UUID.test(v);
+export const isUuid = (v) => typeof v === 'string' && UUID.test(v);
 const ms = (v) => Number.isSafeInteger(v) && v >= 0;
 const characters = (v) => Array.from(v).length;
 const str = (v, min, max) => {
@@ -71,7 +73,7 @@ function question(v) {
     if (!object(v.artifact) || !str(v.artifact.ref, 1, Infinity) || !str(v.artifact.revision, 1, Infinity)) fail('invalid artifact');
     artifact = { ref: v.artifact.ref, revision: v.artifact.revision };
   }
-  if (!orNull(v.supersedes, uuid)) fail('invalid supersedes');
+  if (!orNull(v.supersedes, isUuid)) fail('invalid supersedes');
   const items = v.items.map(item);
   unique(items.map((i) => i.id), 'item');
   return { class: v.class, expiresAt: v.expiresAt, native, artifact, supersedes: v.supersedes, items };
@@ -92,7 +94,7 @@ function value(v) {
 const surface = (v) => SURFACES.includes(v) ? v : fail('invalid surface');
 
 function answer(v) {
-  if (!object(v) || !uuid(v.answerId) || !['answered', 'declined'].includes(v.outcome)
+  if (!object(v) || !isUuid(v.answerId) || !['answered', 'declined'].includes(v.outcome)
       || !orNull(v.artifactRevision, (x) => typeof x === 'string') || !object(v.values)) fail('invalid answer');
   return { answerId: v.answerId, surface: surface(v.surface), outcome: v.outcome, artifactRevision: v.artifactRevision,
     values: Object.fromEntries(Object.entries(v.values).map(([k, x]) => [k, value(x)])) };
@@ -112,7 +114,7 @@ const BODY = {
 };
 
 export function validateMessage(v) {
-  if (!object(v) || v.schema !== 1 || !MESSAGE_KINDS.includes(v.kind) || !uuid(v.id) || !uuid(v.correlationId) || !ms(v.createdAt)) fail('invalid message envelope');
+  if (!object(v) || v.schema !== 1 || !MESSAGE_KINDS.includes(v.kind) || !isUuid(v.id) || !isUuid(v.correlationId) || !ms(v.createdAt)) fail('invalid message envelope');
   if ((v.kind === 'question' || v.kind === 'notice') && v.correlationId !== v.id) fail('a question or notice correlates to itself');
   return { schema: 1, id: v.id, kind: v.kind, correlationId: v.correlationId, from: party(v.from), to: party(v.to),
     createdAt: v.createdAt, context: context(v.context), body: BODY[v.kind](v.body) };

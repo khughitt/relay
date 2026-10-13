@@ -13,6 +13,13 @@ const json = (res, status, value) => {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(value));
 };
 const fail = (res, status, code, message, extra = {}) => json(res, status, { error: { code, message }, ...extra });
+// A sequence cursor in a query or header is plain decimal text: Number() alone would read '' as 0
+// and '0x10' or '1e3' as other sequences. Any other present value is refused.
+function sequence(text, name) {
+  const value = /^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : NaN;
+  if (!Number.isSafeInteger(value)) throw relayError('INVALID_INPUT', `${name} must be a nonnegative sequence`);
+  return value;
+}
 async function readBody(req) {
   let size = 0; const chunks = [];
   for await (const chunk of req.iterator({ destroyOnReturn: false })) {
@@ -63,7 +70,9 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     res.writeHead(200, { 'content-type': TYPES[extname(target)] ?? 'application/octet-stream', 'cache-control': 'no-cache' }); res.end(data);
   }
   async function events(req, res, url) {
-    const raw = Number(req.headers['last-event-id'] ?? url.searchParams.get('since') ?? 0), since = Number.isSafeInteger(raw) && raw >= 0 ? raw : 0;
+    const header = req.headers['last-event-id'];
+    const since = header !== undefined ? sequence(header, 'Last-Event-ID')
+      : url.searchParams.has('since') ? sequence(url.searchParams.get('since'), 'since') : 0;
     streams.add(res);
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
     res.flushHeaders();
@@ -91,8 +100,7 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     }
     if (!pathname.startsWith('/v1/')) return req.method === 'GET' ? staticFile(res, pathname) : fail(res, 404, 'NOT_FOUND', 'not found');
     if (req.method === 'GET' && pathname === '/v1/inbox') {
-      const since = url.searchParams.has('since') ? Number(url.searchParams.get('since')) : undefined;
-      if (since !== undefined && (!Number.isSafeInteger(since) || since < 0)) throw relayError('INVALID_INPUT', 'since must be a nonnegative sequence');
+      const since = url.searchParams.has('since') ? sequence(url.searchParams.get('since'), 'since') : undefined;
       return json(res, 200, await inbox.snapshot({ since }));
     }
     const match = /^\/v1\/inbox\/([^/]+)(?:\/(answer|defer))?$/.exec(pathname);

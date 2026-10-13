@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { relayError, validateHandle } from '../protocol.js';
-import { checkAnswer, validateMessage, LOCAL_SURFACES, WITHDRAWAL_REASONS } from './message.js';
+import { checkAnswer, isUuid, validateMessage, LOCAL_SURFACES, WITHDRAWAL_REASONS } from './message.js';
 // The question lifecycle as pure functions (spec §5). Each returns { entry, changed, error };
 // new log rows carry seq: null, which the store stamps when it persists the entry.
 export const CONFIRM_WINDOW_MS = 60000;
@@ -87,13 +87,15 @@ export function applyAskerGone(entry, now) {
 export function applyClock(entry, now) {
   if (entry.kind === 'notice') return entry.state === 'active' && now >= entry.notice.body.expiresAt ? move(entry, now, 'expired', 'expiry') : keep(entry);
   if (entry.state === 'pending' && now >= entry.question.body.expiresAt) return move(entry, now, 'expired', 'expiry');
+  // A saved answer no route took by the deadline will never be taken: the waiter is gone or stuck.
+  if (entry.state === 'answered' && now >= entry.question.body.expiresAt) return move(entry, now, 'undeliverable', 'expiry');
   if (entry.state === 'handed' && now >= entry.handedAt + CONFIRM_WINDOW_MS) return move(entry, now, 'unconfirmed', 'window');
   return keep(entry);
 }
 export const applySeen = (entry, now) => entry.kind === 'notice' && !entry.seen ? annotate(entry, now, 'seen', { seen: true }) : keep(entry);
 export function nextDeadline(entry) {
   if (entry.kind === 'notice') return entry.state === 'active' ? entry.notice.body.expiresAt : null;
-  if (entry.state === 'pending') return entry.question.body.expiresAt;
+  if (entry.state === 'pending' || entry.state === 'answered') return entry.question.body.expiresAt;
   if (entry.state === 'handed') return entry.handedAt + CONFIRM_WINDOW_MS;
   return null;
 }
@@ -107,7 +109,6 @@ const normalized = (message) => {
   if (!isDeepStrictEqual(clean, message)) fail('message is not normalized');
   return clean;
 };
-const uuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
 const answers = (v) => object(v) && Object.values(v).every((value) => typeof value === 'string');
 export function validateEntry(v) {
   try {
@@ -146,7 +147,7 @@ export function validateEntry(v) {
     if (v.state === 'withdrawn' ? !object(v.withdrawal) || !keys(v.withdrawal, ['reason'])
       || !WITHDRAWAL_REASONS.includes(v.withdrawal.reason) : v.withdrawal !== null) fail('invalid withdrawal');
     if (v.supersededBy !== null) {
-      if (!uuid(v.supersededBy)) fail('invalid supersededBy');
+      if (!isUuid(v.supersededBy)) fail('invalid supersededBy');
       if (v.state !== 'withdrawn' || v.withdrawal.reason !== 'superseded' || v.supersededBy === v.id) fail('invalid supersession');
     }
     if (v.log[0].state !== 'pending' || v.log[0].cause !== 'question') fail('invalid question creation');
@@ -165,7 +166,8 @@ export function validateEntry(v) {
       else if (row.cause === 'confirm' || row.cause === 'confirm-mismatch') valid = ['handed', 'unconfirmed'].includes(previous)
         && row.state === (row.cause === 'confirm' ? 'consumed' : 'unconfirmed');
       else if (row.cause === 'window') valid = previous === 'handed' && row.state === 'unconfirmed' && row.at >= v.handedAt + CONFIRM_WINDOW_MS;
-      else if (row.cause === 'expiry') valid = previous === 'pending' && row.state === 'expired' && row.at >= v.question.body.expiresAt;
+      else if (row.cause === 'expiry') valid = row.at >= v.question.body.expiresAt
+        && ((previous === 'pending' && row.state === 'expired') || (previous === 'answered' && row.state === 'undeliverable'));
       else if (row.cause === 'native-answer') valid = ['released', 'expired'].includes(previous) && row.state === previous;
       if (!valid) fail('invalid question transition');
     }

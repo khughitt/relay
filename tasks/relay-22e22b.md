@@ -1,15 +1,16 @@
 ---
 id: relay-22e22b
 title: "Inbox service gaps from the typed-messages review: expiry clamp, stuck answered entries, notify id conflicts, silent cursor fallbacks, UUID case, ancestor sync"
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: direct
-owner: main
+owner: fix/typed-messages-review
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T18:30:55Z
+updated: 2026-10-13T20:08:48Z
 started: 2026-10-13T18:30:55Z
+completed: 2026-10-13T20:08:48Z
 depends: []
 tags: []
 source: "review:bc4ef2f"
@@ -41,4 +42,20 @@ Where: src/serve/inbox.js, src/serve/socket.js, src/serve/http.js, src/interacti
 
 - 2026-10-13T18:16:26Z (main): concerns: relay-f58531 defect — spec §5.4 expiry clamp unimplemented plus inbox lifecycle and validation gaps
 - 2026-10-13T18:30:55Z (main): started
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T18:31:24Z (fix/typed-messages-review): resumed
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T18:50:54Z (fix/typed-messages-review): uuid case: refuse uppercase with INVALID_MESSAGE (not normalize), for every interaction UUID field (id, correlationId, supersedes, answerId); normalizing would change the sender's id and break resent-message identity. One lowercase rule (message.js isUuid) now backs validateMessage and validateEntry; schema uuid def gains the same pattern.
+- 2026-10-13T18:52:53Z (fix/typed-messages-review): stuck answered: an answered entry becomes undeliverable at question.expiresAt with cause 'expiry' (not a new cause), mirroring how 'asker-gone' already names one event across pending->withdrawn and answered->undeliverable; validateEntry's expiry rule now accepts answered->undeliverable at or after expiresAt. The CLI's undeliverable label shows 'reason: expiry'. ask.js already passes an undeliverable state through to the native UI (UNEXPECTED_STATE).
+- 2026-10-13T18:54:37Z (fix/typed-messages-review): expiry clamp: clamp (not refuse) in inbox.ask to message.createdAt + route maximum, before the entry exists; reattach compares the stored question with the resend after the same clamp. Anchor is createdAt, not operation time: the clamp is then a pure function of the message (identical resend always compares equal), it equals the Claude route's own createdAt+23h so route questions are never altered, and it bounds the wait from when the asker began, which is what the hook's 24 h outer timeout measures (a now-anchor would let a question first accepted after the hook's reconnect backoff outlive the hook). Caveat: a future createdAt would stretch the bound; the socket is same-user (0600) and createdAt comes from the same host clock. Two far-future resends that clamp to the same value compare equal (the raw expiry is not stored).
+- 2026-10-13T18:54:38Z (fix/typed-messages-review): expiry clamp, other routes: a question with no v1 route (native null, or native.harness codex/opencode) is refused at ask with UNSUPPORTED_ROUTE before any entry exists, rather than given Claude's 23 h. Rationale: v1 defines a maximum only for claude-code; applying it to other harnesses would be a silent fallback, and routes/index.js expectAnswers already refuses the same questions with UNSUPPORTED_ROUTE at confirm. expectAnswers and the new expiryLimit share one route lookup. No v1 producer sends such questions.
+- 2026-10-13T19:00:03Z (fix/typed-messages-review): cursors: validation lives in the inbox's snapshot and watch (INVALID_INPUT), so every socket caller gets it; socket watch maps only an absent since to 0 (null is refused). list states accept an array (empty allowed) of QUESTION_STATES plus notice states active/expired. HTTP /v1/events and /v1/inbox share one parser that keeps /v1/inbox's existing numeric rule (Number(), safe integer, >= 0), so both HTTP cursors behave alike; Last-Event-ID wins over ?since= as before and is validated before any stream headers.
+- 2026-10-13T19:03:05Z (fix/typed-messages-review): ancestor sync: rule implemented is 'sync an ancestor iff its child on the chain is owned by the current uid AND the ancestor is writable by that uid (stat mode bits: owner/group/other, root always), plus always the state dir and inbox root'; nothing is caught. This refines the brief's 'sync only owned ancestors' because the link of a relay-created dir lives in its PARENT: owned-only would leave unsynced a dir relay creates inside another user's writable dir (sticky /tmp-style, group-shared), breaking F35; child-owned alone would still open root's 0711 /home. Uses io.stat (follows symlinks, like open). Known limit: ACL-only write grants are judged by mode bits. If owned-only is preferred, it is a one-line filter change plus dropping the foreign-writable guard test.
+- 2026-10-13T20:02:34Z (fix/typed-messages-review): review: impl round 1 — verdict: revise; findings: Important 1, Minor 3; reviewer: claude-code
+- 2026-10-13T20:04:46Z (fix/typed-messages-review): minor (deferred): undeliverable on hook reattach, upgrade effect on persisted state, doc nits -> relay-0811af
+- 2026-10-13T20:08:09Z (fix/typed-messages-review): review: impl round 2 — verdict: accept; findings: Minor 3; reviewer: claude-code
+- 2026-10-13T20:08:10Z (fix/typed-messages-review): minor (deferred): api.md /v1/inbox cursor wording (leading zeros, safe-integer bound) and commit-message CLI comparison; refusal test should list /v1/inbox cases first so a regression names its input; duplicate ' ' header case -> relay-0811af
+- 2026-10-13T20:08:48Z (fix/typed-messages-review): done
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T20:08:48Z (fix/typed-messages-review): socket-ask expiry clamped to createdAt + route max, no-route questions refused; answered -> undeliverable at expiry; notify ID_CONFLICT; socket and HTTP cursors/states refused unless valid (HTTP plain decimal only); lowercase-only UUIDs incl. schema pattern; ancestor sync limited to dirs that can hold a relay link; 4cf2917 947fe66 dfb5540 2a702e7 00dd6d0 593c9e5 84c3c55; minors deferred to relay-0811af
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

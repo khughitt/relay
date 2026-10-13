@@ -13,9 +13,14 @@ import { serveHttp } from '../src/serve/http.js';
 import { classify } from '../src/serve/guard.js';
 import { serveConfig } from '../src/serve/config.js';
 import { expectAnswers } from '../src/routes/index.js';
-import { questionMessage, withdrawalMessage, HANDLE, uuid } from './helpers/interaction.js';
+import { questionMessage, answerMessage, withdrawalMessage, HANDLE, uuid } from './helpers/interaction.js';
+import { until, nextCall, settledYet, turn } from './helpers/wait.js';
 
 const LOGIN = 'me@example.com', HOST = 'desk.tail1234.ts.net';
+// How long close() may take before a test calls it retained. Node holds a connection with an
+// incomplete request until its headers timeout (60 s, checked every 30 s), so this still separates a
+// retained connection from a prompt close, without failing a close that a loaded host made slow.
+const CLOSE_DEADLINE_MS = 5000;
 async function setup(t, { clientDir = null, serveHost = HOST, now = Date.now, io, question = {}, readAgents = async () => ({ agents: {} }) } = {}) {
   const p = await tempState(t);
   const { inbox } = await openInbox({ stateDir: p.stateDir, clock: now, expectAnswers, ...(io ? { io } : {}) });
@@ -116,37 +121,59 @@ test('an event stream closed while its registration is queued leaves no listener
   await hit;
   const req = http.request({ host: '127.0.0.1', port, path: '/v1/events', headers: phone, agent: false });
   t.after(() => req.destroy()); req.on('error', () => {});
+  // The response arrives after the service flushed its headers and queued the registration.
   const registered = new Promise((resolve) => req.on('response', () => resolve())); req.end();
+  // The HTTP surface shows nothing when it sees the close, so 30 ms only favours the close-while-queued
+  // path; the assertion below holds on either path and waits for it.
   try { await registered; req.destroy(); await new Promise((r) => setTimeout(r, 30)); }
   finally { paused.release(); }
   await withdrawing; await inbox.idle();
-  await new Promise((r) => setTimeout(r, 20));
-  assert.equal(inbox.subscribers(), baseline);
+  await until(() => inbox.subscribers() === baseline, { what: 'the closed stream to leave no listener' });
 });
-test('events: Last-Event-ID replays newer entries, then streams', { timeout: 10000 }, async (t) => {
-  const { port, q, inbox } = await setup(t), mark = inbox.seq(), events = [];
-  const req = http.request({ host: '127.0.0.1', port, path: '/v1/events', headers: { ...phone, 'last-event-id': String(mark - 1) }, agent: false });
-  t.after(() => req.destroy());
-  let first, done;
-  const replay = new Promise((r) => { first = r; }), streamed = new Promise((r) => { done = r; });
+// An SSE client that keeps every entry event it receives, as [id, entry id, state].
+function eventStream(t, port, { path = '/v1/events', headers = {} } = {}) {
+  const events = [], req = http.request({ host: '127.0.0.1', port, path, headers: { ...phone, ...headers }, agent: false });
+  t.after(() => req.destroy()); req.on('error', () => {});
   req.on('response', (res) => {
     assert.equal(res.headers['content-type'], 'text/event-stream'); res.setEncoding('utf8');
     let data = '';
     res.on('data', (chunk) => {
       data += chunk;
-      let end;
-      while ((end = data.indexOf('\n\n')) !== -1) {
+      for (let end = data.indexOf('\n\n'); end !== -1; end = data.indexOf('\n\n')) {
         const block = data.slice(0, end); data = data.slice(end + 2);
-        if (block.startsWith('id:')) events.push(Number(/^id: (\d+)/.exec(block)[1]));
+        const fields = Object.fromEntries(block.split('\n').filter((line) => !line.startsWith(':')).map((line) => [line.slice(0, line.indexOf(': ')), line.slice(line.indexOf(': ') + 2)]));
+        if (fields.event !== 'entry') continue;
+        const entry = JSON.parse(fields.data);
+        assert.equal(Number(fields.id), entry.seq);
+        events.push([entry.seq, entry.id, entry.state]);
       }
-      if (events.length >= 1) first();
-      if (events.length >= 2) { req.destroy(); done(); }
     });
   });
-  req.end(); await replay;
-  await inbox.withdraw(q.id, withdrawalMessage(q)); await streamed;
-  assert.deepEqual(events, [mark, mark + 1]);
-});
+  req.end();
+  return { events, count: (n) => until(() => events.length >= n, { what: `${n} events on ${path}` }) };
+}
+// Spec §7.3 and acceptance 5: a resumed stream replays exactly the entries changed after its cursor,
+// in order, then streams live changes. The cursor must exclude a non-terminal entry (kept) and a
+// terminal one (closed), each last changed at or before it.
+for (const [how, cursor] of [['Last-Event-ID', (mark) => ({ headers: { 'last-event-id': String(mark) } })], ['?since=', (mark) => ({ path: `/v1/events?since=${mark}` })]]) {
+  test(`events: ${how} resumes after its cursor, replaying exactly the newer entries before live ones`, { timeout: 15000 }, async (t) => {
+    const { port, q: older, inbox } = await setup(t);
+    const fresh = () => questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000 } });
+    const ask = (q) => inbox.ask(q, { handback: false, waiter: HANDLE });
+    const kept = fresh(), closed = fresh(), later = fresh();
+    await ask(kept); await ask(closed); await inbox.withdraw(closed.id, withdrawalMessage(closed));
+    const mark = inbox.seq();
+    assert.deepEqual([inbox.get(older.id).seq, inbox.get(kept.id).seq, inbox.get(closed.id).seq], [1, 2, mark]);
+    await ask(later); await inbox.answer(older.id, answerMessage(older));
+    const stream = eventStream(t, port, cursor(mark));
+    await stream.count(2); // the replay is written in the same queued step that subscribes the stream
+    await inbox.withdraw(later.id, withdrawalMessage(later));
+    await stream.count(3);
+    assert.deepEqual(stream.events, [[mark + 1, later.id, 'pending'], [mark + 2, older.id, 'answered'], [mark + 3, later.id, 'withdrawn']]);
+    const listed = await call(port, { path: `/v1/inbox?since=${mark}`, headers: phone });
+    assert.deepEqual(listed.json.entries.map((e) => [e.seq, e.id]), [[2, kept.id], [mark + 2, older.id], [mark + 3, later.id]]);
+  });
+}
 
 test('configuration rejects lone, empty, malformed and explicitly invalid values before creating state', async (t) => {
   for (const env of [{ RELAY_SERVE_HOST: HOST }, { RELAY_SERVE_LOGIN: LOGIN }]) {
@@ -229,6 +256,19 @@ test('invalid JSON, scalar bodies and non-JSON media types receive client errors
   assert.equal((await call(port, { method: 'PUT', path: '/v1/presence', headers, body: { mode: 'elsewhere' } })).status, 400);
 });
 
+test('an invalid SSE cursor is refused with 400 INVALID_INPUT instead of replaying from 0', { timeout: 5000 }, async (t) => {
+  const { port, inbox } = await setup(t), baseline = inbox.subscribers();
+  for (const [path, headers] of [['/v1/events', { 'last-event-id': 'abc' }], ['/v1/events', { 'last-event-id': '-1' }],
+    ['/v1/events', { 'last-event-id': '1.5' }], ['/v1/events?since=abc', {}], ['/v1/events?since=-2', {}],
+    ['/v1/events?since=0', { 'last-event-id': 'x' }],
+    // Only plain decimal text is a cursor: Number() would read these as 0 or as another sequence.
+    ...['', ' ', '0x10', '1e3', '+5', '5.0', '01'].flatMap((text) => [['/v1/events', { 'last-event-id': text }],
+      [`/v1/events?since=${encodeURIComponent(text)}`, {}], [`/v1/inbox?since=${encodeURIComponent(text)}`, {}]])]) {
+    const r = await call(port, { path, headers: { ...phone, ...headers } });
+    assert.deepEqual([r.status, r.json?.error.code], [400, 'INVALID_INPUT'], `${path} ${JSON.stringify(headers)}`);
+  }
+  assert.equal(inbox.subscribers(), baseline);
+});
 test('routes match their entire path and absent static configuration is readonly 404', async (t) => {
   const { port, q } = await setup(t);
   for (const path of ['/', '/v1/inbox/extra/answer/extra', `/v1/inbox/${q.id}/extra/extra`, '/v1/agents/extra', '/v1/presence/extra', '/v1/events/extra']) {
@@ -254,9 +294,12 @@ test('point GET waits for a queued supersession to commit both entries', { timeo
   const reached = paused.pause(), replacing = inbox.ask(replacement, { handback: false, waiter: HANDLE });
   await reached;
   let finished = false;
+  const read = nextCall(inbox, 'snapshot');
   const pending = call(port, { path: `/v1/inbox/${q.id}`, headers: phone }).then((r) => { finished = true; return r; });
-  try { await new Promise((r) => setTimeout(r, 40)); assert.equal(finished, false); }
-  finally { paused.release(); }
+  try {
+    const { result } = await read; // the GET has reached the inbox, behind the half-committed supersession
+    assert.equal(await settledYet(result), false); assert.equal(finished, false);
+  } finally { paused.release(); }
   await replacing;
   assert.equal((await pending).json.entry.state, 'withdrawn');
 });
@@ -266,12 +309,13 @@ test('close ends SSE and drains an accepted write before returning; repeated clo
   const { port, q, inbox, srv } = await setup(t, { io: paused.io });
   const req = http.request({ host: '127.0.0.1', port, path: '/v1/events', headers: phone, agent: false });
   t.after(() => req.destroy()); req.on('error', () => {});
-  const streaming = new Promise((resolve) => req.on('response', (res) => { res.resume(); resolve(); })); req.end(); await streaming;
+  let ended; const streamEnded = new Promise((resolve) => { ended = resolve; });
+  const streaming = new Promise((resolve) => req.on('response', (res) => { res.once('end', ended); res.resume(); resolve(); })); req.end(); await streaming;
   const reached = paused.pause();
   const answering = call(port, { method: 'POST', path: `/v1/inbox/${q.id}/answer`, headers: { ...phone, origin: `https://${HOST}` }, body: answerBody() });
   await reached;
   let closed = false; const closing = srv.close().then(() => { closed = true; });
-  try { await new Promise((r) => setTimeout(r, 30)); assert.equal(closed, false); }
+  try { await streamEnded; await turn(); await turn(); assert.equal(closed, false); } // close has ended the stream, and still waits for the write
   finally { paused.release(); }
   assert.equal((await answering).status, 200); await closing; await srv.close();
   assert.equal(inbox.subscribers(), 0); assert.equal(inbox.get(q.id).state, 'answered');
@@ -279,9 +323,15 @@ test('close ends SSE and drains an accepted write before returning; repeated clo
 
 test('close releases a half-written request without a mutation', { timeout: 10000 }, async (t) => {
   const { port, inbox, srv } = await setup(t);
-  const req = http.request({ host: '127.0.0.1', port, method: 'PUT', path: '/v1/presence', headers: { ...phone, origin: `https://${HOST}`, 'content-type': 'application/json' }, agent: false });
-  t.after(() => req.destroy()); req.on('error', () => {}); req.write('{');
-  await new Promise((r) => setTimeout(r, 30)); await srv.close();
+  const req = http.request({ host: '127.0.0.1', port, method: 'PUT', path: '/v1/presence',
+    headers: { ...phone, origin: `https://${HOST}`, 'content-type': 'application/json', expect: '100-continue' }, agent: false });
+  t.after(() => req.destroy()); req.on('error', () => {});
+  // The service answers 100 Continue as it dispatches the request, so it is reading the body when it closes.
+  const reading = new Promise((resolve) => req.once('continue', resolve)); req.flushHeaders();
+  await reading; req.write('{');
+  const closed = srv.close(); let timer;
+  try { await Promise.race([closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained a half-written request')), CLOSE_DEADLINE_MS); })]); }
+  finally { clearTimeout(timer); req.destroy(); await closed; }
   assert.equal(inbox.presence().mode, 'away');
 });
 
@@ -329,7 +379,7 @@ test('close owns TCP connections even before a complete HTTP request arrives', {
   const closed = srv.close();
   // On failure release the connections immediately rather than trapping the teardown.
   let timer;
-  try { await Promise.race([closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained an incomplete connection')), 200); })]); }
+  try { await Promise.race([closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained an incomplete connection')), CLOSE_DEADLINE_MS); })]); }
   finally { clearTimeout(timer); for (const socket of sockets) socket.destroy(); await closed; }
 });
 
@@ -378,12 +428,13 @@ test('close drains a complete request before disposing its incomplete pipelined 
   const disconnected = new Promise((r) => socket.once('close', r));
   let data = ''; socket.on('data', (chunk) => { data += chunk; });
   await new Promise((r) => socket.once('connect', r));
+  const read = nextCall(inbox, 'snapshot');
   socket.write(`GET /v1/inbox/${q.id} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: keep-alive\r\n\r\nGET /v1/inbox HTTP/1.1\r\nHost:`);
-  await new Promise((r) => setTimeout(r, 30));
+  await read; await turn(); // the first request is parsed and waits in the inbox queue; its successor is still incomplete
   const closing = srv.close(); let timer;
   try {
     paused.release(); await withdrawing;
-    await Promise.race([closing, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained an incomplete pipelined request')), 200); })]);
+    await Promise.race([closing, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('HTTP close retained an incomplete pipelined request')), CLOSE_DEADLINE_MS); })]);
     await disconnected;
     assert.match(data, /HTTP\/1\.1 200/); assert.match(data, /"state":"withdrawn"/); assert.match(data, /\r\n0\r\n\r\n$/);
   } finally { clearTimeout(timer); paused.release(); socket.destroy(); await closing; }
