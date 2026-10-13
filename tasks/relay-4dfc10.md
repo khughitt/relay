@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T01:15:00Z
+updated: 2026-10-13T01:15:01Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -51,3 +51,5 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T01:14:59Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T01:15:00Z (design/typed-messages): Phone curl readiness passed by human report: seq 0, entries empty. Host recheck HTTP 200; tracked service PID 1892784 alive after 31 minutes. Isolated Claude version rechecked 2.1.296 and private clean-environment auth loggedIn true via claude.ai. Scratch settings retain exactly two AskUserQuestion command hooks. Effective interactive hooks inspection and all three live cases remain pending.
+- 2026-10-13T01:15:01Z (design/typed-messages): parked (waiting on user, review): User: launch private Claude with prepared isolation flags, inspect /hooks and report configured commands; controller: confirm isolation, guide phone answer/defer and desk withdrawal, then record and clean up. Approved Serve HTTPS8443 remains from none to http://127.0.0.1:3341; restore /usr/bin/tailscale serve --https=8443 off. Tracked service Node PID 1892784, exec session 1227, one-hour timeout; kill -TERM 1892784 stops service and removes mapping via trap. Phone curl readiness passed; live question cases not yet run.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
