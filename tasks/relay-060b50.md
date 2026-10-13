@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-09-25T20:02:44Z
-updated: 2026-10-13T08:30:18Z
+updated: 2026-10-13T08:30:19Z
 depends: []
 tags: []
 source: relay-661946
@@ -21,3 +21,7 @@ Approach: add an explicit `relay install --node PATH` (absolute, existing, execu
 Done: tests cover `--node` reaching both planners and the written commands, its validation (relative, missing, non-executable refuse with USAGE), the warning for nvm- and Cellar-shaped node paths and for a versioned relayBin, and no warning for /usr/bin/node; README and docs/runbooks/hook-install-rollback.md mention `--node`; `just test-fast` passes on Node 22 and the dev runtime.
 
 Where: bin/relay.js:126-140 (install flag parsing and planner calls), src/install/hooks.js, src/install/claude-code.js, src/install/codex.js, test/install-cli.test.js.
+
+## Notes
+
+- 2026-10-13T08:30:18Z (main): scope: scoped; chose an explicit --node flag plus a version-specific-path warning (rejected automatic shim discovery as a silent fallback; doctor check left out of scope); also covers a versioned relayBin; todo P2 s mid direct
