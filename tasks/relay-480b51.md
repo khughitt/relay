@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-13T18:16:14Z
-updated: 2026-10-13T18:16:14Z
+updated: 2026-10-13T18:16:27Z
 depends: []
 tags: []
 source: "review:89cdecb"
@@ -34,3 +34,7 @@ Done:
 - Items 1-7 are fixed.
 - `tools/cli_surface.py` conformance passes.
 - `just test-fast` passes on Node 22 and the dev runtime.
+
+## Notes
+
+- 2026-10-13T18:16:27Z (main): concerns: relay-f58531 defect — docs still report acceptance pending; ask help and exit-code text inaccurate
