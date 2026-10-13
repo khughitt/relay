@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-13T00:56:57Z
+updated: 2026-10-13T01:00:19Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -115,4 +115,6 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-13T00:47:55Z (design/typed-messages): parked (waiting on user, review): User reports Task14 phone inbox reachability; controller resumes relay-4dfc10, guides answer/defer/withdraw, restores live state, records/reviews acceptance and integrates. LIVE Serve HTTPS 8443, from none, to http://127.0.0.1:3341; restore tailscale serve --https=8443 off. Tracked service PID 1892784, exec session 1227, one-hour timeout and cleanup trap; kill -TERM 1892784 stops it. No automated check or agent running.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T00:56:57Z (design/typed-messages): resumed
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T01:00:19Z (design/typed-messages): parked (waiting on user, review): User: run Android phone curl readiness check for Task 14; controller: finish live acceptance, restore temporary Serve HTTPS8443 from http://127.0.0.1:3341 to none with /usr/bin/tailscale serve --https=8443 off, review acceptance record and integrate reviewed branch. Tracked service Node PID 1892784, exec session 1227, one-hour timeout; kill -TERM 1892784 stops service and removes mapping via trap.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
