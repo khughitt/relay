@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-12T12:33:48Z
+updated: 2026-10-13T00:26:26Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -103,4 +103,6 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-12T11:54:05Z (design/typed-messages): review: impl round 1 — verdict: revise; findings: Important 3, Minor 4; reviewer: codex/gpt-6-astra
 - 2026-10-12T12:27:33Z (design/typed-messages): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-12T12:33:48Z (design/typed-messages): parked (waiting on user, review): User approves Task14 phone/private-auth acceptance and temporary Serve8443 mapping; controller resumes relay-4dfc10, runs/records/restores and reviews acceptance, runs final integration gate, closes goal on branch and integrates locally. Tasks1–13 plus whole-branch corrective review complete; no child/check/process active. Branch/worktree and ledger retained.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T00:26:26Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
