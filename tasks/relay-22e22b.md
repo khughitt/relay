@@ -1,15 +1,16 @@
 ---
 id: relay-22e22b
 title: "Inbox service gaps from the typed-messages review: expiry clamp, stuck answered entries, notify id conflicts, silent cursor fallbacks, UUID case, ancestor sync"
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: direct
 owner: fix/typed-messages-review
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T20:08:10Z
+updated: 2026-10-13T20:08:48Z
 started: 2026-10-13T18:30:55Z
+completed: 2026-10-13T20:08:48Z
 depends: []
 tags: []
 source: "review:bc4ef2f"
@@ -54,3 +55,7 @@ Where: src/serve/inbox.js, src/serve/socket.js, src/serve/http.js, src/interacti
 - 2026-10-13T20:04:46Z (fix/typed-messages-review): minor (deferred): undeliverable on hook reattach, upgrade effect on persisted state, doc nits -> relay-0811af
 - 2026-10-13T20:08:09Z (fix/typed-messages-review): review: impl round 2 — verdict: accept; findings: Minor 3; reviewer: claude-code
 - 2026-10-13T20:08:10Z (fix/typed-messages-review): minor (deferred): api.md /v1/inbox cursor wording (leading zeros, safe-integer bound) and commit-message CLI comparison; refusal test should list /v1/inbox cases first so a regression names its input; duplicate ' ' header case -> relay-0811af
+- 2026-10-13T20:08:48Z (fix/typed-messages-review): done
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T20:08:48Z (fix/typed-messages-review): socket-ask expiry clamped to createdAt + route max, no-route questions refused; answered -> undeliverable at expiry; notify ID_CONFLICT; socket and HTTP cursors/states refused unless valid (HTTP plain decimal only); lowercase-only UUIDs incl. schema pattern; ancestor sync limited to dirs that can hold a relay link; 4cf2917 947fe66 dfb5540 2a702e7 00dd6d0 593c9e5 84c3c55; minors deferred to relay-0811af
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
