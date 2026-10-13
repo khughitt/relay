@@ -96,6 +96,29 @@ test('watch replays since a seq and then pushes changes and presence', async (t)
   await new Promise((r) => setTimeout(r, 50));
   assert.deepEqual(pushes.map((m) => m.type), ['presence', 'entry']);
 });
+test('watch refuses a present cursor that is not a nonnegative safe integer, and the connection can still watch', async (t) => {
+  const ctx = await setup(t), baseline = ctx.inbox.subscribers();
+  for (const since of [-1, 1.5, '3', null, 2 ** 53, {}]) {
+    const r = await ctx.client.request('watch', { since });
+    assert.deepEqual([r.ok, r.error?.code], [false, 'INVALID_INPUT'], JSON.stringify(since));
+  }
+  assert.equal(ctx.inbox.subscribers(), baseline);
+  assert.equal((await ctx.client.request('watch', {})).ok, true);
+  assert.equal(ctx.inbox.subscribers(), baseline + 1);
+});
+test('list refuses an invalid since or states instead of widening or substring-matching the selection', async (t) => {
+  const ctx = await setup(t), { q } = await waiter(t, ctx);
+  await ctx.client.request('answer', { message: answerMessage(q) });
+  for (const fields of [{ since: null }, { since: -1 }, { since: '0' }, { since: 0.5 }, { states: 'answered' }, { states: null },
+    { states: ['answered', 'lost'] }, { states: [1] }, { states: {} }]) {
+    const r = await ctx.client.request('list', fields);
+    assert.deepEqual([r.ok, r.error?.code], [false, 'INVALID_INPUT'], JSON.stringify(fields));
+  }
+  for (const [fields, ids] of [[{}, [q.id]], [{ since: 0 }, [q.id]], [{ states: ['answered'] }, [q.id]], [{ states: ['pending', 'active'] }, []], [{ states: [] }, []]]) {
+    const r = await ctx.client.request('list', fields);
+    assert.deepEqual([r.ok, r.entries.map((e) => e.id)], [true, ids], JSON.stringify(fields));
+  }
+});
 test('a watcher that disconnects while its registration is queued leaves no listener', async (t) => {
   let release, reached = null;
   t.after(() => release?.());

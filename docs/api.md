@@ -667,10 +667,10 @@ replies have no line cap so full retained histories can be read.
 | `confirm` | `harness`, `callId`, `observed` (native answers map) | `entry`. |
 | `answer` / `defer` / `withdraw` | `message` of the matching kind | `entry`; socket withdrawal permits only user/asker reasons. |
 | `notify` | `message` (notice) | `entry`; resending the identical notice returns it unchanged, and any other entry under that id is `ID_CONFLICT` with the existing entry, as for `ask`. No v1 producer is wired. |
-| `list` | optional `since` and `states` | `{seq,entries}`: nonterminal entries plus terminal entries changed after `since`, filtered by states. |
+| `list` | optional `since` and `states` | `{seq,entries}`: nonterminal entries plus terminal entries changed after `since`, filtered by states. `since` must be a nonnegative safe integer and `states` an array of entry states; any other present value is `INVALID_INPUT`. |
 | `get` | `id` | `entry`, including terminal entries. |
 | `presence.get` / `presence.set` | none / `mode` | `presence`. |
-| `watch` | optional `since` | Replay `{type:"entry",entry}` changes then subscribe atomically; response contains `seq`; live entry/presence pushes follow. |
+| `watch` | optional `since` | Replay `{type:"entry",entry}` changes then subscribe atomically; response contains `seq`; live entry/presence pushes follow. An absent `since` is 0; a present one that is not a nonnegative safe integer is `INVALID_INPUT`. |
 
 `since` is a durable integer sequence, never a date. Restart grants recorded waiters
 10 seconds to reattach; confirmed-dead waiters withdraw pending questions or make
@@ -699,7 +699,7 @@ case are significant. Mutation JSON bodies are capped at 64 KiB in bytes.
 | `GET /v1/inbox/<id>` | `{entry}`, including terminal entries; 404 if absent. |
 | `POST /v1/inbox/<id>/answer` | `AnswerBody`; 200 `{entry}`, or 409 `{error:{code,message},entry}` plus saved `answer`/expected `revision` when applicable. |
 | `POST /v1/inbox/<id>/defer` | `DeferBody`; same result shape. |
-| `GET /v1/events` | SSE `entry` events carry full entries with id `seq`; `Last-Event-ID` (or `?since=`) resumes retained entries; presence events have no id. |
+| `GET /v1/events` | SSE `entry` events carry full entries with id `seq`; `Last-Event-ID` (or `?since=`) resumes retained entries, and with neither the stream replays from 0; an invalid cursor is 400 `INVALID_INPUT`, as for `/v1/inbox`. Presence events have no id. |
 | `GET /v1/presence` | `{presence}`. |
 | `PUT /v1/presence` | `{mode:"here"\|"away"}` → `{presence}`. |
 | `GET /v1/agents` | `{agents:[{id,harness,project,state}]}` for display. |

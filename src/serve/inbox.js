@@ -16,6 +16,15 @@ function bounded(message) {
   const latest = message.createdAt + expiryLimit(message);
   return message.body.expiresAt <= latest ? message : { ...message, body: { ...message.body, expiresAt: latest } };
 }
+// A cursor or state filter a client sends is refused when invalid, never widened to everything.
+const ENTRY_STATES = Object.freeze([...new Set([...L.QUESTION_STATES, 'active', 'expired'])]);
+const isCursor = (v) => Number.isSafeInteger(v) && v >= 0;
+function checkSelection({ since, states }) {
+  if (since !== undefined && !isCursor(since)) throw relayError('INVALID_INPUT', 'since must be a nonnegative sequence');
+  if (states !== undefined && !(Array.isArray(states) && states.every((state) => ENTRY_STATES.includes(state)))) {
+    throw relayError('INVALID_INPUT', `states must be an array of entry states (${ENTRY_STATES.join(', ')})`);
+  }
+}
 export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAnswers, onCommit = () => {} }) {
   const { store, rejected } = await loadStore(stateDir, { io, now: clock() });
   const presencePath = join(stateDir, 'presence.json');
@@ -101,10 +110,11 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
     list,
     get: (id) => store.get(id),
     seq: () => store.seq(),
-    snapshot: ({ since, states } = {}) => serial(() => ({ seq: store.seq(), entries: list({ since, states }) })),
+    snapshot: ({ since, states } = {}) => serial(() => { checkSelection({ since, states }); return { seq: store.seq(), entries: list({ since, states }) }; }),
     // Replays the entries changed after `since` through fn, then subscribes fn, in one queued
     // step: nothing published in between is lost or reordered.
     watch: (since, fn) => serial(() => {
+      if (!isCursor(since)) throw relayError('INVALID_INPUT', 'since must be a nonnegative sequence');
       for (const entry of list({ since }).filter((e) => e.seq > since)) fn({ type: 'entry', entry });
       listeners.add(fn);
       return { seq: store.seq(), unsubscribe: () => listeners.delete(fn) };

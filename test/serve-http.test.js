@@ -229,6 +229,16 @@ test('invalid JSON, scalar bodies and non-JSON media types receive client errors
   assert.equal((await call(port, { method: 'PUT', path: '/v1/presence', headers, body: { mode: 'elsewhere' } })).status, 400);
 });
 
+test('an invalid SSE cursor is refused with 400 INVALID_INPUT instead of replaying from 0', { timeout: 5000 }, async (t) => {
+  const { port, inbox } = await setup(t), baseline = inbox.subscribers();
+  for (const [path, headers] of [['/v1/events', { 'last-event-id': 'abc' }], ['/v1/events', { 'last-event-id': '-1' }],
+    ['/v1/events', { 'last-event-id': '1.5' }], ['/v1/events?since=abc', {}], ['/v1/events?since=-2', {}],
+    ['/v1/events?since=0', { 'last-event-id': 'x' }]]) {
+    const r = await call(port, { path, headers: { ...phone, ...headers } });
+    assert.deepEqual([r.status, r.json?.error.code], [400, 'INVALID_INPUT'], `${path} ${JSON.stringify(headers)}`);
+  }
+  assert.equal(inbox.subscribers(), baseline);
+});
 test('routes match their entire path and absent static configuration is readonly 404', async (t) => {
   const { port, q } = await setup(t);
   for (const path of ['/', '/v1/inbox/extra/answer/extra', `/v1/inbox/${q.id}/extra/extra`, '/v1/agents/extra', '/v1/presence/extra', '/v1/events/extra']) {

@@ -432,10 +432,10 @@ one request object per line and one response per line, correlated by a client `r
 | `confirm` | `{ harness, callId, observed }` from the route's post-call observation | entry or `NOT_FOUND` |
 | `answer` / `defer` / `withdraw` | message | entry or error |
 | `notify` | notice message | entry; the identical notice resent returns it unchanged, and any other entry under that `id` is `ID_CONFLICT` (no v1 producer is wired) |
-| `list` | `{ since?: seq, states?: [...] }` | entries |
+| `list` | `{ since?: seq, states?: [...] }` | entries; a `since` that is not a nonnegative integer, or `states` that is not an array of entry states, is `INVALID_INPUT` |
 | `get` | `{ id }` | entry |
 | `presence.get` / `presence.set` | `{ mode? }` | presence |
-| `watch` | `{ since?: seq }` | entries as they change |
+| `watch` | `{ since?: seq }` | entries as they change; an absent `since` is 0, and an invalid one is `INVALID_INPUT` |
 
 The socket's 0600 mode is the only local authentication: any process running as the
 user is trusted, as it already is with the registry.
@@ -468,7 +468,7 @@ The guard sets an answer's or defer's `surface`: `phone` for a proxied request a
 | `GET /v1/inbox/<id>` | one entry |
 | `POST /v1/inbox/<id>/answer` | `AnswerBody`; §5.2 responses, as HTTP 200 or 409 with `{error:{code,message}, entry}` |
 | `POST /v1/inbox/<id>/defer` | `DeferBody` |
-| `GET /v1/events` | Server-Sent Events; each event's id is its `seq`, and `Last-Event-ID` resumes |
+| `GET /v1/events` | Server-Sent Events; each event's id is its `seq`, and `Last-Event-ID` (or `?since=`) resumes; an invalid cursor is 400 `INVALID_INPUT`, never a replay from 0 |
 | `GET` / `PUT /v1/presence` | read or set presence |
 | `GET /v1/agents` | the registry snapshot's agent ids, harnesses and project labels, for display |
 
