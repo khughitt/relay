@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-13T18:15:32Z
-updated: 2026-10-13T18:15:32Z
+updated: 2026-10-13T18:16:26Z
 depends: []
 tags: []
 source: "review:89cdecb"
@@ -31,3 +31,7 @@ Done:
 - `just test-fast` passes on Node 22 and the dev runtime.
 
 Where: src/install/hooks.js:62-104, src/install/claude-code.js, bin/relay.js:186-196, test/install-routes.test.js, test/install-cli.test.js.
+
+## Notes
+
+- 2026-10-13T18:16:26Z (main): concerns: relay-f58531 defect — ask-route install cannot be removed after a harness upgrade and its evidence file conflicts with guard dispatch probes
