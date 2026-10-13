@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T00:56:59Z
+updated: 2026-10-13T01:00:17Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -45,3 +45,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T00:56:59Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T01:00:17Z (design/typed-messages): Human reports phone endpoint works; phone is Android and curl availability is unknown. Host HTTPS recheck is HTTP 200 with seq 0 and no entries; no live Claude question has started. Next human step is Termux curl readiness, then isolated Claude hooks inspection and the three acceptance cases.
