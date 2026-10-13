@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-13T20:04:24Z
-updated: 2026-10-13T20:04:24Z
+updated: 2026-10-13T20:08:10Z
 depends: []
 tags: [testing]
 source: "review:fix/typed-messages-review round 1"
@@ -43,3 +43,7 @@ Done:
 - Each item is fixed or explicitly ruled out with a note.
 - Tests cover items 1, 3 and 4.
 - `just test-fast` passes on Node 22 and the dev runtime.
+
+## Notes
+
+- 2026-10-13T20:08:10Z (fix/typed-messages-review): added from round 2 re-review: 8) docs/api.md /v1/inbox since row: say canonical decimal (no sign or leading zeros) within the safe-integer range; 9) test/serve-http.test.js invalid-cursor test: order /v1/inbox cases first (or resolve call() on SSE headers) so a regression names its input instead of timing out; drop the duplicate ' ' header case
