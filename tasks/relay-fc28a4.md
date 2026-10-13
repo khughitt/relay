@@ -7,7 +7,7 @@ size: xs
 complexity: mid
 process: direct
 created: 2026-10-12T09:19:32Z
-updated: 2026-10-13T01:47:28Z
+updated: 2026-10-13T01:47:29Z
 depends: []
 tags: [feedback, friction, "from:relay"]
 agent: codex
@@ -18,3 +18,7 @@ Why: test/dispatch.test.js:305 ("a slow observer never delays a denial…") runs
 Done: the positive-path child ("after", and "quick" if it shares the risk) gets a budget that real Node startup fits under load, with outerMs and the subscribersMs comment recomputed so the test still proves that a later observer which fits still runs after the hung one times out. Timeout-path children (hang) keep short budgets. The test passes 20 times in a row under `stress`-style load or a concurrent suite.
 
 Where: test/dispatch.test.js:300-310 and the budget computation it relies on (budgetFor in src/subscribers.js; see test/subscribers.test.js:94 for the shape). Related class: relay-ef98dc.
+
+## Notes
+
+- 2026-10-13T01:47:29Z (main): scope: scoped; located the 100 ms record observer at test/dispatch.test.js:305; body states the budget fix and repeat-under-load check; todo P2 xs mid direct
