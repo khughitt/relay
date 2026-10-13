@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T10:01:44Z
+updated: 2026-10-13T10:02:06Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -71,3 +71,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T10:01:44Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T10:02:06Z (design/typed-messages): Human returned and requested continuation. Claude2.1.296/private claude.ai sign-in reverified; existing isolated interactive Claude PID2058061 still has exact flags/cwd. No old service/mapping remained. Resumed explicit worktree service with same private durable state: Node3313360, tracked exec5549, two-hour timeout and EXIT/TERM/INT cleanup traps. Approved host pointer Serve HTTPS8443 changed from none to http://127.0.0.1:3341; restore /usr/bin/tailscale serve --https=8443 off. Stop service with kill -TERM 3313360. HTTPS inbox recovery verified case1 consumed and case2 released, no pending question. Next human step: fresh shape question for desk withdrawal.
