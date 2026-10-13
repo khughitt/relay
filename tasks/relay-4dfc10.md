@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T01:42:27Z
+updated: 2026-10-13T01:42:28Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -61,3 +61,5 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T01:41:02Z (design/typed-messages): Human requested longer than five minutes. Verified and SIGTERMed old owned Node PID 1892784; exec session 1227 exited 0 and its cleanup restored Serve HTTPS8443 to none. Restarted same private state and explicit worktree code under tracked two-hour timeout: Node PID 2071814, exec session 7732. Approved temporary host pointer restored from none to http://127.0.0.1:3341 on HTTPS8443; remove with /usr/bin/tailscale serve --https=8443 off. New supervisor traps EXIT/TERM/INT, kills/reaps Node and removes owned mapping. New stop command kill -TERM 2071814. User phone POST returned HTTP200 answered with surface phone during the renewal; verifying final state and waiter reconnect next.
 - 2026-10-13T01:42:27Z (design/typed-messages): Case 1 observed consumed from point read, answer surface phone, native observed Square. Transition times after answer saved: handed 15ms, consumed 166ms; pending creation-to-save includes 321 seconds of manual setup. User phone HTTP200 response retained in session; private case-1-after.json/case-1-summary.json saved. Claude final reply CHOSEN=Square needs human confirmation. Consumption preceded the service renewal; no pending handback was interrupted. New tracked two-hour service PID 2071814, exec session 7732, cleanup/restore ownership recorded.
+- 2026-10-13T01:42:28Z (design/typed-messages): parked (waiting on user, review): User: confirm Claude replied CHOSEN=Square, then prompt a new shape question and report second question ready; controller: read fresh pending entry, prepare phone defer, verify native reply, then desk withdrawal and acceptance record. Approved Serve HTTPS8443 remains from none to http://127.0.0.1:3341; restore /usr/bin/tailscale serve --https=8443 off. Renewed tracked Node PID 2071814 / exec session 7732, two-hour timeout; kill -TERM 2071814 stops service and trap removes mapping. Case 1 consumed/native Square verified; final Claude reply awaits human observation.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
