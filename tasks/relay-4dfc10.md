@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T01:00:17Z
+updated: 2026-10-13T01:00:18Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -46,3 +46,5 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T00:56:59Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T01:00:17Z (design/typed-messages): Human reports phone endpoint works; phone is Android and curl availability is unknown. Host HTTPS recheck is HTTP 200 with seq 0 and no entries; no live Claude question has started. Next human step is Termux curl readiness, then isolated Claude hooks inspection and the three acceptance cases.
+- 2026-10-13T01:00:18Z (design/typed-messages): parked (waiting on user, review): User: prepare curl in Android Termux and report phone GET result; controller: inspect isolated Claude hooks and guide three live cases, collect evidence and clean up. Approved temporary Serve HTTPS8443 remains from none to http://127.0.0.1:3341; restore /usr/bin/tailscale serve --https=8443 off. Tracked service Node PID 1892784, exec session 1227, one-hour timeout; kill -TERM 1892784 stops service and its trap removes mapping. No live question yet.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
