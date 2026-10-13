@@ -1,13 +1,15 @@
 ---
 id: relay-cb8a44
 title: "The installed ask route survives a Claude Code upgrade with no way to remove it, and its evidence cannot be combined with guard dispatch probes"
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-13T18:15:32Z
-updated: 2026-10-13T18:25:59Z
+updated: 2026-10-13T18:30:54Z
+started: 2026-10-13T18:30:54Z
 depends: []
 tags: []
 source: "review:bc4ef2f"
@@ -35,3 +37,5 @@ Where: src/install/hooks.js:62-104, src/install/claude-code.js, bin/relay.js:186
 ## Notes
 
 - 2026-10-13T18:16:26Z (main): concerns: relay-f58531 defect — ask-route install cannot be removed after a harness upgrade and its evidence file conflicts with guard dispatch probes
+- 2026-10-13T18:30:54Z (main): started
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
