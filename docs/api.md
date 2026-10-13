@@ -665,7 +665,7 @@ replies have no line cap so full retained histories can be read.
 | `handed` | `id`, `waiter` (Handle) | `entry`; only the recorded waiter may take the answer; replay is idempotent. |
 | `confirm` | `harness`, `callId`, `observed` (native answers map) | `entry`. |
 | `answer` / `defer` / `withdraw` | `message` of the matching kind | `entry`; socket withdrawal permits only user/asker reasons. |
-| `notify` | `message` (notice) | `entry`; no v1 producer is wired. |
+| `notify` | `message` (notice) | `entry`; resending the identical notice returns it unchanged, and any other entry under that id is `ID_CONFLICT` with the existing entry, as for `ask`. No v1 producer is wired. |
 | `list` | optional `since` and `states` | `{seq,entries}`: nonterminal entries plus terminal entries changed after `since`, filtered by states. |
 | `get` | `id` | `entry`, including terminal entries. |
 | `presence.get` / `presence.set` | none / `mode` | `presence`. |

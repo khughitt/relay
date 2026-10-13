@@ -94,6 +94,17 @@ test('list: non-terminal by default, terminal ones changed since a seq; notices'
   const n = noticeMessage(); await inbox.notify(n);
   assert.equal((await inbox.seen(n.id)).entry.seen, true);
 });
+test('notify is idempotent for the identical notice and refuses any other entry under its id', async (t) => {
+  const { inbox } = await setup(t), n = noticeMessage(), q = questionMessage();
+  const first = await inbox.notify(n), again = await inbox.notify(n);
+  assert.deepEqual([again.error, again.entry.seq], [null, first.entry.seq]);
+  const changed = await inbox.notify({ ...n, body: { ...n.body, title: 'Build failed' } });
+  assert.deepEqual([changed.error, changed.entry], [{ code: 'ID_CONFLICT' }, first.entry]);
+  await ask(inbox, q);
+  const onQuestion = await inbox.notify({ ...noticeMessage(), id: q.id, correlationId: q.id });
+  assert.deepEqual([onQuestion.error, onQuestion.entry.kind], [{ code: 'ID_CONFLICT' }, 'question']);
+  assert.deepEqual(inbox.get(n.id), first.entry);
+});
 test('a failed replacement write stops the inbox; reopening reconciles', async (t) => {
   const p = await tempState(t), arm = { fail: null };
   const io = { ...fs, rename: async (from, to) => { if (arm.fail?.(to)) { arm.fail = null; throw Object.assign(new Error('disk'), { code: 'EIO' }); } return fs.rename(from, to); } };

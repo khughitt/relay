@@ -426,7 +426,7 @@ one request object per line and one response per line, correlated by a client `r
 | `handed` | `{ id, waiter }`, sent by the waiter before it gives the answer to the harness; idempotent for that waiter (§9.1) | entry, or `NOT_WAITER` |
 | `confirm` | `{ harness, callId, observed }` from the route's post-call observation | entry or `NOT_FOUND` |
 | `answer` / `defer` / `withdraw` | message | entry or error |
-| `notify` | notice message | entry (no v1 producer is wired) |
+| `notify` | notice message | entry; the identical notice resent returns it unchanged, and any other entry under that `id` is `ID_CONFLICT` (no v1 producer is wired) |
 | `list` | `{ since?: seq, states?: [...] }` | entries |
 | `get` | `{ id }` | entry |
 | `presence.get` / `presence.set` | `{ mode? }` | presence |

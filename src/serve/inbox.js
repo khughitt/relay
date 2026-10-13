@@ -81,8 +81,9 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
     }),
     notify: (message) => serial(async (now) => {
       const existing = await current(message.id, now);
-      return existing ? { entry: existing, error: null }
-        : commit({ entry: L.applyClock(L.createNotice(message, { now }), now).entry, changed: true, error: null });
+      if (existing) return existing.kind === 'notice' && isDeepStrictEqual(existing.notice, message)
+        ? { entry: existing, error: null } : { entry: existing, error: { code: 'ID_CONFLICT' } };
+      return commit({ entry: L.applyClock(L.createNotice(message, { now }), now).entry, changed: true, error: null });
     }),
     sweep: () => serial(async (now) => { for (const e of store.all()) await commit(L.applyClock(e, now)); }),
     prune: () => serial((now) => persist(() => store.prune(now))),
