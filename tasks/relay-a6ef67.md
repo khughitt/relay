@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/typed-messages-review
 created: 2026-10-13T18:16:05Z
-updated: 2026-10-13T20:02:34Z
+updated: 2026-10-13T20:04:47Z
 started: 2026-10-13T18:30:55Z
 depends: []
 tags: [testing]
@@ -60,3 +60,4 @@ Related: relay-a7aea1, relay-ef98dc, relay-fc28a4, relay-7c134c, relay-4d07f6.
 - 2026-10-13T19:24:51Z (fix/typed-messages-review): decision: item 2 needs no new seam: the live-timer test runs runServe in-process with its existing clock and onCommit injection; onCommit runs before the service re-arms, so it jumps the clock to 300 ms before the entry's next deadline and the service's own timer must fire
 - 2026-10-13T19:45:15Z (fix/typed-messages-review): decision: item 5 adds no src seam. A socket close is observed through a sentinel question on the same connection (the close handler reports its asker gone; socket-waiter gains 'ask <file>' for the cross-process case); HTTP close deadlines are 5 s (Node retains an incomplete request for tens of seconds); the queued-SSE-close test keeps a 30 ms nudge because HTTP exposes no close signal, and its assertion now polls
 - 2026-10-13T20:02:34Z (fix/typed-messages-review): review: impl round 1 — verdict: accept; findings: Minor 2; reviewer: claude-code
+- 2026-10-13T20:04:47Z (fix/typed-messages-review): minor (deferred): cli-desk 20x10ms poll and routes-ask 50ms negative check, closable and nextCall helper fragility -> relay-0811af
