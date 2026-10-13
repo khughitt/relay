@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/typed-messages-review
 created: 2026-10-13T18:15:32Z
-updated: 2026-10-13T20:02:33Z
+updated: 2026-10-13T20:04:47Z
 started: 2026-10-13T18:30:54Z
 depends: []
 tags: []
@@ -43,3 +43,4 @@ Where: src/install/hooks.js:62-104, src/install/claude-code.js, bin/relay.js:186
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-13T18:41:45Z (fix/typed-messages-review): decision: kept one --evidence record (its format already holds probes and routes) and documented a version-checked jq merge, plus an error hint naming it; rejected a --route-evidence flag because it needs an ops cli.toml change first and vendored adoption (ops-80d482 friction) for a convenience. Plain install now reconciles the route to no rows, removing relay's ask entries; this reverses the plan's 'left untouched' (plan Task 9) and spec §11 now says so
 - 2026-10-13T20:02:33Z (fix/typed-messages-review): review: impl round 1 — verdict: accept; findings: Minor 2; reviewer: claude-code
+- 2026-10-13T20:04:47Z (fix/typed-messages-review): minor (deferred): Codex-misleading probe hint, opaque uncoded installer errors -> relay-0811af
