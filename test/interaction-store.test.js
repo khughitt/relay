@@ -190,10 +190,43 @@ test('nested missing state ancestors are published in order, including after ear
     assert.deepEqual(synced.filter((path) => path.startsWith(p.stateDir)), [
       p.stateDir, join(p.stateDir, 'a'), join(p.stateDir, 'a', 'b'), stateDir, join(stateDir, 'inbox'),
     ]);
-    assert.equal(synced[0], '/');
-    for (let i = 1; i < synced.length; i++) assert.equal(dirname(synced[i]), synced[i - 1]);
+    // A directory owned by another user that this uid cannot write holds no relay link: '/' is synced only as root.
+    assert.equal(synced.includes('/'), process.getuid() === 0);
+    for (let i = 1; i < synced.length; i++) assert.ok(synced[i].startsWith(synced[i - 1] === '/' ? '/' : `${synced[i - 1]}/`), synced.join(' '));
     assert.equal((await store.put(entry())).seq, 1);
   }
+});
+
+// An io whose stat reports `faked` paths as owned by another user with the given mode, and whose
+// directory opens fail with EACCES where that mode gives this uid no read permission.
+function foreignIo(faked, synced) {
+  const foreign = process.getuid() + 1;
+  return { ...fs,
+    stat: async (path, ...args) => {
+      const info = await fs.stat(path, ...args);
+      return Object.hasOwn(faked, path) ? Object.assign(info, { uid: foreign, mode: (info.mode & ~0o7777) | faked[path] }) : info;
+    },
+    open: async (path, ...args) => {
+      if (args[0] === 'r' && Object.hasOwn(faked, path) && !(faked[path] & 0o004)) throw Object.assign(new Error(`EACCES: open '${path}'`), { code: 'EACCES' });
+      const handle = await fs.open(path, ...args);
+      if (args[0] !== 'r') return handle;
+      return { close: () => handle.close(), sync: async () => { await handle.sync(); synced.push(path); } };
+    } };
+}
+
+test('an ancestor owned by another user with mode 0711 is neither opened nor synced', async (t) => {
+  const p = await tempState(t), locked = join(p.stateDir, 'locked'), mine = join(locked, 'mine'), stateDir = join(mine, 'state'), synced = [];
+  await fs.mkdir(mine, { recursive: true, mode: 0o700 });
+  const { store } = await loadStore(stateDir, { io: foreignIo({ [locked]: 0o711 }, synced) });
+  assert.deepEqual(synced.filter((path) => path.startsWith(p.stateDir)), [mine, stateDir, join(stateDir, 'inbox')]);
+  assert.equal((await store.put(entry())).seq, 1);
+});
+
+test('a directory relay creates inside another user\'s writable directory is still published there', async (t) => {
+  const p = await tempState(t), shared = join(p.stateDir, 'shared'), created = join(shared, 'mine'), stateDir = join(created, 'state'), synced = [];
+  await fs.mkdir(shared, { mode: 0o700 });
+  await loadStore(stateDir, { io: foreignIo({ [shared]: 0o1777 }, synced) });
+  assert.deepEqual(synced.filter((path) => path.startsWith(p.stateDir)), [shared, created, stateDir, join(stateDir, 'inbox')]);
 });
 
 test('failed nested ancestor sync prevents loading and retry publishes already-created links', async (t) => {

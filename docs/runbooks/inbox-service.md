@@ -151,9 +151,13 @@ the rejection. Terminal entries older than 30 days are pruned separately, except
 predecessors referenced by nonterminal replacements.
 
 `STORE_FAILED` stops the service after a failed durable write; restart reconciles
-what reached disk before accepting clients. Startup syncs the full ancestor chain
-of the configured absolute state path, including recursively created directories
-and links left by interrupted initialization. A sync failure refuses startup.
+what reached disk before accepting clients. Startup syncs every directory on the
+configured absolute state path that can hold a link relay created, including
+recursively created directories and links left by interrupted initialization: the
+state directory, the inbox, and each ancestor whose child on the path is owned by the
+service's uid and which that uid may write. An ancestor relay could not have written
+into, such as another user's 0711 directory, is never opened. A sync failure refuses
+startup.
 Every acknowledged write is durable.
 Preserve `inbox/seq`, entries, rejected files and presence during recovery; never
 reset the counter or treat a published answer as rolled back.

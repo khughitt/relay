@@ -641,9 +641,11 @@ another answer or defer gets `ALREADY_ANSWERED` with the winner, and withdrawal 
 See [spec §5.1–5.2](specs/2026-10-11-typed-interaction-messages.md#51-states)
 for the full transition table and validation/revision ordering.
 
-`relay serve` is the only inbox writer. Startup fsyncs the full directory ancestor
-chain through the inbox, including existing links after interrupted initialization.
-A failure refuses startup before accepting clients. It fsyncs files and directories and allocates
+`relay serve` is the only inbox writer. Startup fsyncs every directory that can hold a
+link relay created, including existing links after interrupted initialization: the
+state directory, the inbox, and each ancestor whose child on the path is owned by the
+current uid and which that uid may write. Other ancestors (another user's 0711 home,
+`/`) are never opened. A failure refuses startup before accepting clients. It fsyncs files and directories and allocates
 `inbox/seq` before publishing entries, preserving monotonic sequence numbers across
 crashes and pruning. Point reads, snapshots and watch registration queue behind writes.
 Terminal entries older than 30 days are pruned at startup and daily; a predecessor
