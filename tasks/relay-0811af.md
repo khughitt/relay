@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-13T20:04:24Z
-updated: 2026-10-13T20:14:32Z
+updated: 2026-10-13T20:14:33Z
 depends: []
 tags: [testing]
 source: "review:fix/typed-messages-review round 1"
@@ -45,3 +45,4 @@ Done:
 ## Notes
 
 - 2026-10-13T20:08:10Z (fix/typed-messages-review): added from round 2 re-review: 8) docs/api.md /v1/inbox since row: say canonical decimal (no sign or leading zeros) within the safe-integer range; 9) test/serve-http.test.js invalid-cursor test: order /v1/inbox cases first (or resolve call() on SSE headers) so a regression names its input instead of timing out; drop the duplicate ' ' header case
+- 2026-10-13T20:14:33Z (main): scope: item 1 (undeliverable on hook reattach) split out to relay-8301b5 at P2
