@@ -5,7 +5,7 @@ status: shelved
 priority: 3
 size: s
 created: 2026-10-06T15:28:54Z
-updated: 2026-10-13T08:30:19Z
+updated: 2026-10-13T08:30:20Z
 depends: []
 tags: []
 source: tack-dcb11a
@@ -17,3 +17,4 @@ The installer takes the record as --evidence FILE and keeps only the harness and
 ## Notes
 
 - 2026-10-13T08:30:19Z (main): shelved: Wake when a consumer (hq's capability fact view, from hq-dcb11a) asks to cite relay's install evidence record by path, or when relay install starts persisting evidence on hosts.
+- 2026-10-13T08:30:19Z (main): scope: shelved; no consumer has asked yet: hq-dcb11a (source) is done and hq's fact view starts from its own facts; the current records live in ops docs/runbooks/relay-guard-probes.md evidence files from ops-c8e4d1, and relay install keeps only harness and version
