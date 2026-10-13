@@ -4,8 +4,9 @@ title: "Codex subagents inherit a parent CODEX_SESSION_ID while setting their ow
 status: idea
 priority: 2
 created: 2026-10-06T15:03:37Z
-updated: 2026-10-06T15:03:37Z
+updated: 2026-10-13T01:33:55Z
 depends: []
+parent: relay-eaca0e
 tags: [feedback, friction, "from:tasks"]
 agent: codex
 ---
