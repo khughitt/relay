@@ -7,14 +7,14 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T18:16:26Z
+updated: 2026-10-13T18:26:00Z
 depends: []
 tags: []
-source: "review:89cdecb"
+source: "review:bc4ef2f"
 agent: claude-code/claude-opus-5-5
 ---
 
-Why: the post-merge review of 89cdecb (2026-10-13) found these gaps in the inbox service. Each one was checked against the code.
+Why: the post-merge review of bc4ef2f (2026-10-13) found these gaps in the inbox service. Each one was checked against the code.
 
 1. **Expiry is not clamped** (spec §5.4: "Askers that supply their own expiry are clamped to the route's maximum"). Socket `ask` stores any `expiresAt` (src/serve/inbox.js:51-58), and nothing in src/ clamps it. A socket asker with a far-future expiry never expires, outlives the hook's 24 h outer timeout, and ends `asker-gone`. Clamp at `ask` to createdAt plus the route maximum (23 h for claude-code, src/routes/claude-code.js:4).
 2. **`answered` has no deadline.** `nextDeadline` returns null for it (src/interaction/lifecycle.js), and the waiter liveness probe runs once, reattachMs after start (src/serve/socket.js:148-169). The service can restart while an entry is answered, with the hook alive at the recheck but still in reconnect backoff. If the hook then dies before reconnecting (Esc), or the probe returns unknown, the entry stays `answered` forever: never undeliverable, never pruned, always listed. Proposed: an `answered` entry with no accepted waiter becomes `undeliverable` at question.expiresAt. Amend the spec §5.2 table with that row.
