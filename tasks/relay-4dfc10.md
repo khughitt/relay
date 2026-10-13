@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T00:47:54Z
+updated: 2026-10-13T00:56:59Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -42,4 +42,6 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T00:47:11Z (design/typed-messages): parked (waiting on user, review): User opens https://<tailnet-host>:8443/v1/inbox on the phone and reports JSON/error plus curl availability; controller resumes for the three live cases and restoration. LIVE approved test pointer: ServeHTTPS8443 from none to127.0.0.1:3341, restore tailscale serve --https=8443 off. Tracked NodePID1892784/session1227, 1h timeout; kill -TERM1892784 stops service and cleanup trap removes mapping. Private Claude sign-in verified; no live question yet.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T00:47:54Z (design/typed-messages): parked (waiting on user, review): User opens the phone inbox URL and reports JSON/error plus curl availability; controller resumes for the three cases and cleanup. LIVE approved pointer: Tailscale Serve HTTPS 8443, from none, to http://127.0.0.1:3341. Restore: tailscale serve --https=8443 off. Tracked Node PID 1892784, exec session 1227, one-hour timeout; kill -TERM 1892784 stops service and its trap removes the mapping. Private sign-in verified; no live question yet.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T00:56:59Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
