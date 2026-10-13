@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T10:59:11Z
+updated: 2026-10-13T18:26:15Z
 started: 2026-10-12T11:46:49Z
 completed: 2026-10-13T10:59:11Z
 depends: [relay-31973b]
@@ -100,3 +100,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T10:59:11Z (design/typed-messages): All three actual live cases passed with human confirmation: phone answer consumed/native Square, phone defer released/native Square, desk withdrawal withdrawn(user)/Claude denial and60041ms no new question. Recorded docs/runbooks/inbox-e2e-2026-10.md in7e55fca; independent read-only review accepted C0 I0 M0 and full review persisted. Pack1/1, full Node26 576/576, Node22 integration gate576/576, both disclosed F32 file-concurrency1. All temporary service/hook/Claude processes stopped and reaped; Serve8443 restored to none, existing443 retained. No real settings/state change. Evidence and decision ledger retained; no default fixture reliability claim.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T18:26:15Z (main): redaction: the 2026-10-13T00:47:11Z park note's private tailnet hostname was replaced with <tailnet-host> by a history rewrite on 2026-10-13 (see relay-f58531); the 10:53:05Z note's 7e55fca is now 35babc0
