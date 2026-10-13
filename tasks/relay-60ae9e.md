@@ -4,8 +4,9 @@ title: "Codex child sessions export conflicting CODEX_SESSION_ID and CODEX_THREA
 status: idea
 priority: 2
 created: 2026-09-30T12:02:31Z
-updated: 2026-10-06T10:04:44Z
+updated: 2026-10-13T01:33:55Z
 depends: []
+parent: relay-eaca0e
 tags: [feedback, friction, "from:sci", "from:tasks"]
 agent: codex
 ---
