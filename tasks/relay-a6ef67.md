@@ -7,14 +7,14 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-13T18:16:05Z
-updated: 2026-10-13T18:16:27Z
+updated: 2026-10-13T18:26:00Z
 depends: []
 tags: [testing]
-source: "review:89cdecb"
+source: "review:bc4ef2f"
 agent: claude-code/claude-opus-5-5
 ---
 
-Why: the post-merge review of 89cdecb (2026-10-13) found test gaps against the spec's acceptance criteria, and timing-dependent assertions. The merged tree was verified only with file concurrency 1 (ruling F32), and relay-31973b recorded default-concurrency failures at Task 13. On 2026-10-13, one default-concurrency `just test-fast` run each on Node 26.5.0 and 22.23.2 passed 576/576. That is one data point, not proof.
+Why: the post-merge review of bc4ef2f (2026-10-13) found test gaps against the spec's acceptance criteria, and timing-dependent assertions. The merged tree was verified only with file concurrency 1 (ruling F32), and relay-31973b recorded default-concurrency failures at Task 13. On 2026-10-13, one default-concurrency `just test-fast` run each on Node 26.5.0 and 22.23.2 passed 576/576. That is one data point, not proof.
 
 1. **SSE resume is untested** (spec acceptance 5). test/serve-http.test.js:126-149 sends `Last-Event-ID` mark-1 = 0 when only one older entry exists, so a server that ignored the header would pass. Deleting the `e.seq > since` filter (src/serve/inbox.js:99) breaks no test. Add an SSE test and a socket `watch` test whose cursor must exclude an older entry.
 2. **The running service's deadline timer is never exercised.** `arm()` (src/serve/serve.js:26-37) has no test: expiry and window tests call `sweep()` by hand or restart the service. Add a test with an injected clock or a short deadline in which a running service moves pending to expired and handed to unconfirmed, and the waiter receives each state line.
