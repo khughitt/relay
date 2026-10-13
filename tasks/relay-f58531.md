@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-13T01:42:28Z
+updated: 2026-10-13T01:45:19Z
 started: 2026-10-11T20:39:50Z
 depends: [hq-d85ede]
 tags: [cross-project]
@@ -127,4 +127,6 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
 - 2026-10-13T01:37:40Z (design/typed-messages): parked (waiting on user, review): User: answer the first live question from the phone and report Claude output; controller: finish three-case acceptance, restore Serve HTTPS8443 from http://127.0.0.1:3341 to none using /usr/bin/tailscale serve --https=8443 off, review record and integrate. Tracked Node PID 1892784 / exec session 1227, one-hour timeout (about five minutes left); kill -TERM 1892784 stops it and removes mapping via trap. First actual question pending, phone POST awaited.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T01:42:28Z (design/typed-messages): parked (waiting on user, review): User: confirm first Claude final reply and create second test question; controller: finish Task 14 defer/withdraw, restore Serve HTTPS8443 from http://127.0.0.1:3341 to none with /usr/bin/tailscale serve --https=8443 off, review record and integrate. Renewed tracked Node PID 2071814 / exec session 7732, two-hour timeout; kill -TERM 2071814 stops service and removes mapping via trap. First phone answer consumed with native Square; two remaining cases pending.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T01:45:19Z (design/typed-messages): parked (waiting on user, review): User: defer the second live question from phone and answer Square in native Claude; controller: verify case 2, run desk withdrawal case, restore Serve HTTPS8443 from http://127.0.0.1:3341 to none with /usr/bin/tailscale serve --https=8443 off, review acceptance record and integrate. Tracked Node PID 2071814 / exec session 7732, two-hour timeout; kill -TERM 2071814 stops service and removes mapping via trap. Case 1 passed; second question pending.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
