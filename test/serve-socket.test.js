@@ -11,6 +11,7 @@ import { connectSocket } from '../src/serve/client.js';
 import { expectAnswers } from '../src/routes/index.js';
 import { createProcessOps } from '../src/bus/proc.js';
 import { questionMessage, answerMessage, deferMessage, withdrawalMessage, noticeMessage, HANDLE, OTHER_HANDLE } from './helpers/interaction.js';
+import { EXPIRY_MS } from '../src/routes/claude-code.js';
 
 const waiterFile = new URL('./fixtures/socket-waiter.js', import.meta.url).pathname;
 async function setup(t, { io } = {}) {
@@ -59,6 +60,18 @@ test('a waiter killed after an answer leaves it undeliverable; a replay still re
   assert.equal(ctx.inbox.get(q.id).state, 'undeliverable');
   const replay = await ctx.client.request('answer', { message: a });
   assert.deepEqual([replay.ok, replay.entry.state], [true, 'undeliverable']);
+});
+test('socket ask stores the clamped expiry, reattaches an identical resend and refuses a question with no route', async (t) => {
+  const ctx = await setup(t), createdAt = Date.now();
+  const q = questionMessage({ createdAt, body: { expiresAt: createdAt + 30 * 24 * 3_600_000 } });
+  const first = await ctx.client.request('ask', { message: q, waiter: HANDLE, handback: false });
+  assert.deepEqual([first.ok, first.entry.question.body.expiresAt], [true, createdAt + EXPIRY_MS]);
+  const again = await ctx.client.request('ask', { message: q, waiter: HANDLE, handback: false });
+  assert.deepEqual([again.ok, again.entry.seq], [true, first.entry.seq]);
+  const codex = questionMessage({ createdAt, body: { expiresAt: createdAt + 3_600_000, native: { harness: 'codex', sessionId: 's', callId: 'c' } } });
+  const refused = await ctx.client.request('ask', { message: codex, waiter: HANDLE, handback: false });
+  assert.deepEqual([refused.ok, refused.error.code], [false, 'UNSUPPORTED_ROUTE']);
+  assert.equal((await ctx.client.request('get', { id: codex.id })).error.code, 'NOT_FOUND');
 });
 test('handed from another process is NOT_WAITER', async (t) => {
   const ctx = await setup(t), { q } = await waiter(t, ctx);

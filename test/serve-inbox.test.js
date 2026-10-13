@@ -8,6 +8,7 @@ import { tempState } from './helpers/fixture.js';
 import { openInbox } from '../src/serve/inbox.js';
 import { CONFIRM_WINDOW_MS } from '../src/interaction/lifecycle.js';
 import { questionMessage, answerMessage, deferMessage, noticeMessage, withdrawalMessage, HANDLE, NOW } from './helpers/interaction.js';
+import { EXPIRY_MS } from '../src/routes/claude-code.js';
 
 async function setup(t, { mode = 'away' } = {}) {
   const p = await tempState(t); let now = NOW;
@@ -29,6 +30,37 @@ test('ask is idempotent by id and refuses a different body under the same id', a
   const first = await ask(inbox, q), again = await ask(inbox, q);
   assert.equal(first.entry.seq, again.entry.seq);
   assert.equal((await ask(inbox, { ...q, createdAt: q.createdAt + 1 })).error.code, 'ID_CONFLICT');
+});
+test('ask clamps expiresAt to createdAt plus the route maximum, and an identical resend still reattaches', async (t) => {
+  const { inbox, advance, at } = await setup(t), q = questionMessage({ body: { expiresAt: NOW + 7 * 24 * 3_600_000 } });
+  const first = await ask(inbox, q);
+  assert.equal(first.error, null);
+  assert.equal(first.entry.question.body.expiresAt, q.createdAt + EXPIRY_MS);
+  assert.deepEqual({ ...first.entry.question, body: { ...first.entry.question.body, expiresAt: q.body.expiresAt } }, q);
+  assert.equal(inbox.nextDeadline(), q.createdAt + EXPIRY_MS);
+  advance(1000);
+  const again = await ask(inbox, q);
+  assert.deepEqual([again.error, again.entry.seq], [null, first.entry.seq]);
+  advance(q.createdAt + EXPIRY_MS - at()); await inbox.sweep();
+  assert.equal(inbox.get(q.id).state, 'expired');
+});
+test('the clamp is anchored on createdAt: a question older than the route maximum is created expired', async (t) => {
+  const { inbox } = await setup(t), q = questionMessage({ createdAt: NOW - EXPIRY_MS, body: { expiresAt: NOW + 3_600_000 } });
+  const r = await ask(inbox, q);
+  assert.deepEqual([r.error, r.entry.state, r.entry.question.body.expiresAt], [null, 'expired', NOW]);
+});
+test('an expiry within the route maximum is stored as sent', async (t) => {
+  const { inbox } = await setup(t), q = questionMessage({ body: { expiresAt: NOW + EXPIRY_MS } });
+  assert.deepEqual((await ask(inbox, q)).entry.question, q);
+});
+test('a question with no v1 route has no route maximum and is refused before any entry exists', async (t) => {
+  const { inbox } = await setup(t);
+  for (const native of [null, { harness: 'codex', sessionId: 's1', callId: 'c1' }]) {
+    const q = questionMessage({ body: { native } });
+    await assert.rejects(ask(inbox, q), { code: 'UNSUPPORTED_ROUTE' });
+    assert.equal(inbox.get(q.id), null);
+  }
+  assert.equal(inbox.seq(), 0);
 });
 test('a reattach still finds its entry after presence moves to here', async (t) => {
   const { inbox } = await setup(t), q = questionMessage();

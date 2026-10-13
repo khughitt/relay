@@ -319,8 +319,12 @@ its entry. It never has to infer a change from silence.
 
 `expiresAt` is required on every question. The Claude terminal route sets it to the
 creation time plus 23 h. That falls within the hook's 24 h outer timeout, so the
-service expires the question and notifies the hook before Claude kills it. Askers that
-supply their own expiry are clamped to the route's maximum.
+service expires the question and notifies the hook before Claude kills it. At `ask`, the
+service lowers an asker's own `expiresAt` to the question's `createdAt` plus its route's
+maximum (23 h on the Claude terminal route) and stores the lowered value; the clamp depends
+on the message alone, so an identical resend clamps to the stored question and reattaches.
+A question with no v1 route (`native` null, or a harness other than `claude-code`) has no
+maximum and is refused with `UNSUPPORTED_ROUTE`.
 
 ### 5.5 Re-asks, supersession and stale answers
 

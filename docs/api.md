@@ -662,7 +662,7 @@ replies have no line cap so full retained histories can be read.
 
 | Op | Fields | Result / pushes |
 | --- | --- | --- |
-| `ask` | `message` (question), `waiter` (Handle), `handback` (boolean) | `entry`, or `passthrough:true` while here; `{type:"state",entry}` on later transitions for the attached waiter. |
+| `ask` | `message` (question), `waiter` (Handle), `handback` (boolean) | `entry`, or `passthrough:true` while here; `{type:"state",entry}` on later transitions for the attached waiter. `expiresAt` is stored lowered to `createdAt` plus the route maximum (23 h for `claude-code`), and an identical resend reattaches; a question with no v1 route (`native` null or another harness) is `UNSUPPORTED_ROUTE`. |
 | `handed` | `id`, `waiter` (Handle) | `entry`; only the recorded waiter may take the answer; replay is idempotent. |
 | `confirm` | `harness`, `callId`, `observed` (native answers map) | `entry`. |
 | `answer` / `defer` / `withdraw` | `message` of the matching kind | `entry`; socket withdrawal permits only user/asker reasons. |

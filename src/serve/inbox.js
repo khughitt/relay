@@ -5,10 +5,17 @@ import { relayError } from '../protocol.js';
 import { readJson } from '../bus/store.js';
 import { loadStore, writeDurable } from '../interaction/store.js';
 import * as L from '../interaction/lifecycle.js';
+import { expiryLimit } from '../routes/index.js';
 // The service's inbox (spec §5-§6, §8): every operation runs one at a time on a promise chain,
 // the clock is applied to an entry before any write to it, and listeners hear each persisted
 // change after the store has it.
 const MODES = ['here', 'away'];
+// Spec §5.4: an asker's own expiry is lowered to createdAt plus its route's maximum. The clamp
+// depends on the message alone, so an identical resend clamps to the stored question and reattaches.
+function bounded(message) {
+  const latest = message.createdAt + expiryLimit(message);
+  return message.body.expiresAt <= latest ? message : { ...message, body: { ...message.body, expiresAt: latest } };
+}
 export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAnswers, onCommit = () => {} }) {
   const { store, rejected } = await loadStore(stateDir, { io, now: clock() });
   const presencePath = join(stateDir, 'presence.json');
@@ -49,18 +56,19 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
   });
   const inbox = {
     ask: (message, { handback, waiter }) => serial(async (now) => {
-      const existing = await current(message.id, now);
-      if (existing) return existing.kind === 'question' && isDeepStrictEqual(existing.question, message)
+      const question = bounded(message);
+      const existing = await current(question.id, now);
+      if (existing) return existing.kind === 'question' && isDeepStrictEqual(existing.question, question)
         ? { entry: existing, error: null } : { entry: existing, error: { code: 'ID_CONFLICT' } };
       if (presence.mode === 'here') return { passthrough: true };
-      const entry = L.applyClock(L.createEntry(message, { handback, waiter, now }), now).entry;
-      const x = message.body.supersedes;
+      const entry = L.applyClock(L.createEntry(question, { handback, waiter, now }), now).entry;
+      const x = question.body.supersedes;
       if (x === null) return commit({ entry, changed: true, error: null });
       if (entry.state === 'expired') {
         const saved = store.get(x), predecessor = saved ? L.applyClock(saved, now).entry : null;
-        return { entry: null, error: L.checkSupersede(predecessor, message) ?? { code: 'EXPIRED' } };
+        return { entry: null, error: L.checkSupersede(predecessor, question) ?? { code: 'EXPIRED' } };
       }
-      const predecessor = await current(x, now), refusal = L.checkSupersede(predecessor, message);
+      const predecessor = await current(x, now), refusal = L.checkSupersede(predecessor, question);
       if (refusal) return { entry: null, error: refusal };
       const [n, w] = await persist(() => store.supersede(entry, L.applySuperseded(predecessor, entry.id, now).entry));
       for (const e of [n, w]) { onCommit(e); publish({ type: 'entry', entry: e }); }
