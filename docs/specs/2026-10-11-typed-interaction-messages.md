@@ -655,7 +655,9 @@ The installer refuses the `relay ask` PreToolUse binding unless `answer-hook-ter
 and `answer-hook-deny-stops` are `probed` and true for the installed version. It
 refuses the PostToolUse binding unless P2 is. P1 decides the route's `handback`, and P3
 is recorded for the lifecycle's interpretation and gates nothing. This is the same
-practice the installer follows for existing bindings. hq's consolidated view takes relay's rows by reference (ops split
+practice the installer follows for existing bindings. Every install reconciles the
+route to the bindings it declares: an install without the route removes relay's own
+`ask` entries, so a route left on an upgraded, unprobed version can always be taken out. hq's consolidated view takes relay's rows by reference (ops split
 design §5.3).
 
 ## 12. Out of v1, and acceptance

@@ -63,7 +63,7 @@ export function validateCapabilities({ harness, subscribers, bindings, evidence 
     for (const reply of replies) {
       const found = evidence?.probes.some(probe => probe.event === binding.event && probe.reply === reply
         && probe.passed && probe.outerMs >= binding.outerMs);
-      if (!found) throw relayError('UNSUPPORTED_BINDING', `missing capability probe (${harness},${binding.event},${reply})`);
+      if (!found) throw relayError('UNSUPPORTED_BINDING', `missing capability probe (${harness},${binding.event},${reply}); a guard subscriber needs passed dispatch probes in the --evidence record, alongside any route rows (docs/runbooks/inbox-service.md)`);
     }
   }
   return { evidence: evidence === null ? null : { harness: evidence.harness, version: evidence.version } };

@@ -720,7 +720,7 @@ shutdown as 503 `UNAVAILABLE`. Host sleep serves nothing; retry with the same
 | `relay inbox answer ID --decline` | Decline, with no values. |
 | `relay inbox defer ID` / `relay inbox withdraw ID` | Defer to desktop/native UI, or withdraw. |
 | `relay presence [here\|away]` | Read/set durable presence; here is the initial default. |
-| `relay install --harness claude-code --subscribers FILE --target FILE --evidence FILE --with ask [--apply --artifact FILE]` | Plan/apply the evidence-gated route. |
+| `relay install --harness claude-code --subscribers FILE --target FILE --evidence FILE --with ask [--apply --artifact FILE]` | Plan/apply the evidence-gated route. Every Claude install reconciles the route: without `--with ask` it removes relay's own `ask` entries. |
 
 `relay inbox` alone is usage error (exit 2); it is a parent command, not an executable
 listing alias. `--json` emits raw machine states and full entries; `--pretty` emits
@@ -738,7 +738,11 @@ The [capability record](evidence/claude-code-answer-routes.json) has five passin
 for Claude Code 2.1.296. Installation requires terminal-answer and deny-stops rows;
 receipt gates PostToolUse, release enables handback, and under-denial gates nothing.
 An upgraded/unknown version needs new [probes](runbooks/answer-route-probes.md) before
-installation. The user-present tailnet [acceptance run](runbooks/inbox-e2e-2026-10.md)
+installation; until then `--with ask` refuses, and an install without it removes the
+route. `--evidence` names one record per harness version: a guard subscriber also needs
+the dispatch `probes` in that same record, beside the route rows (see the
+[service runbook](runbooks/inbox-service.md#installing-the-question-route)).
+The user-present tailnet [acceptance run](runbooks/inbox-e2e-2026-10.md)
 (Task 14 / spec acceptance 7) passed phone answer, phone defer and desk withdrawal
 with this version. No live hook is installed by this package.
 

@@ -86,10 +86,35 @@ test('planClaudeCode adds the route only with withAsk', () => {
   const noReceipt = parseEvidence(record(all.filter((r) => r.name !== 'answer-receipt-observed')));
   const downgraded = planClaudeCode({ ...base, text: installed, evidence: noReceipt, withAsk: true, installedVersion: '2.1.296' }).changes[0].after;
   assert.deepEqual(JSON.parse(downgraded).hooks.PostToolUse, []);
-  const untouched = planClaudeCode({ ...base, text: installed, evidence: null }).changes[0].after;
-  const before = JSON.parse(installed).hooks, after = JSON.parse(untouched).hooks;
-  assert.deepEqual(after.PreToolUse.filter((r) => r.matcher === 'AskUserQuestion'), before.PreToolUse.filter((r) => r.matcher === 'AskUserQuestion'));
-  assert.deepEqual(after.PostToolUse, before.PostToolUse);
+  // Without --with ask an install declares no route, so the route it installed before goes
+  // and the dispatch hooks are exactly a plain install's.
+  const removed = JSON.parse(planClaudeCode({ ...base, text: installed, evidence: null }).changes[0].after).hooks;
+  assert.deepEqual(removed.PreToolUse, JSON.parse(planClaudeCode(base).changes[0].after).hooks.PreToolUse);
+  assert.deepEqual(removed.PostToolUse, []);
+});
+
+test('after a harness upgrade the stale route refuses with --with ask and goes without it', () => {
+  const base = { target: '/t/settings.json', text: '{}', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
+    subscribers: validateSubscribers({ schema: 1, subscribers: [] }), evidence: parseEvidence(record(all)) };
+  const installed = planClaudeCode({ ...base, withAsk: true, installedVersion: '2.1.296' }).changes[0].after;
+  assert.throws(() => planClaudeCode({ ...base, text: installed, withAsk: true, installedVersion: '2.1.300' }), { code: 'UNSUPPORTED_BINDING', message: /2\.1\.296.*2\.1\.300/ });
+  const plain = planClaudeCode({ ...base, text: installed, installedVersion: '2.1.300' }).changes[0].after;
+  assert.doesNotMatch(plain, / ask --harness/);
+  assert.deepEqual(JSON.parse(plain).hooks.PreToolUse, JSON.parse(planClaudeCode(base).changes[0].after).hooks.PreToolUse);
+});
+
+test('a guard subscriber needs one evidence record holding both the dispatch probes and the route rows', async () => {
+  const guard = { name: 'g', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['/usr/bin/true'], timeoutMs: 1000 };
+  const probes = ['refuse', 'context'].map((reply) => ({ event: 'PreToolUse', reply, outerMs: 600000, passed: true }));
+  const base = { target: '/t/settings.json', text: '{}', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
+    subscribers: validateSubscribers({ schema: 1, subscribers: [guard] }), withAsk: true, installedVersion: '2.1.296' };
+  const routesOnly = parseEvidence(await readFile(new URL('../docs/evidence/claude-code-answer-routes.json', import.meta.url), 'utf8'));
+  assert.throws(() => planClaudeCode({ ...base, evidence: routesOnly }),
+    { code: 'UNSUPPORTED_BINDING', message: /claude-code,PreToolUse,refuse.*dispatch probes.*inbox-service/s });
+  const combined = parseEvidence(JSON.stringify({ ...routesOnly, probes }));
+  const after = JSON.parse(planClaudeCode({ ...base, evidence: combined }).changes[0].after).hooks;
+  assert.ok(after.PreToolUse.some((r) => / hook --harness claude-code .* PreToolUse$/.test(r.hooks[0].command)));
+  assert.ok(after.PreToolUse.some((r) => / ask --harness claude-code --handback PreToolUse$/.test(r.hooks[0].command)));
 });
 
 test('the committed Claude route evidence enables both bindings at its probed version', async () => {
