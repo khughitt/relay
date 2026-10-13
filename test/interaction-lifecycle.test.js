@@ -59,8 +59,49 @@ test('defer: release with handback, desktop presentation without', () => {
   const d2 = step(L.applyDefer(d, second, T + 1));
   assert.equal(d2.messages.length, 2);
   assert.equal(L.applyDefer(d2, second, T + 2).changed, false);
-  const { q, e } = answered();
-  refused(L.applyDefer(e, deferMessage(q), T), 'ALREADY_ANSWERED');
+  const { q, a, e } = answered();
+  assert.deepEqual(refused(L.applyDefer(e, deferMessage(q), T), 'ALREADY_ANSWERED').error.answer, a);
+});
+// Spec §5.2, one row per (state, event): the entry is unchanged and the sender gets the code, with
+// the winning answer wherever one is saved.
+test('§5.2: every answer-holding state refuses another answerId, a defer and a withdrawal, returning the winner', () => {
+  const { q, a, e } = answered(), h = step(L.applyHanded(e, HANDLE, T));
+  const states = {
+    answered: e,
+    handed: h,
+    consumed: step(L.applyConfirm(h, { matches: true, observed: {} }, T + 1)),
+    unconfirmed: step(L.applyClock(h, T + L.CONFIRM_WINDOW_MS)),
+    undeliverable: step(L.applyAskerGone(e, T)),
+  };
+  assert.deepEqual(Object.keys(states).sort(), [...L.ANSWER_HOLDING].sort());
+  const events = [
+    ['another answerId', (entry) => L.applyAnswer(entry, answerMessage(q), T + L.CONFIRM_WINDOW_MS + 1), 'ALREADY_ANSWERED'],
+    ['a defer', (entry) => L.applyDefer(entry, deferMessage(q), T + L.CONFIRM_WINDOW_MS + 1), 'ALREADY_ANSWERED'],
+    ['a withdrawal', (entry) => L.applyWithdraw(entry, withdrawalMessage(q), T + L.CONFIRM_WINDOW_MS + 1), 'ANSWERED'],
+  ];
+  for (const [state, entry] of Object.entries(states)) {
+    assert.equal(entry.state, state);
+    for (const [event, apply, code] of events) {
+      const r = apply(entry), row = `${event} on ${state}`;
+      assert.deepEqual([r.changed, r.error?.code, r.entry], [false, code, entry], row);
+      assert.deepEqual(r.error.answer, a, `${row} returns the winning answer`);
+    }
+  }
+});
+test('§5.2: released, withdrawn and expired refuse an answer and a defer, naming the closure', () => {
+  const closures = {
+    released: ({ q, e }) => step(L.applyDefer(e, deferMessage(q), T)),
+    withdrawn: ({ q, e }) => step(L.applyWithdraw(e, withdrawalMessage(q), T)),
+    expired: ({ q, e }) => step(L.applyClock(e, q.body.expiresAt)),
+  };
+  for (const [state, close] of Object.entries(closures)) {
+    const s = fresh({ handback: true }), entry = close(s);
+    assert.equal(entry.state, state);
+    for (const [event, apply] of [['an answer', (x) => L.applyAnswer(x, answerMessage(s.q), T + 1)], ['a defer', (x) => L.applyDefer(x, deferMessage(s.q), T + 1)]]) {
+      const r = apply(entry);
+      assert.deepEqual([r.changed, r.error?.code, r.entry], [false, state.toUpperCase(), entry], `${event} on ${state}`);
+    }
+  }
 });
 test('withdrawal: pending withdraws, answered returns ANSWERED with the answer', () => {
   const { q, e } = fresh();
