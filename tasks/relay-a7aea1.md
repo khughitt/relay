@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-12T06:01:59Z
-updated: 2026-10-13T01:47:28Z
+updated: 2026-10-13T01:47:29Z
 depends: []
 tags: [feedback, friction, "from:relay"]
 agent: codex
@@ -22,3 +22,4 @@ Where: test/darwin-probe-orchestrator.test.js (lines 38, 56, 162-168, 217, 262-2
 ## Notes
 
 - 2026-10-12T11:23:04Z (feedback): feedback from relay: The full test front door's interrupt readiness check and another test fixture reuse one global process marker across files; isolated interrupt passes while two default suite runs lose the initial-stage archive entry. Same-suite collision is a hypothesis, not causally proved.
+- 2026-10-13T01:47:28Z (main): scope: scoped; body rewritten with the shared fixed markers (orchestrator :38 readiness poll, runtime :67 fixture, probe.mjs:217 self-test) and a concurrency check; todo P2 s mid direct
