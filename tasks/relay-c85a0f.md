@@ -4,8 +4,9 @@ title: Codex worker receives conflicting CODEX_SESSION_ID and CODEX_THREAD_ID; t
 status: idea
 priority: 2
 created: 2026-09-27T19:40:09Z
-updated: 2026-09-27T19:40:09Z
+updated: 2026-10-13T01:33:55Z
 depends: []
+parent: relay-eaca0e
 tags: [feedback, friction, "from:beliefs"]
 agent: codex
 ---
