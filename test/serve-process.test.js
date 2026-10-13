@@ -7,7 +7,9 @@ import { spawnLines } from './helpers/spawn-lines.js';
 import { connectSocket } from '../src/serve/client.js';
 import { runServe } from '../src/serve/serve.js';
 import { inboxPaths } from '../src/interaction/store.js';
-import { questionMessage, answerMessage } from './helpers/interaction.js';
+import { CONFIRM_WINDOW_MS } from '../src/interaction/lifecycle.js';
+import { questionMessage, answerMessage, HANDLE } from './helpers/interaction.js';
+import { until } from './helpers/wait.js';
 
 const worker = new URL('./fixtures/serve-worker.js', import.meta.url).pathname;
 const waiterFile = new URL('./fixtures/socket-waiter.js', import.meta.url).pathname;
@@ -121,4 +123,51 @@ test('service startup publishes precreated nested ancestors and refuses a failed
   assert.deepEqual(synced.filter((path) => path.startsWith(p.stateDir)), [p.stateDir, a, join(a, 'b'), stateDir, join(stateDir, 'inbox')]);
   await assert.rejects(fs.access(join(stateDir, 'serve.sock')), { code: 'ENOENT' });
   await assert.rejects(fs.access(join(stateDir, 'serve.lock')), { code: 'ENOENT' });
+});
+
+// Spec §5.3: expiry is checked on a timer. A running service, with no sweep() and no restart, must
+// move each entry on at its deadline and send its waiter the state line. The service runs with an
+// injected clock; when an entry reaches a watched state, onCommit (which runs before the service
+// re-arms its timer) jumps the clock to LEAD ms before that entry's deadline, so the service's own
+// timer, armed from nextDeadline(), is what has to fire.
+test('the running service moves entries on at their deadlines by its own timer, and tells each waiter', { timeout: 30000 }, async (t) => {
+  const p = await tempState(t), LEAD = 300, jumps = new Map();
+  let offset = 0;
+  const clock = () => Date.now() + offset;
+  const onCommit = (entry) => {
+    const deadline = jumps.get(`${entry.id}:${entry.state}`);
+    if (deadline) { jumps.delete(`${entry.id}:${entry.state}`); offset = deadline(entry) - LEAD - Date.now(); }
+  };
+  const abort = new AbortController();
+  let ready; const started = new Promise((resolve) => { ready = resolve; });
+  const run = runServe({ env: { RELAY_STATE_DIR: p.stateDir }, signal: abort.signal, clock, onCommit, ready, log: () => {} });
+  t.after(async () => { abort.abort(); await run; });
+  const client = await connectSocket((await started).socketPath); t.after(() => client.close());
+  const lines = []; client.onPush((m) => { if (m.type === 'state') lines.push(m.entry); });
+  const line = (id, state) => until(() => lines.find((e) => e.id === id && e.state === state), { timeoutMs: 5000, what: `the ${state} state line` });
+  const ask = async (onState, deadline) => {
+    const now = clock(), q = questionMessage({ createdAt: now, body: { expiresAt: now + 3_600_000 } });
+    jumps.set(`${q.id}:${onState}`, deadline);
+    assert.equal((await client.request('ask', { message: q, waiter: HANDLE, handback: false })).entry.state, 'pending');
+    return q;
+  };
+  await client.request('presence.set', { mode: 'away' });
+
+  const pending = await ask('pending', (e) => e.question.body.expiresAt);
+  const expired = await line(pending.id, 'expired');
+  assert.deepEqual([expired.log.at(-1).cause, expired.log.at(-1).at >= pending.body.expiresAt], ['expiry', true]);
+
+  const handed = await ask('handed', (e) => e.handedAt + CONFIRM_WINDOW_MS);
+  assert.equal((await client.request('answer', { message: answerMessage(handed) })).entry.state, 'answered');
+  const hand = await client.request('handed', { id: handed.id, waiter: HANDLE });
+  assert.equal(hand.entry.state, 'handed');
+  const unconfirmed = await line(handed.id, 'unconfirmed');
+  assert.deepEqual([unconfirmed.log.at(-1).cause, unconfirmed.log.at(-1).at >= hand.entry.handedAt + CONFIRM_WINDOW_MS], ['window', true]);
+
+  const untaken = await ask('answered', (e) => e.question.body.expiresAt);
+  const saved = (await client.request('answer', { message: answerMessage(untaken) })).entry;
+  assert.equal(saved.state, 'answered');
+  const undeliverable = await line(untaken.id, 'undeliverable');
+  assert.deepEqual([undeliverable.log.at(-1).cause, undeliverable.answer], ['expiry', saved.answer]);
+  assert.equal(jumps.size, 0);
 });
