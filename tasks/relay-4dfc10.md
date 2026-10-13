@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T01:45:17Z
+updated: 2026-10-13T01:45:18Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -64,3 +64,5 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
 - 2026-10-13T01:42:28Z (design/typed-messages): parked (waiting on user, review): User: confirm Claude replied CHOSEN=Square, then prompt a new shape question and report second question ready; controller: read fresh pending entry, prepare phone defer, verify native reply, then desk withdrawal and acceptance record. Approved Serve HTTPS8443 remains from none to http://127.0.0.1:3341; restore /usr/bin/tailscale serve --https=8443 off. Renewed tracked Node PID 2071814 / exec session 7732, two-hour timeout; kill -TERM 2071814 stops service and trap removes mapping. Case 1 consumed/native Square verified; final Claude reply awaits human observation.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T01:45:17Z (design/typed-messages): Case 1 PASS: human confirmed Claude final reply CHOSEN=Square; consumed and native Square already verified. Case 2 fresh live question verified pending/inbox/handback true, Circle/Square labels unchanged, private case-2-before.json saved. Controller has not deferred from desktop; human owns phone POST defer and native terminal answer next.
+- 2026-10-13T01:45:18Z (design/typed-messages): parked (waiting on user, review): User: POST defer for the second question from Android Termux, select Square in Claude native question, and report phone response plus Claude reply; controller: verify released/native observation and transition timing, then guide fresh desk withdrawal and record acceptance. Approved Serve HTTPS8443 remains from none to http://127.0.0.1:3341; restore /usr/bin/tailscale serve --https=8443 off. Tracked Node PID 2071814 / exec session 7732, two-hour timeout; kill -TERM 2071814 stops service and trap removes mapping. Case 1 passed; case 2 pending.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
