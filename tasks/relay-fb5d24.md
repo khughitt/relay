@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-13T18:15:17Z
-updated: 2026-10-13T18:15:17Z
+updated: 2026-10-13T18:16:25Z
 depends: []
 tags: []
 source: "review:89cdecb"
@@ -27,3 +27,7 @@ Done:
 - `just test-fast` passes on Node 22 and the dev runtime.
 
 Where: bin/relay.js:93-95, src/commands.js:50, test/cli-surface.test.js or test/routes-ask.test.js.
+
+## Notes
+
+- 2026-10-13T18:16:25Z (main): concerns: relay-f58531 defect — relay ask exits 2 on an invalid RELAY_FORMAT despite its exit-0 hook contract (relay hook shares the pre-existing cause)
