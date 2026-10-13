@@ -78,6 +78,22 @@ test('sweep moves handed to unconfirmed after the window; nextDeadline follows',
   advance(CONFIRM_WINDOW_MS); await inbox.sweep();
   assert.equal(inbox.get(q.id).state, 'unconfirmed'); assert.equal(inbox.nextDeadline(), null);
 });
+test('an answered entry no waiter takes becomes undeliverable at expiresAt, live and after a restart', async (t) => {
+  const { inbox, open, advance, at } = await setup(t), q = questionMessage();
+  await ask(inbox, q); await inbox.answer(q.id, answerMessage(q));
+  assert.equal(inbox.nextDeadline(), q.body.expiresAt);
+  advance(q.body.expiresAt - at() - 1); await inbox.sweep();
+  assert.equal(inbox.get(q.id).state, 'answered');
+  advance(1); await inbox.sweep();
+  assert.deepEqual([inbox.get(q.id).state, inbox.get(q.id).log.at(-1).cause], ['undeliverable', 'expiry']);
+  assert.equal(inbox.nextDeadline(), null);
+  const later = questionMessage({ createdAt: at(), body: { expiresAt: at() + 1000 } });
+  await ask(inbox, later); await inbox.answer(later.id, answerMessage(later));
+  advance(1000);
+  const { inbox: again, rejected } = await open();
+  assert.deepEqual(rejected, []);
+  assert.equal(again.get(later.id).state, 'undeliverable');
+});
 test('reopen recovers entries and presence, and sweeps overdue entries at once', async (t) => {
   const { inbox, open, advance } = await setup(t), q = questionMessage();
   await ask(inbox, q); advance(3_600_000);

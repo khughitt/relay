@@ -232,7 +232,7 @@ A question entry is in exactly one state:
 | `handed` | The route took the answer and is about to give it to the harness. Nothing yet says the agent received it. | no |
 | `consumed` | The harness confirmed receipt: a successful tool result for the same native call carries the saved answer (§9.1 step 6). | yes |
 | `unconfirmed` | Handed, and no confirmation arrived within the route's window. A late matching confirmation still moves it to `consumed`. | yes, except for that |
-| `undeliverable` | An answer is saved, but the asker died before its route took it, and nothing can consume it. | yes |
+| `undeliverable` | An answer is saved, but the asker died before its route took it, or no route took it by `expiresAt`, and nothing can consume it. | yes |
 | `released` | The route handed the question back to the harness's own UI after a defer (§9.1). Relay no longer delivers it. | yes |
 | `withdrawn` | Voided by the asker, by the user, by the asker's death, or by a superseding question. | yes |
 | `expired` | `expiresAt` passed while pending. | yes |
@@ -270,6 +270,7 @@ The states that hold an answer are `answered`, `handed`, `consumed`, `unconfirme
 | `pending` | asker gone | `withdrawn (asker-gone)` | — |
 | `answered` | route takes the answer | `handed` | entry |
 | `answered` | asker gone | `undeliverable` | — |
+| `answered` | clock reaches `expiresAt` | `undeliverable` (cause `expiry`) | — |
 | `handed` | matching confirmation | `consumed` | — |
 | `handed` | confirmation window ends | `unconfirmed` | — |
 | `unconfirmed` | matching confirmation | `consumed` | — |
@@ -586,8 +587,10 @@ as for every live hook.
    `ask` with the same `id`, which reattaches. A pending or answered waiter that has
    not reattached within 10 s of service start is probed with relay's liveness probe,
    and only a confirmed death applies the rule above. A live waiter that is slow to
-   reattach keeps its entry. A `handed` entry whose waiter never returns needs no
-   probe: its confirmation window moves it to `unconfirmed`.
+   reattach keeps its entry. An `answered` entry whose waiter never takes the answer,
+   because the probe found it alive or could not tell, becomes `undeliverable` when the
+   clock reaches `expiresAt` (§5.2), so it never stays `answered`. A `handed` entry whose
+   waiter never returns needs no probe: its confirmation window moves it to `unconfirmed`.
 6. **Confirm receipt.** The PostToolUse hook sends `confirm` with the `tool_use_id` and
    the answers from `tool_response` (P2), then exits 0 with no output.
    - If the entry is `handed` or `unconfirmed` and the answers equal the saved

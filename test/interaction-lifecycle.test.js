@@ -120,12 +120,27 @@ test('clock: expiry, window, deadlines, notices', () => {
   assert.equal(L.applyClock(e, q.body.expiresAt - 1).changed, false);
   assert.equal(L.nextDeadline(e), q.body.expiresAt);
   assert.equal(L.nextDeadline(handed().e), T + L.CONFIRM_WINDOW_MS);
-  assert.equal(L.nextDeadline(answered().e), null);
+  assert.equal(L.nextDeadline(answered().e), answered().e.question.body.expiresAt);
   const n = L.createNotice(noticeMessage(), { now: NOW });
   assert.equal(n.state, 'active'); assert.equal(L.isTerminal(n), false);
   const x = step(L.applyClock(n, n.notice.body.expiresAt));
   assert.equal(x.state, 'expired'); assert.equal(L.isTerminal(x), true);
   assert.equal(step(L.applySeen(n, T)).seen, true);
+});
+test('an answer no route took by expiresAt becomes undeliverable, keeps the answer and validates', () => {
+  const { a, e } = answered(), at = e.question.body.expiresAt;
+  assert.equal(L.applyClock(e, at - 1).changed, false);
+  const late = step(L.applyClock(e, at));
+  assert.deepEqual([late.state, late.answer, late.log.at(-1)], ['undeliverable', a, { seq: null, at, state: 'undeliverable', cause: 'expiry' }]);
+  assert.equal(L.nextDeadline(late), null);
+  assert.deepEqual(roundtrip(late), stamped(late));
+  const replay = L.applyAnswer(late, a, at + 1);
+  assert.deepEqual([replay.error, replay.changed], [null, false]);
+  const early = stamped(late);
+  early.log = early.log.map((l) => l.cause === 'expiry' ? { ...l, at: at - 1 } : l); early.updatedAt = at - 1;
+  assert.throws(() => L.validateEntry(early), { code: 'INVALID_ENTRY' });
+  const handedLate = step(L.applyHanded(e, HANDLE, T));
+  assert.equal(L.applyClock(handedLate, at).entry.state, 'unconfirmed');
 });
 test('validateEntry rejects inconsistent entries', () => {
   const { e } = answered();

@@ -628,7 +628,8 @@ changing that terminal state.
 
 Defer releases a handback route; otherwise it leaves pending with desktop presentation.
 Withdrawal, expiry, asker loss or supersession closes a pending question. Asker loss
-with an answer saved yields undeliverable. Sender withdrawals log `withdrawal:<reason>`;
+with an answer saved yields undeliverable, and so does reaching `expiresAt` while the
+answer is still `answered` (logged `expiry`). Sender withdrawals log `withdrawal:<reason>`;
 service-generated loss and supersession log distinct `asker-gone` and `superseded` causes.
 Consumed, unconfirmed, undeliverable, released, withdrawn and expired are terminal,
 except that unconfirmed can still receive confirmation. Notices are active until expiry
@@ -673,7 +674,8 @@ replies have no line cap so full retained histories can be read.
 
 `since` is a durable integer sequence, never a date. Restart grants recorded waiters
 10 seconds to reattach; confirmed-dead waiters withdraw pending questions or make
-saved answers undeliverable. Unknown liveness is not death. Closing an attached
+saved answers undeliverable. Unknown liveness is not death; an answer that no waiter
+has taken by the question's `expiresAt` becomes undeliverable. Closing an attached
 waiter connection while the service runs records asker loss; service shutdown does not.
 
 ### HTTP protocol and guard
