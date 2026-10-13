@@ -1,13 +1,15 @@
 ---
 id: relay-efb409
 title: Update typed interaction completion status
-status: todo
+status: doing
 priority: 2
 size: xs
 complexity: low
 process: direct
+owner: design/typed-messages
 created: 2026-10-13T11:02:03Z
-updated: 2026-10-13T11:02:40Z
+updated: 2026-10-13T11:03:42Z
+started: 2026-10-13T11:03:42Z
 depends: []
 parent: relay-f58531
 tags: []
@@ -19,3 +21,5 @@ After all three user-present acceptance cases passed and the Task14 record was i
 ## Notes
 
 - 2026-10-13T11:02:40Z (design/typed-messages): concerns: relay-31973b extension — replace temporary acceptance-pending labels with links to the now-passed user-present Task14 record and current576-test verification.
+- 2026-10-13T11:03:42Z (design/typed-messages): started
+  provenance: {"harness_session":"codex:01a134ed-f2e1-7850-8120-0f399d750326","harness_session_source":"CODEX_THREAD_ID"}
