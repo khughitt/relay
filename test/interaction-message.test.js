@@ -48,6 +48,14 @@ test('UUID text accepts the nil UUID and still rejects malformed values', () => 
   const malformed = '00000000-0000-0000-0000-00000000000g';
   invalid({ ...questionMessage(), id: malformed, correlationId: malformed });
 });
+test('UUID text is lowercase only: an uppercase id would collide with its lowercase twin on a case-insensitive filesystem', () => {
+  const q = questionMessage(), upper = q.id.toUpperCase();
+  invalid({ ...q, id: upper, correlationId: upper });
+  invalid({ ...answerMessage(q), correlationId: upper });
+  invalid(answerMessage(q, { answerId: uuid().toUpperCase() }));
+  invalid(questionMessage({ body: { supersedes: uuid().toUpperCase() } }));
+  invalid({ ...deferMessage(q), id: uuid().toUpperCase() });
+});
 test('items: 1 to 4, unique ids, option counts by type, limits', () => {
   const item = questionMessage().body.items[0];
   const withItems = (items) => questionMessage({ body: { items } });
@@ -113,4 +121,10 @@ test('the committed JSON Schema agrees with the validator vocabularies', () => {
   assert.deepEqual(schema.$defs.item.properties.type.enum, ITEM_TYPES);
   assert.deepEqual(schema.$defs.surface.enum, SURFACES);
   assert.deepEqual(schema.$defs.withdrawal.properties.reason.enum, WITHDRAWAL_REASONS);
+  const pattern = new RegExp(schema.$defs.uuid.pattern), id = uuid();
+  for (const [text, valid] of [[id, true], ['00000000-0000-0000-0000-000000000000', true], [id.toUpperCase(), false], [`${id}x`, false], [`x${id}`, false]]) {
+    assert.equal(pattern.test(text), valid, text);
+    if (valid) assert.equal(validateMessage(questionMessage({ id: text })).id, text);
+    else invalid(questionMessage({ id: text }));
+  }
 });

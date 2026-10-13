@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { relayError, validateHandle } from '../protocol.js';
-import { checkAnswer, validateMessage, LOCAL_SURFACES, WITHDRAWAL_REASONS } from './message.js';
+import { checkAnswer, isUuid, validateMessage, LOCAL_SURFACES, WITHDRAWAL_REASONS } from './message.js';
 // The question lifecycle as pure functions (spec §5). Each returns { entry, changed, error };
 // new log rows carry seq: null, which the store stamps when it persists the entry.
 export const CONFIRM_WINDOW_MS = 60000;
@@ -107,7 +107,6 @@ const normalized = (message) => {
   if (!isDeepStrictEqual(clean, message)) fail('message is not normalized');
   return clean;
 };
-const uuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
 const answers = (v) => object(v) && Object.values(v).every((value) => typeof value === 'string');
 export function validateEntry(v) {
   try {
@@ -146,7 +145,7 @@ export function validateEntry(v) {
     if (v.state === 'withdrawn' ? !object(v.withdrawal) || !keys(v.withdrawal, ['reason'])
       || !WITHDRAWAL_REASONS.includes(v.withdrawal.reason) : v.withdrawal !== null) fail('invalid withdrawal');
     if (v.supersededBy !== null) {
-      if (!uuid(v.supersededBy)) fail('invalid supersededBy');
+      if (!isUuid(v.supersededBy)) fail('invalid supersededBy');
       if (v.state !== 'withdrawn' || v.withdrawal.reason !== 'superseded' || v.supersededBy === v.id) fail('invalid supersession');
     }
     if (v.log[0].state !== 'pending' || v.log[0].cause !== 'question') fail('invalid question creation');

@@ -277,6 +277,12 @@ test('derived persisted states require legal cause and state evidence', () => {
   }
 });
 
+test('persisted entries refuse uppercase UUID text, as messages do', () => {
+  const { e } = fresh(), by = questionMessage().id;
+  const superseded = stamped(step(L.applySuperseded(e, by, T)));
+  assert.equal(L.validateEntry(superseded).supersededBy, by);
+  assert.throws(() => L.validateEntry({ ...superseded, supersededBy: by.toUpperCase() }), { code: 'INVALID_ENTRY' });
+});
 test('sender withdrawals with special reasons always require their accepted envelopes', () => {
   for (const reason of ['asker-gone', 'superseded']) {
     const { q, e } = fresh();

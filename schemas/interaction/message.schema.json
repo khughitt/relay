@@ -158,8 +158,10 @@
   ],
   "$defs": {
     "uuid": {
+      "description": "Lowercase UUID text. Uppercase is refused: ids are compared exactly and name entry files, so two spellings of one UUID would collide on a case-insensitive filesystem.",
       "type": "string",
-      "format": "uuid"
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$"
     },
     "ms": {
       "type": "integer",

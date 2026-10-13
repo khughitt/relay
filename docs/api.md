@@ -489,7 +489,9 @@ covers operation. Node >=22 remains the runtime floor.
 
 ### Messages and entries
 
-Times are Unix milliseconds; message ids and `answerId` are sender-generated UUIDs.
+Times are Unix milliseconds; message ids and `answerId` are sender-generated UUIDs,
+written in lowercase. Uppercase UUID text is refused with `INVALID_MESSAGE`, because ids
+are compared exactly and name entry files.
 `Harness` is `claude-code | codex | opencode`. These message types follow
 [spec §4](specs/2026-10-11-typed-interaction-messages.md#4-envelope-and-kinds):
 
