@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T10:18:50Z
+updated: 2026-10-13T10:22:32Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -77,3 +77,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T10:18:50Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T10:22:32Z (design/typed-messages): Case3 desk withdrawal executed on fresh pending question through explicit private-state worktree CLI, exit0. Durable withdrawn(reason user) verified; hook PID3471713 exited. Timings after creation pending4ms, withdrawn192967ms including manual wait. Tracked no-reask observation through60041ms after withdrawal saw no new inbox question and exited0. Human Claude final-response/no-reask confirmation requested asynchronously, not received yet; terminal acceptance not claimed. All private evidence saved. Cleanup verified: Serve8443 from http://127.0.0.1:3341 restored to none, original443 retained; Node3313360 reaped, exec5549 exit0,3341closed, marker absent. No agent service/check/child running; user-owned Claude PID2058061 remains idle (/exit closes it).
