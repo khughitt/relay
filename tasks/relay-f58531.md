@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: design/typed-messages
 created: 2026-10-11T17:52:19Z
-updated: 2026-10-13T11:11:27Z
+updated: 2026-10-13T11:27:54Z
 started: 2026-10-11T20:39:50Z
 completed: 2026-10-13T11:11:27Z
 depends: [hq-d85ede]
@@ -147,3 +147,4 @@ Done: a reviewed spec in relay docs/specs naming the envelope, the kinds with JS
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T11:11:27Z (design/typed-messages): Reviewed spec and plan implemented through all14 independently reviewed tasks, plus accepted documentation status closeout. Claude2.1.296 actual Android tailnet phone answer consumed/native Square, phone defer released/native Square, desk withdrawal withdrawn(user)/denial and60041ms no new question; all human-confirmed, recorded7e55fca. Final whole-source review Important3 fixed658e342 and scoped re-review accepted; no open Critical/Important. Current full Node26 and Node22 suites576/576 with disclosed file-concurrency1, packchecks1/1 both; default fixture timing/markers and known subscriber leak remain tracked. All test services/hooks/isolated Claude and owned leaked fixture stopped/reaped, temporary8443mapping removed, real state/settings unchanged. Final decision/review evidence retained; personal local integration follows, external publication separate.
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T11:27:54Z (main): Integrated locally into main by89cdecb25ea0814137210b9acb68d4869520e518. Fresh merged-main gates576/576 on Node26.5.0 and Node22.23.2 with disclosed file-concurrency1, all failure/cancel/skip counts0; full logs parsed. All38rulings, deferred findings and complete reviews/evidence archived privately before worktree cleanup. Temporary test mapping/services/Claude/hooks stopped; this session host-load nothing left. Known owned fixture survivor reaped and existing7c134c follow-up updated. No push/PR/live install; separate Darwin/publication gates preserved.
