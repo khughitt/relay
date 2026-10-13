@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/typed-messages-review
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T20:08:48Z
+updated: 2026-10-13T20:14:33Z
 started: 2026-10-13T18:30:55Z
 completed: 2026-10-13T20:08:48Z
 depends: []
@@ -59,3 +59,4 @@ Where: src/serve/inbox.js, src/serve/socket.js, src/serve/http.js, src/interacti
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-13T20:08:48Z (fix/typed-messages-review): socket-ask expiry clamped to createdAt + route max, no-route questions refused; answered -> undeliverable at expiry; notify ID_CONFLICT; socket and HTTP cursors/states refused unless valid (HTTP plain decimal only); lowercase-only UUIDs incl. schema pattern; ancestor sync limited to dirs that can hold a relay link; 4cf2917 947fe66 dfb5540 2a702e7 00dd6d0 593c9e5 84c3c55; minors deferred to relay-0811af
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-13T20:14:33Z (main): minor (deferred) update: the undeliverable-on-reattach finding now lives in relay-8301b5
