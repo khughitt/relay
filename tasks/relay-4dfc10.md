@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: design/typed-messages
 created: 2026-10-11T22:48:56Z
-updated: 2026-10-13T00:26:27Z
+updated: 2026-10-13T00:28:15Z
 started: 2026-10-12T11:46:49Z
 depends: [relay-31973b]
 parent: relay-f58531
@@ -31,3 +31,4 @@ step: "Task 14: Live end to end, with the user present (acceptance 7)"
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T00:26:27Z (design/typed-messages): resumed
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T00:28:15Z (design/typed-messages): Guided Task14 resumed at user request. Preflight confirms prepared settings hash and exactly two ask hooks, empty private state, Claude2.1.296, Serve8443 unset and localhost3341 available. Private auth status not logged in; user sign-in is first step. No service, exposure or desktop action started; client/daemon warning retained.
