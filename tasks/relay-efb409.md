@@ -1,15 +1,16 @@
 ---
 id: relay-efb409
 title: Update typed interaction completion status
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-13T11:02:03Z
-updated: 2026-10-13T11:10:50Z
+updated: 2026-10-13T11:11:26Z
 started: 2026-10-13T11:03:42Z
+completed: 2026-10-13T11:11:26Z
 depends: []
 parent: relay-f58531
 tags: []
@@ -29,3 +30,7 @@ After all three user-present acceptance cases passed and the Task14 record was i
   provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-13T11:10:49Z (design/typed-messages): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-13T11:10:50Z (design/typed-messages): Fresh read-only doc-closeout review accepted exact five replacements and links with C0 I0 M0. Verified dispatch codex/gpt-6.1-sol medium; full returned review will be persisted by controller. Cannot-verify inherited576-test/review evidence resolved by controller raw Node26/22 logs, recorded reviews and exact source diff against accepted658e342. Focused package1/1 on both runtimes and just check passed; no runtime/package policy changes.
+- 2026-10-13T11:11:26Z (design/typed-messages): done
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T11:11:26Z (design/typed-messages): Updated five acceptance status paragraphs across README, API, accepted spec and approved plan with completed live-record links and current576-test file-concurrency1 disclosure. Exact edits and links independently reviewed C0 I0 M0; both focused pack checks1/1, just check/tasks checks clean. Docs-only2b54ded; all runtime/release gates preserved.
+  provenance: {"harness_session":"codex:01a12de5-994f-7a21-b7f8-ffe86be306eb","harness_session_source":"CODEX_THREAD_ID"}
