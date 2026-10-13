@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/typed-messages-review
 created: 2026-10-13T18:15:49Z
-updated: 2026-10-13T18:52:53Z
+updated: 2026-10-13T18:54:37Z
 started: 2026-10-13T18:30:55Z
 depends: []
 tags: []
@@ -46,3 +46,4 @@ Where: src/serve/inbox.js, src/serve/socket.js, src/serve/http.js, src/interacti
   provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-13T18:50:54Z (fix/typed-messages-review): uuid case: refuse uppercase with INVALID_MESSAGE (not normalize), for every interaction UUID field (id, correlationId, supersedes, answerId); normalizing would change the sender's id and break resent-message identity. One lowercase rule (message.js isUuid) now backs validateMessage and validateEntry; schema uuid def gains the same pattern.
 - 2026-10-13T18:52:53Z (fix/typed-messages-review): stuck answered: an answered entry becomes undeliverable at question.expiresAt with cause 'expiry' (not a new cause), mirroring how 'asker-gone' already names one event across pending->withdrawn and answered->undeliverable; validateEntry's expiry rule now accepts answered->undeliverable at or after expiresAt. The CLI's undeliverable label shows 'reason: expiry'. ask.js already passes an undeliverable state through to the native UI (UNEXPECTED_STATE).
+- 2026-10-13T18:54:37Z (fix/typed-messages-review): expiry clamp: clamp (not refuse) in inbox.ask to message.createdAt + route maximum, before the entry exists; reattach compares the stored question with the resend after the same clamp. Anchor is createdAt, not operation time: the clamp is then a pure function of the message (identical resend always compares equal), it equals the Claude route's own createdAt+23h so route questions are never altered, and it bounds the wait from when the asker began, which is what the hook's 24 h outer timeout measures (a now-anchor would let a question first accepted after the hook's reconnect backoff outlive the hook). Caveat: a future createdAt would stretch the bound; the socket is same-user (0600) and createdAt comes from the same host clock. Two far-future resends that clamp to the same value compare equal (the raw expiry is not stored).
