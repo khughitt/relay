@@ -1,13 +1,15 @@
 ---
 id: relay-a6ef67
 title: "Typed-messages tests: SSE resume cursor, live deadline timer, schema-derived rejection fixtures, missing lifecycle rows, and timing-dependent assertions"
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-13T18:16:05Z
-updated: 2026-10-13T18:26:00Z
+updated: 2026-10-13T18:30:55Z
+started: 2026-10-13T18:30:55Z
 depends: []
 tags: [testing]
 source: "review:bc4ef2f"
@@ -50,3 +52,5 @@ Related: relay-a7aea1, relay-ef98dc, relay-fc28a4, relay-7c134c, relay-4d07f6.
 ## Notes
 
 - 2026-10-13T18:16:27Z (main): concerns: relay-f58531 defect — spec acceptance 2 and 5 coverage missing; timing-dependent assertions under default concurrency
+- 2026-10-13T18:30:55Z (main): started
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
