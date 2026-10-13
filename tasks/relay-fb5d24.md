@@ -1,13 +1,15 @@
 ---
 id: relay-fb5d24
 title: "relay ask and relay hook exit 2 on an invalid RELAY_FORMAT, which Claude Code treats as a blocking hook error"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: low
 process: direct
+owner: main
 created: 2026-10-13T18:15:17Z
-updated: 2026-10-13T18:25:59Z
+updated: 2026-10-13T18:30:53Z
+started: 2026-10-13T18:30:53Z
 depends: []
 tags: []
 source: "review:bc4ef2f"
@@ -31,3 +33,5 @@ Where: bin/relay.js:93-95, src/commands.js:50, test/cli-surface.test.js or test/
 ## Notes
 
 - 2026-10-13T18:16:25Z (main): concerns: relay-f58531 defect — relay ask exits 2 on an invalid RELAY_FORMAT despite its exit-0 hook contract (relay hook shares the pre-existing cause)
+- 2026-10-13T18:30:53Z (main): started
+  provenance: {"harness_session":"claude-code:cee0471d-7415-41b5-933e-f3803576f4bb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
