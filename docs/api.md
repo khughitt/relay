@@ -472,5 +472,287 @@ errors internally but are not serialized into diagnostics. See the
 [operator repair procedure](runbooks/registry-lock-repair.md).
 
 Local tarball smoke tests cover exports, portable JSON, sole plugin export and
-installed CLI. Remote/tag portability, physical Darwin process behavior, live
-harness capability, installation, migration and operator cutover remain later gates.
+installed CLI. The interaction packaging checks also read the installed schema and
+service runbook. The Claude terminal route has version-specific local capability
+evidence; user-present tailnet acceptance, remote/tag portability, physical Darwin
+process behavior, consumer migration and operator cutover remain separate gates.
+
+
+## Interaction messages and relay serve
+
+v1 adds a durable interaction inbox, reached through the CLI, private socket and
+optional HTTP surface. No root package export is added: the interaction modules
+are internal, not a library API. The packaged JSON Schema is
+`schemas/interaction/message.schema.json`; the [service runbook](runbooks/inbox-service.md)
+covers operation. Node >=22 remains the runtime floor.
+
+### Messages and entries
+
+Times are Unix milliseconds; message ids and `answerId` are sender-generated UUIDs.
+`Harness` is `claude-code | codex | opencode`. These message types follow
+[spec §4](specs/2026-10-11-typed-interaction-messages.md#4-envelope-and-kinds):
+
+```ts
+type Party = { kind: 'agent'; agentId: string } | { kind: 'user' };
+type Surface = 'phone' | 'desktop' | 'cli' | 'terminal';
+type Kind = 'question' | 'answer' | 'defer' | 'withdrawal' | 'notice';
+type Message = {
+  schema: 1;
+  id: string;            // this message
+  kind: Kind;
+  correlationId: string; // the question's id; a question's own id; a notice's own id
+  from: Party;
+  to: Party;
+  createdAt: number;
+  context: { project: string | null; taskId: string | null; cwd: string | null };
+  body: QuestionBody | AnswerBody | DeferBody | WithdrawalBody | NoticeBody;
+};
+
+type QuestionBody = {
+  class: 'clarification' | 'artifact-review' | 'authorization';
+  expiresAt: number;                       // required; §5.4
+  native: { harness: Harness; sessionId: string; callId: string } | null;
+  artifact: { ref: string; revision: string } | null;
+  supersedes: string | null;               // id of a question this one replaces
+  items: Item[];                           // 1 to 4
+};
+type Item = {
+  id: string;                              // stable within the question
+  header: string;                          // at most 16 characters
+  prompt: string;                          // at most 1000 characters
+  type: 'boolean' | 'single' | 'multi' | 'text';
+  options: Option[];                       // 2 to 4 for single and multi; empty otherwise
+  recommended: string | null;              // an option id, or null
+  allowOther: boolean;                     // free text beside the options; single and multi only
+  maxLength: number | null;                // text only, at most 2000
+};
+type Option = { id: string; label: string; description: string | null };
+
+type Value =
+  | { type: 'boolean'; value: boolean }
+  | { type: 'choice'; optionIds: string[] }        // exactly 1 for single
+  | { type: 'other'; text: string }                // only when allowOther
+  | { type: 'text'; text: string };
+type AnswerBody = {
+  answerId: string;                    // client-generated UUID; the idempotency key
+  surface: Surface;
+  outcome: 'answered' | 'declined';
+  artifactRevision: string | null;     // the revision the responder saw
+  values: Record<string, Value>;       // every item id when answered; empty when declined
+};
+type DeferBody = { surface: Surface };
+type WithdrawalBody = {
+  reason: 'asker' | 'user' | 'asker-gone' | 'superseded' | 'answered-elsewhere';
+};
+type NoticeBody = { expiresAt: number; title: string; text: string; level: 'info' | 'warn' };
+```
+
+Questions contain 1–4 items; single/multi items have 2–4 options. Item ids and option
+ids are unique within their respective containers. Answers use option ids, not
+labels or positions. Unknown optional message fields are ignored; unknown schema
+versions or kinds fail. Questions are immutable: replace one with `supersedes`.
+An answered outcome supplies every item; a declined outcome supplies no values.
+An authorization answer is local-only, but even a saved answer grants no authority.
+A remote client may decline or defer. The Claude terminal adapter produces only
+clarification questions, expiring after 23 hours. Notice producers are not wired in v1.
+
+The persisted entry types describe the reviewed store (§6): all fields shown are
+required, including null fields and empty histories. Invalid or unknown durable
+entry fields are rejected rather than normalized away.
+
+```ts
+type QuestionState = 'pending' | 'answered' | 'handed' | 'consumed' | 'unconfirmed'
+  | 'undeliverable' | 'released' | 'withdrawn' | 'expired';
+type EntryState = QuestionState | 'active';
+type EntryFrame = {
+  schema: 1;
+  id: string;
+  seq: number; // positive, durable service-wide sequence; gaps are allowed
+  updatedAt: number;
+  log: { seq: number; at: number; state: EntryState; cause: string }[];
+};
+type QuestionEntry = EntryFrame & {
+  kind: 'question';
+  question: Message;
+  state: QuestionState;
+  presentation: 'inbox' | 'desktop';
+  route: { handback: boolean; waiter: Handle | null };
+  answer: Message | null;
+  handedAt: number | null;
+  observed: Record<string, string> | null;
+  withdrawal: WithdrawalBody | null;
+  supersededBy: string | null;
+  messages: { at: number; message: Message }[];
+  observations: { at: number; surface: 'terminal'; answers: Record<string, string> }[];
+};
+type NoticeEntry = EntryFrame & {
+  kind: 'notice';
+  notice: Message;
+  state: 'active' | 'expired';
+  seen: boolean;
+};
+type Entry = QuestionEntry | NoticeEntry;
+type Presence = { mode: 'here' | 'away'; updatedAt: number };
+```
+
+`question`/`notice` retains the original normalized message; `messages` retains
+accepted answer, defer and withdrawal messages. `observations` retains native answer
+observations, including answers from the terminal after release or expiry. `observed`
+is the latest such map. The full saved entry and its histories are returned to clients.
+Raw harness payloads, transcripts and environment values are never persisted.
+
+### Lifecycle
+
+| State | Meaning / human label |
+| --- | --- |
+| `pending` | Waiting, presented in the inbox or on the desktop. |
+| `answered` | answer saved |
+| `handed` | handed to the agent |
+| `consumed` | the agent received it |
+| `unconfirmed` | handed, receipt not confirmed |
+| `undeliverable` | Saved answer shown with its recorded reason. |
+| `released` | Returned to the harness's native question UI. |
+| `withdrawn` | Voided by withdrawal, asker loss or supersession. |
+| `expired` | Deadline passed while pending. |
+
+Only `consumed` means receipt. JSON retains the machine state; human CLI output uses
+the fixed labels above. A valid first answer moves pending → answered; the recorded
+waiter moves answered → handed before writing the harness reply. A matching native
+confirmation moves handed or unconfirmed → consumed. A mismatching confirmation,
+or 60 seconds without confirmation after handoff, yields unconfirmed. Late matching
+confirmation still consumes it. Released/expired native receipts are recorded without
+changing that terminal state.
+
+Defer releases a handback route; otherwise it leaves pending with desktop presentation.
+Withdrawal, expiry, asker loss or supersession closes a pending question. Asker loss
+with an answer saved yields undeliverable. Sender withdrawals log `withdrawal:<reason>`;
+service-generated loss and supersession log distinct `asker-gone` and `superseded` causes.
+Consumed, unconfirmed, undeliverable, released, withdrawn and expired are terminal,
+except that unconfirmed can still receive confirmation. Notices are active until expiry
+and separately carry a seen mark.
+
+A retry with the saved `answerId` returns the entry in every answer-holding state;
+another answer or defer gets `ALREADY_ANSWERED` with the winner, and withdrawal gets
+`ANSWERED`. Clock expiry is applied before mutations, including after host sleep.
+See [spec §5.1–5.2](specs/2026-10-11-typed-interaction-messages.md#51-states)
+for the full transition table and validation/revision ordering.
+
+`relay serve` is the only inbox writer. Startup fsyncs the full directory ancestor
+chain through the inbox, including existing links after interrupted initialization.
+A failure refuses startup before accepting clients. It fsyncs files and directories and allocates
+`inbox/seq` before publishing entries, preserving monotonic sequence numbers across
+crashes and pruning. Point reads, snapshots and watch registration queue behind writes.
+Terminal entries older than 30 days are pruned at startup and daily; a predecessor
+referenced by a nonterminal replacement is retained. Invalid/reconciliation-failed
+entries go to `inbox/rejected/`, never automatically cleaned. A failed write stops
+service operations with `STORE_FAILED`; restart reconciles disk before serving.
+
+### Local socket protocol
+
+`$STATE/serve.sock` is privately owned, mode 0600; same-user processes are trusted.
+Each newline-delimited JSON request is `{reqId, op, ...fields}`; a success is
+`{reqId, ok:true, ...result}`, and an error is
+`{reqId, ok:false, error:{code,message}, entry?, ...detail}`. Requests are limited to
+1 MiB in UTF-8 bytes per line; oversize lines close the connection. Private service
+replies have no line cap so full retained histories can be read.
+
+| Op | Fields | Result / pushes |
+| --- | --- | --- |
+| `ask` | `message` (question), `waiter` (Handle), `handback` (boolean) | `entry`, or `passthrough:true` while here; `{type:"state",entry}` on later transitions for the attached waiter. |
+| `handed` | `id`, `waiter` (Handle) | `entry`; only the recorded waiter may take the answer; replay is idempotent. |
+| `confirm` | `harness`, `callId`, `observed` (native answers map) | `entry`. |
+| `answer` / `defer` / `withdraw` | `message` of the matching kind | `entry`; socket withdrawal permits only user/asker reasons. |
+| `notify` | `message` (notice) | `entry`; no v1 producer is wired. |
+| `list` | optional `since` and `states` | `{seq,entries}`: nonterminal entries plus terminal entries changed after `since`, filtered by states. |
+| `get` | `id` | `entry`, including terminal entries. |
+| `presence.get` / `presence.set` | none / `mode` | `presence`. |
+| `watch` | optional `since` | Replay `{type:"entry",entry}` changes then subscribe atomically; response contains `seq`; live entry/presence pushes follow. |
+
+`since` is a durable integer sequence, never a date. Restart grants recorded waiters
+10 seconds to reattach; confirmed-dead waiters withdraw pending questions or make
+saved answers undeliverable. Unknown liveness is not death. Closing an attached
+waiter connection while the service runs records asker loss; service shutdown does not.
+
+### HTTP protocol and guard
+
+HTTP is off unless `RELAY_HTTP_PORT` is configured (1–65535), and binds only
+`127.0.0.1`. `RELAY_SERVE_HOST` and `RELAY_SERVE_LOGIN` must be set together and
+require HTTP; `RELAY_CLIENT_DIR`, if set, must be absolute and also requires HTTP.
+
+Every path, static paths included, is guarded. Any header starting `X-Forwarded-`,
+`Tailscale-User-Login` or `Tailscale-Funnel-Request` marks a request as proxied. It
+requires an exact login and Host match with the configured values, and no Funnel
+header. Otherwise it must have loopback Host (`127.0.0.1`, `localhost` or `[::1]`)
+on the configured port. The server still binds IPv4 loopback only. Guard failure is
+403. Every POST and PUT requires `application/json` and an exact Origin:
+`https://<RELAY_SERVE_HOST>` for proxy traffic, `http://<Host>` locally. Ports and
+case are significant. Mutation JSON bodies are capped at 64 KiB in bytes.
+
+| Method and path | Request / response |
+| --- | --- |
+| `GET /v1/inbox?since=<seq>` | `{seq,entries}`; same snapshot selection as socket list; invalid negative/noninteger since is 400. |
+| `GET /v1/inbox/<id>` | `{entry}`, including terminal entries; 404 if absent. |
+| `POST /v1/inbox/<id>/answer` | `AnswerBody`; 200 `{entry}`, or 409 `{error:{code,message},entry}` plus saved `answer`/expected `revision` when applicable. |
+| `POST /v1/inbox/<id>/defer` | `DeferBody`; same result shape. |
+| `GET /v1/events` | SSE `entry` events carry full entries with id `seq`; `Last-Event-ID` (or `?since=`) resumes retained entries; presence events have no id. |
+| `GET /v1/presence` | `{presence}`. |
+| `PUT /v1/presence` | `{mode:"here"\|"away"}` → `{presence}`. |
+| `GET /v1/agents` | `{agents:[{id,harness,project,state}]}` for display. |
+| `GET /...` | Read-only static files from `RELAY_CLIENT_DIR`; relay ships no client. |
+
+The service assigns surface `phone` to proxied answer/defer requests and `desktop`
+to local ones, overriding client values. There is no HTTP withdrawal or seen route.
+Malformed JSON/input/message is 400, oversize bodies 413, non-JSON mutations 415,
+missing routes/entries 404; internal faults are reported as 500 `INTERNAL`, and
+shutdown as 503 `UNAVAILABLE`. Host sleep serves nothing; retry with the same
+`answerId` on reconnect, respecting expiry.
+
+### CLI and capability gate
+
+| Command | Contract |
+| --- | --- |
+| `relay serve` | Foreground service; SIGTERM/SIGINT drains active work and exits. |
+| `relay ask --harness claude-code [--handback] PreToolUse\|PostToolUse` | Hook route; strict option order; always exits 0, stdout is the hook reply; errors diagnose and pass through. |
+| `relay inbox list [--since SEQ]` | List current entries plus terminal entries changed after the sequence. |
+| `relay inbox show ID` | Full entry and history. |
+| `relay inbox answer ID ITEM=VALUE...` | Supply every item's value using the tokens below. |
+| `relay inbox answer ID --decline` | Decline, with no values. |
+| `relay inbox defer ID` / `relay inbox withdraw ID` | Defer to desktop/native UI, or withdraw. |
+| `relay presence [here\|away]` | Read/set durable presence; here is the initial default. |
+| `relay install --harness claude-code --subscribers FILE --target FILE --evidence FILE --with ask [--apply --artifact FILE]` | Plan/apply the evidence-gated route. |
+
+`relay inbox` alone is usage error (exit 2); it is a parent command, not an executable
+listing alias. `--json` emits raw machine states and full entries; `--pretty` emits
+human labels. Answer/defer/withdraw conflicts still exit 1 and retain `error.kind`
+and `error.detail`; JSON adds the saved winning entry as `error.entry`, while pretty
+output shows the winning values (choice labels), surface and durable save time.
+Boolean tokens are `ITEM=true`/`false`; choice tokens use option ids
+(`ITEM=o1`, multi `ITEM=o1,o2`); free text uses quoted `ITEM=other:text` or
+`ITEM=text:text`. Inbox/presence use the socket and fail `SERVE_UNAVAILABLE` if absent.
+Away routes new questions into the inbox; here passes new questions to the native UI.
+Existing pending questions remain pending; defer one explicitly to return it to the
+native UI when handback is available.
+
+The [capability record](evidence/claude-code-answer-routes.json) has five passing rows
+for Claude Code 2.1.296. Installation requires terminal-answer and deny-stops rows;
+receipt gates PostToolUse, release enables handback, and under-denial gates nothing.
+An upgraded/unknown version needs new [probes](runbooks/answer-route-probes.md) before
+installation. The user-present tailnet [acceptance run](runbooks/inbox-e2e-2026-10.md)
+(Task 14 / spec acceptance 7) passed phone answer, phone defer and desk withdrawal
+with this version. No live hook is installed by this package.
+
+Interaction error codes (ordinary errors carry `code`, with optional internal cause):
+
+| Codes | Meaning |
+| --- | --- |
+| `ALREADY_ANSWERED`, `ANSWERED` | A saved answer won; it is retained with the response. |
+| `WITHDRAWN`, `EXPIRED`, `RELEASED`, `UNDELIVERABLE` | The requested lifecycle action cannot run in that state. |
+| `STALE`, `INVALID_ANSWER`, `LOCAL_ONLY` | Revision mismatch, invalid item values or remote authorization answer. |
+| `NOT_WAITER`, `NOT_ANSWERED`, `NOT_HANDED`, `NOT_SUPERSEDABLE` | Route ownership or transition precondition failed. |
+| `ID_CONFLICT`, `NOT_FOUND`, `NOT_A_QUESTION` | Conflicting message identity, missing entry/native call, or wrong entry kind. |
+| `INVALID_MESSAGE`, `INVALID_INPUT`, `INVALID_REQUEST`, `UNKNOWN_OP` | Invalid message, native input/presence/cursor, socket frame or operation. |
+| `SERVE_RUNNING`, `SERVE_UNAVAILABLE`, `STORE_FAILED` | Existing live service, unavailable socket or failed durable write requiring restart. |
+| `INVALID_CONFIG`, `INVALID_ENTRY`, `HARNESS_UNAVAILABLE`, `UNSUPPORTED_ROUTE`, `UNEXPECTED_STATE` | Invalid configuration/durable entry, failed harness version probe or unsupported route/state. |
+| `FORBIDDEN`, `UNSUPPORTED_MEDIA`, `TOO_LARGE`, `INTERNAL`, `UNAVAILABLE` | HTTP guard, media/body limit, internal failure or shutdown. |
+
+Existing storage, process, lock, evidence and usage errors above also apply.

@@ -1,0 +1,52 @@
+{
+  "session_id": "00000000-0000-4000-8000-000000000000",
+  "transcript_path": "/tmp/x.jsonl",
+  "cwd": "/tmp/ws",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "AskUserQuestion",
+  "tool_input": {
+    "questions": [
+      {
+        "question": "Which shape do you prefer?",
+        "header": "Shape",
+        "options": [
+          {
+            "label": "Circle",
+            "description": "A round shape"
+          },
+          {
+            "label": "Square",
+            "description": "A four-sided shape"
+          }
+        ],
+        "multiSelect": false
+      }
+    ],
+    "answers": {
+      "Which shape do you prefer?": "Square"
+    }
+  },
+  "tool_response": {
+    "questions": [
+      {
+        "question": "Which shape do you prefer?",
+        "header": "Shape",
+        "options": [
+          {
+            "label": "Circle",
+            "description": "A round shape"
+          },
+          {
+            "label": "Square",
+            "description": "A four-sided shape"
+          }
+        ],
+        "multiSelect": false
+      }
+    ],
+    "answers": {
+      "Which shape do you prefer?": "Square"
+    }
+  },
+  "tool_use_id": "toolu_fixture"
+}

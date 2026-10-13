@@ -34,8 +34,11 @@ R2 adds `relay hook` and reconciling `relay reap`; subscribers come from
 `~/.config/relay/subscribers.json` for a direct `relay hook`, and from the
 `--subscribers FILE` an installed entry names. **No live hook is installed by this package.**
 The OpenCode plugin must still not be enabled until `relay-baa816` and the
-`ops-c8e4d1` probe pass. There is no installer, remote publication or consumer
-migration in R2.
+`ops-c8e4d1` probe pass. `relay serve` now owns a durable interaction inbox with
+local desk commands and optional tailnet HTTP access; see the
+[inbox service runbook](docs/runbooks/inbox-service.md). Installation of the Claude
+question route is evidence-gated; the user-present [acceptance run](docs/runbooks/inbox-e2e-2026-10.md)
+passed phone answer, phone defer and desk withdrawal.
 
 The approved parent design is in ops
 `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`).
@@ -49,3 +52,8 @@ requirement; portable Darwin UTC/local-timezone fixtures do not replace it.
 Verified 2026-09-17: 187 tests pass through the full gate on Node 26.5.0 and
 Node 22.23.2, including installed-tarball exports, JSON fixture, plugin and CLI.
 Independent task reviews and the final branch review completed; physical Darwin has not run.
+
+Typed interaction verification, 2026-10-13: all 576 tests pass on Node 26.5.0 and
+Node 22.23.2 with test file concurrency 1, including the installed schema/runbook
+tarball smoke. The user-present [acceptance run](docs/runbooks/inbox-e2e-2026-10.md)
+passed all three cases. Default-scheduler fixture flakes remain tracked separately.

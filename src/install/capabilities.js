@@ -1,6 +1,7 @@
 import { adapterFor } from '../adapters/index.js';
 import { budgetFor, checkBudget } from '../subscribers.js';
 import { relayError } from '../protocol.js';
+import { ROUTE_EVIDENCE } from './hooks.js';
 
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const fail = message => { throw relayError('INVALID_EVIDENCE', message); };
@@ -11,7 +12,7 @@ export function parseEvidence(text) {
   try { value = JSON.parse(text); } catch { fail('evidence must be JSON'); }
   if (!object(value) || value.schema !== 1 || typeof value.harness !== 'string' || !value.harness
     || typeof value.version !== 'string' || !value.version.trim() || !Array.isArray(value.probes)
-    || !fields(value, ['schema', 'harness', 'version', 'probes'])) fail('invalid evidence record');
+    || !fields(value, ['schema', 'harness', 'version', 'probes', 'routes'])) fail('invalid evidence record');
   let adapter;
   try { adapter = adapterFor(value.harness); } catch { fail('unsupported evidence harness'); }
   const seen = new Set();
@@ -24,6 +25,16 @@ export function parseEvidence(text) {
     const key = `${probe.event}\0${probe.reply}\0${probe.outerMs}`;
     if (seen.has(key)) fail('duplicate probe');
     seen.add(key);
+  }
+  if (value.routes !== undefined) {
+    if (!Array.isArray(value.routes)) fail('routes must be an array');
+    const names = new Set();
+    for (const route of value.routes) {
+      if (!object(route) || !ROUTE_EVIDENCE.includes(route.name) || typeof route.passed !== 'boolean' || typeof route.note !== 'string'
+        || !fields(route, ['name', 'passed', 'note'])) fail('invalid route evidence');
+      if (names.has(route.name)) fail('duplicate route evidence');
+      names.add(route.name);
+    }
   }
   return value;
 }
