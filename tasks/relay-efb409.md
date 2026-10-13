@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: design/typed-messages
 created: 2026-10-13T11:02:03Z
-updated: 2026-10-13T11:03:42Z
+updated: 2026-10-13T11:07:04Z
 started: 2026-10-13T11:03:42Z
 depends: []
 parent: relay-f58531
@@ -22,4 +22,6 @@ After all three user-present acceptance cases passed and the Task14 record was i
 
 - 2026-10-13T11:02:40Z (design/typed-messages): concerns: relay-31973b extension — replace temporary acceptance-pending labels with links to the now-passed user-present Task14 record and current576-test verification.
 - 2026-10-13T11:03:42Z (design/typed-messages): started
+  provenance: {"harness_session":"codex:01a134ed-f2e1-7850-8120-0f399d750326","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-13T11:07:04Z (design/typed-messages): parked (waiting on agent): Controller: independently review commit 2b54ded in .worktrees/typed-messages, then close relay-efb409 on this branch before parent integration.
   provenance: {"harness_session":"codex:01a134ed-f2e1-7850-8120-0f399d750326","harness_session_source":"CODEX_THREAD_ID"}
