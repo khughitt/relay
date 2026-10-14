@@ -7,10 +7,11 @@ import { until } from './wait.js';
 
 export const processMarker = () => `relay-test-${randomUUID()}`;
 
-// Pids of live processes whose command line carries marker. `ps -axo` reads alike on Linux and
-// macOS; a zombie shows no arguments, so an exited child awaiting its parent is not counted.
+// Pids of live processes whose command line carries marker. `ps -ww -axo` reads alike on Linux and
+// macOS, at full width whatever COLUMNS says (the marker is the last word of a long line); a zombie
+// shows no arguments, so an exited child awaiting its parent is not counted.
 export function markedPids(marker) {
-  return execFileSync('ps', ['-axo', 'pid=,args='], { encoding: 'utf8' }).split('\n')
+  return execFileSync('/bin/ps', ['-ww', '-axo', 'pid=,args='], { encoding: 'utf8' }).split('\n')
     .filter((line) => line.includes(marker)).map((line) => Number.parseInt(line.trim(), 10));
 }
 

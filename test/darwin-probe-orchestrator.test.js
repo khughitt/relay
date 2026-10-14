@@ -206,7 +206,7 @@ if pid == 0:
     os.execv(sys.argv[1], sys.argv[1:])
 deadline = time.time() + 60
 tag = os.environb[b"RDP_TAG"]
-ps = lambda: subprocess.run(["/bin/ps", "-axo", "args="], capture_output=True).stdout
+ps = lambda: subprocess.run(["/bin/ps", "-ww", "-axo", "args="], capture_output=True).stdout
 while time.time() < deadline and b"sleep 600." + tag + b"2" not in ps():
     try:
         if select.select([fd], [], [], 0.2)[0]: os.read(fd, 65536)
