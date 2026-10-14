@@ -1,15 +1,16 @@
 ---
 id: relay-ef98dc
 title: "The integration test suite has a 200 ms subprocess deadline that flakes under concurrent test load, reporting a timeout instead of the expected child failure."
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: fix/test-fixture-leaks
 created: 2026-10-12T05:39:43Z
-updated: 2026-10-14T22:13:57Z
+updated: 2026-10-14T22:15:39Z
 started: 2026-10-14T22:13:57Z
+completed: 2026-10-14T22:15:39Z
 depends: []
 tags: [feedback, friction, "from:relay"]
 agent: codex
@@ -25,4 +26,8 @@ Where: integrations/opencode/hook.test.mjs:93-98; spawnHook in integrations/open
 
 - 2026-10-13T01:47:30Z (main): scope: scoped; located the shared 200 ms budget at integrations/opencode/hook.test.mjs:95; body gives per-case budgets and a repeat-under-load check; todo P2 xs low direct
 - 2026-10-14T22:13:57Z (fix/test-fixture-leaks): started
+  provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-14T22:15:39Z (fix/test-fixture-leaks): done
+  provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-14T22:15:39Z (fix/test-fixture-leaks): Per-case budgets in integrations/opencode/hook.test.mjs: exit-3 and stderr-overflow cases get 5000 ms (spawnHook's cap), the timeout case keeps 200 ms. Flake did not reproduce locally before the fix (0/20 under load avg ~18); after it, 20/20 in a row under 8 CPU spinners plus a looping suite. 9c3699e
   provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
