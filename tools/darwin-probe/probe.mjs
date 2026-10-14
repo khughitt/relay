@@ -93,9 +93,14 @@ const onPath = (name) => (process.env.PATH ?? '').split(delimiter).some((dir) =>
 const MIN_TOKEN = 20;
 
 async function main() {
-  const { values } = parseArgs({ options: { bundle: { type: 'string' }, root: { type: 'string' }, 'allow-linux': { type: 'boolean' }, stages: { type: 'string' }, 'self-test-hang': { type: 'boolean' } } });
+  const { values } = parseArgs({ options: { bundle: { type: 'string' }, root: { type: 'string' }, 'allow-linux': { type: 'boolean' }, stages: { type: 'string' }, 'self-test-hang': { type: 'boolean' }, 'self-test-tag': { type: 'string' } } });
   const platform = process.platform, root = values.root, bundle = values.bundle, selfTest = values['self-test-hang'];
   if (platform !== 'darwin' && !values['allow-linux'] && !selfTest) throw new Error('this probe runs on macOS; pass --allow-linux for the smoke run');
+  // A test passes its own tag so the self-test's sleeps are unique on the host; a bare
+  // --self-test-hang keeps the fixed durations the Mac runbook looks for.
+  const tag = values['self-test-tag'];
+  if (tag !== undefined && !(selfTest && /^\d{9}$/.test(tag))) die('--self-test-tag takes nine digits and needs --self-test-hang');
+  const hangSleeps = tag === undefined ? ['600.321', '600.654'] : [`600.${tag}1`, `600.${tag}2`];
   // Before anything runs: an unknown stage id is a typo, not a run worth starting.
   const wanted = requestedStages(values.stages);
   mkdirSync(root, { recursive: true }); prepareRoot(root);
@@ -214,7 +219,7 @@ async function main() {
     if (selfTest) {
       await stageRun('D0', d0mod.run);
       // A stage that resumes whenever its child dies, with grandchildren: the interrupt race.
-      await stageRun('D1', async () => { for (;;) await ctx.t.run('/bin/sh', ['-c', 'sleep 600.321 & sleep 600.654; true']); });
+      await stageRun('D1', async () => { for (;;) await ctx.t.run('/bin/sh', ['-c', `sleep ${hangSleeps[0]} & sleep ${hangSleeps[1]}; true`]); });
     } else {
       for (const id of wanted) {
         if (t.stopping) break;

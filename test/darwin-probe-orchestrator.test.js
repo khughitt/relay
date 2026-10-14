@@ -4,8 +4,17 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
+import { randomInt } from 'node:crypto';
 import { CRASHED, cloneBundle, credentialHits, loadResults, packResults, packingHits, requestedStages, stableVerdict, verifyManifest } from '../tools/darwin-probe/probe.mjs';
 import { credentialWrites, isolationOf } from '../tools/darwin-probe/lib/context.mjs';
+
+// A per-test --self-test-tag: the self-test's two sleeps then carry durations no other run uses
+// (fixed width, so no needle is a prefix of another), and readiness and survivor checks never
+// see another run's children, live or orphaned.
+const hangTag = () => {
+  const tag = String(randomInt(1e9)).padStart(9, '0');
+  return { tag, args: ['--self-test-hang', '--self-test-tag', tag], sleeps: [`sleep 600.${tag}1`, `sleep 600.${tag}2`] };
+};
 
 test('a tampered bundle file fails manifest verification', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
@@ -32,10 +41,11 @@ test('SIGINT after a normal D0 packs results, fills D0, and leaves no grandchild
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
   // --self-test-hang runs the real D0, then a stage that respawns `sh` (with two sleeps)
   // whenever it dies, which is the race between cleanup and a resuming stage.
-  const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', join(d, 'root'), '--bundle', d], { stdio: 'ignore' });
+  const hang = hangTag();
+  const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', ...hang.args, '--root', join(d, 'root'), '--bundle', d], { stdio: 'ignore' });
   const exited = new Promise((r) => child.once('exit', r)); // registered now, so an early exit is not missed
   const ps = () => execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' });
-  for (let i = 0; i < 100 && child.exitCode === null && !ps().includes('sleep 600.654'); i++) await new Promise((r) => setTimeout(r, 200));
+  for (let i = 0; i < 100 && child.exitCode === null && !ps().includes(hang.sleeps[1]); i++) await new Promise((r) => setTimeout(r, 200));
   assert.equal(child.exitCode, null, 'the probe exited before the interrupt');
   child.kill('SIGINT');
   assert.equal(await exited, 130);
@@ -53,7 +63,7 @@ test('SIGINT after a normal D0 packs results, fills D0, and leaves no grandchild
   assert.ok(JSON.parse(readFileSync(join(x, 'verdict.redacted.json'), 'utf8')).checks.D0);
   assert.deepEqual(JSON.parse(readFileSync(join(x, 'manifest.json'), 'utf8')).cleanup.survivors, []);
   await new Promise((r) => setTimeout(r, 1000));
-  assert.equal(ps().includes('sleep 600.321'), false); assert.equal(ps().includes('sleep 600.654'), false);
+  for (const needle of hang.sleeps) assert.equal(ps().includes(needle), false, needle);
   for (const f of ['verdict.raw.json', 'verdict.redacted.json', 'manifest.json']) assert.equal(readFileSync(join(x, f), 'utf8').includes(homedir()), false, f);
 });
 
@@ -143,6 +153,13 @@ test('credential writes are read from each D7 harness observation', () => {
   assert.deepEqual(credentialWrites(undefined), []);
   assert.deepEqual(credentialWrites({ status: 'skipped', observations: {} }), []);
 });
+test('--self-test-tag takes nine digits and only with --self-test-hang (exit 2, one line)', (t) => {
+  const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
+  for (const args of [['--self-test-hang', '--self-test-tag', '12345678'], ['--self-test-hang', '--self-test-tag', '12345678x'], ['--allow-linux', '--self-test-tag', '123456789']]) {
+    const r = spawnSync(process.execPath, ['tools/darwin-probe/probe.mjs', ...args, '--root', join(d, 'root'), '--bundle', d], { encoding: 'utf8' });
+    assert.equal(r.status, 2, args.join(' ')); assert.equal(r.stderr, '--self-test-tag takes nine digits and needs --self-test-hang\n');
+  }
+});
 test('python3 older than 3.11, or none, stops the probe with one line (exit 2)', (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
   const bin = join(d, 'bin'), empty = join(d, 'empty'); mkdirSync(bin); mkdirSync(empty);
@@ -156,42 +173,48 @@ test('python3 older than 3.11, or none, stops the probe with one line (exit 2)',
 test('credential material in the results stops packing (exit 1, no tarball)', { timeout: 90000 }, async (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
   const root = join(d, 'root');
-  const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', root, '--bundle', d], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const hang = hangTag();
+  const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', ...hang.args, '--root', root, '--bundle', d], { stdio: ['ignore', 'ignore', 'pipe'] });
   let stderr = ''; child.stderr.on('data', (x) => { stderr += x; });
   const exited = new Promise((r) => child.once('exit', r));
-  assert.ok(await waitFor('sleep 600.654', child), 'the probe never reached its hanging stage');
+  assert.ok(await waitFor(hang.sleeps[1], child), 'the probe never reached its hanging stage');
   mkdirSync(join(root, 'results/logs'), { recursive: true }); writeFileSync(join(root, 'results/logs/auth.json'), '{}');
   child.kill('SIGINT');
   assert.equal(await exited, 1);
   assert.match(stderr, /refusing to pack: credential material in logs\/auth\.json/);
   assert.equal(readdirSync(d).some((f) => f.startsWith('relay-darwin-results-')), false);
-  assert.equal(psArgs().includes('sleep 600.654'), false);
+  for (const needle of hang.sleeps) assert.equal(psArgs().includes(needle), false, needle);
 });
 // `run` as the user starts it: a copied bundle layout (run + probe/), under each POSIX shell here.
 const bundleLayout = (d) => {
   execFileSync('cp', ['tools/darwin-probe/run', join(d, 'run')]);
   symlinkSync(join(process.cwd(), 'tools/darwin-probe'), join(d, 'probe'));
 };
-const rdpRoots = () => new Set(readdirSync('/tmp').filter((f) => f.startsWith('rdp.')));
 const shells = [...new Set(['/bin/sh', '/usr/bin/dash', '/bin/dash'].filter((s) => existsSync(s)).map((s) => realpathSync(s)))];
 for (const shell of shells) {
   test(`closing the terminal (${shell}) still packs the results and leaves no child`, { timeout: 120000 }, async (t) => {
     const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true }));
     bundleLayout(d);
-    const roots = rdpRoots();
     // A pty whose master is closed once the probe hangs: the shell and node both get SIGHUP,
-    // and every later write to the terminal fails with EIO. The needle is split so this
-    // harness's own argv never matches it.
-    const harness = `import json, os, pty, select, signal, subprocess, sys, time
+    // and every later write to the terminal fails with EIO. The tag comes in through the
+    // environment so this harness's own argv never matches the needle. While the probe hangs,
+    // the harness reads the root run made from the probe's argv, so the root check below
+    // looks at this run's root alone.
+    const harness = `import json, os, pty, re, select, signal, subprocess, sys, time
 pid, fd = pty.fork()
 if pid == 0:
     os.execv(sys.argv[1], sys.argv[1:])
 deadline = time.time() + 60
-while time.time() < deadline and b"sleep 600." + b"654" not in subprocess.run(["/bin/ps", "-axo", "args="], capture_output=True).stdout:
+tag = os.environb[b"RDP_TAG"]
+ps = lambda: subprocess.run(["/bin/ps", "-axo", "args="], capture_output=True).stdout
+while time.time() < deadline and b"sleep 600." + tag + b"2" not in ps():
     try:
         if select.select([fd], [], [], 0.2)[0]: os.read(fd, 65536)
     except OSError:
         break
+# The probe's own line: this harness's argv holds the tag and this source, never the split path.
+probe = [line for line in ps().splitlines() if b"/probe/" + b"probe.mjs " in line and b"--self-test-tag " + tag in line]
+root = re.search(rb"--root (\\S+)", probe[0]).group(1).decode() if len(probe) == 1 else None
 os.close(fd)
 # The kernel signals only the session leader; the user's login shell then sends SIGHUP to its
 # jobs' process groups, which is what reaches ./run and node on a closed terminal window.
@@ -203,10 +226,12 @@ while True:
     if time.time() > deadline:
         os.killpg(pid, signal.SIGKILL); os.waitpid(pid, 0); status = None; break
     time.sleep(0.1)
-print(json.dumps({"exit": None if status is None else os.waitstatus_to_exitcode(status)}))`;
-    const r = spawnSync('python3', ['-c', harness, shell, join(d, 'run'), '--self-test-hang'], { encoding: 'utf8', timeout: 110000 });
+print(json.dumps({"exit": None if status is None else os.waitstatus_to_exitcode(status), "root": root}))`;
+    const hang = hangTag();
+    const r = spawnSync('python3', ['-c', harness, shell, join(d, 'run'), ...hang.args], { encoding: 'utf8', timeout: 110000, env: { ...process.env, RDP_TAG: hang.tag } });
     assert.equal(r.status, 0, r.stderr);
-    assert.equal(JSON.parse(r.stdout).exit, 129);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.exit, 129); assert.match(out.root ?? '', /^\/tmp\/rdp\.[A-Za-z0-9]{6}$/, 'the probe never showed its root');
     const tarball = readdirSync(d).find((f) => f.startsWith('relay-darwin-results-'));
     assert.ok(tarball, 'no results tarball after the hangup');
     const x = join(d, 'x'); mkdirSync(x); execFileSync('tar', ['xzf', join(d, tarball), '-C', x]);
@@ -214,8 +239,8 @@ print(json.dumps({"exit": None if status is None else os.waitstatus_to_exitcode(
     assert.equal(manifest.interrupted, 'SIGHUP'); assert.deepEqual(manifest.cleanup.survivors, []);
     await new Promise((res) => setTimeout(res, 500));
     const left = psArgs();
-    for (const needle of ['sleep 600.321', 'sleep 600.654', join(d, 'run')]) assert.equal(left.includes(needle), false, needle);
-    assert.deepEqual([...rdpRoots()].filter((f) => !roots.has(f)), [], 'run left its root behind');
+    for (const needle of [...hang.sleeps, join(d, 'run')]) assert.equal(left.includes(needle), false, needle);
+    assert.equal(existsSync(out.root), false, 'run left its root behind');
   });
 }
 test('run keeps its root and names it when the probe dies abnormally, and removes it otherwise', (t) => {
@@ -248,7 +273,8 @@ const timer = at > 0 && setInterval(() => {
   throw new Error('injected crash');
 }, 100);
 `);
-  const r = spawnSync('/bin/sh', [join(d, 'run'), '--self-test-hang'], { encoding: 'utf8', timeout: 80000, env: { ...process.env, NODE_OPTIONS: `--import=${crash}` } });
+  const hang = hangTag();
+  const r = spawnSync('/bin/sh', [join(d, 'run'), ...hang.args], { encoding: 'utf8', timeout: 80000, env: { ...process.env, NODE_OPTIONS: `--import=${crash}` } });
   const root = r.stderr.match(/\/tmp\/rdp\.[A-Za-z0-9]{6}/)?.[0];
   t.after(() => { if (root) rmSync(root, { recursive: true, force: true }); });
   assert.equal(r.status, CRASHED, r.stderr);
@@ -259,21 +285,22 @@ const timer = at > 0 && setInterval(() => {
   assert.equal(existsSync(join(root, 'd7/home/.claude/.credentials.json')), false);
   assert.equal(existsSync(join(root, 'd7/home/.codex/config.toml')), true);
   assert.equal(existsSync(join(root, 'results/stages/D0.json')), true);
-  assert.equal(psArgs().includes('sleep 600.654'), false);
+  for (const needle of hang.sleeps) assert.equal(psArgs().includes(needle), false, needle);
 });
 const asRoot = process.getuid?.() === 0; // chmod does not stop root from writing
 test('a failure while packing exits CRASHED, not the signal code, so run keeps the root', { timeout: 90000, skip: asRoot }, async (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => { chmodSync(d, 0o755); rmSync(d, { recursive: true, force: true }); });
   const root = join(d, 'root'); mkdirSync(root);
   chmodSync(d, 0o555); // the tarball cannot be moved into the bundle directory
-  const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', '--self-test-hang', '--root', root, '--bundle', d], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const hang = hangTag();
+  const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', ...hang.args, '--root', root, '--bundle', d], { stdio: ['ignore', 'ignore', 'pipe'] });
   let stderr = ''; child.stderr.on('data', (x) => { stderr += x; });
   const exited = new Promise((r) => child.once('exit', r));
-  assert.ok(await waitFor('sleep 600.654', child), 'the probe never reached its hanging stage');
+  assert.ok(await waitFor(hang.sleeps[1], child), 'the probe never reached its hanging stage');
   child.kill('SIGINT');
   assert.equal(await exited, CRASHED, stderr);
   assert.match(stderr, /finalize failed/);
-  assert.equal(psArgs().includes('sleep 600.654'), false);
+  for (const needle of hang.sleeps) assert.equal(psArgs().includes(needle), false, needle);
 });
 test('a throw outside a stage whose finalize also fails exits CRASHED, not 2', { timeout: 60000, skip: asRoot }, async (t) => {
   const d = mkdtempSync(join(tmpdir(), 'dp-')), root = join(d, 'root'), results = join(root, 'results');

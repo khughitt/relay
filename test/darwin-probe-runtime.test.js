@@ -4,12 +4,19 @@ import { linkSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { randomInt } from 'node:crypto';
 import { isolatedEnv, prepareRoot, registryFor, requireStarted, tracker, fingerprint, changedPaths, WATCHED_FILES, WATCHED_TREES } from '../tools/darwin-probe/lib/context.mjs';
 import { readHidden } from '../tools/darwin-probe/lib/tty.mjs';
 import { compareCapture, rowFor } from '../tools/darwin-probe/lib/ps.mjs';
 import { buildParent, checkParent, installParent, startParent } from '../tools/darwin-probe/lib/parents.mjs';
 import { fleetTimeoutMs } from '../tools/darwin-probe/lib/fleet.mjs';
 import { createProcessOps } from '../src/index.js';
+
+// Two sleep durations no other run uses, the shape the orchestrator tests' self-test tag gives
+// (fixed width, so no needle is a prefix of another): a host-wide `ps` check then sees only
+// this test's children, never a concurrent run's or an orphan's.
+const uniqueSleeps = () => { const tag = String(randomInt(1e9)).padStart(9, '0'); return [`600.${tag}1`, `600.${tag}2`]; };
+const psArgs = () => execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' });
 
 const root = (t) => { const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true })); return d; };
 test('isolation sets every redirect and drops COLUMNS and session variables', (t) => {
@@ -38,15 +45,15 @@ test('registry access follows the given env, never the ambient one', async (t) =
   assert.equal(reg.paths.stateDir, join(r, 'relay-state'));
 });
 test('after stop, spawning is refused and a resumed stage cannot outlive cleanup', async (t) => {
-  const r = root(t); const tr = tracker(r);
+  const r = root(t); const tr = tracker(r), [secs] = uniqueSleeps();
   // A stage that resumes whenever its child dies and immediately spawns another.
-  const stage = (async () => { for (;;) await tr.run('/bin/sleep', ['600.777']); })().catch((e) => e.message);
+  const stage = (async () => { for (;;) await tr.run('/bin/sleep', [secs]); })().catch((e) => e.message);
   await new Promise((x) => setTimeout(x, 300));
   tr.stop();
   const { survivors } = await tr.killAll();
   assert.deepEqual(survivors, []);
   assert.equal(await stage, 'probe is stopping');
-  assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes('sleep 600.777'), false);
+  assert.equal(psArgs().includes(`sleep ${secs}`), false);
   assert.throws(() => tr.spawn('/bin/true', []), /stopping/);
 });
 test('run survives a child that exits without reading its stdin', async (t) => {
@@ -64,12 +71,13 @@ test('kill is idempotent and a group is retired when its last member exits', asy
 });
 test('killAll reaches grandchildren and forgets only emptied groups', async (t) => {
   const r = root(t); const tr = tracker(r);
-  const child = tr.spawn('/bin/sh', ['-c', 'sleep 600.321 & sleep 600.654; true'], { stdio: 'ignore' });
+  const sleeps = uniqueSleeps().map((secs) => `sleep ${secs}`);
+  const child = tr.spawn('/bin/sh', ['-c', `${sleeps[0]} & ${sleeps[1]}; true`], { stdio: 'ignore' });
   await new Promise((x) => setTimeout(x, 300));
   assert.match(readFileSync(join(r, 'pids'), 'utf8'), new RegExp(`^-${child.pid}$`, 'm'));
   assert.deepEqual((await tr.killAll()).survivors, []);
-  assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes('sleep 600.321'), false);
-  assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes('sleep 600.654'), false);
+  const left = psArgs();
+  for (const needle of sleeps) assert.equal(left.includes(needle), false, needle);
   assert.equal(readFileSync(join(r, 'pids'), 'utf8'), '');
 });
 test('capture comparison flags a cut row and a clean row', () => {
