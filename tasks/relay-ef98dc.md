@@ -1,13 +1,15 @@
 ---
 id: relay-ef98dc
 title: "The integration test suite has a 200 ms subprocess deadline that flakes under concurrent test load, reporting a timeout instead of the expected child failure."
-status: todo
+status: doing
 priority: 2
 size: xs
 complexity: low
 process: direct
+owner: fix/test-fixture-leaks
 created: 2026-10-12T05:39:43Z
-updated: 2026-10-13T01:47:30Z
+updated: 2026-10-14T22:13:57Z
+started: 2026-10-14T22:13:57Z
 depends: []
 tags: [feedback, friction, "from:relay"]
 agent: codex
@@ -22,3 +24,5 @@ Where: integrations/opencode/hook.test.mjs:93-98; spawnHook in integrations/open
 ## Notes
 
 - 2026-10-13T01:47:30Z (main): scope: scoped; located the shared 200 ms budget at integrations/opencode/hook.test.mjs:95; body gives per-case budgets and a repeat-under-load check; todo P2 xs low direct
+- 2026-10-14T22:13:57Z (fix/test-fixture-leaks): started
+  provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
