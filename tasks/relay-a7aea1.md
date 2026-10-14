@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-12T06:01:59Z
-updated: 2026-10-13T18:35:43Z
+updated: 2026-10-14T22:18:26Z
 depends: []
 tags: [feedback, friction, "from:relay"]
 agent: codex
@@ -24,3 +24,4 @@ Where: test/darwin-probe-orchestrator.test.js (lines 38, 56, 162-168, 217, 262-2
 - 2026-10-12T11:23:04Z (feedback): feedback from relay: The full test front door's interrupt readiness check and another test fixture reuse one global process marker across files; isolated interrupt passes while two default suite runs lose the initial-stage archive entry. Same-suite collision is a hypothesis, not causally proved.
 - 2026-10-13T01:47:28Z (main): scope: scoped; body rewritten with the shared fixed markers (orchestrator :38 readiness poll, runtime :67 fixture, probe.mjs:217 self-test) and a concurrency check; todo P2 s mid direct
 - 2026-10-13T18:35:43Z (fix/typed-messages-review): observed 2026-10-13: default-concurrency test-fast failed once on 'SIGINT after a normal D0 packs results' (test/darwin-probe-orchestrator.test.js:31, ENOENT stages/D0.json); the focused file and a full rerun passed immediately after
+- 2026-10-14T22:18:26Z (fix/test-fixture-leaks): evidence 2026-10-14: a suite killed mid-run (load generator) orphaned one probe 'run --self-test-hang' with its 'sleep 600.321' and 'sleep 600.654' children; while they lived, 4 orchestrator tests failed on both Node 22 and 26 (SIGINT after a normal D0, credential material stops packing, closing the terminal bash/dash). After reaping them the suite passed 607/607. Confirms the host-wide fixed-marker collision, from a stale survivor rather than a concurrent run.
