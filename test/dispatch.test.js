@@ -145,7 +145,9 @@ test('an expired deadline refuses before running the remaining guards', async (t
   const late = await hook(p, { outerMs: 1000, deps: { clock: (() => { let n = 0; return () => (n += 400); })() } });
   assert.equal(late.exitCode, 2); assert.match(late.stdout, /relay refused: (DEADLINE_EXCEEDED|INPUT_TIMEOUT)/);
   assert.ok(await absent(never), 'no guard started after the deadline');
-  const r = await hook(p, { outerMs: 1000 });
+  // never must outlast a real Node startup under load; outerMs 10000 gives subscribersMs 2667 >= 150 + 2000.
+  await writeSubscribers(p, [strip(guard('slow', 'slow', { argv: argv('slow', '400'), timeoutMs: 150 })), strip(guard('never', 'record', { file: never, timeoutMs: 2000 }))]);
+  const r = await hook(p, { outerMs: 10000 });
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /GUARD_FAILED: guard slow timeout/);
   assert.equal(await absent(never), false);
 });
