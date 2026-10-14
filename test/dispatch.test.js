@@ -16,6 +16,7 @@ import { relayError } from '../src/protocol.js';
 import { CONTEXT_LIMIT } from '../src/adapters/reply.js';
 import { RECONCILE } from '../src/subscribers.js';
 import { tempPaths, writeSubscribers } from './helpers/fixture.js';
+import { processMarker, noneMarked, reapMarked } from './helpers/survivors.js';
 
 const fixture = new URL('./fixtures/subscriber.js', import.meta.url).pathname;
 const argv = (mode, ...rest) => [process.execPath, fixture, mode, ...rest];
@@ -70,8 +71,9 @@ test('allow replies concatenate context in configuration order and honor the cha
 });
 
 test('every guard failure relay survives is a native refusal', async (t) => {
-  const p = await tempPaths(t);
-  const cases = [['hang', 'GUARD_FAILED', { timeoutMs: 300 }], ['crash', 'GUARD_FAILED'], ['garbage', 'INVALID_REPLY'], ['extra-field', 'INVALID_REPLY'],
+  const p = await tempPaths(t), marker = processMarker();
+  t.after(() => reapMarked(marker));
+  const cases = [['hang', 'GUARD_FAILED', { timeoutMs: 300, argv: argv('hang', marker) }], ['crash', 'GUARD_FAILED'], ['garbage', 'INVALID_REPLY'], ['extra-field', 'INVALID_REPLY'],
     ['unreasoned', 'INVALID_REPLY'], ['big-context', 'INVALID_REPLY'], ['big', 'GUARD_FAILED'], ['missing', 'GUARD_FAILED', { argv: ['/nonexistent/guard'] }]];
   for (const [mode, code, over = {}] of cases) {
     await writeSubscribers(p, [strip(guard('g', mode, over))]);
@@ -80,6 +82,7 @@ test('every guard failure relay survives is a native refusal', async (t) => {
     assert.equal(r.stderr, `${JSON.parse(r.stdout).hookSpecificOutput.permissionDecisionReason}\n`);
     assert.ok(await absent(p.agentsPath), mode);
   }
+  await noneMarked(marker);
   await writeSubscribers(p, [strip(guard('g', 'deny-context'))]);
   const r = await hook(p); assert.equal(r.stdout, `${denyOut}"denied by fixture"}}\n`);
 });
@@ -302,11 +305,13 @@ test('a slow observer never delays a denial and observers run only within their 
   await writeSubscribers(p, [strip(observer('slow', 'slow', { argv: argv('slow', '4000'), timeoutMs: 5000 })), strip(guard('g', 'deny'))]);
   let started = performance.now(); let r = await hook(p);
   assert.equal(r.exitCode, 2); assert.ok(performance.now() - started < 2000, 'the denial returned before the observer could run');
-  await writeSubscribers(p, [strip(observer('hang', 'hang', { timeoutMs: 150 })), strip(observer('quick', 'slow', { argv: argv('slow', '10'), timeoutMs: 150 })), strip(observer('after', 'record', { file, timeoutMs: 100 }))]);
+  const marker = processMarker(); t.after(() => reapMarked(marker));
+  await writeSubscribers(p, [strip(observer('hang', 'hang', { argv: argv('hang', marker), timeoutMs: 150 })), strip(observer('quick', 'slow', { argv: argv('slow', '10'), timeoutMs: 150 })), strip(observer('after', 'record', { file, timeoutMs: 100 }))]);
   started = performance.now(); r = await hook(p, { outerMs: 3000 }); // subscribersMs 800 = 150 + 150 + 100 + 400 scheduling slack
   assert.equal(r.exitCode, 0); assert.match(r.stderr, /SUBSCRIBER_FAILED: hang timeout/);
   assert.ok(performance.now() - started < 3000);
   assert.equal(JSON.parse(await readFile(file, 'utf8')).subscriber, 'after', 'a later observer that fits still runs');
+  await noneMarked(marker);
   // A publication that fulfills after its deadline is rejected and no observer runs.
   await writeSubscribers(p, [strip(observer('never', 'record', { file: join(p.stateDir, '..', 'never'), timeoutMs: 100 }))]);
   let now = 0;
