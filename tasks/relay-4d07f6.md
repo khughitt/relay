@@ -1,13 +1,15 @@
 ---
 id: relay-4d07f6
 title: Test runs leak hung subscriber fixtures that outlive the worktree
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: fix/test-fixture-leaks
 created: 2026-09-22T12:21:09Z
-updated: 2026-09-22T12:21:09Z
+updated: 2026-10-14T22:13:50Z
+started: 2026-10-14T22:13:50Z
 depends: []
 tags: [testing]
 agent: "claude-code/claude-opus-5[1m]"
@@ -26,3 +28,8 @@ The fixture's hang mode is `setInterval(() => {}, 60000)`, which keeps the event
 This matters beyond tidiness: relay dispatches guards and observers under a budget, and "the subscriber hung and was never reaped" is precisely the production failure the timeout exists to prevent. A test fixture surviving its own timeout assertion is evidence that the guarantee has a hole; the tests pass because they assert on the returned status, not on the child being gone.
 
 Reproduce: run the suite, then `pgrep -af "subscriber.js hang"`. Fix the kill path, then make the leak visible — a suite-level teardown that fails if any fixture child survives, so this cannot regress silently.
+
+## Notes
+
+- 2026-10-14T22:13:50Z (fix/test-fixture-leaks): started
+  provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
