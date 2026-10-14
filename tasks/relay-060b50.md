@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/node-path
 created: 2026-09-25T20:02:44Z
-updated: 2026-10-14T23:20:15Z
+updated: 2026-10-14T23:25:46Z
 started: 2026-10-14T23:11:45Z
 depends: []
 tags: []
@@ -32,3 +32,4 @@ Where: bin/relay.js:126-140 (install flag parsing and planner calls), src/instal
 - 2026-10-14T23:11:52Z (fix/node-path): resumed
   provenance: {"harness_session":"claude-code:711a298e-1d8a-4d9f-b6a1-c21f9fd625ed","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-14T23:20:15Z (fix/node-path): cross-project: --node row added to ops cli.toml as ops 05e7db2 (ff-merged to ops main, not pushed); tools/cli.toml re-adopted from it in f122e18
+- 2026-10-14T23:25:46Z (fix/node-path): review: impl round 1 — verdict: revise; findings: Critical 0, Important 2, Minor 6; reviewer: claude-code
