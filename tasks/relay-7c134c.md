@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/test-fixture-leaks
 created: 2026-09-23T13:52:45Z
-updated: 2026-10-14T22:13:49Z
+updated: 2026-10-14T22:44:06Z
 started: 2026-10-14T22:09:54Z
 completed: 2026-10-14T22:13:49Z
 depends: []
@@ -31,3 +31,4 @@ Each npm test run leaves one detached 'node test/fixtures/subscriber.js hang' ch
   provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-14T22:13:49Z (fix/test-fixture-leaks): Source was the survival-limitation CLI test: its outer SIGKILL orphans the guard relay started. Every hang-fixture test now carries a per-test argv marker (test/helpers/survivors.js), asserts no marked process survives relay's own timeout, and reaps the one the outer-kill case orphans on purpose; RED shown (survivor pid caught), then 607/607 on Node 22.23.2 and 26.5.0 with no worktree fixture surviving. b518142
   provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-14T22:44:06Z (fix/test-fixture-leaks): review: impl round 1 — verdict: revise; findings: Critical 0, Important 1, Minor 5; reviewer: claude-code
