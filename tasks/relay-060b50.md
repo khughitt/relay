@@ -1,13 +1,15 @@
 ---
 id: relay-060b50
 title: "Installed hooks name a version-specific node, so removing that node silently disables relay guards"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-09-25T20:02:44Z
-updated: 2026-10-13T08:30:19Z
+updated: 2026-10-14T23:11:45Z
+started: 2026-10-14T23:11:45Z
 depends: []
 tags: []
 source: relay-661946
@@ -25,3 +27,5 @@ Where: bin/relay.js:126-140 (install flag parsing and planner calls), src/instal
 ## Notes
 
 - 2026-10-13T08:30:18Z (main): scope: scoped; chose an explicit --node flag plus a version-specific-path warning (rejected automatic shim discovery as a silent fallback; doctor check left out of scope); also covers a versioned relayBin; todo P2 s mid direct
+- 2026-10-14T23:11:45Z (main): started
+  provenance: {"harness_session":"claude-code:711a298e-1d8a-4d9f-b6a1-c21f9fd625ed","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
