@@ -1,13 +1,15 @@
 ---
 id: relay-fc28a4
 title: A dispatch deadline test gives a real child record fixture only 100ms; it missed the write under a serial full suite while the focused file passed immediately afterward.
-status: todo
+status: doing
 priority: 2
 size: xs
 complexity: mid
 process: direct
+owner: fix/test-fixture-leaks
 created: 2026-10-12T09:19:32Z
-updated: 2026-10-13T01:47:29Z
+updated: 2026-10-14T22:15:40Z
+started: 2026-10-14T22:15:40Z
 depends: []
 tags: [feedback, friction, "from:relay"]
 agent: codex
@@ -22,3 +24,5 @@ Where: test/dispatch.test.js:300-310 and the budget computation it relies on (bu
 ## Notes
 
 - 2026-10-13T01:47:29Z (main): scope: scoped; located the 100 ms record observer at test/dispatch.test.js:305; body states the budget fix and repeat-under-load check; todo P2 xs mid direct
+- 2026-10-14T22:15:40Z (fix/test-fixture-leaks): started
+  provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
