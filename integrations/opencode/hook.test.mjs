@@ -90,9 +90,10 @@ test('hook uses own CLI, exact argv, no shell and inherited environment',async()
   assert.equal(call[0],RELAY_BIN);assert.deepEqual(call[1],['hook','--harness','opencode','init']);assert.equal(call[2].shell,false);assert.equal(Object.hasOwn(call[2],'env'),false);
 });
 test('stderr is bounded, timeout kills child, and diagnostics do not leak payload',async()=>{
-  for(const [args,expected] of [[['-e',"process.stderr.write('PRIVATE');process.exitCode=3"],'PROCESS_UNAVAILABLE'],[['-e',"process.stderr.write('x'.repeat(65537));setInterval(()=>{},1000)"],'INPUT_TOO_LARGE'],[['-e','setInterval(()=>{},1000)'],'INPUT_TIMEOUT']]) {
+  // Only the timeout case wants a short budget; the others must outlast Node startup under load.
+  for(const [args,expected,timeoutMs] of [[['-e',"process.stderr.write('PRIVATE');process.exitCode=3"],'PROCESS_UNAVAILABLE',5000],[['-e',"process.stderr.write('x'.repeat(65537));setInterval(()=>{},1000)"],'INPUT_TOO_LARGE',5000],[['-e','setInterval(()=>{},1000)'],'INPUT_TIMEOUT',200]]) {
     let child;
-    await assert.rejects(spawnHook('init',{}, {bin:process.execPath,args,timeoutMs:200,spawnFn:(...a)=>(child=spawn(...a))}),error=>{assert.equal(error.code,expected);assert.equal(error.message.includes('PRIVATE'),false);return true;});
+    await assert.rejects(spawnHook('init',{}, {bin:process.execPath,args,timeoutMs,spawnFn:(...a)=>(child=spawn(...a))}),error=>{assert.equal(error.code,expected);assert.equal(error.message.includes('PRIVATE'),false);return true;});
     if(child.exitCode===null&&child.signalCode===null)await new Promise(resolve=>child.once('exit',resolve));
     assert.ok(child.exitCode!==null||child.signalCode!==null);
   }
