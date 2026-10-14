@@ -1,15 +1,16 @@
 ---
 id: relay-4d07f6
 title: Test runs leak hung subscriber fixtures that outlive the worktree
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: fix/test-fixture-leaks
 created: 2026-09-22T12:21:09Z
-updated: 2026-10-14T22:13:50Z
+updated: 2026-10-14T22:13:51Z
 started: 2026-10-14T22:13:50Z
+completed: 2026-10-14T22:13:50Z
 depends: []
 tags: [testing]
 agent: "claude-code/claude-opus-5[1m]"
@@ -32,4 +33,8 @@ Reproduce: run the suite, then `pgrep -af "subscriber.js hang"`. Fix the kill pa
 ## Notes
 
 - 2026-10-14T22:13:50Z (fix/test-fixture-leaks): started
+  provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-14T22:13:50Z (fix/test-fixture-leaks): done
+  provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-14T22:13:50Z (fix/test-fixture-leaks): Same leak as relay-7c134c, fixed in b518142. runChild's kill path was not at fault: the three in-process hang sites (child.test.js, dispatch.test.js x2) now assert inline that no fixture survives relay's timeout and pass. The survivors came from the CLI survival-limitation test's deliberate outer SIGKILL, which now reaps its orphan. The per-test survivor assertion is the regression guard asked for.
   provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
