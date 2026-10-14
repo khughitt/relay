@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, chmod, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { shellQuote } from '../src/install/hooks.js';
 import { main } from '../bin/relay.js';
 import { runCli } from './helpers/cli-interaction.js';
 
@@ -23,6 +24,14 @@ async function scratch(t) {
   const target = join(root, 'hooks.json'); await writeFile(target, '{"hooks":{}}\n');
   return { root, dir, file, target };
 }
+// An executable at a chosen path stands in for node: install validates and writes the path, never runs it.
+async function fakeNode(dir) {
+  await mkdir(dir, { recursive: true });
+  const file = join(dir, 'node'); await writeFile(file, '#!/bin/sh\n', { mode: 0o700 });
+  return file;
+}
+const quoted = (value) => shellQuote(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const commands = (artifact) => Object.values(JSON.parse(artifact.changes[0].after).hooks).flat().map((entry) => entry.hooks[0].command);
 const install = (args) => { const out = stream(), err = stream(); return main(args, { stdout: out, stderr: err }).then((code) => ({ code, out: out.text, err: err.text })); };
 
 test('install reads the subscriber file with the runtime checks and writes its path', async (t) => {
@@ -59,7 +68,10 @@ async function askInstall(t) {
   await writeFile(evidence, await readFile(new URL('../docs/evidence/claude-code-answer-routes.json', import.meta.url)));
   const claude = join(bin, 'claude');
   await writeFile(claude, '#!/bin/sh\nprintf "%s\\n" "2.1.296 (Claude Code)"\n', { mode: 0o700 });
-  const args = ['install', '--harness', 'claude-code', '--subscribers', s.file, '--target', s.target, '--evidence', evidence, '--with', 'ask'];
+  // An explicit, unversioned node keeps the run's stderr free of the versioned-path warning
+  // on a host whose own node lives under a version manager.
+  const node = await fakeNode(join(s.root, 'stable'));
+  const args = ['install', '--harness', 'claude-code', '--subscribers', s.file, '--target', s.target, '--node', node, '--evidence', evidence, '--with', 'ask'];
   return { ...s, bin, evidence, claude, args, run: (argv = args) => runCli({ stateDir: s.dir }, argv, undefined, { PATH: bin }) };
 }
 
@@ -137,4 +149,42 @@ test('successful Claude version checks do not leak subprocess stderr', async (t)
   assert.equal(success.stderr, '');
   assert.equal(JSON.parse(success.stdout).harness, 'claude-code');
   assert.equal(await readFile(s.target, 'utf8'), before);
+});
+
+test('install --node names that node in every command it writes, for both harnesses', async (t) => {
+  const s = await scratch(t), node = await fakeNode(join(s.root, "o'stable"));
+  for (const harness of ['claude-code', 'codex']) {
+    const r = await install(['install', '--harness', harness, '--subscribers', s.file, '--target', s.target, '--node', node]);
+    assert.equal(r.code, 0, r.err); assert.equal(r.err, '', harness);
+    const written = commands(JSON.parse(r.out));
+    assert.ok(written.length > 0, harness);
+    for (const command of written) assert.match(command, new RegExp(`^${quoted(node)} `), harness);
+  }
+});
+
+test('install refuses a --node that is not an absolute path to an executable file', async (t) => {
+  const s = await scratch(t), node = await fakeNode(join(s.root, 'stable'));
+  const plain = join(s.root, 'plain'); await writeFile(plain, '', { mode: 0o600 });
+  const cases = [['relative', 'bin/node', /--node must be an absolute path/], ['missing', join(s.root, 'none'), /--node .*does not exist/],
+    ['not executable', plain, /--node .*not an executable file/], ['directory', s.root, /--node .*not an executable file/]];
+  for (const [name, value, expected] of cases) {
+    const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', value]);
+    assert.equal(r.code, 2, name); assert.equal(r.out, '', name); assert.match(r.err, expected, name);
+  }
+  const opencode = await install(['install', '--harness', 'opencode', '--subscribers', s.file, '--config-dir', s.dir, '--node', node]);
+  assert.equal(opencode.code, 2); assert.match(opencode.err, /--node exists only for claude-code and codex/);
+});
+
+test('install warns when the node it writes lives in one version\'s directory, and still plans', async (t) => {
+  const s = await scratch(t);
+  for (const [dir, manager] of [[join(s.root, '.nvm/versions/node/v26.5.0/bin'), 'nvm'], [join(s.root, 'opt/homebrew/Cellar/node/26.5.0/bin'), 'Homebrew']]) {
+    const node = await fakeNode(dir);
+    for (const format of [[], ['--pretty']]) {
+      const r = await install([...format, 'install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', node]);
+      assert.equal(r.code, 0, r.err);
+      assert.equal(r.err.split('\n').filter(Boolean).length, 1, r.err);
+      assert.match(r.err, new RegExp(`^relay: warning: node path ${node.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} is in a version-specific directory \\(${manager}\\);`));
+      assert.match(r.err, /stop running, silently, when that version is removed/); assert.match(r.err, /--node/);
+    }
+  }
 });

@@ -12,10 +12,29 @@ const esc = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const executable = "(?:'(?:[^']|'\\\\'')*'|[^\\s']+)";
 // The command names node itself: a harness started from the macOS GUI inherits launchd's
 // PATH (/usr/bin:/bin:/usr/sbin:/sbin), where relay.js's `#!/usr/bin/env node` finds no node.
+// That node is the installer's own unless `relay install --node PATH` names another.
 const command = (node, bin, harness, event, outerMs, subscribersPath) => `${shellQuote(node)} ${shellQuote(bin)} hook --harness ${harness} --outer-ms ${outerMs} --subscribers ${shellQuote(subscribersPath)} ${event}`;
 // An entry installed before the node path, with relay.js alone, is still relay's own.
 const relay = (value, harness, event) => new RegExp(`^(?:${executable} )?${executable} hook --harness ${esc(harness)}(?: --outer-ms \\d+)?(?: --subscribers ${executable})? ${esc(event)}$`).test(value);
 const familiar = (value, event) => new RegExp(`^${executable} hook(?: --agent codex)? ${esc(event)}(?: --agent codex)?$`).test(value);
+// Directories that hold one Node version, which a version manager removes with it. Node
+// reports its resolved binary, so a stable shim in front of one of these is not what gets
+// written; the installer warns rather than guessing a different binary.
+const VERSIONED = [
+  ['nvm', /\/versions\/node\/[^/]+\//], ['fnm', /\/node-versions\/[^/]+\//], ['Volta', /\/\.volta\/tools\/image\/node\/[^/]+\//],
+  ['asdf or mise', /\/installs\/node(?:js)?\/[^/]+\//], ['Homebrew', /\/Cellar\/[^/]+\/[^/]+\//],
+];
+export const versionManagerOf = path => VERSIONED.find(([, pattern]) => pattern.test(path))?.[0] ?? null;
+export function versionWarnings({ nodeBin, relayBin }) {
+  const removed = 'the installed hooks stop running, silently, when that version is removed.';
+  return [
+    [nodeBin, 'node', 'Rerun relay install with --node naming a node that outlives version changes.'],
+    [relayBin, 'relay', 'Install relay outside the version manager, or rerun relay install whenever that version changes.'],
+  ].flatMap(([path, name, remedy]) => {
+    const manager = versionManagerOf(path);
+    return manager ? [`${name} path ${path} is in a version-specific directory (${manager}); ${removed} ${remedy}`] : [];
+  });
+}
 // Both harnesses store a hook's outer timeout in whole seconds; relay is told the same
 // budget in milliseconds. A profile that is not a positive whole second cannot be written.
 export function timeoutSeconds(outerMs) {

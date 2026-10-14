@@ -425,7 +425,7 @@ Callback and cleanup failures are preserved together in AggregateError.
 The CLI's commands are `relay list`, `relay reap [--outer-ms N]`,
 `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`,
 `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--evidence FILE]
-[--retire familiar] [--apply --artifact FILE]`, and `relay rollback --artifact FILE`; `relay --help`,
+[--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`, and `relay rollback --artifact FILE`; `relay --help`,
 `relay help [<command>]`, `relay <command> --help`, and `relay --version` round it out. `--json` and
 `--pretty` are global and mutually exclusive, `RELAY_FORMAT` sets the default (the protocol rows
 `hook` and `ask` ignore it, since they print only the harness reply), and `install` is JSON
@@ -433,7 +433,14 @@ by default (its value is the installation artifact). Each hook command it writes
 relay.js through the installer's own node (`process.execPath`, absolute and quoted), because a
 harness launched from the macOS GUI inherits launchd's `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`),
 where `#!/usr/bin/env node` finds no nvm or Homebrew node. That path can be version-specific (an
-nvm path always is): removing that node breaks installed hooks until relay is reinstalled. List emits one JSON Listing under `--json`.
+nvm path always is, and Node reports the resolved binary, so a stable shim in front of it is
+lost): removing that node makes every installed hook fail to start, which both harnesses treat
+as a non-blocking failure, so guards stop guarding until relay is reinstalled. `--node PATH`
+(Claude Code and Codex only) writes that node instead, as given and unresolved; it must be an
+absolute path to an executable file, or install exits 2. When the node or relay path to be written
+lies in one version's directory (nvm, fnm, Volta, asdf or mise, Homebrew Cellar), a successful
+install prints one `relay: warning: …` line per path on stderr after its apply, in either output
+mode; there is no automatic shim discovery. List emits one JSON Listing under `--json`.
 On failure any command exits 1 with one stderr envelope whose `kind` is `<command>_failed`:
 
 ```json
