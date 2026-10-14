@@ -12,7 +12,7 @@ import { runServe, servePaths } from '../src/serve/serve.js';
 import { runAsk } from '../src/routes/ask.js';
 import { runInbox, runPresence } from '../src/cli/desk.js';
 
-const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const { version, engines } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const usage = (message) => relayError('USAGE', message);
 const hasHelp = (args) => args.includes('--help') || args.includes('-h');
 
@@ -70,10 +70,19 @@ function flags(args, cmd, positional) {
 function explicitNode(path, harness) {
   if (harness === 'opencode') throw usage('--node exists only for claude-code and codex');
   if (!isAbsolute(path)) throw usage(`--node must be an absolute path, got ${JSON.stringify(path)}`);
-  const file = statSync(path, { throwIfNoEntry: false }), notExecutable = () => usage(`--node ${path} is not an executable file`);
+  let file;
+  try { file = statSync(path, { throwIfNoEntry: false }); } catch (error) { throw usage(`--node ${path} cannot be inspected: ${error.code}`); }
+  const notExecutable = () => usage(`--node ${path} is not an executable file`);
   if (!file) throw usage(`--node ${path} does not exist`);
   if (!file.isFile()) throw notExecutable();
   try { accessSync(path, constants.X_OK); } catch { throw notExecutable(); }
+  // It runs relay in every hook, so it must meet relay's own engines floor: a hook that cannot
+  // start under it fails silently, the very failure --node exists to avoid.
+  let reported = '';
+  try { reported = execFileSync(path, ['--version'], { encoding: 'utf8', timeout: 10000, stdio: 'pipe' }).trim(); } catch { /* reported below */ }
+  const major = /^v(\d+)\.\d+\.\d+$/.exec(reported)?.[1], floor = Number(/^>=(\d+)$/.exec(engines.node)[1]);
+  if (!major) throw usage(`--node ${path} does not report a Node version`);
+  if (Number(major) < floor) throw usage(`--node ${path} is Node ${reported}; relay needs ${engines.node}`);
   return path;
 }
 export async function main(rawArgs, { list = listAgents, reap = reconcile, hook = dispatchHook, stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {

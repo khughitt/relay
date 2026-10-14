@@ -20,8 +20,10 @@ const familiar = (value, event) => new RegExp(`^${executable} hook(?: --agent co
 // Directories that hold one Node version, which a version manager removes with it. Node
 // reports its resolved binary, so a stable shim in front of one of these is not what gets
 // written; the installer warns rather than guessing a different binary.
+// fnm's per-shell link is what `which node` prints in an fnm shell, and it outlives only the shell.
 const VERSIONED = [
-  ['nvm', /\/versions\/node\/[^/]+\//], ['fnm', /\/node-versions\/[^/]+\//], ['Volta', /\/\.volta\/tools\/image\/node\/[^/]+\//],
+  ['nvm or n', /\/versions\/node\/[^/]+\//], ['fnm', /\/node-versions\/[^/]+\//], ['fnm, a per-shell temporary link', /\/fnm_multishells\//],
+  ['nodenv', /\/\.nodenv\/versions\/[^/]+\//], ['Volta', /\/tools\/image\/node\/[^/]+\//],
   ['asdf or mise', /\/installs\/node(?:js)?\/[^/]+\//], ['Homebrew', /\/Cellar\/[^/]+\/[^/]+\//],
 ];
 export const versionManagerOf = path => VERSIONED.find(([, pattern]) => pattern.test(path))?.[0] ?? null;

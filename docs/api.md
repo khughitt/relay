@@ -437,8 +437,9 @@ nvm path always is, and Node reports the resolved binary, so a stable shim in fr
 lost): removing that node makes every installed hook fail to start, which both harnesses treat
 as a non-blocking failure, so guards stop guarding until relay is reinstalled. `--node PATH`
 (Claude Code and Codex only) writes that node instead, as given and unresolved; it must be an
-absolute path to an executable file, or install exits 2. When the node or relay path to be written
-lies in one version's directory (nvm, fnm, Volta, asdf or mise, Homebrew Cellar), a successful
+absolute path to an executable file whose `--version` meets relay's `engines.node` floor (>=22),
+or install exits 2. When the node or relay path to be written lies in one version's directory
+(nvm or n, fnm or its per-shell link, nodenv, Volta, asdf or mise, Homebrew Cellar), a successful
 install prints one `relay: warning: …` line per path on stderr after its apply, in either output
 mode; there is no automatic shim discovery. List emits one JSON Listing under `--json`.
 On failure any command exits 1 with one stderr envelope whose `kind` is `<command>_failed`:

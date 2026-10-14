@@ -25,9 +25,9 @@ async function scratch(t) {
   return { root, dir, file, target };
 }
 // An executable at a chosen path stands in for node: install validates and writes the path, never runs it.
-async function fakeNode(dir) {
+async function fakeNode(dir, reports = 'v22.0.0') {
   await mkdir(dir, { recursive: true });
-  const file = join(dir, 'node'); await writeFile(file, '#!/bin/sh\n', { mode: 0o700 });
+  const file = join(dir, 'node'); await writeFile(file, `#!/bin/sh\nprintf '%s\\n' '${reports}'\n`, { mode: 0o700 });
   return file;
 }
 const quoted = (value) => shellQuote(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -171,13 +171,27 @@ test('install refuses a --node that is not an absolute path to an executable fil
     const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', value]);
     assert.equal(r.code, 2, name); assert.equal(r.out, '', name); assert.match(r.err, expected, name);
   }
+  // The written node runs relay, so it must meet relay's own engines floor.
+  const old = await fakeNode(join(s.root, 'old'), 'v18.19.0'), other = await fakeNode(join(s.root, 'other'), 'Python 3.13.1');
+  for (const [name, value, expected] of [['below the floor', old, /--node .* is Node v18\.19\.0; relay needs >=22/], ['not node', other, /--node .* does not report a Node version/]]) {
+    const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', value]);
+    assert.equal(r.code, 2, name); assert.equal(r.out, '', name); assert.match(r.err, expected, name);
+  }
+  if (process.getuid?.() !== 0) {
+    const sealed = join(s.root, 'sealed'), hidden = await fakeNode(sealed);
+    await chmod(sealed, 0o000);
+    try {
+      const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', hidden]);
+      assert.equal(r.code, 2, r.err); assert.match(r.err, /--node .* cannot be inspected/);
+    } finally { await chmod(sealed, 0o700); }
+  }
   const opencode = await install(['install', '--harness', 'opencode', '--subscribers', s.file, '--config-dir', s.dir, '--node', node]);
   assert.equal(opencode.code, 2); assert.match(opencode.err, /--node exists only for claude-code and codex/);
 });
 
 test('install warns when the node it writes lives in one version\'s directory, and still plans', async (t) => {
   const s = await scratch(t);
-  for (const [dir, manager] of [[join(s.root, '.nvm/versions/node/v26.5.0/bin'), 'nvm'], [join(s.root, 'opt/homebrew/Cellar/node/26.5.0/bin'), 'Homebrew']]) {
+  for (const [dir, manager] of [[join(s.root, '.nvm/versions/node/v26.5.0/bin'), 'nvm or n'], [join(s.root, 'opt/homebrew/Cellar/node/26.5.0/bin'), 'Homebrew']]) {
     const node = await fakeNode(dir);
     for (const format of [[], ['--pretty']]) {
       const r = await install([...format, 'install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', node]);
@@ -187,4 +201,11 @@ test('install warns when the node it writes lives in one version\'s directory, a
       assert.match(r.err, /stop running, silently, when that version is removed/); assert.match(r.err, /--node/);
     }
   }
+});
+
+test('a failed apply leaves its one error envelope on stderr, without the versioned-path warning', async (t) => {
+  const s = await scratch(t), node = await fakeNode(join(s.root, '.nvm/versions/node/v26.5.0/bin'));
+  const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', node, '--apply', '--artifact', join(s.root, 'missing', 'artifact.json')]);
+  assert.equal(r.code, 1, r.err); assert.equal(r.out, '');
+  assert.equal(JSON.parse(r.err).error.kind, 'install_failed');
 });
