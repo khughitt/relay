@@ -742,6 +742,15 @@ options = [
 # ---- walictl
 
 [[cli.walictl.commands]]
+path = ["config"]
+summary = "the configured wallpaper and archive directories"
+
+[[cli.walictl.commands]]
+path = ["config", "show"]
+verb = "show"
+summary = "show the resolved wallpaper and archive directories"
+
+[[cli.walictl.commands]]
 path = ["current"]
 summary = "describe the default wallpaper"
 verb = "list"
@@ -1870,6 +1879,10 @@ options = [
   { names = ["--activity"], value = "enum", values = ["rubric", "audit"], required = true },
 ]
 
+[[cli.survey.commands]]
+path = ["probe"]
+summary = "Send each kind of request to each model reader once, outside any run"
+
 # ---- mindful
 
 [[cli.mindful.commands]]
@@ -1881,6 +1894,7 @@ options = [
   { shared = "as", value = "string" },
   { shared = "via", value = "string" },
   { names = ["--body"], value = "string" },
+  { names = ["--from"], value = "path" },
   { names = ["--body-file"], value = "path" },
   { shared = "tag", role = "set", value = "string", repeatable = true },
   { names = ["--alias"], value = "string" },
@@ -1933,6 +1947,8 @@ options = [
   { shared = "via", value = "string" },
   { names = ["--title"], value = "string" },
   { names = ["--body"], value = "string" },
+  { names = ["--from"], value = "path" },
+  { names = ["--etag"], value = "string" },
   { names = ["--interactive", "-i"], value = "none" },
 ]
 
@@ -2102,6 +2118,12 @@ options = [
 path = ["mindmap", "view"]
 summary = "Render a mindmap as terminal sprites and edges"
 args = [{ name = "map-ref", value = "ref", required = true }]
+
+[[cli.mindful.commands]]
+path = ["op"]
+output = "json"
+summary = "Send one raw op through the CLI's transport and print its result"
+args = [{ name = "op", value = "string", required = true }]
 
 [[cli.mindful.commands]]
 path = ["relate"]
@@ -2294,6 +2316,15 @@ options = [
 path = ["undo"]
 summary = "Restore the previous version"
 args = [{ name = "ref", value = "ref", required = true }]
+options = [
+  { shared = "as", value = "string" },
+  { shared = "via", value = "string" },
+]
+
+[[cli.mindful.commands]]
+path = ["untag"]
+summary = "Remove a tag from a thought"
+args = [{ name = "ref", value = "ref", required = true }, { name = "name", value = "string", required = true }]
 options = [
   { shared = "as", value = "string" },
   { shared = "via", value = "string" },
@@ -2652,6 +2683,7 @@ options = [
   { names = ["--evidence"], value = "path" },
   { names = ["--retire"], value = "enum", values = ["familiar"] },
   { names = ["--with"], value = "enum", values = ["ask"] },
+  { names = ["--node"], value = "path" },
   { names = ["--artifact"], value = "path" },
   { names = ["--apply"], value = "none" },
 ]

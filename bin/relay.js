@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { realpathSync, readFileSync, existsSync } from 'node:fs';
+import { realpathSync, readFileSync, existsSync, statSync, accessSync, constants } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -12,7 +12,7 @@ import { runServe, servePaths } from '../src/serve/serve.js';
 import { runAsk } from '../src/routes/ask.js';
 import { runInbox, runPresence } from '../src/cli/desk.js';
 
-const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const { version, engines } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const usage = (message) => relayError('USAGE', message);
 const hasHelp = (args) => args.includes('--help') || args.includes('-h');
 
@@ -64,6 +64,27 @@ function flags(args, cmd, positional) {
     out[key] = value;
   }
   return out;
+}
+// The node an installed hook command runs, named by the operator: written as given, never
+// resolved, so a stable shim stays a shim.
+function explicitNode(path, harness) {
+  if (harness === 'opencode') throw usage('--node exists only for claude-code and codex');
+  if (!isAbsolute(path)) throw usage(`--node must be an absolute path, got ${JSON.stringify(path)}`);
+  let file;
+  try { file = statSync(path, { throwIfNoEntry: false }); } catch (error) { throw usage(`--node ${path} cannot be inspected: ${error.code}`); }
+  const notExecutable = () => usage(`--node ${path} is not an executable file`);
+  if (!file) throw usage(`--node ${path} does not exist`);
+  if (!file.isFile()) throw notExecutable();
+  try { accessSync(path, constants.X_OK); } catch { throw notExecutable(); }
+  // It runs relay in every hook, so it must meet relay's own engines floor: a hook that cannot
+  // start under it fails silently, the very failure --node exists to avoid.
+  let reported;
+  try { reported = execFileSync(path, ['--version'], { encoding: 'utf8', timeout: 10000, killSignal: 'SIGKILL', stdio: 'pipe' }).trim(); }
+  catch (error) { throw usage(`--node ${path} --version failed: ${error.code ?? error.signal ?? `exit ${error.status}`}`); }
+  const major = /^v(\d+)\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.exec(reported)?.[1], floor = Number(/^>=(\d+)$/.exec(engines.node)[1]);
+  if (!major) throw usage(`--node ${path} does not report a Node version: ${JSON.stringify(reported.split('\n', 1)[0])}`);
+  if (Number(major) < floor) throw usage(`--node ${path} is Node ${reported}; relay needs ${engines.node}`);
+  return path;
 }
 export async function main(rawArgs, { list = listAgents, reap = reconcile, hook = dispatchHook, stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {
   let mode = 'pretty', cmdName = null;
@@ -185,6 +206,7 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
       if (withAsk && harness !== 'claude-code') throw usage('--with ask exists only for claude-code');
       if (harness === 'opencode' && (!f['--config-dir'] || f['--target'])
         || harness !== 'opencode' && (!f['--target'] || f['--config-dir'])) throw usage('install target does not match harness');
+      const nodeBin = f['--node'] ? explicitNode(f['--node'], harness) : process.execPath;
       const { loadSubscribersFrom } = await import('../src/subscribers.js');
       const subscribersPath = f['--subscribers'], subscribers = await loadSubscribersFrom(subscribersPath);
       const evidence = f['--evidence'] ? (await import('../src/install/capabilities.js')).parseEvidence(readFileSync(f['--evidence'], 'utf8')) : null;
@@ -194,10 +216,15 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
         try { installedVersion = execFileSync('claude', ['--version'], { encoding: 'utf8', timeout: 10000, stdio: 'pipe' }).trim().split(/\s+/, 1)[0]; }
         catch (error) { throw relayError('HARNESS_UNAVAILABLE', 'cannot read the installed Claude Code version', error); }
       }
-      if (harness === 'claude-code') artifact = (await import('../src/install/claude-code.js')).planClaudeCode({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin: process.execPath, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'], withAsk, installedVersion });
-      else if (harness === 'codex') artifact = (await import('../src/install/codex.js')).planCodex({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin: process.execPath, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
+      if (harness === 'claude-code') artifact = (await import('../src/install/claude-code.js')).planClaudeCode({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'], withAsk, installedVersion });
+      else if (harness === 'codex') artifact = (await import('../src/install/codex.js')).planCodex({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
       else { const dir = f['--config-dir'], read = name => { const path = join(dir, name); return existsSync(path) ? readFileSync(path, 'utf8') : null; }; artifact = (await import('../src/install/opencode.js')).planOpenCode({ configDir: dir, json: read('opencode.json'), jsonc: read('opencode.jsonc'), relayPlugin: fileURLToPath(new URL('../integrations/opencode/plugin.js', import.meta.url)), subscribers }); }
       if (f['--apply']) (await import('../src/install/atomic.js')).applyArtifact(f['--artifact'], artifact);
+      // After the apply, so a failure still leaves one error envelope alone on stderr.
+      if (harness !== 'opencode') {
+        const { versionWarnings } = await import('../src/install/hooks.js');
+        await emit(stderr, versionWarnings({ nodeBin, relayBin }).map((w) => `relay: warning: ${w}\n`).join(''));
+      }
       if (!silent) {
         if (mode === 'json') await emit(stdout, `${JSON.stringify(artifact)}\n`);
         else await emit(stdout, `harness=${artifact.harness} changes=${artifact.changes.length}\n`);

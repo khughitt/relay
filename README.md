@@ -33,6 +33,10 @@ host using tasks' relay identity, tasks is upgraded first; see the
 R2 adds `relay hook` and reconciling `relay reap`; subscribers come from
 `~/.config/relay/subscribers.json` for a direct `relay hook`, and from the
 `--subscribers FILE` an installed entry names. **No live hook is installed by this package.**
+Each installed entry runs relay.js through the installer's own node. Under nvm, fnm, Volta,
+asdf, mise or a Homebrew Cellar that path belongs to one Node version, and removing that
+version silently stops the hooks; `relay install` warns when it would write such a path,
+and `--node PATH` names a node that outlives version changes instead.
 The OpenCode plugin must still not be enabled until `relay-baa816` and the
 `ops-c8e4d1` probe pass. `relay serve` now owns a durable interaction inbox with
 local desk commands and optional tailnet HTTP access; see the

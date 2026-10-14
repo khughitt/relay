@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { planHooks, shellQuote, timeoutSeconds } from '../src/install/hooks.js';
+import { planHooks, shellQuote, timeoutSeconds, versionManagerOf, versionWarnings } from '../src/install/hooks.js';
 import { planClaudeCode } from '../src/install/claude-code.js';
 import { planCodex } from '../src/install/codex.js';
 import { tempState } from './helpers/fixture.js';
@@ -130,4 +130,41 @@ test('a rendered hook command runs under launchd\'s minimal PATH', async (t) => 
     const r = run(entry.hooks[0].command.slice(shellQuote(process.execPath).length + 1));
     assert.equal(r.status, 127, r.stderr); assert.match(r.stderr, /node: No such file or directory/);
   }
+});
+
+// A path inside one version's directory dies with that version; Node reports the resolved
+// binary, so a stable shim in front of it is not what an install would write.
+test('a node or relay path under a version manager\'s per-version directory is recognized', () => {
+  const versioned = [
+    ['/home/u/.nvm/versions/node/v26.5.0/bin/node', 'nvm or n'],
+    ['/home/u/.nvm/versions/node/v26.5.0/lib/node_modules/relay/bin/relay.js', 'nvm or n'],
+    ['/home/u/.local/share/fnm/node-versions/v22.23.2/installation/bin/node', 'fnm'],
+    ['/usr/local/n/versions/node/22.23.2/bin/node', 'nvm or n'],
+    ['/run/user/1000/fnm_multishells/4242_1760000000000/bin/node', "fnm's per-shell link"],
+    ['/home/u/.nodenv/versions/22.23.2/bin/node', 'nodenv'],
+    ['/home/u/.volta/tools/image/node/22.23.2/bin/node', 'Volta'],
+    ['/opt/volta-home/tools/image/node/22.23.2/bin/node', 'Volta'],
+    ['/home/u/.asdf/installs/nodejs/22.23.2/bin/node', 'asdf or mise'],
+    ['/home/u/.local/share/mise/installs/node/22.23.2/bin/node', 'asdf or mise'],
+    ['/opt/homebrew/Cellar/node/26.5.0/bin/node', 'Homebrew'],
+    ['/usr/local/Cellar/node@22/22.23.2/bin/node', 'Homebrew'],
+  ];
+  for (const [path, manager] of versioned) assert.equal(versionManagerOf(path), manager, path);
+  for (const path of ['/usr/bin/node', '/usr/local/bin/node', '/opt/homebrew/bin/node', '/home/u/.volta/bin/node', '/opt/relay/bin/relay.js', '/home/u/src/versions/relay/bin/relay.js']) {
+    assert.equal(versionManagerOf(path), null, path);
+  }
+});
+
+test('install warnings name each versioned path, its failure mode and its remedy', () => {
+  const nvm = '/home/u/.nvm/versions/node/v26.5.0';
+  assert.deepEqual(versionWarnings({ nodeBin: '/usr/bin/node', relayBin: '/opt/relay/bin/relay.js' }), []);
+  const [node, relayWarning, ...rest] = versionWarnings({ nodeBin: `${nvm}/bin/node`, relayBin: `${nvm}/lib/node_modules/relay/bin/relay.js` });
+  assert.deepEqual(rest, []);
+  assert.match(node, new RegExp(`^node path ${nvm}/bin/node is managed by nvm or n; .*stop running, silently, when that version is removed.*--node`));
+  assert.match(relayWarning, new RegExp(`^relay path ${nvm}/lib/node_modules/relay/bin/relay.js is managed by nvm or n; .*stop running, silently, when that version is removed`));
+  assert.doesNotMatch(relayWarning, /--node/);
+  const [only, ...none] = versionWarnings({ nodeBin: '/usr/bin/node', relayBin: '/usr/local/Cellar/relay/0.1.0/libexec/bin/relay.js' });
+  assert.deepEqual(none, []); assert.match(only, /^relay path .* is managed by Homebrew;/);
+  const [shell] = versionWarnings({ nodeBin: '/run/user/1000/fnm_multishells/4242_1760000000000/bin/node', relayBin: '/opt/relay/bin/relay.js' });
+  assert.match(shell, /is managed by fnm's per-shell link; .*stop running, silently, when that shell's session ends/);
 });
