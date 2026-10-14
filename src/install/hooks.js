@@ -19,22 +19,24 @@ const relay = (value, harness, event) => new RegExp(`^(?:${executable} )?${execu
 const familiar = (value, event) => new RegExp(`^${executable} hook(?: --agent codex)? ${esc(event)}(?: --agent codex)?$`).test(value);
 // Directories that hold one Node version, which a version manager removes with it. Node
 // reports its resolved binary, so a stable shim in front of one of these is not what gets
-// written; the installer warns rather than guessing a different binary.
-// fnm's per-shell link is what `which node` prints in an fnm shell, and it outlives only the shell.
+// written; the installer warns rather than guessing a different binary. fnm's per-shell link
+// is what `which node` prints in an fnm shell; it outlives only that shell's session.
+const versionRemoved = 'when that version is removed';
 const VERSIONED = [
-  ['nvm or n', /\/versions\/node\/[^/]+\//], ['fnm', /\/node-versions\/[^/]+\//], ['fnm, a per-shell temporary link', /\/fnm_multishells\//],
-  ['nodenv', /\/\.nodenv\/versions\/[^/]+\//], ['Volta', /\/tools\/image\/node\/[^/]+\//],
-  ['asdf or mise', /\/installs\/node(?:js)?\/[^/]+\//], ['Homebrew', /\/Cellar\/[^/]+\/[^/]+\//],
+  ['nvm or n', /\/versions\/node\/[^/]+\//, versionRemoved], ['fnm', /\/node-versions\/[^/]+\//, versionRemoved],
+  ["fnm's per-shell link", /\/fnm_multishells\//, "when that shell's session ends or its runtime directory is cleared"],
+  ['nodenv', /\/\.nodenv\/versions\/[^/]+\//, versionRemoved], ['Volta', /\/tools\/image\/node\/[^/]+\//, versionRemoved],
+  ['asdf or mise', /\/installs\/node(?:js)?\/[^/]+\//, versionRemoved], ['Homebrew', /\/Cellar\/[^/]+\/[^/]+\//, versionRemoved],
 ];
-export const versionManagerOf = path => VERSIONED.find(([, pattern]) => pattern.test(path))?.[0] ?? null;
+const managed = path => VERSIONED.find(([, pattern]) => pattern.test(path)) ?? null;
+export const versionManagerOf = path => managed(path)?.[0] ?? null;
 export function versionWarnings({ nodeBin, relayBin }) {
-  const removed = 'the installed hooks stop running, silently, when that version is removed.';
   return [
     [nodeBin, 'node', 'Rerun relay install with --node naming a node that outlives version changes.'],
     [relayBin, 'relay', 'Install relay outside the version manager, or rerun relay install whenever that version changes.'],
   ].flatMap(([path, name, remedy]) => {
-    const manager = versionManagerOf(path);
-    return manager ? [`${name} path ${path} is in a version-specific directory (${manager}); ${removed} ${remedy}`] : [];
+    const [manager, , when] = managed(path) ?? [];
+    return manager ? [`${name} path ${path} is managed by ${manager}; the installed hooks stop running, silently, ${when}. ${remedy}`] : [];
   });
 }
 // Both harnesses store a hook's outer timeout in whole seconds; relay is told the same

@@ -24,7 +24,7 @@ async function scratch(t) {
   const target = join(root, 'hooks.json'); await writeFile(target, '{"hooks":{}}\n');
   return { root, dir, file, target };
 }
-// An executable at a chosen path stands in for node: install validates and writes the path, never runs it.
+// An executable at a chosen path stands in for node: install runs only its --version, then writes the path.
 async function fakeNode(dir, reports = 'v22.0.0') {
   await mkdir(dir, { recursive: true });
   const file = join(dir, 'node'); await writeFile(file, `#!/bin/sh\nprintf '%s\\n' '${reports}'\n`, { mode: 0o700 });
@@ -177,6 +177,11 @@ test('install refuses a --node that is not an absolute path to an executable fil
     const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', value]);
     assert.equal(r.code, 2, name); assert.equal(r.out, '', name); assert.match(r.err, expected, name);
   }
+  const failing = join(s.root, 'failing', 'node'); await mkdir(join(s.root, 'failing')); await writeFile(failing, '#!/bin/sh\nexit 3\n', { mode: 0o700 });
+  const failed = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', failing]);
+  assert.equal(failed.code, 2); assert.match(failed.err, /--node .* --version failed: exit 3/);
+  const prerelease = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', await fakeNode(join(s.root, 'nightly'), 'v24.0.0-nightly20250101abcdef')]);
+  assert.equal(prerelease.code, 0, prerelease.err);
   if (process.getuid?.() !== 0) {
     const sealed = join(s.root, 'sealed'), hidden = await fakeNode(sealed);
     await chmod(sealed, 0o000);
@@ -197,7 +202,7 @@ test('install warns when the node it writes lives in one version\'s directory, a
       const r = await install([...format, 'install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', node]);
       assert.equal(r.code, 0, r.err);
       assert.equal(r.err.split('\n').filter(Boolean).length, 1, r.err);
-      assert.match(r.err, new RegExp(`^relay: warning: node path ${node.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} is in a version-specific directory \\(${manager}\\);`));
+      assert.match(r.err, new RegExp(`^relay: warning: node path ${node.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} is managed by ${manager};`));
       assert.match(r.err, /stop running, silently, when that version is removed/); assert.match(r.err, /--node/);
     }
   }

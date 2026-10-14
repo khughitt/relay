@@ -78,10 +78,11 @@ function explicitNode(path, harness) {
   try { accessSync(path, constants.X_OK); } catch { throw notExecutable(); }
   // It runs relay in every hook, so it must meet relay's own engines floor: a hook that cannot
   // start under it fails silently, the very failure --node exists to avoid.
-  let reported = '';
-  try { reported = execFileSync(path, ['--version'], { encoding: 'utf8', timeout: 10000, stdio: 'pipe' }).trim(); } catch { /* reported below */ }
-  const major = /^v(\d+)\.\d+\.\d+$/.exec(reported)?.[1], floor = Number(/^>=(\d+)$/.exec(engines.node)[1]);
-  if (!major) throw usage(`--node ${path} does not report a Node version`);
+  let reported;
+  try { reported = execFileSync(path, ['--version'], { encoding: 'utf8', timeout: 10000, killSignal: 'SIGKILL', stdio: 'pipe' }).trim(); }
+  catch (error) { throw usage(`--node ${path} --version failed: ${error.code ?? error.signal ?? `exit ${error.status}`}`); }
+  const major = /^v(\d+)\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.exec(reported)?.[1], floor = Number(/^>=(\d+)$/.exec(engines.node)[1]);
+  if (!major) throw usage(`--node ${path} does not report a Node version: ${JSON.stringify(reported.split('\n', 1)[0])}`);
   if (Number(major) < floor) throw usage(`--node ${path} is Node ${reported}; relay needs ${engines.node}`);
   return path;
 }
