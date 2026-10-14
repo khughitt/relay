@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-14T22:45:29Z
-updated: 2026-10-14T22:45:29Z
+updated: 2026-10-14T22:47:23Z
 depends: []
 tags: [testing]
 source: "review:fix/test-fixture-leaks round 1"
@@ -23,3 +23,7 @@ Deferred minor findings from the whole-branch review of fix/test-fixture-leaks (
 5. Other probe-test psArgs helpers read ps without -ww; their needles sit on short lines today, but -ww would make them robust to an exported COLUMNS too.
 
 Done: each item fixed or ruled out with a note; just test-fast passes on Node 22 and the dev runtime.
+
+## Notes
+
+- 2026-10-14T22:47:23Z (fix/test-fixture-leaks): review round 2 minors: survivors.js now hard-codes /bin/ps (loud ENOENT on a host without it, e.g. NixOS; consistent with the probe tests) — consider a comment; test/survivors.test.js:17 runs markedPids twice per poll
