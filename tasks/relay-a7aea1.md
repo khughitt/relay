@@ -1,13 +1,15 @@
 ---
 id: relay-a7aea1
 title: "Process tests use global fixed process markers, so concurrent suite runs mistake each other's children for readiness and survivors."
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: fix/test-fixture-leaks
 created: 2026-10-12T06:01:59Z
-updated: 2026-10-14T22:18:26Z
+updated: 2026-10-14T22:18:31Z
+started: 2026-10-14T22:18:31Z
 depends: []
 tags: [feedback, friction, "from:relay"]
 agent: codex
@@ -25,3 +27,5 @@ Where: test/darwin-probe-orchestrator.test.js (lines 38, 56, 162-168, 217, 262-2
 - 2026-10-13T01:47:28Z (main): scope: scoped; body rewritten with the shared fixed markers (orchestrator :38 readiness poll, runtime :67 fixture, probe.mjs:217 self-test) and a concurrency check; todo P2 s mid direct
 - 2026-10-13T18:35:43Z (fix/typed-messages-review): observed 2026-10-13: default-concurrency test-fast failed once on 'SIGINT after a normal D0 packs results' (test/darwin-probe-orchestrator.test.js:31, ENOENT stages/D0.json); the focused file and a full rerun passed immediately after
 - 2026-10-14T22:18:26Z (fix/test-fixture-leaks): evidence 2026-10-14: a suite killed mid-run (load generator) orphaned one probe 'run --self-test-hang' with its 'sleep 600.321' and 'sleep 600.654' children; while they lived, 4 orchestrator tests failed on both Node 22 and 26 (SIGINT after a normal D0, credential material stops packing, closing the terminal bash/dash). After reaping them the suite passed 607/607. Confirms the host-wide fixed-marker collision, from a stale survivor rather than a concurrent run.
+- 2026-10-14T22:18:31Z (fix/test-fixture-leaks): started
+  provenance: {"harness_session":"claude-code:9f3b3355-be3d-44ca-987d-9722adfbbe40","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
