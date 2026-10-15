@@ -642,7 +642,7 @@ git commit -m "feat(install): bind Codex SubagentStart and SubagentStop; runbook
 
 **Files:**
 - Create: `tools/codex-subagent-capture/lib.sh`, `tools/codex-subagent-capture/judge-registry.mjs`
-- Modify: `tools/codex-subagent-capture/run`
+- Modify: `tools/codex-subagent-capture/run`, `tools/codex-subagent-capture/summarize.mjs`
 - Create: `docs/notes/2026-10-15-codex-worker-rows-acceptance.md`
 
 **Interfaces:**
@@ -752,7 +752,24 @@ if [[ ${1:-} == --relay ]]; then relay=${2:?--relay needs the path to bin/relay.
 With `--relay`: call `install_relay "$out" "$relay"` then `wrap_relay "$out"` instead of
 `plain_hooks`, and export `RELAY_STATE_DIR="$out/relay-state"` before Codex starts (the
 TUI's tmux command line needs it too: add `RELAY_STATE_DIR=$(printf %q "$RELAY_STATE_DIR")`
-beside `CODEX_HOME`). After the run (after the TUI is killed, for `background`):
+beside `CODEX_HOME`).
+
+The `background` case must end the TUI in order, so that its SessionEnd fires. Replace its
+`sleep 3` / capture / `kill-session` sequence with:
+
+```bash
+  sleep 3
+  tmux capture-pane -p -t "$tmux_session" >"$out/tui.txt" || true
+  # Quit through the TUI so Codex fires SessionEnd; kill only if it has not exited.
+  tmux send-keys -t "$tmux_session" /quit Enter
+  quit_deadline=$((SECONDS + 20))
+  until compgen -G "$out/log/*-SessionEnd.json" >/dev/null || ((SECONDS >= quit_deadline)); do sleep 1; done
+  compgen -G "$out/log/*-SessionEnd.json" >/dev/null || echo "no SessionEnd within 20 s of /quit" >>"$out/tui-shutdown"
+  tmux kill-session -t "$tmux_session" 2>/dev/null || true
+  tmux_session=
+```
+
+After the run, reap separately, once the Codex process has exited:
 
 ```bash
 if [[ -n $relay ]]; then
@@ -760,6 +777,13 @@ if [[ -n $relay ]]; then
   if [[ -r $out/relay-state/agents.json ]]; then cp "$out/relay-state/agents.json" "$out/final-agents.json"
   else echo null >"$out/final-agents.json"; fi
 fi
+```
+
+In `summarize.mjs`, read hook records only: the run now also writes `.agents.json`,
+`.claims.json`, `.reply` and `.reply-stderr` files beside them. Replace its `files` line with:
+
+```js
+const files = readdirSync(log).filter(name => /^\d+-[A-Za-z]+\.json$/.test(name)).sort();
 ```
 
 - [ ] **Step 2: Verify the refactor kept the plain capture**
@@ -773,9 +797,12 @@ Expected: the 12-row table of brief §7 (labels identical), and no `home/auth.js
 
 ```js
 #!/usr/bin/env node
-// Judge a `run --relay` capture: worker rows exist with scope worker and their root, share
-// the root's handle, never move the root row, and leave nothing behind. Exit 0 pass, 1 fail,
-// 2 invalid run (no worker event captured). Usage: judge-registry.mjs OUT_DIR
+// Judge a `run --relay` capture. Worker rows exist with scope worker and their root, share
+// the root's handle and never move the root row; the root's SessionEnd publication removes
+// the root and its workers; reap after the process exits leaves nothing. Only events relay
+// handled (wrapped hooks, which leave a .reply file) carry a registry copy; PostToolUse is
+// logged only and is skipped. Exit 0 pass, 1 fail, 2 invalid run (no worker event).
+// Usage: judge-registry.mjs OUT_DIR
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -784,29 +811,41 @@ const dir = process.argv[2];
 if (!dir) throw new Error('usage: judge-registry.mjs OUT_DIR');
 const log = join(dir, 'log'), read = path => JSON.parse(readFileSync(path, 'utf8'));
 const records = readdirSync(log).filter(name => /^\d+-[A-Za-z]+\.json$/.test(name)).sort().map(name => {
-  const snapshotPath = join(log, name.replace(/\.json$/, '.agents.json'));
-  return { name, ...read(join(log, name)), after: existsSync(snapshotPath) ? read(snapshotPath) : null };
+  const base = join(log, name.replace(/\.json$/, ''));
+  return { name, ...read(join(log, name)), wrapped: existsSync(`${base}.reply`),
+    after: existsSync(`${base}.agents.json`) ? read(`${base}.agents.json`) : null };
 });
 const failures = [], fail = message => failures.push(message);
-const workerEvents = records.filter(record => typeof record.payload.agent_id === 'string');
-if (!workerEvents.length) { console.log('INVALID: no worker event captured'); process.exit(2); }
-let previousRoot = null;
-for (const record of records) {
-  const rootId = `codex:${record.payload.session_id}`, rows = record.after?.agents ?? {}, root = rows[rootId] ?? null;
+const handled = records.filter(record => record.wrapped);
+const workerEvents = handled.filter(record => typeof record.payload.agent_id === 'string');
+if (!workerEvents.length) { console.log('INVALID: no worker event reached relay'); process.exit(2); }
+const rooted = (rows, rootId) => Object.values(rows).filter(row => row.id === rootId || row.root === rootId).map(row => row.id);
+let previousRoot = null, ended = false;
+for (const record of handled) {
+  if (record.after === null) { fail(`${record.name}: no registry copy after a relay event`); continue; }
+  const rootId = `codex:${record.payload.session_id}`, rows = record.after.agents, root = rows[rootId] ?? null;
   if (typeof record.payload.agent_id === 'string') {
     const row = rows[`codex:${record.payload.agent_id}`];
-    if (!row) { fail(`${record.name}: no worker row`); continue; }
-    if (row.scope !== 'worker' || row.root !== rootId) fail(`${record.name}: worker row scope ${row.scope}, root ${row.root}`);
-    if (root && !isDeepStrictEqual(row.process, root.process)) fail(`${record.name}: worker and root handles differ`);
+    if (!row) fail(`${record.name}: no worker row`);
+    else {
+      if (row.scope !== 'worker' || row.root !== rootId) fail(`${record.name}: worker row scope ${row.scope}, root ${row.root}`);
+      if (root && !isDeepStrictEqual(row.process, root.process)) fail(`${record.name}: worker and root handles differ`);
+    }
     if (!isDeepStrictEqual(root, previousRoot)) fail(`${record.name}: a worker event changed the root row`);
+  }
+  if (record.event === 'SessionEnd') {
+    ended = true;
+    const left = rooted(rows, rootId);
+    if (left.length) fail(`${record.name}: SessionEnd left ${left.join(', ')}`);
   }
   previousRoot = root;
 }
+if (!ended) fail('no SessionEnd publication captured');
 const final = existsSync(join(dir, 'final-agents.json')) ? read(join(dir, 'final-agents.json')) : undefined;
-if (final === undefined) fail('no final-agents.json');
-else if (final !== null && Object.keys(final.agents).length) fail(`rows left after the session: ${Object.keys(final.agents).join(', ')}`);
+if (final === undefined) fail('no final-agents.json (reap result)');
+else if (final !== null && Object.keys(final.agents).length) fail(`rows left after reap: ${Object.keys(final.agents).join(', ')}`);
 for (const message of failures) console.log(`FAIL: ${message}`);
-console.log(failures.length ? `FAIL (${failures.length})` : `PASS: ${workerEvents.length} worker events`);
+console.log(failures.length ? `FAIL (${failures.length})` : `PASS: ${workerEvents.length} worker events, SessionEnd removed the session's rows, reap left none`);
 process.exit(failures.length ? 1 : 0);
 ```
 
@@ -821,7 +860,7 @@ for c in single nested background; do
 done
 ```
 
-Expected: `PASS` for each case. An `INVALID` result (the model did not spawn) is rerun, at most twice. A `FAIL` is a defect: stop, debug with superpowers:systematic-debugging, and fix in the owning task's files with a test before rerunning.
+Expected: `PASS` for each case, each naming SessionEnd. An `INVALID` result (the model did not spawn) is rerun, at most twice. For `background`, a `tui-shutdown` file means `/quit` produced no SessionEnd: that is a FAIL to investigate (which key ends the TUI in order), never a pass by reap. A `FAIL` is a defect: stop, debug with superpowers:systematic-debugging, and fix in the owning task's files with a test before rerunning.
 
 - [ ] **Step 5: Run the older-writer check**
 
@@ -903,11 +942,14 @@ if [[ -n $sandboxed ]]; then
   sandbox="sandbox_mode = \"workspace-write\"
 [sandbox_workspace_write]
 writable_roots = [\"$out\"]"
-  prompt="Run the shell command \`tasks start $A\` exactly once and reply with its output. Run nothing else."
+  prompt="Run the shell command \`tasks start $A 2>&1; echo exit=\$?\` exactly once and reply with its output. Run nothing else."
 else
   # Host PID view: a workspace-write sandbox hides the codex session process from tasks.
   sandbox='sandbox_mode = "danger-full-access"'
-  prompt="Follow these steps exactly, running only the commands named. 1. Run \`tasks start $A\`. 2. Spawn exactly one subagent named worker with this instruction: \"Run \`tasks start $B\`. Then run each of these once, continuing after failures: \`tasks start $A\`, \`tasks park $A probe\`, \`tasks done $A probe\`. Then reply done.\" 3. Wait for the worker to finish. 4. Run each of these once, continuing after failures: \`tasks start $B\`, \`tasks park $B probe\`, \`tasks done $B probe\`. 5. Reply with the single word done."
+  # Each command reports its exit code and folds stderr (where tasks writes errors) into the
+  # tool result the judge reads.
+  x='2>&1; echo exit=$?'
+  prompt="Follow these steps exactly, running each command verbatim as one shell command and nothing else. 1. Run \`tasks start $A $x\`. 2. Spawn exactly one subagent named worker with this instruction: \"Run \`tasks start $B $x\`. Then run each of these once, continuing after failures: \`tasks start $A $x\`, \`tasks park $A probe $x\`, \`tasks done $A probe $x\`. Then reply done.\" 3. Wait for the worker to finish. 4. Run each of these once, continuing after failures: \`tasks start $B $x\`, \`tasks park $B probe $x\`, \`tasks done $B probe $x\`. 5. Reply with the single word done."
 fi
 cat >"$out/home/config.toml" <<TOML
 model = "$model"
@@ -939,8 +981,10 @@ exit "$status"
 
 ```js
 #!/usr/bin/env node
-// Judge a codex-worker-claims run from tasks' and relay's state, not the transcript.
-// Exit 0 pass, 1 fail, 2 invalid run (the model skipped a scripted command).
+// Judge a codex-worker-claims run from command results, tasks' claims and relay's rows,
+// never from the transcript. Each scripted command ends `2>&1; echo exit=$?`, so its
+// PostToolUse result carries tasks' error JSON (tasks writes errors to stderr) and its exit
+// code. Exit 0 pass, 1 fail, 2 invalid run (the model skipped or altered a command).
 // Usage: judge.mjs OUT_DIR [--sandboxed]
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -955,25 +999,51 @@ const records = readdirSync(log).filter(name => /^\d+-[A-Za-z]+\.json$/.test(nam
   const copy = suffix => { const path = join(log, name.replace(/\.json$/, suffix)); return existsSync(path) ? read(path) : null; };
   return { ...read(join(log, name)), after: copy('.agents.json'), claims: copy('.claims.json')?.claims ?? null };
 });
-// Claims seen while the run was live, per task id: every recorded holder session.
-const holders = id => records.flatMap(r => (r.claims ?? []).filter(c => c.id === id).map(c => c.session));
-const commands = records.filter(r => r.event === 'PreToolUse' && r.payload.tool_name === 'Bash')
-  .map(r => ({ by: r.payload.agent_id ?? null, command: r.payload.tool_input?.command ?? '' }));
-const ran = (by, text) => commands.some(c => (by === 'worker' ? c.by !== null : c.by === null) && c.command.includes(text));
 const invalid = message => { console.log(`INVALID: ${message}`); process.exit(2); };
 const failures = [], fail = message => failures.push(message);
+// Claims seen while the run was live, per task id: every recorded holder session.
+const holders = id => records.flatMap(r => (r.claims ?? []).filter(c => c.id === id).map(c => c.session));
+const isBy = (record, by) => by === 'worker' ? typeof record.payload.agent_id === 'string' : !Object.hasOwn(record.payload, 'agent_id');
+// The result of the one command `by` ran containing `text`: exit code and tasks' error, if any.
+function result(by, text) {
+  const pre = records.filter(r => r.event === 'PreToolUse' && r.payload.tool_name === 'Bash' && isBy(r, by)
+    && String(r.payload.tool_input?.command ?? '').includes(text));
+  if (pre.length !== 1) invalid(`${by} ran "${text}" ${pre.length} times`);
+  const post = records.find(r => r.event === 'PostToolUse' && r.payload.tool_use_id === pre[0].payload.tool_use_id);
+  if (!post) { fail(`no result captured for ${by} "${text}"`); return null; }
+  const out = post.payload.tool_response;
+  if (typeof out !== 'string') { fail(`${by} "${text}": tool_response is ${typeof out}, expected text`); return null; }
+  const exit = /^exit=(\d+)$/m.exec(out);
+  if (!exit) invalid(`${by} "${text}" did not report its exit code`);
+  let error = null;
+  const line = out.split('\n').find(l => l.startsWith('{"error"'));
+  if (line) { try { error = JSON.parse(line).error; } catch { fail(`${by} "${text}": unparsable error ${line}`); } }
+  return { exit: Number(exit[1]), error, out };
+}
+const succeeds = (by, text) => {
+  const r = result(by, text);
+  if (r && (r.exit !== 0 || r.error)) fail(`${by} "${text}" failed: exit ${r.exit}, ${r.error?.kind ?? r.out.trim()}`);
+};
+const refuses = (by, text, kind, detail = null) => {
+  const r = result(by, text);
+  if (!r) return;
+  if (r.exit === 0 || r.error?.kind !== kind) fail(`${by} "${text}": exit ${r.exit}, kind ${r.error?.kind ?? 'none'} (${r.out.trim()}), expected refusal ${kind}`);
+  else if (detail && !detail.test(r.error.detail ?? '')) fail(`${by} "${text}": ${kind} for another reason: ${r.error.detail}`);
+};
 const A = read(join(dir, 'A.json')), B = read(join(dir, 'B.json'));
 const markers = task => (task.task.notes ?? []).filter(n => /^(started|resumed|done|dropped|parked)/.test(n.text));
 
 if (mode === '--sandboxed') {
-  if (!ran('controller', `tasks start ${ids.A}`)) invalid('the controller did not run tasks start A');
+  // The sandbox hides the session process: tasks must refuse on process proof, nothing else.
+  refuses('controller', `tasks start ${ids.A}`, 'config', /relay identity: no relay agent matches the nearest codex ancestor/);
   if (holders(ids.A).length) fail(`A was claimed under the sandbox by ${holders(ids.A).join(', ')}`);
   if (A.task.status !== 'todo') fail(`A status ${A.task.status}`);
 } else {
-  for (const [by, text] of [['controller', `tasks start ${ids.A}`], ['worker', `tasks start ${ids.B}`],
-    ['worker', `tasks start ${ids.A}`], ['worker', `tasks park ${ids.A}`], ['worker', `tasks done ${ids.A}`],
-    ['controller', `tasks start ${ids.B}`], ['controller', `tasks park ${ids.B}`], ['controller', `tasks done ${ids.B}`]]) {
-    if (!ran(by, text)) invalid(`${by} did not run ${text}`);
+  succeeds('controller', `tasks start ${ids.A}`);
+  succeeds('worker', `tasks start ${ids.B}`);
+  for (const verb of ['start', 'park', 'done']) {
+    refuses('worker', `tasks ${verb} ${ids.A}`, 'claimed');
+    refuses('controller', `tasks ${verb} ${ids.B}`, 'claimed');
   }
   const start = records.find(r => r.event === 'SessionStart'), sub = records.find(r => r.event === 'SubagentStart');
   if (!start || !sub) invalid('no SessionStart or SubagentStart captured');
@@ -999,6 +1069,14 @@ for (const message of failures) console.log(`FAIL: ${message}`);
 console.log(failures.length ? `FAIL (${failures.length})` : 'PASS');
 process.exit(failures.length ? 1 : 0);
 ```
+
+The refusal kinds come from tasks' source: a live claim held by another session refuses
+`start`, `park` and `done` with `claimed` (`src/commands/mod.rs`, `src/commands/park.rs`),
+and a relay identity that matches no row refuses with `config`, detail
+`relay identity: no relay agent matches the nearest codex ancestor, pid …`
+(`src/relay/resolve.rs`). A command that never reached tasks (`command not found`, exit
+127) fails every expectation. Codex 0.162.1 gave a Bash PostToolUse `tool_response` as
+text (brief §7); any other shape fails rather than being searched loosely.
 
 Claims are read from the snapshots taken during the run, because once Codex exits its claims are no longer live. Every snapshot that holds A's claim must name R, and every one holding B's must name W, so a cross attempt that took a claim over fails even if it was later released. The claim's `session` and the note's `harness_session` are the relay agent id and the native `codex:<thread>` respectively; for a Codex root the thread is the session id, so both equal `codex:<R>` for A and `codex:<W>` for B. If the first valid run shows tasks recording the claim session in another form, record it in the acceptance note and ask before changing the judge: a different form is a finding about the tasks change, not a judge bug.
 
