@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: chore/typecheck
 created: 2026-10-12T00:40:45Z
-updated: 2026-10-15T08:36:44Z
+updated: 2026-10-15T08:48:31Z
 started: 2026-10-15T08:36:36Z
 depends: []
 tags: [tooling]
@@ -35,3 +35,4 @@ Ordering with relay-f58531: independent. If it lands before that plan's Task 2, 
   provenance: {"harness_session":"codex:01a13ead-6548-7d42-bd33-f8d9c6ad15e2","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-15T08:36:44Z (chore/typecheck): resumed
   provenance: {"harness_session":"codex:01a13ead-6548-7d42-bd33-f8d9c6ad15e2","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T08:48:31Z (chore/typecheck): Direct implementation in .worktrees/typecheck. Baseline: just test-fast passed 619/619 on Node 26.5.0 after setup. Strict check initially failed on missing annotations; now all src/bin files check with shared domain types and operation-specific socket responses. Added compile-time negative contract fixtures; runtime dependencies and public exports remain unchanged.
