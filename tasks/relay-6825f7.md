@@ -7,7 +7,7 @@ size: m
 complexity: high
 process: planned
 created: 2026-10-13T01:33:23Z
-updated: 2026-10-15T09:27:22Z
+updated: 2026-10-15T09:27:24Z
 depends: [relay-ed3f00, relay-752a6e]
 parent: relay-eaca0e
 tags: []
@@ -20,3 +20,4 @@ Ideas it wakes: On completion, run `tasks note relay-f56e30 --no-reviewed "<deci
 ## Notes
 
 - 2026-10-13T09:20:01Z (main): design input from hq-872750 (dropped as covered by relay-eaca0e): on Codex 0.162.1 a worker's turn failed on a model-capacity error (mind6 controller session 01a12f9f-8550-7973-832b-e6fd98ffb80c, worker /root/task11_implement, 2026-10-12 13:46Z); the controller received FINAL_ANSWER 'Agent errored: Selected model is at capacity', but the worker's claim still looked live and needed host-load plus tasks start --force to recover. Worker liveness should cover the errored-turn case: does SubagentStop fire when a worker turn fails?
+- 2026-10-15T09:27:24Z (main): Inputs from relay-ed3f00's capture: worker rows are feasible (brief §7); relay-15b49c fixes worker events landing on the root row in either alternative; relay-752a6e answers the lifecycle cases (repeat turns, failed turn, background, nested) before the spec settles row removal.
