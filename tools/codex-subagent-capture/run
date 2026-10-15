@@ -4,7 +4,9 @@
 # ancestry. Runs under a private CODEX_HOME: the user's hook config and the relay
 # registry are never touched. Only auth.json is copied in, and it is removed on exit.
 #
-# Usage: tools/codex-subagent-capture/run [--case CASE] [OUT_DIR]
+# Usage: tools/codex-subagent-capture/run [--relay RELAY_JS] [--case CASE] [OUT_DIR]
+#   --relay     install relay's own hooks (relay install, private state and subscribers)
+#               and run each inside the logging hook, which copies the registry after it
 #   single      one worker runs one tool and finishes its turn (the default)
 #   followup    the controller gives the same worker a second turn (followup_task)
 #   badmodel    the spawn names a model that does not exist (Codex refuses the spawn)
@@ -17,7 +19,10 @@
 #   CODEX_AUTH (default: ~/.codex/auth.json), CAPTURE_TIMEOUT seconds (default: 600).
 # Prints OUT_DIR; raw payloads land in OUT_DIR/log, one <seq>-<event>.json each.
 set -euo pipefail
+. "$(dirname "$0")/lib.sh"
 
+relay=
+if [[ ${1:-} == --relay ]]; then relay=${2:?--relay needs the path to bin/relay.js}; shift 2; fi
 case=single
 if [[ ${1:-} == --case ]]; then case=${2:?--case needs a name}; shift 2; fi
 only='Do not run any tool yourself other than the agent tools named here.'
@@ -32,14 +37,11 @@ case $case in
 esac
 
 codex=${CODEX_BIN:-codex}
-auth=${CODEX_AUTH:-$HOME/.codex/auth.json}
 out=${1:-$(mktemp -d "${TMPDIR:-/tmp}/codex-subagent-capture.XXXXXX")}
 mkdir -p "$out"/{home,work,log}
 out=$(cd "$out" && pwd -P)
 home=$out/home
 
-[[ -r $auth ]] || { echo "no readable Codex auth at $auth" >&2; exit 2; }
-install -m 600 "$auth" "$home/auth.json"
 model=${CAPTURE_MODEL:-$(sed -n 's/^model = "\(.*\)"$/\1/p' "$HOME/.codex/config.toml" | head -1)}
 [[ -n $model ]] || { echo "set CAPTURE_MODEL: no model in ~/.codex/config.toml" >&2; exit 2; }
 
@@ -47,41 +49,18 @@ child= tmux_session=
 cleanup() {
   [[ -n $child ]] && kill "$child" 2>/dev/null || true
   [[ -n $tmux_session ]] && tmux kill-session -t "$tmux_session" 2>/dev/null || true
-  rm -f "$home/auth.json"
+  scrub_auth "$out"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-
-cat >"$out/hook.sh" <<'HOOK'
-#!/usr/bin/env bash
-# One logging hook for every event: payload, CODEX_* env and /proc ancestry, as JSON.
-event=$1 log=$2
-exec 2>>"$log/hook.stderr"
-seq=$(date +%s%N)
-payload=$(cat)
-chain='[' pid=$$ sep=
-while [[ $pid -gt 1 && -r /proc/$pid/stat ]]; do
-  stat=$(</proc/$pid/stat)
-  comm=${stat#*(} comm=${comm%)*}
-  rest=${stat##*) } ppid=$(cut -d' ' -f2 <<<"$rest")
-  argv0=$(tr '\0' '\n' </proc/$pid/cmdline | head -1)
-  chain+="$sep{\"pid\":$pid,\"ppid\":$ppid,\"comm\":$(jq -Rn --arg v "$comm" '$v'),\"argv0\":$(jq -Rn --arg v "$argv0" '$v')}"
-  sep=, pid=$ppid
-done
-chain+=']'
-env_json=$(env | grep '^CODEX_' | jq -Rn '[inputs | capture("^(?<key>[^=]+)=(?<value>.*)$")] | from_entries')
-jq -n --arg event "$event" --argjson payload "$payload" --argjson env "$env_json" --argjson ancestry "$chain" \
-  '{event: $event, payload: $payload, env: $env, ancestry: $ancestry}' >"$log/$seq-$event.json"
-# A failing logger must not block the run: Codex reads exit 2 as a refusal.
-exit 0
-HOOK
-chmod 700 "$out/hook.sh"
-
-events=(SessionStart SubagentStart UserPromptSubmit PreToolUse PostToolUse PermissionRequest Stop SubagentStop SessionEnd)
-jq -n --arg hook "$out/hook.sh" --arg log "$out/log" '
-  {hooks: ($ARGS.positional | map({key: ., value: [{hooks: [{type: "command",
-    command: "\($hook | @sh) \(. | @sh) \($log | @sh)", timeout: 30}]}]}) | from_entries)}' \
-  --args "${events[@]}" >"$home/hooks.json"
+capture_home "$out"
+if [[ -n $relay ]]; then
+  install_relay "$out" "$relay"
+  wrap_relay "$out"
+  export RELAY_STATE_DIR="$out/relay-state"
+else
+  plain_hooks "$out"
+fi
 
 cat >"$home/config.toml" <<TOML
 model = "$model"
@@ -99,14 +78,22 @@ if [[ $case == background ]]; then
   printf '\n[projects."%s"]\ntrust_level = "trusted"\n' "$out/work" >>"$home/config.toml"
   tmux_session=relay-capture-$$
   tmux new-session -d -s "$tmux_session" -x 200 -y 50 \
-    "CODEX_HOME=$(printf %q "$home") $(printf %q "$codex") --dangerously-bypass-hook-trust -C $(printf %q "$out/work") $(printf %q "$prompt")"
+    "CODEX_HOME=$(printf %q "$home") ${relay:+RELAY_STATE_DIR=$(printf %q "$RELAY_STATE_DIR") }$(printf %q "$codex") --dangerously-bypass-hook-trust -C $(printf %q "$out/work") $(printf %q "$prompt")"
   # The worker's SubagentStop, or the timeout, ends the run; the TUI stays up until then.
   deadline=$((SECONDS + ${CAPTURE_TIMEOUT:-600}))
   until compgen -G "$out/log/*-SubagentStop.json" >/dev/null || ((SECONDS >= deadline)); do sleep 1; done
   compgen -G "$out/log/*-SubagentStop.json" >/dev/null || status=124
   sleep 3
   tmux capture-pane -p -t "$tmux_session" >"$out/tui.txt" || true
-  tmux kill-session -t "$tmux_session"
+  # Quit through the TUI so Codex fires SessionEnd; kill only if it has not exited. Enter
+  # follows a pause: sent in the same burst, the TUI reads it as pasted text, not a submit.
+  tmux send-keys -t "$tmux_session" /quit
+  sleep 1
+  tmux send-keys -t "$tmux_session" Enter
+  quit_deadline=$((SECONDS + 20))
+  until compgen -G "$out/log/*-SessionEnd.json" >/dev/null || ((SECONDS >= quit_deadline)); do sleep 1; done
+  compgen -G "$out/log/*-SessionEnd.json" >/dev/null || echo "no SessionEnd within 20 s of /quit" >>"$out/tui-shutdown"
+  tmux kill-session -t "$tmux_session" 2>/dev/null || true
   tmux_session=
 else
   CODEX_HOME=$home timeout "${CAPTURE_TIMEOUT:-600}" "$codex" exec --skip-git-repo-check --dangerously-bypass-hook-trust \
@@ -114,6 +101,11 @@ else
   child=$!
   wait "$child" || status=$?
   child=
+fi
+if [[ -n $relay ]]; then
+  RELAY_STATE_DIR="$out/relay-state" node "$relay" reap --outer-ms 30000 >/dev/null || status=$?
+  if [[ -r $out/relay-state/agents.json ]]; then cp "$out/relay-state/agents.json" "$out/final-agents.json"
+  else echo null >"$out/final-agents.json"; fi
 fi
 "$codex" --version >"$out/codex-version"
 echo "$case" >"$out/case"

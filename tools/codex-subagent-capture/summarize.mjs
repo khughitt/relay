@@ -9,7 +9,7 @@ import { join } from 'node:path';
 const dir = process.argv[2];
 if (!dir) throw new Error('usage: summarize.mjs OUT_DIR');
 const log = join(dir, 'log');
-const files = readdirSync(log).filter(name => name.endsWith('.json')).sort();
+const files = readdirSync(log).filter(name => /^\d+-[A-Za-z]+\.json$/.test(name)).sort();
 const records = files.map(name => ({ ns: BigInt(name.split('-')[0]), ...JSON.parse(readFileSync(join(log, name), 'utf8')) }));
 if (!records.length) throw new Error(`no hook records in ${log}`);
 
