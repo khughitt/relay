@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-15T08:56:13Z
-updated: 2026-10-15T22:27:41Z
+updated: 2026-10-15T22:27:43Z
 depends: []
 tags: [feedback, friction, "from:relay"]
 agent: codex
@@ -24,3 +24,7 @@ Done: an interrupted run of each of the three files leaves no fixture alive with
 Approach: tie each long-lived fixture's life to its spawner, not to a cleanup hook in the killed process. After its payload, parent.c exits once getppid() differs from the pid that started it, since an orphan is reparented; this works alike on Darwin and Linux. The runtime tests' sleeps get a bound far below 600 s, or the same tie. The tracker's detached groups and probe.mjs's signal path stay as they are: the probe measures these process shapes on the Mac (docs/specs/2026-09-25-darwin-probe.md), and the tie changes nothing while the spawner lives. If a stage needs a constructed parent to outlive its spawner, or the tie changes a probe reading, record it and change this task to planned.
 
 Where: tools/darwin-probe/lib/context.mjs (tracker, killAll), lib/parent.c, lib/parents.mjs (startParent, checkParent), lib/fleet.mjs; the three test files above; test/darwin-probe-orchestrator.test.js for how the probe's interrupt tests drive signals.
+
+## Notes
+
+- 2026-10-15T22:27:43Z (main): scope: scoped; reproduced on node v26.5.0 and v22.23.2 (SIGINT/SIGTERM to runner or group, SIGKILL to runner: neither t.after nor an exit handler runs, the detached child survives), traced to the three tests that call the darwin-probe tracker directly and parent.c's endless pause() (main d7ac402); retitled to the outcome, kept the report verbatim; todo P3 s/mid/direct (only interrupted runs leak, and the survivors are idle)
