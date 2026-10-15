@@ -1,13 +1,15 @@
 ---
 id: relay-ed3f00
 title: Capture genuine Codex subagent hook delivery to a command hook
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-13T01:33:22Z
-updated: 2026-10-13T01:33:22Z
+updated: 2026-10-15T08:59:51Z
+started: 2026-10-15T08:59:51Z
 depends: []
 parent: relay-eaca0e
 tags: []
@@ -19,3 +21,8 @@ Where to start: docs/notes/2026-10-12-codex-worker-registration-brief.md; src/ad
 Bound: One isolated capture with a private CODEX_HOME and a logging command hook (no relay registry write, no change to the user's hook config): one controller spawning one worker that runs a tool and finishes a turn. Record payloads (IDs redacted to stable labels) and ancestry. No adapter or schema change.
 Expected result: An evidence table on this task and in the brief, with the Codex version, and a recommendation among the brief's alternatives.
 Ideas it wakes: On completion, run `tasks note relay-f56e30 --no-reviewed "<finding>"` before this result's branch merges.
+
+## Notes
+
+- 2026-10-15T08:59:51Z (main): started
+  provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
