@@ -19,8 +19,9 @@ const records = readdirSync(log).filter(name => /^\d+-[A-Za-z]+\.json$/.test(nam
 });
 const invalid = message => { console.log(`INVALID: ${message}`); process.exit(2); };
 const failures = [], fail = message => failures.push(message);
-// Claims seen while the run was live, per task id: every recorded holder session.
-const holders = id => records.flatMap(r => (r.claims ?? []).filter(c => c.id === id).map(c => c.session));
+// Claims seen while the run was live, per task id.
+const claimsOf = id => records.flatMap(r => (r.claims ?? []).filter(c => c.id === id));
+const holders = id => claimsOf(id).map(c => c.session);
 const isBy = (record, by) => by === 'worker' ? typeof record.payload.agent_id === 'string' : !Object.hasOwn(record.payload, 'agent_id');
 // The result of the one command `by` ran containing `text`: exit code and tasks' error, if any.
 function result(by, text) {
@@ -36,11 +37,12 @@ function result(by, text) {
   let error = null;
   const line = out.split('\n').find(l => l.startsWith('{"error"'));
   if (line) { try { error = JSON.parse(line).error; } catch { fail(`${by} "${text}": unparsable error ${line}`); } }
-  return { exit: Number(exit[1]), error, out };
+  return { exit: Number(exit[1]), error, out, pre: pre[0] };
 }
 const succeeds = (by, text) => {
   const r = result(by, text);
   if (r && (r.exit !== 0 || r.error)) fail(`${by} "${text}" failed: exit ${r.exit}, ${r.error?.kind ?? r.out.trim()}`);
+  return r;
 };
 const refuses = (by, text, kind, detail = null) => {
   const r = result(by, text);
@@ -59,8 +61,7 @@ if (mode === '--sandboxed') {
   if (holders(ids.A).length) fail(`A was claimed under the sandbox by ${holders(ids.A).join(', ')}`);
   if (A.task.status !== 'todo') fail(`A status ${A.task.status}`);
 } else {
-  succeeds('controller', `tasks start ${ids.A}`);
-  succeeds('worker', `tasks start ${ids.B}`);
+  const acquired = { A: succeeds('controller', `tasks start ${ids.A}`), B: succeeds('worker', `tasks start ${ids.B}`) };
   for (const verb of ['start', 'park', 'done']) {
     refuses('worker', `tasks ${verb} ${ids.A}`, 'claimed');
     refuses('controller', `tasks ${verb} ${ids.B}`, 'claimed');
@@ -80,6 +81,12 @@ if (mode === '--sandboxed') {
     const seen = holders(ids[name]);
     if (!seen.length) fail(`${name} was never claimed while the run was live`);
     else if (seen.some(session => session !== owner)) fail(`${name} held by ${[...new Set(seen)].join(', ')}, expected only ${owner}`);
+    // The owner's row was in the registry when its start ran (the copy its PreToolUse left),
+    // and the claim holds that row's process: tasks' native CODEX_THREAD_ID fallback names
+    // the same session but records no pid.
+    const at = acquired[name]?.pre.after?.agents?.[owner];
+    if (!at) fail(`${name}: no ${owner} row when its start ran`);
+    else if (claimsOf(ids[name]).some(c => c.pid !== at.process?.pid)) fail(`${name} claimed without the relay row's process (pid ${at.process?.pid})`);
     const lifecycle = markers(task);
     if (lifecycle.length !== 1 || lifecycle[0].text !== 'started') fail(`${name} lifecycle notes ${JSON.stringify(lifecycle.map(n => n.text))}`);
     else if (lifecycle[0].harness_session !== owner) fail(`${name} started by ${lifecycle[0].harness_session}, expected ${owner}`);

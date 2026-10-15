@@ -139,7 +139,10 @@ results, the `tasks claims` copies taken in each relay hook, the registry copies
 Positive run: A's claim was held only by `codex:R` (the root row) and B's only by
 `codex:W` (the worker row, `scope: "worker"`, `root: codex:R`, on the root's handle);
 each task's single `started` note carries its own session's provenance; both stayed
-`doing`. Command results (ids redacted to A, B, R, W; host, pid and path elided):
+`doing`. Each owner's row was in the registry when its `tasks start` ran, and every
+claim held that row's pid, which tasks' native `CODEX_THREAD_ID` fallback never
+records; the judge gained that check after review, and a rerun of the positive case
+passed it. Command results (ids redacted to A, B, R, W; host, pid and path elided):
 
 | By | Command | Result |
 | --- | --- | --- |
