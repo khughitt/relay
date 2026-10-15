@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: relay-6825f7
 created: 2026-10-15T10:02:39Z
-updated: 2026-10-15T12:37:57Z
+updated: 2026-10-15T12:58:10Z
 started: 2026-10-15T10:03:07Z
 depends: [tasks-af3aac]
 parent: relay-eaca0e
@@ -52,3 +52,5 @@ Implement docs/specs/2026-10-15-codex-worker-rows.md: route agent_id events to c
 - 2026-10-15T11:28:07Z (relay-6825f7): parked (waiting on agent, dependency): Agent, once tasks-af3aac is done and its tasks binary is installed: in .worktrees/relay-6825f7 run tasks start relay-635fdc, then execute plan Task 6 (relay-805fb4, claim acceptance + sandboxed control) with superpowers:executing-plans resuming the ledger at .superpowers/sdd/2026-10-15-codex-worker-rows/progress.md, then just gate and integrate the branch (merge to main). Tasks 1-5 done; final review + re-review accepted (rulings and deferred minors in the ledger).
   provenance: {"harness_session":"claude-code:783163fb-6924-41d7-a9d8-63a7fc5cb315","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-15T12:37:57Z (relay-6825f7): tasks-af3aac landed on tasks main and is installed on this host (titan); Task 6 can run against it. tasks vendors registry-workers.json from relay plan revision 74ce0d8; the final reviewer found it byte-identical to relay c7074c8 (relay-6825f7 branch), and tasks will repoint its fixtures README once that commit is on relay main.
+- 2026-10-15T12:58:10Z (relay-6825f7): resumed
+  provenance: {"harness_session":"claude-code:783163fb-6924-41d7-a9d8-63a7fc5cb315","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
