@@ -1,20 +1,32 @@
 ---
 id: relay-2cd4b1
 title: "Resolve a Codex session's model from its own rollout, keyed on CODEX_THREAD_ID"
-status: idea
+status: todo
 priority: 2
+size: m
+complexity: mid
+process: planned
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-15T01:10:36Z
+updated: 2026-10-15T22:17:41Z
 depends: []
 tags: []
 source: "lore:docs/notes/2026-10-02-codex-model-identity-brief.md"
 agent: claude-code/claude-opus-5-5
 ---
 
-Why: Codex sessions stamp TASKS_AGENT=codex with no model, so task stamps and review notes lose the model half (goal hq-fce47e).
+Why: Codex sessions stamp TASKS_AGENT=codex with no model, so task stamps and review notes lose the model half (goal hq-fce47e, which depends on this task; tasks-970049, the consumer, depends on it too).
 
 Evidence (hq-1bd166, codex-cli 0.162.1; lore brief docs/notes/2026-10-02-codex-model-identity-brief.md §5): CODEX_THREAD_ID -> ${CODEX_HOME:-$HOME/.codex}/sessions/*/*/*/rollout-*-<thread>.jsonl -> last turn_context.model resolved the running model in a top-level session before and after an exec resume -m switch and in multi-agent v2 children spawned on another model. In a child CODEX_SESSION_ID is the root session's id, so keying on it stamps the parent's model. session_meta (base_instructions.provenance.model) is an inherited or creation-time value that can match no running model, and a forked child's rollout begins with its own session_meta (forked_from_id), then the parent's session_meta and turn_context, so only the last turn_context counts and id validation reads the first session_meta. Between a resume -m and the next turn's turn_context the last turn_context is stale, so the resolver is valid only inside a tool call, never from a SessionStart or UserPromptSubmit hook (PreToolUse fires after the turn_context and was not shown stale). Hook payloads carry the correct per-agent model, plus agent_id (the child's thread id) and agent_transcript_path at SubagentStop; the shell cannot read them unless a hook stores them. state_5.sqlite's threads table also records model and rollout_path per thread (update timing unprobed).
 
 Proposed: a resolver command printing codex/<model> (and effort if wanted), or bare codex when the thread id is unset, zero or several rollouts match, or no turn_context exists; skip an unparseable trailing line; never the session id, session_meta or config. Consumer: tasks, when TASKS_AGENT is bare codex (a separate tasks piece).
 
-Open for scoping: the command's name and home in relay; a rule for processes that inherit CODEX_THREAD_ID from a Codex session (tmux, another harness); whether app-server thread/read or the state database should locate the rollout instead of the glob (archived_sessions is flat and the glob misses it); ephemeral sessions; a hook-adapter cross-check keyed on agent_id.
+Established at scoping (2026-10-15, relay main d7ac402, this host):
+- relay's hooks are not live for Codex here (~/.codex/hooks.json runs familiar's until relay-1231bf), so the registry is no model source yet, and the hook-adapter cross-check keyed on agent_id waits on that migration.
+- A codex-named ancestor survives the workspace-write sandbox: there, tasks' relay identity check reports "the nearest codex ancestor is pid 1 with no parent" (docs/notes/2026-10-15-codex-worker-rows-acceptance.md, sandboxed control). An ancestry test sees the namespace-local helper; matching a registry handle does not.
+- Lookup cost: the store holds 16,287 rollouts in 238 day directories, plus 594 in the flat archived_sessions. A full readdir scan took about 0.13 s, and relay's CLI starts in 0.10-0.15 s (relay --help). Every rollout's day directory equals the local date of its thread id's UUIDv7 timestamp (16,287 of 16,287): an observed layout, not a documented contract.
+
+Done: a reviewed design spec and plan (docs/specs/, docs/plans/), then the resolver in relay with tests and docs/api.md. It prints codex/<model> in a top-level session, in a child, and after a resume -m switch, and bare codex in each case listed under Proposed; the call contract tasks-970049 needs (command, output, exit code, time budget) is written down.
+
+The spec decides, from the original open list: (1) the command's name and home in relay (lean: a subcommand declared in src/commands.js, one Node start per tasks stamp); (2) a rule for processes that inherit CODEX_THREAD_ID from a Codex session, such as a tmux server or another harness (lean: require a codex-named ancestor and print bare codex without one; confirm that a tmux server or setsid process started from a Codex tool call loses it); (3) how to locate the rollout: the UUIDv7 day directory, the glob, state_5.sqlite (node:sqlite, against the Node 22 floor) or app-server thread/read, with archived_sessions covered either way, since the glob misses it; (4) ephemeral sessions (no rollout means bare codex, if confirmed); (5) whether a tool call's CODEX_THREAD_ID follows the TUI's /new, /resume and /fork in one process (relay-3d6c93 records it); (6) whether the effort is printed, and how a fallback to bare codex reports its reason rather than passing silently.
+
+Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surface; src/adapters/codex.js and src/adapters/ancestry.js (resolveSessionPid's codex match); obs's codex_adapter.py:66-69 reads the same turn_context fields; tasks-970049 for the consumer.
