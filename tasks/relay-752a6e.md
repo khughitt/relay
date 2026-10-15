@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-15T09:27:12Z
-updated: 2026-10-15T09:27:21Z
+updated: 2026-10-15T09:27:33Z
 depends: []
 parent: relay-eaca0e
 tags: []
@@ -22,3 +22,4 @@ Expected result: brief §7 gains a row table per case and the Not-exercised list
 ## Notes
 
 - 2026-10-15T09:27:21Z (main): concerns: relay-ed3f00 extension — cases the single-turn capture did not exercise
+- 2026-10-15T09:27:33Z (main): Also correct brief §7's last finding: worker events on the root row are invisible while the controller sits in wait_agent (already working); the visible harm is a background worker after the controller's Stop (relay-15b49c has the right framing).
