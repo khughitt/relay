@@ -8,12 +8,13 @@ complexity: high
 process: planned
 owner: relay-6825f7
 created: 2026-10-13T01:33:23Z
-updated: 2026-10-15T09:36:35Z
+updated: 2026-10-15T09:41:44Z
 started: 2026-10-15T09:36:30Z
 depends: [relay-ed3f00, relay-752a6e]
 parent: relay-eaca0e
 tags: []
 agent: claude-code/claude-opus-5-5
+spec: docs/specs/2026-10-15-codex-worker-rows.md
 ---
 
 Why: relay-f56e30 — tasks refuses a root row for a Codex worker, and relay has no worker row. Done: a reviewed spec in docs/specs/ choosing row key, root association, lifecycle end (no worker end event; SubagentStop is per-turn), meaning of shared-process liveness, and the schema-2 change with its tasks Rust mirror (relay-4a5559); or a reviewed decision not to register workers. Review with the tasks lane (tasks-2fa8c6). Where: docs/notes/2026-10-12-codex-worker-registration-brief.md; relay-ed3f00's capture once done; tasks docs/specs/2026-10-06-delegated-identity-design.md §4.
