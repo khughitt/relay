@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: chore/typecheck
 created: 2026-10-12T00:40:45Z
-updated: 2026-10-15T08:54:49Z
+updated: 2026-10-15T08:56:25Z
 started: 2026-10-15T08:36:36Z
 depends: []
 tags: [tooling]
@@ -39,3 +39,4 @@ Ordering with relay-f58531: independent. If it lands before that plan's Task 2, 
 - 2026-10-15T08:54:40Z (chore/typecheck): Verification: just check passes; compiler --listFilesOnly includes all 43 src/bin JavaScript files. Removing the expected-error marker from numeric Handle.start made just check fail with TS2322; restored marker passes. just gate passes 619/619 on Node 26.5.0 and Node 22.23.2, including installed-tarball smoke and IPC/process tests.
 - 2026-10-15T08:54:48Z (chore/typecheck): review: impl round 1 — verdict: accept; findings: Minor 1; reviewer: codex
 - 2026-10-15T08:54:49Z (chore/typecheck): Ruling: accept. Critical and Important: none. minor (deferred): constrain socket handler return types with SocketResponses so producer drift is checked; clients are typed, but the server-to-contract agreement is currently asserted. No behavior was declined from review.
+- 2026-10-15T08:56:25Z (chore/typecheck): Final verification: just gate passed 619/619 on Node 26.5.0 and Node 22.23.2 after the last code edits. Minor socket-producer coverage follow-up: relay-713015. Interrupted initial baseline left 28 confirmed fixture processes; cleaned those exact PIDs and host-load now reports nothing left running. Filed relay-4b0aea for interruption cleanup behavior.
