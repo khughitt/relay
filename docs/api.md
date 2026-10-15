@@ -31,7 +31,8 @@ type Agent = {
   id: string;
   harness: 'claude-code' | 'codex' | 'opencode';
   sessionId: string;
-  scope: 'session' | 'process';
+  scope: 'session' | 'process' | 'worker';
+  root?: string;         // Codex workers only: the root session's agent id
   process: Handle | null;
   cwd: string;
   repoRoot: string | null;
@@ -57,6 +58,17 @@ never read: `readSnapshot`, `listAgents` and `relay list` fail with
 empty schema-2 snapshot under a fresh generation and reports one `REGISTRY_SUPERSEDED`
 diagnostic per dropped agent. Any other unknown schema is `INVALID_SCHEMA`.
 
+A Codex worker has its own row (spec `docs/specs/2026-10-15-codex-worker-rows.md`):
+`id: codex:<agent_id>`, `sessionId: <agent_id>` (the worker's thread id),
+`scope: "worker"` and `root: codex:<session_id>`, the root session's agent id, never an
+immediate parent. It shares its root's process handle. `scope` is `process` for
+OpenCode, `session` for Claude Code, and for Codex `session` without `root` or `worker`
+with it; any other combination is `INVALID_SCHEMA`. A relay from before worker rows
+accepts only `session` for Codex, so it refuses a snapshot holding a worker row and
+writes nothing, rather than publishing the rows without their `root`.
+`test/fixtures/registry-workers.json` is the shared example: a root, a worker, a nested
+worker and a Claude row; tasks vendors it.
+
 ```ts
 type EventKind = 'session-start' | 'prompt' | 'before-tool' | 'activity' | 'idle'
   | 'needs-input' | 'needs-approval' | 'turn-end' | 'turn-error' | 'session-end';
@@ -67,6 +79,7 @@ type Event = {
   nativeEvent: string;
   agentId: string;
   sessionId: string;
+  root?: string;         // Codex worker events only
   cwd: string;
   stopHookActive?: boolean;
   tool: null | { name: string; input: Record<string, unknown>; command: string | null };

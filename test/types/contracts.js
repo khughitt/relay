@@ -44,3 +44,11 @@ if (result.ok) {
 }
 // @ts-expect-error Unknown socket operations cannot be sent by checked callers.
 connection.request('bogus');
+
+/** @type {import('../../src/types.js').Agent} */
+const row = { id: 'codex:w', harness: 'codex', sessionId: 'w', scope: 'worker', root: 'codex:r', process: null,
+  cwd: '/repo', repoRoot: null, remote: null, projectKey: '/repo', project: 'repo', state: 'idle', updatedAt: 0 };
+// @ts-expect-error Registry scopes are session, process or worker.
+row.scope = 'thread';
+// @ts-expect-error A root is an agent id, never a number.
+row.root = 1;

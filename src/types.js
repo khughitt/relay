@@ -4,10 +4,10 @@
  * @typedef {'idle'|'working'|'needs-input'|'needs-approval'|'done'|'error'} State
  * @typedef {'session-start'|'prompt'|'before-tool'|'activity'|'idle'|'needs-input'|'needs-approval'|'turn-end'|'turn-error'|'session-end'} Kind
  * @typedef {{platform: 'linux'|'darwin', host: string, bootId: string|null, pid: number, start: string}} Handle
- * @typedef {{id: string, harness: Harness, sessionId: string, scope: 'process'|'session', process: Handle|null, cwd: string, repoRoot: string|null, remote: string|null, projectKey: string, project: string, state: State, updatedAt: number}} Agent
+ * @typedef {{id: string, harness: Harness, sessionId: string, scope: 'process'|'session'|'worker', root?: string, process: Handle|null, cwd: string, repoRoot: string|null, remote: string|null, projectKey: string, project: string, state: State, updatedAt: number}} Agent
  * @typedef {{schema: 2, generation: string, revision: number, agents: Record<string, Agent>}} Snapshot
  * @typedef {{name: string, input: Record<string, unknown>, command: string|null}} Tool
- * @typedef {{schema: 1, kind: Kind, harness: Harness, nativeEvent: string, agentId: string, sessionId: string, cwd: string, stopHookActive?: boolean, tool: Tool|null}} Event
+ * @typedef {{schema: 1, kind: Kind, harness: Harness, nativeEvent: string, agentId: string, sessionId: string, root?: string, cwd: string, stopHookActive?: boolean, tool: Tool|null}} Event
  * @typedef {{code: string, message: string, agentId?: string}} Diagnostic
  * @typedef {{snapshot: Snapshot|null, changed: boolean, reaped: string[], diagnostics: Diagnostic[]}} RegistryResult
  * @typedef {{status: 'alive'|'dead'|'unknown', reason: string}} Liveness

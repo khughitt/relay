@@ -46,3 +46,29 @@ test('handle qualification and event metadata are explicit', () => {
   assert.deepEqual(validateEvent({ ...e, private: true }), e);
   assert.throws(() => validateEvent({ ...e, stopHookActive: 0 }), { code: 'INVALID_SCHEMA' });
 });
+
+const workers = JSON.parse(readFileSync(new URL('./fixtures/registry-workers.json', import.meta.url)));
+const R = '0199f000-0000-7000-8000-000000000001', W1 = '0199f000-0000-7000-8000-000000000002';
+test('the shared worker fixture validates unchanged', () => {
+  assert.deepEqual(validateSnapshot(workers), workers);
+});
+test('a worker row needs Codex and a root other than itself; a session row has no root', () => {
+  const worker = workers.agents[`codex:${W1}`], root = workers.agents[`codex:${R}`];
+  const { root: _dropped, ...rootless } = worker;
+  const alone = (agent) => ({ ...workers, agents: { [agent.id]: agent } });
+  const bad = [rootless, { ...worker, root: `codex:${W1}` }, { ...worker, root: 'claude-code:x' },
+    { ...worker, root: 'codex:' }, { ...worker, root: 7 }, { ...root, root: `codex:${W1}` },
+    { ...worker, id: `claude-code:${W1}`, harness: 'claude-code' },
+    { ...worker, id: `opencode:${W1}`, harness: 'opencode' }];
+  for (const agent of bad) assert.throws(() => validateSnapshot(alone(agent)), { code: 'INVALID_SCHEMA' }, JSON.stringify([agent.id, agent.root]));
+});
+test('an event root is a Codex root other than the event itself', () => {
+  const base = { schema: 1, kind: 'before-tool', harness: 'codex', nativeEvent: 'PreToolUse', agentId: 'codex:w',
+    sessionId: 'w', cwd: '/repo', tool: { name: 'Bash', input: {}, command: null } };
+  assert.equal(validateEvent({ ...base, root: 'codex:r' }).root, 'codex:r');
+  assert.equal(Object.hasOwn(validateEvent(base), 'root'), false);
+  for (const root of ['codex:w', 'claude-code:r', 'codex:', '', null]) {
+    assert.throws(() => validateEvent({ ...base, root }), { code: 'INVALID_SCHEMA' }, String(root));
+  }
+  assert.throws(() => validateEvent({ ...base, harness: 'claude-code', agentId: 'claude-code:w', root: 'codex:r' }), { code: 'INVALID_SCHEMA' });
+});
