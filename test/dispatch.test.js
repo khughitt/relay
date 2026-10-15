@@ -375,3 +375,20 @@ test('reconcile rejects a reap that fulfills after its deadline without notifyin
   await assert.rejects(reconcile({ outerMs: 1500 }, { paths: p, clock: () => now, reap: async () => { now = 550; return published; } }), { code: 'DEADLINE_EXCEEDED' });
   assert.ok(await absent(file));
 });
+
+// Characterization, not a fix: relay fails closed on malformed Codex worker input with no
+// guard configured, and on SubagentStop the refusal is a continuation. Spec:
+// docs/specs/2026-10-15-codex-worker-rows.md ("Event routing").
+test('a malformed Codex agent_id refuses even with no guard, and publishes nothing', async (t) => {
+  const p = await tempPaths(t);
+  await writeSubscribers(p, []);
+  const codex = (nativeEvent, over) => hook(p, { harness: 'codex', nativeEvent, body: payload(over) });
+  let r = await codex('PreToolUse', { agent_id: null });
+  assert.equal(r.exitCode, 2); assert.match(r.stdout, /"permissionDecision":"deny".*relay refused: INVALID_INPUT: invalid worker agent_id/);
+  r = await codex('SubagentStop', { agent_id: null, stop_hook_active: true });
+  assert.deepEqual(r, { stdout: '{"decision":"block","reason":"relay refused: INVALID_INPUT: invalid worker agent_id"}\n',
+    stderr: 'relay refused: INVALID_INPUT: invalid worker agent_id\n', exitCode: 2 });
+  r = await codex('SubagentStart', {});
+  assert.deepEqual(r, { stdout: '', stderr: 'INVALID_INPUT: a subagent event requires agent_id\n', exitCode: 1 });
+  assert.equal(await readSnapshot({ paths: p }), null);
+});

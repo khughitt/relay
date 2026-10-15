@@ -29,7 +29,7 @@
 
 ## Review Focus
 
-1. **A Codex payload with `agent_id: null`** (a future release serializing the absent value). It is refused as `INVALID_INPUT`, not treated as a root event; with a guard configured that is a native refusal, which is relay's fail-closed rule for malformed input. Pinned in Task 2.
+1. **A Codex payload with `agent_id: null`** (a future release serializing the absent value). It is refused as `INVALID_INPUT`, not treated as a root event. Relay fails closed on malformed input whether or not a guard is configured: PreToolUse is denied and Stop or SubagentStop is answered with `decision: block`, a continuation (corrected after the final review; pinned by the dispatch characterization test). Pinned in Task 2.
 2. **A Claude Code payload carrying `agent_id`** (Claude's own subagent hooks). It stays the Claude session's event, unrouted. Pinned in Task 2.
 3. **A worker event arriving before its root has any row** (relay installed mid-session, or a SessionStart that failed). The worker row is created and still names its root; a later root SessionEnd removes it. Pinned in Task 3.
 4. **A worker's later turn, which has no start event.** Its first tool event sets the row back to `working` after a `done`. Pinned in Task 3.
