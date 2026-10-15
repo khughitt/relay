@@ -1,15 +1,16 @@
 ---
 id: relay-6825f7
 title: Design Codex worker registration from the brief
-status: doing
+status: done
 priority: 2
 size: m
 complexity: high
 process: planned
 owner: relay-6825f7
 created: 2026-10-13T01:33:23Z
-updated: 2026-10-15T10:01:39Z
+updated: 2026-10-15T10:03:06Z
 started: 2026-10-15T09:36:30Z
+completed: 2026-10-15T10:03:06Z
 depends: [relay-ed3f00, relay-752a6e]
 parent: relay-eaca0e
 tags: []
@@ -42,3 +43,7 @@ Ideas it wakes: On completion, run `tasks note relay-f56e30 --no-reviewed "<deci
   provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-15T10:01:11Z (relay-6825f7): review: spec round 2 — verdict: revise; findings: P2 1; reviewer: human
 - 2026-10-15T10:01:39Z (relay-6825f7): Round 2 fix: positive claim acceptance runs danger-full-access (host PID view) with private dirs and no TASKS_SESSION overrides; workspace-write run kept as a refusal control. User approved the spec for planning after this fix (2026-10-15).
+- 2026-10-15T10:03:06Z (relay-6825f7): done
+  provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T10:03:06Z (relay-6825f7): Spec docs/specs/2026-10-15-codex-worker-rows.md approved after two review rounds: worker rows keyed by agent_id with scope worker and root, cascade on root SessionEnd, tasks tie-break (tasks-af3aac) first; implementation filed as relay-635fdc.
+  provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
