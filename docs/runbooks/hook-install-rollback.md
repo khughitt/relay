@@ -29,3 +29,24 @@ the opt-in off is not exposed.
 After upgrading relay, run `relay reap` once. It replaces a schema-1 registry with an
 empty schema-2 one and names every dropped agent on stderr; each live session
 reappears with its own handle at its next hook event. No session restart is needed.
+
+## Activating Codex worker rows
+
+Codex workers get their own registry rows (`scope: "worker"`, spec
+`docs/specs/2026-10-15-codex-worker-rows.md`). Before relay hooks run under Codex on a
+host where tasks' relay identity is on:
+
+1. Every `tasks` binary each harness resolves on `PATH` carries the worker-scope and
+   thread-hint tie-break change (the tasks project task "Accept relay Codex worker rows:
+   worker scope and thread-hint tie-break"). An older tasks refuses the whole registry
+   while any worker row exists, Claude sessions included.
+2. Every relay writer on the host resolves to a relay with worker rows: the installed
+   hook command of every harness (Claude Code settings, Codex `hooks.json`, the OpenCode
+   plugin when enabled), every `relay reap`, and every package that depends on relay and
+   calls `applyEvent` or `reapRegistry` (familiar pins its own). List each writer with
+   the relay path it runs. An older writer refuses a snapshot holding a worker row with
+   `INVALID_SCHEMA` and writes nothing: its hook reports the diagnostic, its observers
+   are skipped, and `relay reap` and `relay list` fail until it is upgraded.
+3. Install the Codex hooks, which now include SubagentStart and SubagentStop. A guard on
+   Codex `turn-end` needs a passed SubagentStop refusal probe in `--evidence` as well as
+   Stop's. Re-trust the changed hooks in Codex.

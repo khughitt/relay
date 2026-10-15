@@ -8,7 +8,7 @@ export const shellQuote = value => `'${String(value).replaceAll("'", "'\\''")}'`
 /** @type {Record<string, [string, string?, number?][]>} */
 const table = {
   'claude-code': [['SessionStart', 'startup|resume'], ['UserPromptSubmit'], ['PreToolUse', '*'], ['Notification:idle_prompt', 'idle_prompt'], ['Notification:permission_prompt', 'permission_prompt'], ['Stop'], ['StopFailure'], ['SessionEnd', undefined, 60000]],
-  codex: [['SessionStart'], ['UserPromptSubmit'], ['PreToolUse', '*'], ['PermissionRequest'], ['Stop'], ['SessionEnd', undefined, 3000]],
+  codex: [['SessionStart'], ['SubagentStart'], ['UserPromptSubmit'], ['PreToolUse', '*'], ['PermissionRequest'], ['Stop'], ['SubagentStop'], ['SessionEnd', undefined, 3000]],
 };
 /** @param {string} event */
 const nativeKey = event => event.startsWith('Notification:') ? 'Notification' : event;
