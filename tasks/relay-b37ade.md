@@ -1,13 +1,15 @@
 ---
 id: relay-b37ade
 title: Type-check relay's JavaScript with tsc --checkJs and JSDoc types
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-12T00:40:45Z
-updated: 2026-10-12T01:04:03Z
+updated: 2026-10-15T08:36:36Z
+started: 2026-10-15T08:36:36Z
 depends: []
 tags: [tooling]
 agent: claude-code/claude-opus-5-5
@@ -29,3 +31,5 @@ Ordering with relay-f58531: independent. If it lands before that plan's Task 2, 
 ## Notes
 
 - 2026-10-12T01:04:03Z (main): piece of ops-a66936 (type-check every JS/TS project); this is the pilot: its tsconfig and check_cmd line inform ops-17cd42, which fam, forge and prism wait on
+- 2026-10-15T08:36:36Z (main): started
+  provenance: {"harness_session":"codex:01a13ead-6548-7d42-bd33-f8d9c6ad15e2","harness_session_source":"CODEX_THREAD_ID"}
