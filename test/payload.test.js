@@ -11,18 +11,18 @@ test('Bash input normalizes without persisting native extras', () => {
 import { adapterFor } from '../src/adapters/index.js';
 const rows = {
   'claude-code': [['SessionStart','session-start','idle'], ['UserPromptSubmit','prompt','working'], ['PreToolUse','before-tool','working'], ['Notification:idle_prompt','needs-input','needs-input'], ['Notification:permission_prompt','needs-approval','needs-approval'], ['Stop','turn-end','done'], ['StopFailure','turn-error','error'], ['SessionEnd','session-end',null]],
-  codex: [['SessionStart','session-start','idle'], ['UserPromptSubmit','prompt','working'], ['PreToolUse','before-tool','working'], ['PermissionRequest','needs-approval','needs-approval'], ['Stop','turn-end','done'], ['SessionEnd','session-end',null]],
+  codex: [['SessionStart','session-start','idle'], ['UserPromptSubmit','prompt','working'], ['PreToolUse','before-tool','working'], ['PermissionRequest','needs-approval','needs-approval'], ['Stop','turn-end','done'], ['SessionEnd','session-end',null], ['SubagentStart','session-start','working',{ agent_id: 'w' }], ['SubagentStop','turn-end','done',{ agent_id: 'w' }]],
   opencode: [['init','session-start','idle'], ['session.busy','activity','working'], ['permission.pending','needs-approval','needs-approval'], ['session.error','turn-error','error'], ['session.idle','idle','idle'], ['dispose','session-end',null]]
 };
 const raw = (over = {}) => JSON.stringify({ session_id: 's', cwd: '/repo', ...over });
-test('all twenty mappings have literal kind and level expectations', () => {
+test('all twenty-two mappings have literal kind and level expectations', () => {
   for (const [harness, expected] of Object.entries(rows)) {
     const adapter = adapterFor(harness);
     assert.equal(Object.keys(adapter.events).length, expected.length);
     assert.ok(Object.isFrozen(adapter.events));
     for (const fn of ['stateForEvent','reduceState','resolveSessionPid','resolveTerminalPid']) assert.equal(typeof adapter[fn], 'function');
-    for (const [event, kind, level] of expected) {
-      const e = normalizeEvent(harness, event, raw({ tool_name: 'Bash', tool_input: {} }));
+    for (const [event, kind, level, extra = {}] of expected) {
+      const e = normalizeEvent(harness, event, raw({ tool_name: 'Bash', tool_input: {}, ...extra }));
       assert.equal(e.kind, kind); assert.equal(adapter.stateForEvent(event), level);
       assert.ok(Object.isFrozen(adapter.events[event]));
     }

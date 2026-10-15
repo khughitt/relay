@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# One Codex controller and one worker acquire separate tasks through relay identity, then
+# each tries to start, park and close the other's task. Everything lives under OUT_DIR: a
+# private CODEX_HOME, relay state and subscriber file, tasks config and state, and a
+# throwaway tasks project. --sandboxed runs the refusal control under workspace-write.
+# Usage: tools/codex-worker-claims/run [--sandboxed] [OUT_DIR]
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd -P)
+. "$here/../codex-subagent-capture/lib.sh"
+sandboxed=; [[ ${1:-} == --sandboxed ]] && { sandboxed=1; shift; }
+out=${1:-$(mktemp -d "${TMPDIR:-/tmp}/codex-worker-claims.XXXXXX")}
+mkdir -p "$out" && out=$(cd "$out" && pwd -P)
+relay=$(cd "$here/../.." && pwd -P)/bin/relay.js
+trap 'scrub_auth "$out"' EXIT
+
+capture_home "$out"
+install_relay "$out" "$relay"
+wrap_relay "$out"
+mkdir -p "$out/xdg-config/tasks" "$out/xdg-state" "$out/project"
+printf '[identity]\nrelay = true\n' >"$out/xdg-config/tasks/config.toml"
+export XDG_CONFIG_HOME=$out/xdg-config XDG_STATE_HOME=$out/xdg-state RELAY_STATE_DIR=$out/relay-state TASKS_FORMAT=json
+git -C "$out/project" init -q
+(cd "$out/project" && tasks init --prefix wk >/dev/null)
+A=$(cd "$out/project" && tasks add "A" -p 2 | jq -r .id) B=$(cd "$out/project" && tasks add "B" -p 2 | jq -r .id)
+(cd "$out/project" && git add -A && git -c user.name=t -c user.email=t@t commit -qm init)
+printf 'A=%s\nB=%s\n' "$A" "$B" >"$out/ids"
+
+model=${CAPTURE_MODEL:-$(sed -n 's/^model = "\(.*\)"$/\1/p' "$HOME/.codex/config.toml" | head -1)}
+if [[ -n $sandboxed ]]; then
+  sandbox="sandbox_mode = \"workspace-write\"
+[sandbox_workspace_write]
+writable_roots = [\"$out\"]"
+  prompt="Run the shell command \`tasks start $A 2>&1; echo exit=\$?\` exactly once and reply with its output. Run nothing else."
+else
+  # Host PID view: a workspace-write sandbox hides the codex session process from tasks.
+  sandbox='sandbox_mode = "danger-full-access"'
+  # Each command reports its exit code and folds stderr (where tasks writes errors) into the
+  # tool result the judge reads.
+  x='2>&1; echo exit=$?'
+  prompt="Follow these steps exactly, running each command verbatim as one shell command and nothing else. 1. Run \`tasks start $A $x\`. 2. Spawn exactly one subagent named worker with this instruction: \"Run \`tasks start $B $x\`. Then run each of these once, continuing after failures: \`tasks start $A $x\`, \`tasks park $A probe $x\`, \`tasks done $A probe $x\`. Then reply done.\" 3. Wait for the worker to finish. 4. Run each of these once, continuing after failures: \`tasks start $B $x\`, \`tasks park $B probe $x\`, \`tasks done $B probe $x\`. 5. Reply with the single word done."
+fi
+cat >"$out/home/config.toml" <<TOML
+model = "$model"
+approval_policy = "never"
+$sandbox
+
+[features]
+hooks = true
+multi_agent = true
+TOML
+
+status=0
+env -i HOME="$HOME" PATH="$PATH" USER="${USER:-}" LANG="${LANG:-C.UTF-8}" TERM=dumb \
+  CODEX_HOME="$out/home" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_STATE_HOME="$XDG_STATE_HOME" \
+  RELAY_STATE_DIR="$RELAY_STATE_DIR" TASKS_FORMAT=json CAPTURE_CLAIMS=1 \
+  timeout "${CAPTURE_TIMEOUT:-900}" codex exec --skip-git-repo-check --dangerously-bypass-hook-trust \
+  -C "$out/project" "$prompt" >"$out/exec.stdout" 2>"$out/exec.stderr" || status=$?
+(cd "$out/project" && tasks show "$A" >"$out/A.json" && tasks show "$B" >"$out/B.json")
+codex --version >"$out/codex-version"; tasks --version >"$out/tasks-version"
+echo "$out"
+exit "$status"

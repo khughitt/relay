@@ -1,13 +1,14 @@
 ---
 id: relay-15b49c
 title: Codex adapter applies worker hook events (agent_id present) to the controller's row
-status: todo
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 created: 2026-10-15T09:27:07Z
-updated: 2026-10-15T10:02:51Z
+updated: 2026-10-15T10:55:52Z
+completed: 2026-10-15T10:55:52Z
 depends: []
 parent: relay-eaca0e
 tags: []
@@ -24,3 +25,7 @@ Where: src/adapters/index.js, src/adapters/codex.js, docs/notes/2026-10-12-codex
 - 2026-10-15T09:27:20Z (main): concerns: relay-ed3f00 extension — capture exposed worker events reaching the root row
 - 2026-10-15T10:02:26Z (main): Subsumed by  (approved spec docs/specs/2026-10-15-codex-worker-rows.md routes agent_id events to worker rows); close with it.
 - 2026-10-15T10:02:51Z (main): correction to the previous note: the subsuming task is relay-635fdc
+- 2026-10-15T10:55:52Z (relay-6825f7): done
+  provenance: {"harness_session":"claude-code:783163fb-6924-41d7-a9d8-63a7fc5cb315","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T10:55:52Z (relay-6825f7): Worker events now update their own codex:<agent_id> row (scope worker); the root row is untouched, pinned by the background-worker test in test/transaction.test.js (relay-635fdc Task 3).
+  provenance: {"harness_session":"claude-code:783163fb-6924-41d7-a9d8-63a7fc5cb315","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

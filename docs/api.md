@@ -31,7 +31,8 @@ type Agent = {
   id: string;
   harness: 'claude-code' | 'codex' | 'opencode';
   sessionId: string;
-  scope: 'session' | 'process';
+  scope: 'session' | 'process' | 'worker';
+  root?: string;         // Codex workers only: the root session's agent id
   process: Handle | null;
   cwd: string;
   repoRoot: string | null;
@@ -57,6 +58,22 @@ never read: `readSnapshot`, `listAgents` and `relay list` fail with
 empty schema-2 snapshot under a fresh generation and reports one `REGISTRY_SUPERSEDED`
 diagnostic per dropped agent. Any other unknown schema is `INVALID_SCHEMA`.
 
+A Codex worker has its own row (spec `docs/specs/2026-10-15-codex-worker-rows.md`):
+`id: codex:<agent_id>`, `sessionId: <agent_id>` (the worker's thread id),
+`scope: "worker"` and `root: codex:<session_id>`, the root session's agent id, never an
+immediate parent. It shares its root's process handle. `scope` is `process` for
+OpenCode, `session` for Claude Code, and for Codex `session` without `root` or `worker`
+with it; any other combination is `INVALID_SCHEMA`. A relay from before worker rows
+accepts only `session` for Codex, so it refuses a snapshot holding a worker row and
+writes nothing, rather than publishing the rows without their `root`.
+A worker row ends only with its root: the root's SessionEnd removes the root and every
+row naming it as `root` in one publication, and the prune of a dead process removes them
+together, since they share its handle. A worker has no end event of its own, and an
+interrupted or failed worker turn leaves its row in its last state; a worker row's
+`state` is the last event seen, not proof of activity.
+`test/fixtures/registry-workers.json` is the shared example: a root, a worker, a nested
+worker and a Claude row; tasks vendors it.
+
 ```ts
 type EventKind = 'session-start' | 'prompt' | 'before-tool' | 'activity' | 'idle'
   | 'needs-input' | 'needs-approval' | 'turn-end' | 'turn-error' | 'session-end';
@@ -67,6 +84,7 @@ type Event = {
   nativeEvent: string;
   agentId: string;
   sessionId: string;
+  root?: string;         // Codex worker events only
   cwd: string;
   stopHookActive?: boolean;
   tool: null | { name: string; input: Record<string, unknown>; command: string | null };
@@ -210,7 +228,8 @@ result remains null/unchanged. Recreation starts a new generation. Revision
 overflow fails before publication.
 Git and agent resolution occur before locking; latest-state reduction and one
 canonical atomic snapshot publication occur under the lock. SessionEnd skips
-Git/process enrichment and removes its exact ID. Confirmed-dead pruning still
+Git/process enrichment and removes its exact ID and, for a Codex root, every row
+whose `root` is that ID, in the same publication. Confirmed-dead pruning still
 occurs under the same lock. OpenCode idle preserves error, turns active into done,
 and otherwise becomes idle. Reap always returns MutationResult, emits no Event,
 and invokes no guard/subscriber. R2 must notify reconciliation observers even on
@@ -235,7 +254,9 @@ abort. Timestamps are sampled at write time, never derived from process start.
 | Claude | Notification:permission_prompt | needs-approval | needs-approval |
 | Claude | StopFailure | turn-error | error |
 | Codex | PermissionRequest | needs-approval | needs-approval |
+| Codex | SubagentStart | session-start | working |
 | Claude, Codex | Stop | turn-end | done |
+| Codex | SubagentStop | turn-end | done |
 | Claude, Codex | SessionEnd | session-end | remove |
 | OpenCode | init | session-start | idle |
 | OpenCode | session.busy | activity | working |
@@ -255,6 +276,14 @@ code-mode interpretation. These fixture forms follow the approved plan's
 [Codex hook reference](https://developers.openai.com/codex/hooks) and
 [Claude hook reference](https://code.claude.com/docs/en/hooks), checked during design
 on 2026-09-17. They do not prove live guard capability; ops-c8e4d1 owns that gate.
+
+A Codex payload carrying `agent_id` is a worker's event: its `agentId` is
+`codex:<agent_id>`, its `sessionId` the `agent_id`, and `root` is `codex:<session_id>`.
+`agent_id` must be nonempty text other than `session_id`; SubagentStart and SubagentStop
+require it. Anything else is `INVALID_INPUT`. Claude Code and OpenCode payloads are not
+routed by `agent_id`. SubagentStop refuses as Stop does (`decision: block`, exit 2), so a
+guard on Codex `turn-end` also sees worker turn ends, and its install needs a passed
+SubagentStop refusal probe.
 
 ## Hook dispatch (R2)
 

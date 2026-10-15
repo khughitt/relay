@@ -37,14 +37,20 @@ function identity(v, id) {
   if (!harnesses.includes(v.harness) || !text(v.sessionId) || id !== `${v.harness}:${v.sessionId}`
       || !absolute(v.cwd)) fail('invalid agent identity');
 }
+// A Codex worker names its root session's agent id; nothing else carries a root.
+// Spec: docs/specs/2026-10-15-codex-worker-rows.md.
+/** @param {unknown} root @param {string} id */
+const rootOf = (root, id) => text(root) && root.startsWith('codex:') && text(root.slice('codex:'.length)) && root !== id;
 /** @param {unknown} v @param {string} key @returns {import("./types.js").Agent} */
 function validateAgent(v, key) {
   if (!object(v)) fail('invalid agent');
   identity(v, v.id);
-  if (v.id !== key || v.scope !== (v.harness === 'opencode' ? 'process' : 'session')
+  const worker = v.scope === 'worker';
+  if (v.id !== key || !(worker ? v.harness === 'codex' && rootOf(v.root, v.id)
+      : v.scope === (v.harness === 'opencode' ? 'process' : 'session') && !Object.hasOwn(v, 'root'))
       || !(v.repoRoot === null || absolute(v.repoRoot)) || !(v.remote === null || text(v.remote))
       || !text(v.projectKey) || !text(v.project) || !STATES.includes(v.state) || !integer(v.updatedAt)) fail('invalid agent');
-  return { id: v.id, harness: v.harness, sessionId: v.sessionId, scope: v.scope,
+  return { id: v.id, harness: v.harness, sessionId: v.sessionId, scope: v.scope, ...(worker ? { root: v.root } : {}),
     process: v.process === null ? null : validateHandle(v.process), cwd: v.cwd,
     repoRoot: v.repoRoot, remote: v.remote, projectKey: v.projectKey, project: v.project,
     state: v.state, updatedAt: v.updatedAt };
@@ -59,6 +65,7 @@ export function validateSnapshot(v) {
 export function validateEvent(v) {
   if (!object(v) || v.schema !== 1 || !KINDS.includes(v.kind) || !text(v.nativeEvent)) fail('invalid event');
   identity(v, v.agentId);
+  if (Object.hasOwn(v, 'root') && !(v.harness === 'codex' && rootOf(v.root, v.agentId))) fail('invalid event root');
   if (Object.hasOwn(v, 'stopHookActive') && typeof v.stopHookActive !== 'boolean') fail('invalid stop flag');
   let tool = null;
   if (v.kind === 'before-tool') {
@@ -67,6 +74,7 @@ export function validateEvent(v) {
     tool = { name: v.tool.name, input: v.tool.input, command: v.tool.command };
   } else if (v.tool !== null) fail('unexpected tool');
   return { schema: 1, kind: v.kind, harness: v.harness, nativeEvent: v.nativeEvent,
-    agentId: v.agentId, sessionId: v.sessionId, cwd: v.cwd,
+    agentId: v.agentId, sessionId: v.sessionId,
+    ...(Object.hasOwn(v, 'root') ? { root: v.root } : {}), cwd: v.cwd,
     ...(Object.hasOwn(v, 'stopHookActive') ? { stopHookActive: v.stopHookActive } : {}), tool };
 }

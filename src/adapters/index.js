@@ -17,8 +17,9 @@ export function normalizeEvent(harness, nativeEvent, raw) {
   adapter.stateForEvent(nativeEvent);
   const kind = adapter.events[nativeEvent].kind;
   const data = parsePayload(raw, nativeEvent);
-  return validateEvent({ schema: 1, kind, harness, nativeEvent, agentId: `${harness}:${data.session_id}`,
-    sessionId: data.session_id, cwd: data.cwd,
+  const worker = adapter.workerIdOf?.(data, nativeEvent) ?? null, sessionId = worker ?? data.session_id;
+  return validateEvent({ schema: 1, kind, harness, nativeEvent, agentId: `${harness}:${sessionId}`, sessionId,
+    ...(worker === null ? {} : { root: `${harness}:${data.session_id}` }), cwd: data.cwd,
     ...(Object.hasOwn(data, 'stop_hook_active') ? { stopHookActive: data.stop_hook_active } : {}),
     tool: kind === 'before-tool' ? { name: data.tool_name, input: data.tool_input,
       command: data.tool_name === 'Bash' && typeof data.tool_input.command === 'string' ? data.tool_input.command : null } : null });

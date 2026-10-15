@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { planHooks, shellQuote, timeoutSeconds, versionManagerOf, versionWarnings } from '../src/install/hooks.js';
+import { bindingsFor, planHooks, shellQuote, timeoutSeconds, versionManagerOf, versionWarnings } from '../src/install/hooks.js';
 import { planClaudeCode } from '../src/install/claude-code.js';
 import { planCodex } from '../src/install/codex.js';
 import { tempState } from './helpers/fixture.js';
@@ -167,4 +167,15 @@ test('install warnings name each versioned path, its failure mode and its remedy
   assert.deepEqual(none, []); assert.match(only, /^relay path .* is managed by Homebrew;/);
   const [shell] = versionWarnings({ nodeBin: '/run/user/1000/fnm_multishells/4242_1760000000000/bin/node', relayBin: '/opt/relay/bin/relay.js' });
   assert.match(shell, /is managed by fnm's per-shell link; .*stop running, silently, when that shell's session ends/);
+});
+test('Codex binds the worker lifecycle with the default budget and no matcher', () => {
+  assert.deepEqual(bindingsFor('codex').map(binding => binding.event),
+    ['SessionStart', 'SubagentStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'Stop', 'SubagentStop', 'SessionEnd']);
+  const hooks = JSON.parse(planHooks({ text: '{"hooks":{}}', harness: 'codex', relayBin: relay, subscribersPath: subscribers })).hooks;
+  for (const event of ['SubagentStart', 'SubagentStop']) {
+    const [entry] = hooks[event];
+    assert.equal(Object.hasOwn(entry, 'matcher'), false, event);
+    assert.match(entry.hooks[0].command, new RegExp(` hook --harness codex --outer-ms 600000 --subscribers \\S+ ${event}$`), event);
+    assert.equal(entry.hooks[0].timeout, 600, event);
+  }
 });
