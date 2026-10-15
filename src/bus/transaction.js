@@ -60,12 +60,18 @@ async function mutate(opts, event, context, handle, diagnostics) {
     let changed = superseded || reaped.length > 0;
     if (event) {
       const adapter = adapterFor(event.harness), level = adapter.stateForEvent(event.nativeEvent);
-      if (level === null) { changed ||= Object.hasOwn(agents,event.agentId); delete agents[event.agentId]; }
+      if (level === null) {
+        // A root's SessionEnd ends its workers too: they share its process and have no end event.
+        const ended = Object.keys(agents).filter(id => id === event.agentId || agents[id].root === event.agentId);
+        changed ||= ended.length > 0;
+        for (const id of ended) delete agents[id];
+      }
       else {
         const state = adapter.reduceState(level,agents[event.agentId]?.state ?? null);
         const {remote,repoRoot} = /** @type {{remote: string|null, repoRoot: string|null}} */ (context);
         agents[event.agentId] = {id:event.agentId,harness:event.harness,sessionId:event.sessionId,
-          scope:event.harness === 'opencode' ? 'process' : 'session',process:handle,cwd:event.cwd,repoRoot,remote,
+          scope:event.harness === 'opencode' ? 'process' : event.root === undefined ? 'session' : 'worker',
+          ...(event.root === undefined ? {} : {root:event.root}),process:handle,cwd:event.cwd,repoRoot,remote,
           projectKey:projectKeyFor({remote,repoRoot,cwd:event.cwd}),project:displayProject({remote,repoRoot,cwd:event.cwd}),state: /** @type {import("../types.js").State} */ (state),updatedAt:opts.now()};
         changed = true;
       }

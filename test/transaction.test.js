@@ -155,3 +155,65 @@ test('a contaminated schema-1 registry recovers: reap, then the outer event, lea
     assert.equal(r.snapshot.agents['claude-code:outer'].process.pid,100,first);
   }
 });
+
+const R = '0199f000-0000-7000-8000-000000000001', W1 = '0199f000-0000-7000-8000-000000000002', C = '0199f000-0000-7000-8000-0000000000c1';
+const codex = (native, fields = {}) => normalizeEvent('codex', native, JSON.stringify({ session_id: R, cwd: '/repo', ...fields }));
+const tool = { tool_name: 'Bash', tool_input: { command: 'true' } };
+const worker = (native, fields = {}) => codex(native, { ...fields, agent_id: W1, agent_type: 'default' });
+const seed = async (p, handleFor) => {
+  const fixture = JSON.parse(await fs.readFile(new URL('./fixtures/registry-workers.json', import.meta.url), 'utf8'));
+  for (const agent of Object.values(fixture.agents)) agent.process = handleFor(agent);
+  await fs.writeFile(p.agentsPath, JSON.stringify(fixture), { mode: 0o600 });
+  return fixture;
+};
+test('a background worker never moves its root row', async t => {
+  const p = await tempState(t), o = localObservation(p);
+  for (const native of ['SessionStart', 'UserPromptSubmit', 'Stop']) await applyEvent(codex(native), o);
+  const started = await applyEvent(worker('SubagentStart'), o);
+  assert.equal(started.snapshot.agents[`codex:${W1}`].state, 'working');
+  await applyEvent(worker('PreToolUse', tool), o);
+  const { snapshot } = await applyEvent(worker('SubagentStop', { stop_hook_active: false }), o);
+  const root = snapshot.agents[`codex:${R}`], row = snapshot.agents[`codex:${W1}`];
+  assert.equal(root.state, 'done');
+  assert.deepEqual([row.scope, row.root, row.sessionId, row.state], ['worker', `codex:${R}`, W1, 'done']);
+  assert.deepEqual(row.process, root.process);
+  assert.equal(Object.hasOwn(root, 'root'), false);
+});
+test('a later worker turn reopens its row without a start event', async t => {
+  const p = await tempState(t), o = localObservation(p);
+  await applyEvent(worker('SubagentStart'), o);
+  await applyEvent(worker('SubagentStop', { stop_hook_active: false }), o);
+  const { snapshot } = await applyEvent(worker('PreToolUse', tool), o);
+  assert.equal(snapshot.agents[`codex:${W1}`].state, 'working');
+});
+test('a worker seen before its root still names it, and leaves with it', async t => {
+  const p = await tempState(t), o = localObservation(p);
+  const first = await applyEvent(worker('PreToolUse', tool), o);
+  assert.deepEqual(Object.keys(first.snapshot.agents), [`codex:${W1}`]);
+  assert.equal(first.snapshot.agents[`codex:${W1}`].root, `codex:${R}`);
+  const ended = await applyEvent(codex('SessionEnd'), { paths: p });
+  assert.deepEqual(ended.snapshot.agents, {});
+});
+test('a root SessionEnd removes the root and its workers, nested included, in one revision', async t => {
+  const p = await tempState(t), live = createProcessOps().handleOf(process.pid);
+  const fixture = await seed(p, () => live);
+  const ended = await applyEvent(normalizeEvent('codex', 'SessionEnd', JSON.stringify({ session_id: R, cwd: '/home/user/project' })), { paths: p });
+  assert.deepEqual(Object.keys(ended.snapshot.agents), [`claude-code:${C}`]);
+  assert.equal(ended.snapshot.revision, fixture.revision + 1);
+});
+test('a root SessionEnd removes its workers when its own row is already gone', async t => {
+  const p = await tempState(t), live = createProcessOps().handleOf(process.pid);
+  const fixture = await seed(p, () => live);
+  delete fixture.agents[`codex:${R}`];
+  await fs.writeFile(p.agentsPath, JSON.stringify(fixture), { mode: 0o600 });
+  const ended = await applyEvent(codex('SessionEnd'), { paths: p });
+  assert.deepEqual(Object.keys(ended.snapshot.agents), [`claude-code:${C}`]);
+});
+test('a dead codex process takes its root and every worker with it', async t => {
+  const p = await tempState(t), live = createProcessOps().handleOf(process.pid);
+  const dead = { ...live, start: String(BigInt(live.start) + 1n) };
+  await seed(p, agent => agent.harness === 'codex' ? dead : live);
+  const reaped = await reapRegistry({ paths: p });
+  assert.deepEqual(reaped.reaped.sort(), [`codex:${R}`, `codex:${W1}`, 'codex:0199f000-0000-7000-8000-000000000003']);
+  assert.deepEqual(Object.keys(reaped.snapshot.agents), [`claude-code:${C}`]);
+});
