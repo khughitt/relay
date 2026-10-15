@@ -1,15 +1,16 @@
 ---
 id: relay-752a6e
 title: "Extend the Codex subagent capture: second worker turn, failed turn, background worker, nested worker"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: relay-752a6e
 created: 2026-10-15T09:27:12Z
-updated: 2026-10-15T09:35:56Z
+updated: 2026-10-15T09:35:58Z
 started: 2026-10-15T09:28:41Z
+completed: 2026-10-15T09:35:58Z
 depends: []
 parent: relay-eaca0e
 tags: []
@@ -30,3 +31,7 @@ Expected result: brief §7 gains a row table per case and the Not-exercised list
 - 2026-10-15T09:28:47Z (relay-752a6e): resumed
   provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-15T09:35:56Z (relay-752a6e): Results (brief §8): SubagentStart only before a worker's first turn; SubagentStop only on a successful turn (interrupt live, error path by source); background worker events arrive after root Stop (TUI; exec kills unstarted workers); nested worker has own agent_id, parent only via SubagentStop transcript_path; refused spawn yields no worker events. Failed turn not provoked live: spawn with unknown model is refused before a worker exists.
+- 2026-10-15T09:35:58Z (relay-752a6e): done
+  provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T09:35:58Z (relay-752a6e): Captured followup, interrupted, background (TUI) and nested worker cases plus a refused spawn; evidence in brief §8, capture tool gains --case and summarize.mjs; corrected §7's misattribution framing.
+  provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
