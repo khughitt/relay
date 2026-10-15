@@ -7,8 +7,8 @@ size: m
 complexity: mid
 process: planned
 created: 2026-10-15T10:02:39Z
-updated: 2026-10-15T10:02:39Z
-depends: []
+updated: 2026-10-15T10:02:40Z
+depends: [tasks-af3aac]
 parent: relay-eaca0e
 tags: []
 source: relay-6825f7
