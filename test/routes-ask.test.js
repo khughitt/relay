@@ -8,6 +8,7 @@ import { createProcessOps } from '../src/bus/proc.js';
 import { expectAnswers } from '../src/routes/index.js';
 import { Readable } from 'node:stream';
 import { runAsk } from '../src/routes/ask.js';
+import { toQuestion } from '../src/routes/claude-code.js';
 import assert from 'node:assert/strict';
 import { tempState } from './helpers/fixture.js';
 import { spawnLines } from './helpers/spawn-lines.js';
@@ -115,6 +116,52 @@ for (const handback of [true, false]) {
       assert.deepEqual(expired.observations.map(({ surface, answers }) => ({ surface, answers })), [{ surface: 'terminal', answers: { 'Which shape?': 'Circle' } }]);
     }
   });
+}
+for (const handback of [true, false]) {
+  for (const replay of [true, false]) {
+    test(`undeliverable ${replay ? 'replay' : 'handed refusal'} ${handback ? 'releases' : 'denies'}`, { timeout: 30000 }, async (t) => {
+      const p = await tempState(t), socketPath = join(p.stateDir, 'serve.sock');
+      const createdAt = Date.now(), id = uuid(), processOps = createProcessOps();
+      let now = createdAt;
+      const question = toQuestion(JSON.parse(pre()), { now: createdAt, id });
+      const { inbox } = await openInbox({ stateDir: p.stateDir, expectAnswers, clock: () => now });
+      await inbox.setPresence('away');
+      const { entry } = await inbox.ask(question, { handback, waiter: processOps.handleOf(process.pid) });
+      const savedAnswer = answer(entry);
+      assert.equal((await inbox.answer(id, savedAnswer)).error, null);
+      if (replay) {
+        now = question.body.expiresAt;
+        await inbox.sweep();
+      }
+      const server = await serveSocket({ inbox, socketPath, processOps, log: () => {} });
+      t.after(() => server.close());
+      let handedResult;
+      const connect = async (path) => {
+        const conn = await connectSocket(path);
+        return { ...conn, request: async (op, fields) => {
+          if (op !== 'handed') return conn.request(op, fields);
+          now = question.body.expiresAt;
+          return handedResult = await conn.request(op, fields);
+        } };
+      };
+      const result = await runAsk({ nativeEvent: 'PreToolUse', handback, stdin: Readable.from([pre()]),
+        socketPath, connect, processOps, clock: () => createdAt, newId: () => id });
+      if (replay) assert.equal(handedResult, undefined);
+      else assert.equal(handedResult.error.code, 'UNDELIVERABLE');
+      assert.equal(result.exitCode, 0);
+      assert.equal(result.stderr, '');
+      if (handback) assert.equal(result.stdout, '');
+      else {
+        const reply = JSON.parse(result.stdout).hookSpecificOutput;
+        assert.equal(reply.permissionDecision, 'deny');
+        assert.match(reply.permissionDecisionReason, /saved answer.*not.*delivered.*expired/);
+        assert.match(reply.permissionDecisionReason, /do not wait/);
+        assert.equal(reply.updatedInput, undefined);
+      }
+      assert.equal(inbox.get(id).state, 'undeliverable');
+      assert.deepEqual(inbox.get(id).answer, savedAnswer);
+    });
+  }
 }
 test('a hook killed mid-wait withdraws its question', { timeout: 30000 }, async (t) => {
   const p = await tempState(t), { client } = await service(t, p);

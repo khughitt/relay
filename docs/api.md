@@ -748,6 +748,12 @@ Away routes new questions into the inbox; here passes new questions to the nativ
 Existing pending questions remain pending; defer one explicitly to return it to the
 native UI when handback is available.
 
+For `relay ask`, an `undeliverable` entry (including one replayed on reattach) or a
+`handed` refusal with `UNDELIVERABLE` follows expiry handling: with `--handback`,
+exit 0 with no output; without it, return a `deny` hook reply explaining that the
+saved answer could not be delivered before the question expired and the agent
+should not wait. The saved answer is never delivered from this terminal state.
+
 The [capability record](evidence/claude-code-answer-routes.json) has five passing rows
 for Claude Code 2.1.296. Installation requires terminal-answer and deny-stops rows;
 receipt gates PostToolUse, release enables handback, and under-denial gates nothing.

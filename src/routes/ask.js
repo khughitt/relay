@@ -14,6 +14,7 @@ const passthrough = (error) => ({ stdout: '', stderr: `relay ask: ${error?.code 
 const reply = (value) => ({ stdout: `${JSON.stringify(value)}\n`, stderr: '', exitCode: 0 });
 const WITHDRAWN = 'question withdrawn by the user; do not wait for an answer';
 const EXPIRED = 'question expired before an answer arrived; do not wait for an answer';
+const UNDELIVERABLE = 'saved answer could not be delivered before the question expired; do not wait for an answer';
 
 // Failures leave the native question available; a saved handoff is acknowledged before stdout.
 export async function runAsk({ nativeEvent, handback = false, stdin, socketPath, connect = connectSocket, processOps,
@@ -56,11 +57,13 @@ function attend(conn, { question, waiter, handback, payload }) {
             let r;
             try { r = await conn.request('handed', { id: entry.id, waiter }); } catch { return lost(); }
             if (finished) return;
+            if (!r.ok && r.error.code === 'UNDELIVERABLE') return finish(handback ? quiet : reply(denyReply(UNDELIVERABLE)));
             if (!r.ok) return finish(passthrough(relayError(r.error.code, r.error.message)));
             return finish(reply(allowReply(payload, question, r.entry.answer.body)));
           }
           case 'released': return finish(quiet);
           case 'expired': return finish(handback ? quiet : reply(denyReply(EXPIRED)));
+          case 'undeliverable': return finish(handback ? quiet : reply(denyReply(UNDELIVERABLE)));
           case 'withdrawn': return finish(reply(denyReply(WITHDRAWN)));
           default: return finish(passthrough(relayError('UNEXPECTED_STATE', `question is ${entry.state}`)));
         }

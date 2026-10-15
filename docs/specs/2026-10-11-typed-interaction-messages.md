@@ -574,6 +574,11 @@ as for every live hook.
      output, so the native question appears in the terminal (P1).
    - **Expired.** With P1, the same as released: the user at the desk still sees the
      question. Without P1, the hook denies (below).
+   - **Undeliverable.** On reattach to an `undeliverable` entry, or when `handed` is
+     refused with `UNDELIVERABLE`, the hook behaves like expiry: with P1 it exits 0
+     with no output; without P1 it returns `deny` with the reason "saved answer could
+     not be delivered before the question expired; do not wait for an answer". It
+     never delivers the saved answer from this terminal state.
    - **Withdrawn.** On this route only the user can withdraw (`relay inbox withdraw`),
      because the asker is blocked and never supersedes (§5.5). The hook must stop the
      call, not release it. It returns `deny` with the reason "question withdrawn by the
