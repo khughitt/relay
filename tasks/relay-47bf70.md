@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-14T10:24:23Z
-updated: 2026-10-15T22:28:13Z
+updated: 2026-10-15T22:28:14Z
 depends: []
 tags: [feedback, friction, "from:trans"]
 agent: codex
@@ -23,3 +23,7 @@ Every consumer takes the path from servePaths: serve (src/serve/serve.js:24), an
 Done: relay refuses an over-long socket path before any bind or connect, with INVALID_CONFIG naming the path, its byte length, the platform limit, and the remedy (a shorter RELAY_STATE_DIR or XDG_STATE_HOME), on both runtimes, in serve and in every client. The limit is sun_path less its terminating NUL: 107 bytes on Linux and 103 on Darwin (Darwin's is from its sockaddr_un, not probed here). Lengths count UTF-8 bytes, not characters. relay ask keeps its passthrough on a connect failure, now with that error. Tests cover a path at the limit and one byte over, through serve and a client; docs/api.md's serve section and error table name the check.
 
 Where: src/serve/serve.js (servePaths, runServe), src/serve/socket.js (serveSocket), src/serve/client.js (connectSocket), src/routes/ask.js (passthrough), bin/relay.js; test/serve-socket.test.js, test/serve-process.test.js and test/cli-desk.test.js for the existing shapes.
+
+## Notes
+
+- 2026-10-15T22:28:14Z (main): scope: scoped; reproduced on Linux (node v26.5.0: EINVAL past 108 bytes; v22.23.2: silently binds a 108-byte truncation, so serveSocket's chmod and lstat target a missing path), with every socket consumer traced to servePaths (main d7ac402); retitled to the outcome, kept the report verbatim; todo P2 s/low/direct
