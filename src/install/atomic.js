@@ -1,11 +1,15 @@
+// @ts-check
 import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 
 const harnesses = new Set(['claude-code', 'codex', 'opencode']);
+/** @param {unknown} value @returns {value is Record<string, any>} */
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+/** @type {(message: string) => never} */
 const fail = message => { throw new Error(`invalid artifact: ${message}`); };
 
+/** @param {unknown} value @returns {import("../types.js").Artifact} */
 export function validateArtifact(value) {
   if (!object(value) || value.schema !== 1 || !harnesses.has(value.harness) || !Array.isArray(value.changes)
     || !Object.hasOwn(value, 'evidence')) fail('expected schema, harness, changes, and evidence');
@@ -22,20 +26,22 @@ export function validateArtifact(value) {
     if (paths.has(change.path)) fail('duplicate change path');
     paths.add(change.path);
   }
-  return value;
+  return /** @type {import("../types.js").Artifact} */ (value);
 }
 
+/** @param {string} path @param {typeof fs} io */
 const inspect = (path, io) => {
   try {
     const stat = io.lstatSync(path);
     if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`unsafe target: ${path}`);
     return io.readFileSync(path, 'utf8');
-  } catch (error) {
+  } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught);
     if (error.code === 'ENOENT') return null;
     throw error;
   }
 };
 
+/** @param {string} path @param {string} text */
 export function writeAtomicSync(path, text, { io = fs, suffix = randomUUID } = {}) {
   const temp = `${path}.tmp.${suffix()}`;
   try {
@@ -43,15 +49,16 @@ export function writeAtomicSync(path, text, { io = fs, suffix = randomUUID } = {
     const fd = io.openSync(temp, 'r');
     try { io.fsyncSync(fd); } finally { io.closeSync(fd); }
     io.renameSync(temp, path);
-  } catch (error) {
+  } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught);
     try { io.unlinkSync(temp); }
-    catch (cleanup) {
+    catch (caught) { const cleanup = /** @type {import('../types.js').Failure} */ (caught);
       if (cleanup.code !== 'ENOENT') throw new AggregateError([error, cleanup], `atomic write and cleanup failed for ${temp}`);
     }
     throw error;
   }
 }
 
+/** @param {import("../types.js").Change} change @param {typeof fs} io */
 const targetState = (change, io) => {
   const current = inspect(change.path, io);
   if (change.before === null) {
@@ -64,6 +71,7 @@ const targetState = (change, io) => {
   throw new Error(`preimage drift: ${change.path}`);
 };
 
+/** @param {string} path @param {unknown} value */
 export function applyArtifact(path, value, { io = fs } = {}) {
   const artifact = validateArtifact(value);
   writeAtomicSync(path, `${JSON.stringify(artifact)}\n`, { io });
@@ -72,6 +80,7 @@ export function applyArtifact(path, value, { io = fs } = {}) {
   }
 }
 
+/** @param {unknown} value */
 export function rollbackArtifact(value, { io = fs } = {}) {
   const artifact = validateArtifact(value);
   for (const change of artifact.changes) {

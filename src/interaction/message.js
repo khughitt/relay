@@ -1,3 +1,4 @@
+// @ts-check
 import { relayError } from '../protocol.js';
 
 // The JSON Schema is the public contract; this module also checks its cross-field rules.
@@ -13,21 +14,32 @@ const ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
 // Lowercase only: ids are compared exactly and name entry files, so two spellings of one UUID
 // would be two entries that overwrite each other on a case-insensitive filesystem.
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+/** @type {(message: string) => never} */
 const fail = (message) => { throw relayError('INVALID_MESSAGE', message); };
+/** @type {(message: string) => never} */
 const bad = (message) => { throw relayError('INVALID_ANSWER', message); };
+/** @param {unknown} v @returns {v is Record<string, any>} */
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+/** @param {unknown} v */
 export const isUuid = (v) => typeof v === 'string' && UUID.test(v);
+/** @param {number} v */
 const ms = (v) => Number.isSafeInteger(v) && v >= 0;
+/** @param {string} v */
 const characters = (v) => Array.from(v).length;
+/** @param {unknown} v @param {number} min @param {number} max @returns {v is string} */
 const str = (v, min, max) => {
   if (typeof v !== 'string') return false;
   const length = characters(v);
   return length >= min && length <= max;
 };
+/** @template T @param {T|null} v @param {(v: T) => boolean} check */
 const orNull = (v, check) => v === null || check(v);
+/** @param {unknown} v */
 const isId = (v) => typeof v === 'string' && ID.test(v);
+/** @param {string[]} ids @param {string} what */
 const unique = (ids, what) => { if (new Set(ids).size !== ids.length) fail(`duplicate ${what} id`); };
 
+/** @param {unknown} v @returns {import("../types.js").Party} */
 function party(v) {
   if (object(v) && v.kind === 'user') return { kind: 'user' };
   if (object(v) && v.kind === 'agent' && typeof v.agentId === 'string' && /^(claude-code|codex|opencode):.+$/.test(v.agentId)) {
@@ -36,6 +48,7 @@ function party(v) {
   return fail('invalid party');
 }
 
+/** @param {unknown} v @returns {import("../types.js").Context} */
 function context(v) {
   if (!object(v) || !orNull(v.project, (x) => typeof x === 'string')
       || !orNull(v.cwd, (x) => typeof x === 'string')
@@ -43,11 +56,13 @@ function context(v) {
   return { project: v.project, taskId: v.taskId, cwd: v.cwd };
 }
 
+/** @param {unknown} v @returns {import("../types.js").Option} */
 function option(v) {
   if (!object(v) || !isId(v.id) || !str(v.label, 1, 80) || !orNull(v.description, (x) => str(x, 0, 400))) fail('invalid option');
   return { id: v.id, label: v.label, description: v.description };
 }
 
+/** @param {unknown} v @returns {import("../types.js").Item} */
 function item(v) {
   if (!object(v) || !isId(v.id) || !str(v.header, 1, 16) || !str(v.prompt, 1, 1000) || !ITEM_TYPES.includes(v.type)
       || !Array.isArray(v.options) || typeof v.allowOther !== 'boolean') fail('invalid item');
@@ -62,6 +77,7 @@ function item(v) {
   return { id: v.id, header: v.header, prompt: v.prompt, type: v.type, options, recommended: v.recommended, allowOther: v.allowOther, maxLength: v.maxLength };
 }
 
+/** @param {unknown} v @returns {import("../types.js").Question} */
 function question(v) {
   if (!object(v) || !CLASSES.includes(v.class) || !ms(v.expiresAt) || !Array.isArray(v.items) || v.items.length < 1 || v.items.length > 4) fail('invalid question');
   let native = null, artifact = null;
@@ -79,6 +95,7 @@ function question(v) {
   return { class: v.class, expiresAt: v.expiresAt, native, artifact, supersedes: v.supersedes, items };
 }
 
+/** @param {unknown} v @returns {import("../types.js").Value} */
 function value(v) {
   if (!object(v)) fail('invalid value');
   if (v.type === 'boolean' && typeof v.value === 'boolean') return { type: 'boolean', value: v.value };
@@ -91,8 +108,10 @@ function value(v) {
   return fail('invalid value');
 }
 
+/** @param {string} v */
 const surface = (v) => SURFACES.includes(v) ? v : fail('invalid surface');
 
+/** @param {unknown} v @returns {import("../types.js").Answer} */
 function answer(v) {
   if (!object(v) || !isUuid(v.answerId) || !['answered', 'declined'].includes(v.outcome)
       || !orNull(v.artifactRevision, (x) => typeof x === 'string') || !object(v.values)) fail('invalid answer');
@@ -100,11 +119,13 @@ function answer(v) {
     values: Object.fromEntries(Object.entries(v.values).map(([k, x]) => [k, value(x)])) };
 }
 
+/** @param {unknown} v @returns {import("../types.js").NoticeMessage["body"]} */
 function notice(v) {
   if (!object(v) || !ms(v.expiresAt) || !str(v.title, 1, 80) || !str(v.text, 0, 2000) || !['info', 'warn'].includes(v.level)) fail('invalid notice');
   return { expiresAt: v.expiresAt, title: v.title, text: v.text, level: v.level };
 }
 
+/** @type {Record<string, (v: unknown) => unknown>} */
 const BODY = {
   question,
   answer,
@@ -113,13 +134,15 @@ const BODY = {
   notice,
 };
 
+/** @param {unknown} v @returns {import("../types.js").Message} */
 export function validateMessage(v) {
   if (!object(v) || v.schema !== 1 || !MESSAGE_KINDS.includes(v.kind) || !isUuid(v.id) || !isUuid(v.correlationId) || !ms(v.createdAt)) fail('invalid message envelope');
   if ((v.kind === 'question' || v.kind === 'notice') && v.correlationId !== v.id) fail('a question or notice correlates to itself');
-  return { schema: 1, id: v.id, kind: v.kind, correlationId: v.correlationId, from: party(v.from), to: party(v.to),
-    createdAt: v.createdAt, context: context(v.context), body: BODY[v.kind](v.body) };
+  return /** @type {import("../types.js").Message} */ ({ schema: 1, id: v.id, kind: v.kind, correlationId: v.correlationId, from: party(v.from), to: party(v.to),
+    createdAt: v.createdAt, context: context(v.context), body: BODY[v.kind](v.body) });
 }
 
+/** @param {import("../types.js").Question} q @param {import("../types.js").Answer} a */
 export function checkAnswer(q, a) {
   if ((q.artifact === null) !== (a.artifactRevision === null)) bad('artifactRevision must be present exactly when the question has an artifact');
   const keys = Object.keys(a.values);

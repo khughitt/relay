@@ -1,6 +1,9 @@
+// @ts-check
 import { isAbsolute } from 'node:path';
 import { relayError } from '../protocol.js';
+/** @type {(message: string) => never} */
 const invalid = (message) => { throw relayError('INVALID_CONFIG', message); };
+/** @param {NodeJS.ProcessEnv} env */
 export function serveConfig(env) {
   const { RELAY_HTTP_PORT: port, RELAY_SERVE_HOST: host, RELAY_SERVE_LOGIN: login, RELAY_CLIENT_DIR: clientDir } = env;
   if ((host === undefined) !== (login === undefined)) invalid(`${host === undefined ? 'RELAY_SERVE_HOST' : 'RELAY_SERVE_LOGIN'} is required when ${host === undefined ? 'RELAY_SERVE_LOGIN' : 'RELAY_SERVE_HOST'} is set`);

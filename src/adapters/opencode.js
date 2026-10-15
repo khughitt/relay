@@ -1,8 +1,10 @@
+// @ts-check
 import { createProcessOps } from '../bus/proc.js';
 import { relayError } from '../protocol.js';
 import { encodeStandardReply } from './reply.js';
 import { nearestSessionPid, nearestTerminalPid } from './ancestry.js';
 
+/** @type {import("../types.js").Adapter["events"]} */
 export const events = Object.freeze({
   'init': Object.freeze({ kind: 'session-start', level: 'idle' }),
   'session.busy': Object.freeze({ kind: 'activity', level: 'working' }),
@@ -11,24 +13,31 @@ export const events = Object.freeze({
   'session.idle': Object.freeze({ kind: 'idle', level: 'idle' }),
   'dispose': Object.freeze({ kind: 'session-end', level: null }),
 });
+/** @param {string} event */
 export function stateForEvent(event) {
   if (!Object.hasOwn(events, event)) throw relayError('UNSUPPORTED_EVENT', 'unsupported harness event');
   return events[event].level;
 }
 const ACTIVE = new Set(['working', 'needs-input', 'needs-approval']);
+/** @param {import("../types.js").State|null} level @param {import("../types.js").State|null} [previous] */
 export function reduceState(level, previous) {
   if (level !== 'idle') return level;
   if (previous === 'error') return 'error';
-  return ACTIVE.has(previous) ? 'done' : 'idle';
+  return (/** @type {Set<unknown>} */ (ACTIVE)).has(previous) ? 'done' : 'idle';
 }
 const ops = () => createProcessOps();
+/** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
   return nearestSessionPid(ancestors(startPid), { isHarness: (row) => row.comm === 'opencode' });
 }
+/** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
   return nearestTerminalPid(ancestors(startPid), 'opencode');
 }
 // The server plugin observes only; its spawnHook lifetime is five seconds.
+/** @type {Readonly<Record<string, import("../types.js").Capability>>} */
 export const replies = Object.freeze({});
+/** @type {import("../types.js").Adapter["outerTimeouts"]} */
 export const outerTimeouts = Object.freeze({ default: 5000, max: Object.freeze({}) });
+/** @param {string} nativeEvent @param {import("../types.js").Reply} reply */
 export const encodeReply = (nativeEvent, reply) => encodeStandardReply(nativeEvent, reply);

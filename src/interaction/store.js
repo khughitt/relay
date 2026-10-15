@@ -1,3 +1,4 @@
+// @ts-check
 import * as fs from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -8,11 +9,14 @@ import { validateEntry, isTerminal, applySuperseded } from './lifecycle.js';
 // sequence number, writes seq, then the entry; both writes are fsynced files renamed into place
 // followed by a directory fsync.
 export const RETENTION_MS = 30 * 24 * 3600 * 1000;
+/** @param {string} stateDir */
 export function inboxPaths(stateDir) {
   const root = join(stateDir, 'inbox');
   return { root, seqPath: join(root, 'seq'), entriesDir: join(root, 'entries'), rejectedDir: join(root, 'rejected') };
 }
+/** @param {string} path @param {typeof fs} io */
 async function syncDir(path, io) { const dir = await io.open(path, 'r'); try { await dir.sync(); } finally { await dir.close(); } }
+/** @param {string} path @param {string} text @param {import("../types.js").IOOptions} [options] */
 export async function writeDurable(path, text, { io = fs } = {}) {
   await checkPrivate(dirname(path), true, { io });
   await checkPrivate(path, false, { io });
@@ -26,9 +30,10 @@ export async function writeDurable(path, text, { io = fs } = {}) {
     return;
   } catch (cause) { error = relayError('IO_ERROR', 'cannot publish inbox file', cause); }
   try { await io.unlink(temp); }
-  catch (cause) { if (cause.code !== 'ENOENT') throw new AggregateError([error, relayError('IO_ERROR', 'cannot clean temporary inbox file', cause)], 'inbox write and cleanup failed'); }
+  catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught); if (cause.code !== 'ENOENT') throw new AggregateError([error, relayError('IO_ERROR', 'cannot clean temporary inbox file', cause)], 'inbox write and cleanup failed'); }
   throw error;
 }
+/** @param {string} path @param {typeof fs} io */
 async function readSeq(path, io) {
   let text;
   try { if (!await checkPrivate(path, false, { io })) return 0; text = await io.readFile(path, 'utf8'); }
@@ -36,6 +41,7 @@ async function readSeq(path, io) {
   if (!/^(0|[1-9][0-9]{0,15})\n?$/.test(text) || !Number.isSafeInteger(Number(text.trim()))) throw relayError('CORRUPT_STATE', 'inbox seq is not a safe decimal integer');
   return Number(text.trim());
 }
+/** @param {string} stateDir */
 export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
   const p = inboxPaths(stateDir);
   for (const dir of [stateDir, p.root, p.entriesDir, p.rejectedDir]) await ensurePrivateDir(dir, { io });
@@ -44,7 +50,8 @@ export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
   // where that uid can write, so an ancestor is synced exactly when its child on the chain is owned by
   // this uid and the ancestor is writable by it. Any other ancestor holds no relay link and is never
   // opened, so another user's 0711 directory cannot stop startup. The state and inbox dirs are relay's.
-  const uid = process.getuid(), groups = new Set([process.getegid(), ...process.getgroups()]);
+  const uid = (/** @type {() => number} */ (process.getuid))(), groups = new Set([(/** @type {() => number} */ (process.getegid))(), ...(/** @type {() => number[]} */ (process.getgroups))()]);
+  /** @param {import("node:fs").Stats} info */
   const writable = (info) => uid === 0 || (info.mode & (info.uid === uid ? 0o200 : groups.has(info.gid) ? 0o020 : 0o002)) !== 0;
   const chain = [];
   for (let dir = stateDir; ; dir = dirname(dir)) {
@@ -52,13 +59,18 @@ export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
     if (dirname(dir) === dir) break;
   }
   try {
+    /** @type {import("node:fs").Stats[]} */
     const infos = [];
     for (const dir of chain) infos.push(await io.stat(dir));
     const directories = chain.slice(0, -1).filter((dir, i) => infos[i + 1].uid === uid && writable(infos[i]));
     for (const dir of [...directories, stateDir, p.root]) await syncDir(dir, io);
   } catch (cause) { throw relayError('IO_ERROR', 'cannot publish inbox directories', cause); }
   const persisted = await readSeq(p.seqPath, io);
-  const entries = new Map(), rejected = [];
+  /** @type {Map<string, import("../types.js").StoredEntry>} */
+  const entries = new Map();
+  /** @type {{name: string, reason: string}[]} */
+  const rejected = [];
+  /** @param {string} name @param {string} reason */
   const quarantine = async (name, reason) => {
     let destination = join(p.rejectedDir, name);
     if (await checkPrivate(destination, false, { io })) destination += `.${randomUUID()}`;
@@ -87,7 +99,7 @@ export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
     try {
       entry = validateEntry(JSON.parse(text));
       if (`${entry.id}.json` !== name) throw relayError('INVALID_ENTRY', 'entry id does not match its file');
-    } catch (error) { if (error.code === 'IO_ERROR') throw error; await quarantine(name, error.message); continue; }
+    } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught); if (error.code === 'IO_ERROR') throw error; await quarantine(name, error.message); continue; }
     entries.set(entry.id, entry);
   }
   const start = [...entries.values()].reduce((highest, entry) => Math.max(highest, entry.seq), persisted);
@@ -106,10 +118,12 @@ export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
   }
   return { store, rejected };
 }
+/** @param {ReturnType<typeof inboxPaths>} p @param {Map<string, import("../types.js").StoredEntry>} entries @param {number} start @param {typeof fs} io */
 function makeStore(p, entries, start, io) {
   // allocated runs ahead of committed while a write is in flight; only committed is ever
   // exposed, so a cursor never names a change that is not yet readable.
   let allocated = start, committed = start;
+  /** @param {import("../types.js").Entry} entry */
   async function put(entry) {
     if (allocated === Number.MAX_SAFE_INTEGER) throw relayError('CORRUPT_STATE', 'inbox sequence exhausted');
     const seq = allocated + 1;
@@ -122,14 +136,17 @@ function makeStore(p, entries, start, io) {
     return stamped;
   }
   return {
+    /** @param {string} id */
     get: (id) => entries.get(id) ?? null,
     all: () => [...entries.values()].sort((a, b) => a.seq - b.seq),
     seq: () => committed,
     put,
     // Fixed order (spec §5.5): the replacement first, then the predecessor's withdrawal.
+    /** @param {import("../types.js").QuestionEntry} replacement @param {import("../types.js").QuestionEntry} withdrawnPredecessor */
     async supersede(replacement, withdrawnPredecessor) { const n = await put(replacement); const x = await put(withdrawnPredecessor); return [n, x]; },
+    /** @param {number} now */
     async prune(now) {
-      const kept = new Set([...entries.values()].filter((e) => e.kind === 'question' && !isTerminal(e) && e.question.body.supersedes).map((e) => e.question.body.supersedes));
+      const kept = new Set([...entries.values()].filter((e) => e.kind === 'question' && !isTerminal(e) && e.question.body.supersedes).map((e) => (/** @type {import("../types.js").QuestionEntry} */ (e)).question.body.supersedes));
       const pruned = [];
       for (const e of [...entries.values()]) {
         if (!isTerminal(e) || now - e.updatedAt < RETENTION_MS || kept.has(e.id)) continue;

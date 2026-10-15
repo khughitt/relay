@@ -1,3 +1,4 @@
+// @ts-check
 import { randomUUID } from 'node:crypto';
 import { relayError, validateEvent, validateSnapshot } from '../protocol.js';
 import { adapterFor } from '../adapters/index.js';
@@ -7,6 +8,7 @@ import { gitContext as defaultGitContext, projectKeyFor, displayProject } from '
 import { readJson, writeJsonAtomic } from './store.js';
 import { withLock } from './lock.js';
 import { pruneDead } from './prune.js';
+/** @param {import("../types.js").RegistryOptions} given */
 function options(given) {
   const clock = given.clock ?? performance.now.bind(performance);
   return { ...given, clock, deadline:given.deadline ?? clock()+12000, paths:given.paths ?? defaultPaths(),
@@ -17,13 +19,16 @@ function options(given) {
 // a handle is rightful cannot be told, so its rows are dropped rather than migrated. Spec:
 // docs/specs/2026-09-23-session-process-handle.md, "Rollout and recovery".
 const SUPERSEDED_MESSAGE = 'registry predates session handles; run relay reap or wait for any hook event';
+/** @param {any} value */
 const isSchemaOne = (value) => value !== null && typeof value === 'object' && !Array.isArray(value) && value.schema === 1;
+/** @param {ReturnType<typeof options>} opts */
 async function read(opts) {
   const value = await readJson(opts.paths.agentsPath,opts);
   if (value === undefined) return null;
   if (isSchemaOne(value)) throw relayError('REGISTRY_SUPERSEDED',SUPERSEDED_MESSAGE);
   return validateSnapshot(value);
 }
+/** @param {ReturnType<typeof options>} opts @param {import("../types.js").Diagnostic[]} diagnostics */
 async function readForMutation(opts, diagnostics) {
   const value = await readJson(opts.paths.agentsPath,opts);
   if (value === undefined) return {before:null,superseded:false};
@@ -35,14 +40,18 @@ async function readForMutation(opts, diagnostics) {
     : ids.map(agentId=>({code:'REGISTRY_SUPERSEDED',message:`dropped ${agentId} from a superseded schema-1 registry`,agentId}))));
   return {before:null,superseded:true};
 }
+/** @param {import("../types.js").RegistryOptions} [given] */
 export async function readSnapshot(given = {}) { return read(options(given)); }
+/** @param {import("../types.js").RegistryOptions} [given] */
 export async function listAgents(given = {}) {
   const opts = options(given), snapshot = await read(opts);
   const liveness = Object.fromEntries(Object.entries(snapshot?.agents ?? {}).map(([id,a]) => [id,opts.processOps.probe(a.process,opts)]));
   return {snapshot,liveness};
 }
+/** @param {Record<string, import("../types.js").Liveness>} liveness */
 const diagnosticsFor = (liveness) => Object.entries(liveness).filter(([,v])=>v.status === 'unknown')
   .map(([agentId])=>({code:'PROCESS_UNAVAILABLE',message:'agent liveness unknown',agentId}));
+/** @param {ReturnType<typeof options>} opts @param {import("../types.js").Event|null} event @param {{remote: string|null, repoRoot: string|null}|null} context @param {import("../types.js").Handle|null} handle @param {import("../types.js").Diagnostic[]} diagnostics @returns {Promise<import("../types.js").RegistryResult>} */
 async function mutate(opts, event, context, handle, diagnostics) {
   const locked = await withLock(opts.paths.lockPath,async () => {
     const {before,superseded} = await readForMutation(opts,diagnostics);
@@ -54,10 +63,10 @@ async function mutate(opts, event, context, handle, diagnostics) {
       if (level === null) { changed ||= Object.hasOwn(agents,event.agentId); delete agents[event.agentId]; }
       else {
         const state = adapter.reduceState(level,agents[event.agentId]?.state ?? null);
-        const {remote,repoRoot} = context;
+        const {remote,repoRoot} = /** @type {{remote: string|null, repoRoot: string|null}} */ (context);
         agents[event.agentId] = {id:event.agentId,harness:event.harness,sessionId:event.sessionId,
           scope:event.harness === 'opencode' ? 'process' : 'session',process:handle,cwd:event.cwd,repoRoot,remote,
-          projectKey:projectKeyFor({...context,cwd:event.cwd}),project:displayProject({...context,cwd:event.cwd}),state,updatedAt:opts.now()};
+          projectKey:projectKeyFor({remote,repoRoot,cwd:event.cwd}),project:displayProject({remote,repoRoot,cwd:event.cwd}),state: /** @type {import("../types.js").State} */ (state),updatedAt:opts.now()};
         changed = true;
       }
     }
@@ -66,10 +75,11 @@ async function mutate(opts, event, context, handle, diagnostics) {
     await writeJsonAtomic(opts.paths.agentsPath,snapshot,opts);
     return {snapshot,changed:true,reaped,diagnostics};
   },opts);
-  if (locked.cleanupError) locked.value.diagnostics.push({code:locked.cleanupError.code,
+  if (locked.cleanupError) locked.value.diagnostics.push({code: /** @type {string} */ (locked.cleanupError.code),
     message:locked.value.changed ? 'publication completed; lock cleanup failed' : 'registry unchanged; lock cleanup failed'});
   return locked.value;
 }
+/** @param {unknown} value @param {import("../types.js").RegistryOptions} [given] */
 export async function applyEvent(value, given = {}) {
   const event = validateEvent(value), adapter = adapterFor(event.harness);
   adapter.stateForEvent(event.nativeEvent);
@@ -82,11 +92,12 @@ export async function applyEvent(value, given = {}) {
       const pid = given.resolveSessionPid ? given.resolveSessionPid(adapter) : adapter.resolveSessionPid({
         ancestors:p=>opts.processOps.ancestors(p,opts),executableOf:p=>opts.processOps.executableOf(p,opts),argvOf:p=>opts.processOps.argvOf(p,opts)});
       handle = pid === null ? null : opts.processOps.handleOf(pid,opts);
-    } catch (cause) {
-      if (!['PROCESS_UNREADABLE','PROCESS_UNAVAILABLE'].includes(cause.code)) throw cause;
+    } catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught);
+      if (!(/** @type {unknown[]} */ (['PROCESS_UNREADABLE','PROCESS_UNAVAILABLE'])).includes(cause.code)) throw cause;
     }
     if (!handle) diagnostics.push({code:'PROCESS_UNAVAILABLE',message:'agent process identity unavailable',agentId:event.agentId});
   }
   return mutate(opts,event,context,handle,diagnostics);
 }
+/** @param {import("../types.js").RegistryOptions} [given] */
 export async function reapRegistry(given = {}) { return mutate(options(given),null,null,null,[]); }

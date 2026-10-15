@@ -1,3 +1,4 @@
+// @ts-check
 import http from 'node:http';
 import * as fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -6,20 +7,26 @@ import { relayError } from '../protocol.js';
 import { validateMessage } from '../interaction/message.js';
 import { classify } from './guard.js';
 const BODY_LIMIT = 64 * 1024;
+/** @type {Record<string, string>} */
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
+/** @type {Record<string, number>} */
 const STATUS = { NOT_FOUND: 404, INVALID_MESSAGE: 400, INVALID_INPUT: 400, INVALID_ANSWER: 409, TOO_LARGE: 413 };
+/** @param {import("node:http").ServerResponse} res @param {number} status @param {unknown} value */
 const json = (res, status, value) => {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(value));
 };
+/** @param {import("node:http").ServerResponse} res @param {number} status @param {string} code @param {string} message @param {Record<string, unknown>} [extra] */
 const fail = (res, status, code, message, extra = {}) => json(res, status, { error: { code, message }, ...extra });
 // A sequence cursor in a query or header is plain decimal text: Number() alone would read '' as 0
 // and '0x10' or '1e3' as other sequences. Any other present value is refused.
+/** @param {string|string[]|null} text @param {string} name */
 function sequence(text, name) {
-  const value = /^(0|[1-9][0-9]*)$/.test(text) ? Number(text) : NaN;
+  const value = /^(0|[1-9][0-9]*)$/.test(/** @type {string} */ (text)) ? Number(text) : NaN;
   if (!Number.isSafeInteger(value)) throw relayError('INVALID_INPUT', `${name} must be a nonnegative sequence`);
   return value;
 }
+/** @param {import("node:http").IncomingMessage} req @returns {Promise<Record<string, any>>} */
 async function readBody(req) {
   let size = 0; const chunks = [];
   for await (const chunk of req.iterator({ destroyOnReturn: false })) {
@@ -33,29 +40,36 @@ async function readBody(req) {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) throw relayError('INVALID_INPUT', 'body must be a JSON object');
   return body;
 }
+/** @param {import("node:http").ServerResponse} res @param {{entry: import("../types.js").Entry|null, error: import("../types.js").Refusal|null}} result */
 const reply = (res, result) => result.error
   ? fail(res, STATUS[result.error.code] ?? 409, result.error.code, result.error.message ?? result.error.code, { entry: result.entry ?? null,
     ...(result.error.answer ? { answer: result.error.answer } : {}), ...(result.error.revision ? { revision: result.error.revision } : {}) })
   : json(res, 200, { entry: result.entry });
+/** @param {{inbox: import("../types.js").Inbox, http: NonNullable<ReturnType<typeof import("./config.js").serveConfig>["http"]>, readAgents: () => Promise<import("../types.js").Snapshot|null>, clock?: () => number, log: (line: string) => void}} options */
 export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now, log }) {
   let port = cfg.port, closing = false, closed;
   const pending = new Set(), requests = new Set(), streams = new Set(), sockets = new Set();
   const root = cfg.clientDir ? await fs.realpath(cfg.clientDir) : null;
   if (root && !(await fs.stat(root)).isDirectory()) throw relayError('INVALID_CONFIG', 'RELAY_CLIENT_DIR must name a directory');
-  const message = (entry, kind, body) => validateMessage({ schema: 1, id: randomUUID(), kind, correlationId: entry.id, from: { kind: 'user' },
-    to: entry.question.from, createdAt: clock(), context: entry.question.context, body });
+  /** @template {import("../types.js").Message["kind"]} K @param {import("../types.js").QuestionEntry} entry @param {K} kind @param {unknown} body @returns {Extract<import("../types.js").Message, {kind: K}>} */
+  const message = (entry, kind, body) => /** @type {Extract<import("../types.js").Message, {kind: K}>} */ (validateMessage({ schema: 1, id: randomUUID(), kind, correlationId: entry.id, from: { kind: 'user' },
+    to: entry.question.from, createdAt: clock(), context: entry.question.context, body }));
+  /** @param {string} id */
   const entry = async (id) => (await inbox.snapshot({ since: 0 })).entries.find((e) => e.id === id);
+  /** @param {import("node:http").ServerResponse} res @param {string} id */
   async function question(res, id) {
     const e = await entry(id);
     if (!e || e.kind !== 'question') { fail(res, 404, 'NOT_FOUND', 'no such question'); return null; }
     return e;
   }
+  /** @param {import("node:http").ServerResponse} res @param {string} pathname */
   async function staticFile(res, pathname) {
     if (!root) return fail(res, 404, 'NOT_FOUND', 'not found');
     let decoded;
     try { decoded = decodeURIComponent(pathname); } catch { return fail(res, 404, 'NOT_FOUND', 'not found'); }
     if (decoded.split('/').includes('..') || decoded.includes('\0')) return fail(res, 404, 'NOT_FOUND', 'not found');
     const file = resolve(root, `.${decoded === '/' ? '/index.html' : decoded}`);
+    /** @param {string} path */
     const inside = (path) => path.startsWith(root.endsWith(sep) ? root : root + sep);
     if (!inside(file)) return fail(res, 404, 'NOT_FOUND', 'not found');
     let data, target;
@@ -63,12 +77,13 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
       target = await fs.realpath(file);
       if (!inside(target) || !(await fs.stat(target)).isFile()) return fail(res, 404, 'NOT_FOUND', 'not found');
       data = await fs.readFile(target);
-    } catch (error) {
-      if (!['ENOENT', 'ENOTDIR', 'ELOOP', 'EACCES', 'EINVAL'].includes(error.code)) throw error;
+    } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught);
+      if (!(/** @type {unknown[]} */ (['ENOENT', 'ENOTDIR', 'ELOOP', 'EACCES', 'EINVAL'])).includes(error.code)) throw error;
       return fail(res, 404, 'NOT_FOUND', 'not found');
     }
     res.writeHead(200, { 'content-type': TYPES[extname(target)] ?? 'application/octet-stream', 'cache-control': 'no-cache' }); res.end(data);
   }
+  /** @param {import("node:http").IncomingMessage} req @param {import("node:http").ServerResponse} res @param {URL} url */
   async function events(req, res, url) {
     const header = req.headers['last-event-id'];
     const since = header !== undefined ? sequence(header, 'Last-Event-ID')
@@ -76,9 +91,13 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     streams.add(res);
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
     res.flushHeaders();
-    let ping, unsubscribe;
+    /** @type {NodeJS.Timeout|undefined} */
+    let ping;
+    /** @type {(() => void)|undefined} */
+    let unsubscribe;
     const stop = () => { clearInterval(ping); unsubscribe?.(); streams.delete(res); };
     res.once('close', stop);
+    /** @param {import("../types.js").InboxEvent} event */
     const write = (event) => {
       if (res.destroyed || res.writableEnded) return;
       if (event.type === 'entry') res.write(`id: ${event.entry.seq}\nevent: entry\ndata: ${JSON.stringify(event.entry)}\n\n`);
@@ -88,11 +107,12 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     if (res.destroyed || res.writableEnded || closing) { stop(); res.end(); }
     else ping = setInterval(() => res.write(': ping\n\n'), 25000);
   }
+  /** @param {import("node:http").IncomingMessage} req @param {import("node:http").ServerResponse} res */
   async function route(req, res) {
     const verdict = classify(req.headers, { port, serveHost: cfg.serveHost, serveLogin: cfg.serveLogin });
     if (!verdict.allowed) return fail(res, 403, 'FORBIDDEN', 'forbidden');
-    if (!req.url.startsWith('/')) return fail(res, 404, 'NOT_FOUND', 'not found');
-    const url = new URL(req.url, 'http://relay'), pathname = req.url.split('?')[0];
+    if (!(/** @type {string} */ (req.url)).startsWith('/')) return fail(res, 404, 'NOT_FOUND', 'not found');
+    const url = new URL(/** @type {string} */ (req.url), 'http://relay'), pathname = (/** @type {string} */ (req.url)).split('?')[0];
     const mutation = req.method === 'POST' || req.method === 'PUT';
     if (mutation) {
       if (req.headers.origin !== verdict.origin) return fail(res, 403, 'FORBIDDEN', 'origin mismatch');
@@ -116,8 +136,9 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     if (req.method === 'PUT' && pathname === '/v1/presence') return json(res, 200, { presence: await inbox.setPresence((await readBody(req)).mode) });
     if (req.method === 'POST' && match?.[2]) {
       const body = await readBody(req), e = await question(res, match[1]); if (!e) return;
-      const m = message(e, match[2], { ...body, surface: verdict.surface });
-      return reply(res, await inbox[match[2]](e.id, m));
+      const op = /** @type {"answer"|"defer"} */ (match[2]);
+      const m = message(e, op, { ...body, surface: verdict.surface });
+      return reply(res, await (/** @type {(id: string, message: typeof m) => Promise<{entry: import("../types.js").Entry|null, error: import("../types.js").Refusal|null}>} */ (inbox[op]))(e.id, m));
     }
     return fail(res, 404, 'NOT_FOUND', 'not found');
   }
@@ -141,9 +162,9 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     if (closing) { socket.destroy(); return; }
     sockets.add(socket); socket.once('close', () => sockets.delete(socket));
   });
-  try { await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); }); }
-  catch (error) { await new Promise((resolve) => server.close(resolve)); throw error; }
-  port = server.address().port;
+  try { await /** @type {Promise<void>} */ (new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); })); }
+  catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught); await new Promise((resolve) => server.close(resolve)); throw error; }
+  port = (/** @type {import("node:net").AddressInfo} */ (server.address())).port;
   return {
     port,
     close() {

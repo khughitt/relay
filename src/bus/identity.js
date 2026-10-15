@@ -1,8 +1,10 @@
+// @ts-check
 import { basename } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { relayError } from '../protocol.js';
 const defaultExec = promisify(execFile);
+/** @param {unknown} url */
 export function normalizeRemote(url) {
   if (typeof url !== 'string' || !url.trim()) return null;
   let rest;
@@ -18,7 +20,9 @@ export function normalizeRemote(url) {
   if (parts.length < 2 || !parts[0].includes('.')) return null;
   return parts.join('/').toLowerCase();
 }
+/** @param {string} cwd */
 export async function gitContext(cwd, { exec = defaultExec, clock = performance.now.bind(performance), deadline = clock() + 12000, timeoutMs = 2000 } = {}) {
+  /** @param {string[]} args */
   const run = async (args) => {
     const remaining = Math.min(2000, timeoutMs, deadline - clock());
     if (remaining <= 0) throw relayError('GIT_ERROR', 'repository deadline exceeded');
@@ -27,18 +31,20 @@ export async function gitContext(cwd, { exec = defaultExec, clock = performance.
   };
   let repoRoot;
   try { repoRoot = (await run(['rev-parse', '--show-toplevel'])).stdout.trim(); }
-  catch (cause) {
+  catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught);
     if (cause.code === 128 && !cause.killed && !cause.signal && /^fatal: not a git repository(?: \(|:)/.test(cause.stderr ?? '')) return { repoRoot: null, remote: null };
     throw relayError('GIT_ERROR', 'cannot resolve repository', cause);
   }
   if (!repoRoot.startsWith('/')) throw relayError('GIT_ERROR', 'invalid repository root');
   let remote;
   try { remote = normalizeRemote((await run(['config', '--get', 'remote.origin.url'])).stdout); }
-  catch (cause) {
+  catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught);
     if (cause.code === 1 && !cause.killed && !cause.signal && !(cause.stderr ?? '').trim()) remote = null;
     else throw relayError('GIT_ERROR', 'cannot resolve repository remote', cause);
   }
   return { repoRoot, remote };
 }
+/** @param {{remote: string|null, repoRoot: string|null, cwd: string}} context */
 export const projectKeyFor = ({ remote, repoRoot, cwd }) => remote ?? repoRoot ?? cwd;
+/** @param {{repoRoot: string|null, cwd: string, remote?: string|null}} context */
 export const displayProject = ({ repoRoot, cwd }) => basename(repoRoot ?? cwd) || '/';

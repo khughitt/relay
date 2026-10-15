@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 import { realpathSync, readFileSync, existsSync, statSync, accessSync, constants } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, isAbsolute } from 'node:path';
@@ -13,12 +14,16 @@ import { runAsk } from '../src/routes/ask.js';
 import { runInbox, runPresence } from '../src/cli/desk.js';
 
 const { version, engines } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+/** @param {string} message */
 const usage = (message) => relayError('USAGE', message);
+/** @param {string[]} args */
 const hasHelp = (args) => args.includes('--help') || args.includes('-h');
 
 // Strict flag parsing: --harness NAME (hook only), --outer-ms N, --subscribers FILE, then exactly one EVENT for hook.
 // Order rules are unchanged; names and values are now checked against the declared table.
+/** @param {string[]} args @param {{harness: boolean}} options @returns {{harness?: string, nativeEvent?: string, outerMs?: number, subscribersPath?: string}} */
 function parse(args, { harness }) {
+  /** @param {string} value */
   const readOuter = (value) => {
     if (!/^[1-9][0-9]*$/.test(value ?? '')) throw usage('--outer-ms must be a positive integer');
     return Number(value);
@@ -33,6 +38,7 @@ function parse(args, { harness }) {
   if (!HARNESSES.includes(name)) throw usage(`--harness must be one of ${HARNESSES.join(', ')}, got ${JSON.stringify(name)}`);
   const order = () => usage('hook requires [--outer-ms N] [--subscribers FILE] then exactly one EVENT');
   if (!nativeEvent || nativeEvent.startsWith('--')) throw order();
+  /** @type {{harness: string, nativeEvent: string, outerMs?: number, subscribersPath?: string}} */
   const request = { harness: name, nativeEvent };
   let i = 0;
   if (options[i] === '--outer-ms') { request.outerMs = readOuter(options[i + 1]); i += 2; }
@@ -47,10 +53,13 @@ function parse(args, { harness }) {
 // Every write is awaited so the reply is flushed before the explicit exit below; pipes are
 // asynchronous on Darwin, and a pending filesystem operation would otherwise keep the
 // process alive past the harness's outer timeout.
+/** @param {import("node:stream").Writable} stream @param {string} text @returns {Promise<void>} */
 const emit = (stream, text) => new Promise((resolve) => (text ? stream.write(text, () => resolve()) : resolve()));
 // Keyed flags in any order; inbox commands also collect their positional arguments.
+/** @param {string[]} args @param {import("../src/types.js").Command} cmd @param {string[]} [positional] @returns {Record<string, string> & {"--apply"?: true, "--decline"?: true}} */
 function flags(args, cmd, positional) {
   const opts = cmd.options ?? [];
+  /** @type {Record<string, string|true>} */
   const out = {};
   for (let i = 0; i < args.length; i++) {
     const key = args[i];
@@ -63,15 +72,16 @@ function flags(args, cmd, positional) {
     if (opt.values && !opt.values.includes(value)) throw usage(`${key} must be one of ${opt.values.join(', ')}, got ${JSON.stringify(value)}`);
     out[key] = value;
   }
-  return out;
+  return /** @type {Record<string, string> & {"--apply"?: true, "--decline"?: true}} */ (out);
 }
 // The node an installed hook command runs, named by the operator: written as given, never
 // resolved, so a stable shim stays a shim.
+/** @param {string} path @param {string} harness */
 function explicitNode(path, harness) {
   if (harness === 'opencode') throw usage('--node exists only for claude-code and codex');
   if (!isAbsolute(path)) throw usage(`--node must be an absolute path, got ${JSON.stringify(path)}`);
   let file;
-  try { file = statSync(path, { throwIfNoEntry: false }); } catch (error) { throw usage(`--node ${path} cannot be inspected: ${error.code}`); }
+  try { file = statSync(path, { throwIfNoEntry: false }); } catch (caught) { const error = /** @type {import('../src/types.js').Failure} */ (caught); throw usage(`--node ${path} cannot be inspected: ${error.code}`); }
   const notExecutable = () => usage(`--node ${path} is not an executable file`);
   if (!file) throw usage(`--node ${path} does not exist`);
   if (!file.isFile()) throw notExecutable();
@@ -80,12 +90,13 @@ function explicitNode(path, harness) {
   // start under it fails silently, the very failure --node exists to avoid.
   let reported;
   try { reported = execFileSync(path, ['--version'], { encoding: 'utf8', timeout: 10000, killSignal: 'SIGKILL', stdio: 'pipe' }).trim(); }
-  catch (error) { throw usage(`--node ${path} --version failed: ${error.code ?? error.signal ?? `exit ${error.status}`}`); }
-  const major = /^v(\d+)\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.exec(reported)?.[1], floor = Number(/^>=(\d+)$/.exec(engines.node)[1]);
+  catch (caught) { const error = /** @type {import('../src/types.js').Failure} */ (caught); throw usage(`--node ${path} --version failed: ${error.code ?? error.signal ?? `exit ${error.status}`}`); }
+  const major = /^v(\d+)\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.exec(reported)?.[1], floor = Number((/** @type {RegExpExecArray} */ (/^>=(\d+)$/.exec(engines.node)))[1]);
   if (!major) throw usage(`--node ${path} does not report a Node version: ${JSON.stringify(reported.split('\n', 1)[0])}`);
   if (Number(major) < floor) throw usage(`--node ${path} is Node ${reported}; relay needs ${engines.node}`);
   return path;
 }
+/** @param {string[]} rawArgs */
 export async function main(rawArgs, { list = listAgents, reap = reconcile, hook = dispatchHook, stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {
   let mode = 'pretty', cmdName = null;
   try {
@@ -146,7 +157,7 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     if (cmd.path[0] === 'hook') {
       // Protocol row: stdout is the harness reply, the exit code is the guard's. Untouched
       // beyond reading its option names from the table above.
-      const request = parse(rest, { harness: true });
+      const request = /** @type {{harness: string, nativeEvent: string, outerMs?: number, subscribersPath?: string}} */ (parse(rest, { harness: true }));
       const r = await hook({ ...request, input: stdin });
       await emit(stdout, r.stdout); await emit(stderr, r.stderr);
       return r.exitCode;
@@ -171,13 +182,13 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
         const r = await runAsk({ nativeEvent: tail[0], handback, stdin, socketPath: servePaths(paths().stateDir).socketPath });
         await emit(stdout, r.stdout); await emit(stderr, r.stderr);
         return r.exitCode;
-      } catch (error) {
+      } catch (caught) { const error = /** @type {import('../src/types.js').Failure} */ (caught);
         await emit(stderr, `relay ask: ${error?.code ?? 'ERROR'}: ${error?.message ?? String(error)}\n`);
         return 0;
       }
     }
     if (cmd.path[0] === 'inbox') {
-      const action = cmd.path[1], args = [], f = flags(rest, cmd, args);
+      const action = cmd.path[1], args = /** @type {string[]} */ ([]), f = flags(rest, cmd, args);
       if (action === 'list') { if (args.length) throw usage('inbox list takes no arguments'); }
       else {
         if (!args[0]) throw usage(`inbox ${action} needs an id`);
@@ -218,7 +229,7 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
       }
       if (harness === 'claude-code') artifact = (await import('../src/install/claude-code.js')).planClaudeCode({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'], withAsk, installedVersion });
       else if (harness === 'codex') artifact = (await import('../src/install/codex.js')).planCodex({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
-      else { const dir = f['--config-dir'], read = name => { const path = join(dir, name); return existsSync(path) ? readFileSync(path, 'utf8') : null; }; artifact = (await import('../src/install/opencode.js')).planOpenCode({ configDir: dir, json: read('opencode.json'), jsonc: read('opencode.jsonc'), relayPlugin: fileURLToPath(new URL('../integrations/opencode/plugin.js', import.meta.url)), subscribers }); }
+      else { const dir = f['--config-dir'], read = (/** @type {string} */ name) => { const path = join(dir, name); return existsSync(path) ? readFileSync(path, 'utf8') : null; }; artifact = (await import('../src/install/opencode.js')).planOpenCode({ configDir: dir, json: read('opencode.json'), jsonc: read('opencode.jsonc'), relayPlugin: fileURLToPath(new URL('../integrations/opencode/plugin.js', import.meta.url)), subscribers }); }
       if (f['--apply']) (await import('../src/install/atomic.js')).applyArtifact(f['--artifact'], artifact);
       // After the apply, so a failure still leaves one error envelope alone on stderr.
       if (harness !== 'opencode') {
@@ -237,21 +248,21 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
       return 0; // output = "none": nothing on success in any mode
     }
     throw usage(`unknown command "${cmd.path[0]}"`);
-  } catch (error) {
+  } catch (caught) { const error = /** @type {import('../src/types.js').Failure} */ (caught);
     if (error.code === 'USAGE') { await emit(stderr, `relay: ${error.message}\n`); return 2; }
     const kind = `${cmdName ?? 'relay'}_failed`, detail = error.code ? `${error.code}: ${error.message}` : 'relay operation failed';
-    const entry = ['ALREADY_ANSWERED', 'ANSWERED'].includes(error.code) && error.entry?.answer ? error.entry : null;
+    const entry = (/** @type {unknown[]} */ (['ALREADY_ANSWERED', 'ANSWERED'])).includes(error.code) && error.entry?.answer ? error.entry : null;
     if (mode === 'json') await emit(stderr, `${JSON.stringify({ error: { kind, detail, ...(entry ? { entry } : {}) } })}\n`);
     else {
       await emit(stderr, `relay: ${detail}\n`);
       if (entry) {
-        const answer = entry.answer.body, values = {};
+        const answer = (/** @type {import("../src/types.js").AnswerMessage} */ (entry.answer)).body, values = /** @type {Record<string, unknown>} */ ({});
         for (const item of entry.question.body.items) {
           const value = answer.values[item.id];
-          if (value) values[item.id] = value.type === 'choice' ? value.optionIds.map((id) => item.options.find((option) => option.id === id).label)
+          if (value) values[item.id] = value.type === 'choice' ? value.optionIds.map((id) => (/** @type {import("../src/types.js").Option} */ (item.options.find((option) => option.id === id))).label)
             : value.type === 'boolean' ? value.value : value.text;
         }
-        const at = entry.log.find((row) => row.cause === 'answer').at;
+        const at = (/** @type {import("../src/types.js").LogRow} */ (entry.log.find((row) => row.cause === 'answer'))).at;
         await emit(stderr, `Winning answer from ${answer.surface} saved at ${new Date(at).toISOString()}: ${answer.outcome} ${JSON.stringify(values)}\n`);
       }
     }

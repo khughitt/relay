@@ -1,3 +1,4 @@
+// @ts-check
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -6,11 +7,12 @@ import { relayError, validateHandle } from '../protocol.js';
 import { DEADLINE_CUT, createProcessOps } from './proc.js';
 import { checkPrivate, ensurePrivateDir } from './store.js';
 
+/** @param {string} path @param {typeof fs} io */
 async function readToken(path, io) {
   if (!await checkPrivate(path,false,{io})) return null;
   let text;
   try { text = await io.readFile(path,'utf8'); }
-  catch (cause) { if (cause.code === 'ENOENT') return null; throw relayError('IO_ERROR','cannot read lock owner',cause); }
+  catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught); if (cause.code === 'ENOENT') return null; throw relayError('IO_ERROR','cannot read lock owner',cause); }
   try {
     const token = JSON.parse(text);
     if (!token || token.schema !== 1 || typeof token.nonce !== 'string'
@@ -19,6 +21,7 @@ async function readToken(path, io) {
     return token;
   } catch (cause) { throw relayError('LOCK_REPAIR_REQUIRED','invalid lock owner token; operator repair required',cause); }
 }
+/** @param {string} path @param {unknown} token @param {typeof fs} io */
 async function release(path, token, io) {
   try {
     const current = await readToken(path,io);
@@ -27,16 +30,17 @@ async function release(path, token, io) {
     return null;
   } catch (cause) { return relayError('LOCK_CLEANUP_FAILED','cannot release lock',cause); }
 }
+/** @param {string} path @param {unknown} token @param {typeof fs} io */
 async function acquire(path, token, io) {
   const temp = `${path}.tmp.${process.pid}.${randomUUID()}`;
   let acquired = false, failure;
   try {
     await io.writeFile(temp,JSON.stringify(token),{flag:'wx',mode:0o600});
     try { await io.link(temp,path); acquired = true; }
-    catch (cause) { if (cause.code !== 'EEXIST') throw cause; }
+    catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught); if (cause.code !== 'EEXIST') throw cause; }
   } catch (cause) { failure = relayError('IO_ERROR','cannot publish lock token',cause); }
   try { await io.unlink(temp); }
-  catch (cause) {
+  catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught);
     if (cause.code !== 'ENOENT') {
       const cleanup = relayError('LOCK_CLEANUP_FAILED','cannot clean private lock token',cause);
       const errors = [failure,cleanup].filter(Boolean);
@@ -48,6 +52,7 @@ async function acquire(path, token, io) {
   if (failure) throw failure;
   return acquired;
 }
+/** @template T @param {string} lockPath @param {() => Promise<T>} fn @param {import("../types.js").Deadline & import("../types.js").IOOptions & {processOps?: import("../types.js").ProcessOps, sleep?: (ms: number) => Promise<void>}} [options] @returns {Promise<{value: T, cleanupError: Error & {code: string|number|undefined}|null}>} */
 export async function withLock(lockPath, fn, { clock = performance.now.bind(performance), deadline = clock() + 12000,
   processOps = createProcessOps(), sleep = ms => new Promise(resolve => setTimeout(resolve,ms)), io = fs } = {}) {
   let holder;
@@ -60,6 +65,7 @@ export async function withLock(lockPath, fn, { clock = performance.now.bind(perf
   let unknown = false, token;
   // A probe the deadline cut short learned nothing, so the last completed verdict stands: a
   // live owner at the deadline is LOCK_TIMEOUT, not LOCK_IDENTITY_UNKNOWN.
+  /** @param {unknown} handle */
   const observe = (handle) => {
     const { status, reason } = processOps.probe(handle,{clock,deadline});
     if (reason !== DEADLINE_CUT) unknown = status === 'unknown';
@@ -97,16 +103,16 @@ export async function withLock(lockPath, fn, { clock = performance.now.bind(perf
       const current = await readToken(lockPath,io);
       if (current && observe(current.holder) === 'dead'
           && isDeepStrictEqual(await readToken(lockPath,io),current)) await io.unlink(lockPath);
-    } catch (cause) { error = cause.code?.startsWith('LOCK_') ? cause : relayError('IO_ERROR','cannot reclaim lock',cause); }
+    } catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught); error = (/** @type {string|undefined} */ (cause.code))?.startsWith('LOCK_') ? cause : relayError('IO_ERROR','cannot reclaim lock',cause); }
     const cleanup = await release(guardPath,guard,io);
     if (error && cleanup) throw new AggregateError([error,cleanup],'reclamation and cleanup failed');
     if (cleanup) throw relayError('LOCK_CLEANUP_FAILED','cannot release reclaim guard',cleanup);
     if (error) throw error;
   }
   let value, error, failed = false;
-  try { expired(); value = await fn(); } catch (cause) { failed = true; error = cause; }
+  try { expired(); value = await fn(); } catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught); failed = true; error = cause; }
   const cleanupError = await release(lockPath,token,io);
   if (failed && cleanupError) throw new AggregateError([error,cleanupError],'callback and lock cleanup failed');
   if (failed) throw error;
-  return {value,cleanupError};
+  return {value: /** @type {T} */ (value),cleanupError};
 }

@@ -1,5 +1,7 @@
+// @ts-check
 // Newline-delimited JSON framing; only private service replies bypass the request cap.
 export const LINE_LIMIT = 1024 * 1024;
+/** @param {import("node:net").Socket} socket @param {(line: string) => void} onLine */
 export function lineReader(socket, onLine, limit = LINE_LIMIT) {
   let buffer = '';
   socket.setEncoding('utf8');
