@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: relay-6825f7
 created: 2026-10-15T10:02:39Z
-updated: 2026-10-15T11:27:37Z
+updated: 2026-10-15T11:28:07Z
 started: 2026-10-15T10:03:07Z
 depends: [tasks-af3aac]
 parent: relay-eaca0e
@@ -49,3 +49,5 @@ Implement docs/specs/2026-10-15-codex-worker-rows.md: route agent_id events to c
   provenance: {"harness_session":"claude-code:783163fb-6924-41d7-a9d8-63a7fc5cb315","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-15T11:18:31Z (relay-6825f7): review: impl round 1 — verdict: revise; findings: Important 2, Minor 6; reviewer: claude-code
 - 2026-10-15T11:27:37Z (relay-6825f7): review: impl round 2 — verdict: accept; findings: Minor 5; reviewer: claude-code
+- 2026-10-15T11:28:07Z (relay-6825f7): parked (waiting on agent, dependency): Agent, once tasks-af3aac is done and its tasks binary is installed: in .worktrees/relay-6825f7 run tasks start relay-635fdc, then execute plan Task 6 (relay-805fb4, claim acceptance + sandboxed control) with superpowers:executing-plans resuming the ledger at .superpowers/sdd/2026-10-15-codex-worker-rows/progress.md, then just gate and integrate the branch (merge to main). Tasks 1-5 done; final review + re-review accepted (rulings and deferred minors in the ledger).
+  provenance: {"harness_session":"claude-code:783163fb-6924-41d7-a9d8-63a7fc5cb315","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
