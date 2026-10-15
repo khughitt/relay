@@ -10,6 +10,8 @@
 
 **Spec:** `docs/specs/2026-10-15-codex-worker-rows.md` (approved 2026-10-15 after two review rounds).
 
+**Status:** approved 2026-10-15 after three review rounds. Execution: Native (superpowers:executing-plans) for Tasks 1–5, then a fresh whole-branch review; Task 6 runs only once tasks-af3aac has landed and its `tasks` is installed.
+
 ## Global Constraints
 
 - Node >=22, ES modules and built-ins only; the one runtime dependency stays `jsonc-parser`.
