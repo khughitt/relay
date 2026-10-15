@@ -66,14 +66,16 @@ Row for worker `W` under root session `R`:
 id:        codex:W          (key and id)
 harness:   codex
 sessionId: W
-scope:     session
-root:      codex:R          (new, optional; absent on root rows)
+scope:     worker           (new value; root rows keep session)
+root:      codex:R          (new, optional; present exactly on worker rows)
 process:   the handle of the nearest codex process (the same as R's)
 cwd, repoRoot, remote, projectKey, project, state, updatedAt: as for any row
 ```
 
 `root` is always the root session, never an immediate parent (fact 4): a nested worker's
-row names `codex:R` as well.
+row names `codex:R` as well. `scope: "worker"` marks the row's kind for every reader and is
+the tripwire that keeps older relay writers from corrupting worker rows (Older writers,
+below).
 
 ### Rejected alternatives
 
@@ -146,7 +148,8 @@ only the row they update changes.
 ```ts
 type Agent = {
   // …unchanged fields
-  root?: string;   // Codex workers only: the root session's agent id
+  scope: 'session' | 'process' | 'worker';
+  root?: string;   // present exactly when scope is 'worker': the root session's agent id
 };
 type Event = {
   // …unchanged fields
@@ -154,14 +157,37 @@ type Event = {
 };
 ```
 
-Validation, relay side: when `root` is present, the harness is `codex`, `root` is
-`codex:<nonempty>`, and it differs from `id`. Root rows never carry it, so every existing
-row stays byte-identical. The snapshot schema stays 2: tasks ignores the new field (fact
-8), and the shared handle is safe for tasks once the change below is installed. The
-rollout order, not a schema bump, keeps an old tasks from meeting worker rows.
-Rejected: bumping to schema 3. Every installed tasks would then refuse the whole registry,
-Claude sessions included, until upgraded, to protect only the Codex sessions that spawn
-workers.
+Validation, relay side: `scope` is `process` for OpenCode, and for Codex either `session`
+with no `root`, or `worker` with `root` set to `codex:<nonempty>` different from `id`.
+Claude Code rows stay `session`. Root rows are unchanged, so every existing row stays
+byte-identical. The snapshot schema stays 2. A tasks without the change below refuses the
+whole snapshot while it holds a worker row (`scope` is not `session`), Claude sessions
+included: loud, where a `session`-scoped worker row would quietly lock out only the
+controller. The rollout installs the change first. Rejected: bumping to schema 3.
+Every installed tasks and relay would then refuse the whole registry, Claude sessions
+included, from the first publication by an upgraded writer, not only once a worker
+appears.
+
+### Older writers
+
+Every relay writer validates the snapshot it read, rebuilds each row from the fields it
+knows, and publishes the result: `applyEvent` from any harness's hook, and
+`reapRegistry` from `relay reap`. A relay before this change accepting a worker row
+under `scope: "session"` would drop `root` on its next publication (a Claude event is
+enough), and the root's SessionEnd could no longer find that worker's row. Once dropped,
+the association cannot be recovered or even detected: a worker row without `root` looks
+like a root row.
+
+`scope: "worker"` closes that path. The pre-change validator accepts only `session` for
+Codex, so an older writer refuses the whole snapshot with `INVALID_SCHEMA` and writes
+nothing; checked against `main` at `022f29d`, whose `reapRegistry` refused a worker-scope
+snapshot and left the file's bytes unchanged. The refusal is loud and bounded: the hook's
+registry step reports a diagnostic, its observers are skipped (guards run before the
+registry and are unaffected), `relay reap` and `relay list` fail, and nothing is lost.
+Rejected: a rollout rule alone, which an overlooked writer would break silently.
+
+The tripwire turns a missed upgrade into a visible failure; it does not replace the
+upgrade. The rollout requires every writer to be upgraded before workers appear.
 
 The Event mapping table gains the two rows above; the persisted-contract text gains one
 paragraph on worker rows and the cascade on root SessionEnd.
@@ -173,9 +199,10 @@ proposes for schema contracts.
 
 ## The tasks change
 
-In tasks' resolver, after the process filters and before the cardinality refusal: when
-the harness is Codex, a hint is present and more than one row qualifies, keep the single
-qualifying row whose `sessionId` equals the hint. If none or more than one matches, refuse
+tasks' snapshot validator accepts `scope: "worker"` for Codex rows (it may ignore
+`root`). In tasks' resolver, after the process filters and before the cardinality refusal:
+when the harness is Codex, a hint is present and more than one row qualifies, keep the
+single qualifying row whose `sessionId` equals the hint. If none or more than one matches, refuse
 as today. The rows all share host, boot, pid and start, so they are one `codex` process;
 the hint is tasks' own validated `CODEX_THREAD_ID`; and ids are unique per `sessionId`.
 The controller (thread == R) selects the root row and a worker selects its own. This is
@@ -188,17 +215,27 @@ amendment. It is filed in tasks as a piece of goal `relay-eaca0e`.
 Relay's routing change alone creates worker rows, because PreToolUse is already installed
 for every tool. So:
 
-1. tasks' tie-break lands and is installed on every host that enables relay identity.
+1. tasks' change (worker scope and tie-break) lands and is installed on every host that
+   enables relay identity.
 2. Relay's worker routing, cascade, validator and installer changes land. The relay
    implementation task depends on the tasks piece.
-3. The operator cutover (`hq-539508`) installs the hooks, SubagentStart and SubagentStop
-   included.
+3. Every relay writer on a host resolves to the upgraded relay before any Codex worker
+   event can reach it. The writers are: the installed hook command of every harness
+   (Claude Code settings, Codex `hooks.json`, the OpenCode plugin when enabled), every
+   `relay reap` invocation (manual or scheduled), and any package that depends on relay
+   and calls `applyEvent` or `reapRegistry` (familiar, once `fam-6e8321` consumes relay,
+   pins a relay revision of its own). The cutover checklist lists each writer on the host
+   and the relay it resolves to.
+4. The operator cutover (`hq-539508`) then installs the Codex hooks, SubagentStart and
+   SubagentStop included.
 
-Nothing writes the registry on this host yet (no `agents.json`, no relay hooks, relay
-identity off in tasks), so steps 1–2 change nothing live.
+A missed writer in step 3 fails closed through the tripwire above. Nothing writes the
+registry on this host yet (no `agents.json`, no relay hooks, relay identity off in
+tasks), so steps 1–2 change nothing live.
 
 familiar (`fam-6e8321`, consuming relay identity) will see worker rows as agents; `root`
-lets it group or skip them. That is noted on its task, not gated here.
+and `scope: "worker"` let it group or skip them, and its pinned relay must satisfy step 3.
+That is noted on its task, not gated here.
 
 ## Testing
 
@@ -208,17 +245,42 @@ lets it group or skip them. That is noted on its task, not gated here.
 - Registry: worker events create and update only the worker row; the root row's state is
   untouched through a background worker after the root's Stop; root SessionEnd removes the
   root and its workers, nested included, in one revision; prune removes all rows of a dead
-  process; a row with an invalid `root` fails validation.
+  process; a row with an invalid `root`, a worker scope without `root`, `root` on a
+  session row, or a worker scope on a non-Codex row fails validation.
 - Installer: the Codex binding table includes SubagentStart and SubagentStop, and the plan
   and rollback artifacts cover them.
 - Subscribers: a guard on Codex `turn-end` still loads, and a SubagentStop denial encodes
   as Stop's.
 - Fixture: `registry-workers.json` validates.
-- Live acceptance: the capture harness's `single`, `nested` and `background` cases rerun
-  with relay's own hook command (installed by `relay install` into the private
-  `CODEX_HOME`, with a private `RELAY_STATE_DIR`). Expected: root and worker rows on one
-  handle during the run, worker rows named by `agent_id` with `root` set, and an empty
-  registry after SessionEnd.
+- Older writer: `reapRegistry` and `applyEvent` from the last pre-change relay revision,
+  run against `registry-workers.json` in a private `RELAY_STATE_DIR`, refuse with
+  `INVALID_SCHEMA` and leave the file's bytes unchanged.
+
+Live acceptance, after the tasks piece is installed. Both runs use the capture harness's
+isolation: a private `CODEX_HOME` (auth copied in, removed on exit) with relay's own hook
+command installed by `relay install`, a private `RELAY_STATE_DIR`, and no change to the
+user's harness, relay or tasks configuration.
+
+- **Registry rows.** The `single`, `nested` and `background` cases. Expected: root and
+  worker rows on one handle during the run, worker rows `codex:<agent_id>` with
+  `scope: "worker"` and `root` set, the root row's state untouched by worker events, and
+  an empty registry after SessionEnd.
+- **Claim acquisition.** One controller/worker run through tasks itself. Isolation adds a
+  private `XDG_CONFIG_HOME` and `XDG_STATE_HOME` holding a throwaway tasks project with
+  two todo tasks, A and B, and `[identity] relay = true`. Codex runs with a
+  workspace-write sandbox over that project, and its `shell_environment_policy` sets the
+  relay and XDG variables explicitly. The controller runs `tasks start A`, then spawns one
+  worker that runs `tasks start B`. The worker then attempts `tasks start A`,
+  `tasks park A` and `tasks done A`, and the controller, after the worker's turn, attempts
+  the same on B. The harness judges the outcome from tasks' and relay's state, not the
+  transcript:
+  - A's claim is held by the root row's id and B's by the worker row's id, and each
+    matches a row present in the registry at acquisition;
+  - every cross-claim attempt refuses and leaves both claims' owners unchanged;
+  - each task's `started` note carries its own session's provenance.
+
+  A run in which the model deviates from the script (no spawn, commands skipped) is an
+  invalid attempt, rerun, not a pass.
 
 ## Out of scope
 
