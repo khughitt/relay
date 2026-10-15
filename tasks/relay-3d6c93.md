@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-15T13:23:04Z
-updated: 2026-10-15T22:17:04Z
+updated: 2026-10-15T22:17:20Z
 depends: []
 tags: []
 source: relay-635fdc
@@ -21,3 +21,7 @@ Done: one live run each of three new capture cases (new, resume, fork) on Codex 
 Where: tools/codex-subagent-capture/run (the background case drives the TUI in a detached tmux session, and send-keys needs its one-second pause before Enter; --relay installs relay's hooks under a private CODEX_HOME and relay state and copies the registry after each event); judge-registry.mjs (it tracks one previousRoot across all records, so a run with two roots needs per-root tracking; relay-105775 separately asks it to judge root-row versions by publication); summarize.mjs; "Row lifecycle" in docs/specs/2026-10-15-codex-worker-rows.md. /resume needs a saved session in the private home: run one codex exec there first, then pass its id or pick it.
 
 Bound: the three cases and the judge changes they need; no change to src/, the registry contract or the live Codex config. Each run spends Codex model turns under the user's auth, as the earlier captures did.
+
+## Notes
+
+- 2026-10-15T22:17:20Z (main): scope: scoped; rewrote as a three-case TUI capture (/new, /resume, /fork) with --relay, checked against main d7ac402 (src/bus/transaction.js:62-67 cascade, tools/codex-subagent-capture background case) and the codex-cli 0.162.1 binary's slash-command strings; added the CODEX_THREAD_ID-after-switch reading relay-2cd4b1's spec needs; todo P2 s/mid/direct
