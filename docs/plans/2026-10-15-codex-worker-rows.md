@@ -1034,8 +1034,10 @@ const A = read(join(dir, 'A.json')), B = read(join(dir, 'B.json'));
 const markers = task => (task.task.notes ?? []).filter(n => /^(started|resumed|done|dropped|parked)/.test(n.text));
 
 if (mode === '--sandboxed') {
-  // The sandbox hides the session process: tasks must refuse on process proof, nothing else.
-  refuses('controller', `tasks start ${ids.A}`, 'config', /relay identity: no relay agent matches the nearest codex ancestor/);
+  // The sandbox hides the session process behind a pid-1 helper: tasks must refuse with its
+  // PID-namespace diagnostic, nothing else.
+  refuses('controller', `tasks start ${ids.A}`, 'config',
+    /^relay identity: the nearest codex ancestor is pid 1 with no parent, so this command runs in a PID namespace/);
   if (holders(ids.A).length) fail(`A was claimed under the sandbox by ${holders(ids.A).join(', ')}`);
   if (A.task.status !== 'todo') fail(`A status ${A.task.status}`);
 } else {
@@ -1071,10 +1073,14 @@ process.exit(failures.length ? 1 : 0);
 ```
 
 The refusal kinds come from tasks' source: a live claim held by another session refuses
-`start`, `park` and `done` with `claimed` (`src/commands/mod.rs`, `src/commands/park.rs`),
-and a relay identity that matches no row refuses with `config`, detail
-`relay identity: no relay agent matches the nearest codex ancestor, pid …`
-(`src/relay/resolve.rs`). A command that never reached tasks (`command not found`, exit
+`start`, `park` and `done` with `claimed` (`src/commands/mod.rs`, `src/commands/park.rs`).
+Under the workspace-write sandbox the nearest `codex` process tasks can see is the sandbox
+helper, pid 1 with no parent, and the resolver names that case before any row matching
+(`src/relay/resolve.rs`, the `nearest.pid == 1 && nearest.ppid == 0` branch): kind
+`config`, detail `relay identity: the nearest codex ancestor is pid 1 with no parent, so
+this command runs in a PID namespace that hides the harness session process …`. The
+control requires that diagnostic, a nonzero exit, and no claim on A; the generic "no relay
+agent matches" refusal would mean the namespace was not detected, and fails. A command that never reached tasks (`command not found`, exit
 127) fails every expectation. Codex 0.162.1 gave a Bash PostToolUse `tool_response` as
 text (brief §7); any other shape fails rather than being searched loosely.
 
