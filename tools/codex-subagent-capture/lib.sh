@@ -32,7 +32,10 @@ while [[ $pid -gt 1 && -r /proc/$pid/stat ]]; do
   sep=, pid=$ppid
 done
 chain+=']'
-env_json=$(env | grep '^CODEX_' | jq -Rn '[inputs | capture("^(?<key>[^=]+)=(?<value>.*)$")] | from_entries')
+# Every CODEX_* name is kept, but only the ids and CODEX_HOME keep their values: any other
+# variable (CODEX_API_KEY) may be a credential.
+env_json=$(env | grep '^CODEX_' | jq -Rn '[inputs | capture("^(?<key>[^=]+)=(?<value>.*)$")
+  | if (.key | IN("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_HOME")) then . else .value = "<redacted>" end] | from_entries')
 jq -n --arg event "$event" --argjson payload "$payload" --argjson env "$env_json" --argjson ancestry "$chain" \
   '{event: $event, payload: $payload, env: $env, ancestry: $ancestry}' >"$log/$seq-$event.json"
 if [[ -n $wrapped ]]; then
