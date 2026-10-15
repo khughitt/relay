@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: relay-6825f7
 created: 2026-10-13T01:33:23Z
-updated: 2026-10-15T09:52:44Z
+updated: 2026-10-15T09:54:08Z
 started: 2026-10-15T09:36:30Z
 depends: [relay-ed3f00, relay-752a6e]
 parent: relay-eaca0e
@@ -35,3 +35,4 @@ Ideas it wakes: On completion, run `tasks note relay-f56e30 --no-reviewed "<deci
 - 2026-10-15T09:52:43Z (relay-6825f7): resumed
   provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-15T09:52:44Z (relay-6825f7): review: spec round 1 — verdict: revise; findings: P2 2; reviewer: human
+- 2026-10-15T09:54:08Z (relay-6825f7): Round 1 revisions: worker rows use scope: worker as a tripwire (pre-change relay refuses the snapshot with INVALID_SCHEMA, bytes unchanged; checked) plus a rollout step inventorying every writer; tasks piece also accepts worker scope; live acceptance adds a controller/worker tasks-claim run with cross-claim refusals.
