@@ -267,9 +267,17 @@ user's harness, relay or tasks configuration.
   an empty registry after SessionEnd.
 - **Claim acquisition.** One controller/worker run through tasks itself. Isolation adds a
   private `XDG_CONFIG_HOME` and `XDG_STATE_HOME` holding a throwaway tasks project with
-  two todo tasks, A and B, and `[identity] relay = true`. Codex runs with a
-  workspace-write sandbox over that project, and its `shell_environment_policy` sets the
-  relay and XDG variables explicitly. The controller runs `tasks start A`, then spawns one
+  two todo tasks, A and B, and `[identity] relay = true`. Codex runs with
+  `sandbox_mode = "danger-full-access"`, so its commands see the host PID view: a
+  workspace-write sandbox runs each command under a namespace-local `codex` helper at pid
+  1, which hides the session process, and tasks refuses acquisition there before worker
+  selection is reached (tasks `docs/notes/2026-09-30-delegated-identity-brief.md`,
+  "PID-namespace process proof"). Its `shell_environment_policy` sets the relay and XDG
+  variables explicitly and excludes `TASKS_SESSION` and `TASKS_SESSION_PID`. The harness
+  confirms both are absent in the commands' environment: an explicit identity override
+  bypasses relay selection, so identity must come from the relay row and Codex's native
+  thread export alone. The prompt names only `tasks` commands over the throwaway project.
+  The controller runs `tasks start A`, then spawns one
   worker that runs `tasks start B`. The worker then attempts `tasks start A`,
   `tasks park A` and `tasks done A`, and the controller, after the worker's turn, attempts
   the same on B. The harness judges the outcome from tasks' and relay's state, not the
@@ -281,6 +289,10 @@ user's harness, relay or tasks configuration.
 
   A run in which the model deviates from the script (no spawn, commands skipped) is an
   invalid attempt, rerun, not a pass.
+- **Sandboxed refusal control.** A separate run with the same private directories under
+  a workspace-write sandbox, in which the controller runs only `tasks start A`. Expected:
+  the start refuses on process proof and A stays unclaimed. This pins the boundary the
+  positive run avoids; it is not a pass condition for worker rows.
 
 ## Out of scope
 
