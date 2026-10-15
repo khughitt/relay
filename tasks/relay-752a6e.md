@@ -6,9 +6,9 @@ priority: 2
 size: s
 complexity: mid
 process: direct
-owner: main
+owner: relay-752a6e
 created: 2026-10-15T09:27:12Z
-updated: 2026-10-15T09:28:41Z
+updated: 2026-10-15T09:28:47Z
 started: 2026-10-15T09:28:41Z
 depends: []
 parent: relay-eaca0e
@@ -26,4 +26,6 @@ Expected result: brief §7 gains a row table per case and the Not-exercised list
 - 2026-10-15T09:27:21Z (main): concerns: relay-ed3f00 extension — cases the single-turn capture did not exercise
 - 2026-10-15T09:27:33Z (main): Also correct brief §7's last finding: worker events on the root row are invisible while the controller sits in wait_agent (already working); the visible harm is a background worker after the controller's Stop (relay-15b49c has the right framing).
 - 2026-10-15T09:28:41Z (main): started
+  provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T09:28:47Z (relay-752a6e): resumed
   provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
