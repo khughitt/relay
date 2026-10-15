@@ -6,8 +6,8 @@ priority: 2
 complexity: mid
 process: direct
 created: 2026-10-15T10:12:29Z
-updated: 2026-10-15T10:12:29Z
-depends: []
+updated: 2026-10-15T10:12:45Z
+depends: [relay-641058, tasks-af3aac]
 parent: relay-635fdc
 tags: []
 agent: claude-code/claude-opus-5-5
