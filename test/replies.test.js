@@ -21,7 +21,8 @@ test('parseReply accepts only the documented reply shape', () => {
 test('Claude and Codex share the standard decision model with exit 2 refusals', () => {
   for (const harness of ['claude-code', 'codex']) {
     const { encodeReply, replies } = adapterFor(harness);
-    assert.deepEqual(Object.keys(replies).sort(), ['PreToolUse', 'Stop', 'UserPromptSubmit']);
+    const expected = harness === 'codex' ? ['PreToolUse', 'Stop', 'SubagentStop', 'UserPromptSubmit'] : ['PreToolUse', 'Stop', 'UserPromptSubmit'];
+    assert.deepEqual(Object.keys(replies).sort(), expected);
     assert.deepEqual(encodeReply('PreToolUse', { decision: 'deny', reason: 'no' }), {
       stdout: '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no"}}\n',
       stderr: 'no\n', exitCode: 2 });
@@ -45,6 +46,11 @@ test('Claude and Codex share the standard decision model with exit 2 refusals', 
   assert.throws(() => adapterFor('claude-code').encodeReply('Notification:permission_prompt', { decision: 'deny', reason: 'no' }), { code: 'UNSUPPORTED_REPLY' });
   assert.throws(() => adapterFor('codex').encodeReply('PermissionRequest', { decision: 'deny', reason: 'no' }), { code: 'UNSUPPORTED_REPLY' });
   assert.throws(() => encodeStandardReply('PreToolUse', { decision: 'deny', reason: 'no' }), { code: 'UNSUPPORTED_REPLY' });
+  const codex = adapterFor('codex');
+  assert.deepEqual(codex.encodeReply('SubagentStop', { decision: 'deny', reason: 'keep going' }), {
+    stdout: '{"decision":"block","reason":"keep going"}\n', stderr: 'keep going\n', exitCode: 2 });
+  assert.throws(() => codex.encodeReply('SubagentStop', { decision: 'allow', context: 'c' }), { code: 'UNSUPPORTED_REPLY' });
+  assert.throws(() => codex.encodeReply('SubagentStart', { decision: 'deny', reason: 'no' }), { code: 'UNSUPPORTED_REPLY' });
 });
 
 test('OpenCode has no reply channel and every adapter states its outer timeouts', () => {

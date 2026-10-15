@@ -132,3 +132,6 @@ test('checkBudget sums the worst match ignoring tool filters', () => {
   assert.deepEqual(checkBudget(config, budgetFor({ outerMs: 1000 }), { kind: RECONCILE }).map((s) => s.name), ['observer']);
   assert.throws(() => checkBudget(config, budgetFor({ outerMs: 500 }), { kind: RECONCILE }), { code: 'INVALID_CONFIG' });
 });
+test('a Codex turn-end guard still loads once SubagentStop shares the kind', () => {
+  validateSubscribers({ schema: 1, subscribers: [guard({ kinds: ['turn-end'], harnesses: ['codex'], tools: null })] });
+});

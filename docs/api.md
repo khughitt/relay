@@ -248,7 +248,9 @@ abort. Timestamps are sampled at write time, never derived from process start.
 | Claude | Notification:permission_prompt | needs-approval | needs-approval |
 | Claude | StopFailure | turn-error | error |
 | Codex | PermissionRequest | needs-approval | needs-approval |
+| Codex | SubagentStart | session-start | working |
 | Claude, Codex | Stop | turn-end | done |
+| Codex | SubagentStop | turn-end | done |
 | Claude, Codex | SessionEnd | session-end | remove |
 | OpenCode | init | session-start | idle |
 | OpenCode | session.busy | activity | working |
@@ -268,6 +270,14 @@ code-mode interpretation. These fixture forms follow the approved plan's
 [Codex hook reference](https://developers.openai.com/codex/hooks) and
 [Claude hook reference](https://code.claude.com/docs/en/hooks), checked during design
 on 2026-09-17. They do not prove live guard capability; ops-c8e4d1 owns that gate.
+
+A Codex payload carrying `agent_id` is a worker's event: its `agentId` is
+`codex:<agent_id>`, its `sessionId` the `agent_id`, and `root` is `codex:<session_id>`.
+`agent_id` must be nonempty text other than `session_id`; SubagentStart and SubagentStop
+require it. Anything else is `INVALID_INPUT`. Claude Code and OpenCode payloads are not
+routed by `agent_id`. SubagentStop refuses as Stop does (`decision: block`, exit 2), so a
+guard on Codex `turn-end` also sees worker turn ends, and its install needs a passed
+SubagentStop refusal probe.
 
 ## Hook dispatch (R2)
 
