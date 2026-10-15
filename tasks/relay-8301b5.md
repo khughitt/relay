@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/ask-undeliverable
 created: 2026-10-13T20:14:23Z
-updated: 2026-10-15T08:22:31Z
+updated: 2026-10-15T08:23:30Z
 started: 2026-10-15T08:22:17Z
 depends: []
 tags: []
@@ -37,3 +37,4 @@ Done:
   provenance: {"harness_session":"codex:01a13ea6-4e87-7e12-9ed3-696c55f0a636","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-15T08:22:31Z (fix/ask-undeliverable): resumed
   provenance: {"harness_session":"codex:01a13ea6-4e87-7e12-9ed3-696c55f0a636","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T08:23:30Z (fix/ask-undeliverable): Confirmed both fallthroughs in attend; scope is src/routes/ask.js, test/routes-ask.test.js, spec section 9.1 step 4 and docs/api.md. Baseline just test-fast: 615 passed on Node v26.5.0. Regression cases will use a real inbox/socket and controlled clock for replay and handed-refusal paths, each with and without handback.
