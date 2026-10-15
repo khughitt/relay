@@ -24,7 +24,7 @@ tt := "python3 tools/tt"
 # so here; the target must always exist and the report shows the gap as equal durations.
 fast_cmd := "npm test"
 test_cmd := "npm test"
-check_cmd := "python3 tools/ops-check && tasks check"
+check_cmd := "python3 tools/ops-check && tasks check && npx --no-install tsc --noEmit"
 
 # What a fresh checkout or worktree needs before the suite can run: dependency installs
 # (npm ci, uv sync) and any gitignored inputs the tests read, hydrated from the main

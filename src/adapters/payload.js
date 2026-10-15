@@ -1,6 +1,8 @@
+// @ts-check
 import { isAbsolute } from 'node:path';
 import { relayError } from '../protocol.js';
 const MAX_BYTES = 4 * 1024 * 1024;
+/** @param {unknown} raw @param {string} nativeEvent @returns {Record<string, any>} */
 export function parsePayload(raw, nativeEvent) {
   if (!(typeof raw === 'string' || Buffer.isBuffer(raw))) throw relayError('INVALID_INPUT', 'native input must be bytes or text');
   if (Buffer.byteLength(raw) > MAX_BYTES) throw relayError('INPUT_TOO_LARGE', 'native input exceeds byte limit');
@@ -16,13 +18,16 @@ export function parsePayload(raw, nativeEvent) {
       || !data.tool_input || typeof data.tool_input !== 'object' || Array.isArray(data.tool_input))) throw relayError('INVALID_INPUT', 'invalid native tool fields');
   return data;
 }
+/** @param {import("node:stream").Readable} stream @param {import("../types.js").Deadline} [options] @returns {Promise<Buffer>} */
 export function readNativeInput(stream, { clock = performance.now.bind(performance), deadline } = {}) {
   const started = clock();
   const effectiveDeadline = Math.min(deadline ?? Infinity, started + 5000);
   const remaining = effectiveDeadline - started;
   if (remaining <= 0) return Promise.reject(relayError('INPUT_TIMEOUT', 'native input deadline exceeded'));
   return new Promise((resolve, reject) => {
+    /** @type {Buffer[]} */
     const chunks = []; let size = 0, finished = false;
+    /** @param {Error} [error] */
     const done = (error) => {
       if (finished) return; finished = true;
       if (!error && clock() >= effectiveDeadline) error = relayError('INPUT_TIMEOUT', 'native input deadline exceeded');
@@ -32,6 +37,7 @@ export function readNativeInput(stream, { clock = performance.now.bind(performan
       stream.pause();
       if (error) reject(error); else resolve(Buffer.concat(chunks, size));
     };
+    /** @param {Buffer|string} chunk */
     const data = (chunk) => {
       if (clock() >= effectiveDeadline) return done(relayError('INPUT_TIMEOUT', 'native input deadline exceeded'));
       const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
@@ -40,6 +46,7 @@ export function readNativeInput(stream, { clock = performance.now.bind(performan
       chunks.push(bytes);
     };
     const end = () => done();
+    /** @param {unknown} cause */
     const failed = (cause) => done(relayError('INVALID_INPUT', 'cannot read native input', cause));
     const closed = () => done(relayError('INVALID_INPUT', 'native input closed before EOF'));
     const timer = setTimeout(() => done(relayError('INPUT_TIMEOUT', 'native input deadline exceeded')), remaining);

@@ -1,7 +1,9 @@
+// @ts-check
 import { homedir } from 'node:os';
 import { join, isAbsolute } from 'node:path';
 import { relayError } from '../protocol.js';
 export function paths(env = process.env) {
+  /** @param {string} value */
   const absolute = (value) => {
     if (typeof value !== 'string' || !value.trim() || !isAbsolute(value)) throw relayError('INVALID_INPUT', 'expected absolute directory');
     return value;

@@ -1,3 +1,4 @@
+// @ts-check
 export { STATES } from './protocol.js';
 export { paths } from './bus/paths.js';
 export { adapterFor, normalizeEvent } from './adapters/index.js';

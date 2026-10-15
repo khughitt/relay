@@ -1,3 +1,4 @@
+// @ts-check
 import { isDeepStrictEqual } from 'node:util';
 import { relayError, validateHandle } from '../protocol.js';
 import { checkAnswer, isUuid, validateMessage, LOCAL_SURFACES, WITHDRAWAL_REASONS } from './message.js';
@@ -7,40 +8,56 @@ export const CONFIRM_WINDOW_MS = 60000;
 export const QUESTION_STATES = Object.freeze(['pending', 'answered', 'handed', 'consumed', 'unconfirmed', 'undeliverable', 'released', 'withdrawn', 'expired']);
 export const ANSWER_HOLDING = Object.freeze(['answered', 'handed', 'consumed', 'unconfirmed', 'undeliverable']);
 const TERMINAL = ['consumed', 'unconfirmed', 'undeliverable', 'released', 'withdrawn', 'expired'];
+/** @type {Record<string, string>} */
 const CLOSED = { withdrawn: 'WITHDRAWN', expired: 'EXPIRED', released: 'RELEASED', undeliverable: 'UNDELIVERABLE' };
+/** @param {import("../types.js").Entry} entry */
 export const isTerminal = (entry) => entry.kind === 'notice' ? entry.state === 'expired' : TERMINAL.includes(entry.state);
 
+/** @template {import("../types.js").Entry} E @param {E} entry @returns {import("../types.js").Result<E>} */
 const keep = (entry) => ({ entry, changed: false, error: null });
+/** @template {import("../types.js").Entry} E @param {E} entry @param {string} code @param {Partial<import("../types.js").Refusal>} [extra] @returns {import("../types.js").Result<E>} */
 const refuse = (entry, code, extra = {}) => ({ entry, changed: false, error: { code, ...extra } });
+/** @param {import("../types.js").Entry} entry @param {number} now @param {string} state @param {string} cause */
 const row = (entry, now, state, cause) => [...entry.log, { seq: null, at: now, state, cause }];
+/** @template {import("../types.js").Entry} E @param {E} entry @param {number} now @param {E["state"]} state @param {string} cause @param {Partial<E>} [patch] @returns {import("../types.js").Result<E>} */
 const move = (entry, now, state, cause, patch = {}) => ({ entry: { ...entry, ...patch, state, updatedAt: now, log: row(entry, now, state, cause) }, changed: true, error: null });
+/** @template {import("../types.js").Entry} E @param {E} entry @param {number} now @param {string} cause @param {Partial<E>} patch @returns {import("../types.js").Result<E>} */
 const annotate = (entry, now, cause, patch) => ({ entry: { ...entry, ...patch, updatedAt: now, log: row(entry, now, entry.state, cause) }, changed: true, error: null });
+/** @param {import("../types.js").Handle|null} a @param {import("../types.js").Handle|null} b */
 const sameHandle = (a, b) => a !== null && b !== null && isDeepStrictEqual(a, b);
+/** @param {import("../types.js").Party} a @param {import("../types.js").Party} b */
 const sameParty = (a, b) => isDeepStrictEqual(a, b);
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").Message} message @param {number} now */
 const accepted = (entry, message, now) => [...entry.messages, { at: now, message }];
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").Message} message */
 const conflictingId = (entry, message) => message.id === entry.id || entry.messages.some((row) => row.message.id === message.id);
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").Message} message */
 const replayed = (entry, message) => entry.messages.some((row) => isDeepStrictEqual(row.message, message));
 
+/** @param {import("../types.js").QuestionMessage} question @param {{handback: boolean, waiter: import("../types.js").Handle|null, now: number}} options @returns {import("../types.js").QuestionEntry} */
 export function createEntry(question, { handback, waiter, now }) {
   return { schema: 1, id: question.id, kind: 'question', question, state: 'pending', presentation: 'inbox',
     route: { handback, waiter }, answer: null, handedAt: null, observed: null, withdrawal: null, supersededBy: null,
     messages: [], observations: [], seq: null, updatedAt: now, log: [{ seq: null, at: now, state: 'pending', cause: 'question' }] };
 }
+/** @param {import("../types.js").NoticeMessage} notice @param {{now: number}} options @returns {import("../types.js").NoticeEntry} */
 export function createNotice(notice, { now }) {
   return { schema: 1, id: notice.id, kind: 'notice', notice, state: 'active', seen: false,
     seq: null, updatedAt: now, log: [{ seq: null, at: now, state: 'active', cause: 'notice' }] };
 }
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").AnswerMessage} message @param {number} now */
 export function applyAnswer(entry, message, now) {
   const body = message.body, q = entry.question.body;
   if (entry.answer !== null && entry.answer.body.answerId === body.answerId) return keep(entry);
   if (ANSWER_HOLDING.includes(entry.state)) return refuse(entry, 'ALREADY_ANSWERED', { answer: entry.answer });
   if (entry.state !== 'pending') return refuse(entry, CLOSED[entry.state]);
-  try { checkAnswer(q, body); } catch (error) { return refuse(entry, 'INVALID_ANSWER', { message: error.message }); }
+  try { checkAnswer(q, body); } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught); return refuse(entry, 'INVALID_ANSWER', { message: error.message }); }
   if (q.class === 'authorization' && body.outcome === 'answered' && !LOCAL_SURFACES.includes(body.surface)) return refuse(entry, 'LOCAL_ONLY');
   if (q.artifact !== null && body.artifactRevision !== q.artifact.revision) return refuse(entry, 'STALE', { revision: q.artifact.revision });
   if (conflictingId(entry, message)) return refuse(entry, 'ID_CONFLICT');
   return move(entry, now, 'answered', 'answer', { answer: message, messages: accepted(entry, message, now) });
 }
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").DeferMessage} message @param {number} now */
 export function applyDefer(entry, message, now) {
   if (ANSWER_HOLDING.includes(entry.state)) return refuse(entry, 'ALREADY_ANSWERED', { answer: entry.answer });
   if (entry.state !== 'pending') return refuse(entry, CLOSED[entry.state]);
@@ -50,6 +67,7 @@ export function applyDefer(entry, message, now) {
   if (entry.route.handback) return move(entry, now, 'released', `defer:${message.body.surface}`, { messages });
   return annotate(entry, now, `defer:${message.body.surface}`, { presentation: 'desktop', messages });
 }
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").WithdrawalMessage} message @param {number} now */
 export function applyWithdraw(entry, message, now) {
   if (ANSWER_HOLDING.includes(entry.state)) return refuse(entry, 'ANSWERED', { answer: entry.answer });
   if (entry.state !== 'pending') return refuse(entry, CLOSED[entry.state]);
@@ -57,13 +75,16 @@ export function applyWithdraw(entry, message, now) {
   const reason = message.body.reason;
   return move(entry, now, 'withdrawn', `withdrawal:${reason}`, { withdrawal: { reason }, messages: accepted(entry, message, now) });
 }
+/** @param {import("../types.js").QuestionEntry} entry @param {string} byId @param {number} now */
 export const applySuperseded = (entry, byId, now) => move(entry, now, 'withdrawn', 'superseded', { withdrawal: { reason: 'superseded' }, supersededBy: byId });
+/** @param {import("../types.js").Entry|null} predecessor @param {import("../types.js").QuestionMessage} replacement */
 export function checkSupersede(predecessor, replacement) {
   if (!predecessor || predecessor.kind !== 'question') return { code: 'NOT_SUPERSEDABLE' };
   if (ANSWER_HOLDING.includes(predecessor.state)) return { code: 'ANSWERED', answer: predecessor.answer };
   if (predecessor.state !== 'pending' || !sameParty(predecessor.question.from, replacement.from)) return { code: 'NOT_SUPERSEDABLE' };
   return null;
 }
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").Handle|null} waiter @param {number} now */
 export function applyHanded(entry, waiter, now) {
   if (!sameHandle(entry.route.waiter, waiter)) return refuse(entry, 'NOT_WAITER');
   if (['handed', 'unconfirmed', 'consumed'].includes(entry.state)) return keep(entry);
@@ -71,6 +92,7 @@ export function applyHanded(entry, waiter, now) {
   if (entry.state !== 'answered') return refuse(entry, CLOSED[entry.state]);
   return move(entry, now, 'handed', 'handed', { handedAt: now });
 }
+/** @param {import("../types.js").QuestionEntry} entry @param {{matches: boolean, observed: Record<string, string>}} observation @param {number} now */
 export function applyConfirm(entry, { matches, observed }, now) {
   const native = entry.state === 'released' || entry.state === 'expired';
   if (!native && entry.state !== 'handed' && entry.state !== 'unconfirmed') return refuse(entry, 'NOT_HANDED');
@@ -79,37 +101,49 @@ export function applyConfirm(entry, { matches, observed }, now) {
   if (native) return annotate(entry, now, 'native-answer', patch);
   return move(entry, now, matches ? 'consumed' : 'unconfirmed', matches ? 'confirm' : 'confirm-mismatch', patch);
 }
+/** @param {import("../types.js").QuestionEntry} entry @param {number} now */
 export function applyAskerGone(entry, now) {
   if (entry.state === 'pending') return move(entry, now, 'withdrawn', 'asker-gone', { withdrawal: { reason: 'asker-gone' } });
   if (entry.state === 'answered') return move(entry, now, 'undeliverable', 'asker-gone');
   return keep(entry);
 }
+/** @template {import("../types.js").Entry} E @param {E} entry @param {number} now @returns {import("../types.js").Result<E>} */
 export function applyClock(entry, now) {
   if (entry.kind === 'notice') return entry.state === 'active' && now >= entry.notice.body.expiresAt ? move(entry, now, 'expired', 'expiry') : keep(entry);
   if (entry.state === 'pending' && now >= entry.question.body.expiresAt) return move(entry, now, 'expired', 'expiry');
   // A saved answer no route took by the deadline will never be taken: the waiter is gone or stuck.
   if (entry.state === 'answered' && now >= entry.question.body.expiresAt) return move(entry, now, 'undeliverable', 'expiry');
-  if (entry.state === 'handed' && now >= entry.handedAt + CONFIRM_WINDOW_MS) return move(entry, now, 'unconfirmed', 'window');
+  if (entry.state === 'handed' && now >= (/** @type {number} */ (entry.handedAt)) + CONFIRM_WINDOW_MS) return move(entry, now, 'unconfirmed', 'window');
   return keep(entry);
 }
+/** @param {import("../types.js").Entry} entry @param {number} now */
 export const applySeen = (entry, now) => entry.kind === 'notice' && !entry.seen ? annotate(entry, now, 'seen', { seen: true }) : keep(entry);
+/** @param {import("../types.js").Entry} entry */
 export function nextDeadline(entry) {
   if (entry.kind === 'notice') return entry.state === 'active' ? entry.notice.body.expiresAt : null;
   if (entry.state === 'pending' || entry.state === 'answered') return entry.question.body.expiresAt;
-  if (entry.state === 'handed') return entry.handedAt + CONFIRM_WINDOW_MS;
+  if (entry.state === 'handed') return (/** @type {number} */ (entry.handedAt)) + CONFIRM_WINDOW_MS;
   return null;
 }
+/** @type {(message: string) => never} */
 const fail = (message) => { throw relayError('INVALID_ENTRY', message); };
+/** @param {unknown} v @returns {v is Record<string, any>} */
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+/** @param {number} v */
 const seqOk = (v) => Number.isSafeInteger(v) && v >= 1;
+/** @param {number} v */
 const ms = (v) => Number.isSafeInteger(v) && v >= 0;
+/** @param {Record<string, unknown>} v @param {string[]} allowed */
 const keys = (v, allowed) => Object.keys(v).every((key) => allowed.includes(key));
+/** @param {unknown} message */
 const normalized = (message) => {
   const clean = validateMessage(message);
   if (!isDeepStrictEqual(clean, message)) fail('message is not normalized');
   return clean;
 };
+/** @param {unknown} v */
 const answers = (v) => object(v) && Object.values(v).every((value) => typeof value === 'string');
+/** @param {unknown} v @returns {import("../types.js").StoredEntry} */
 export function validateEntry(v) {
   try {
     if (!object(v) || v.schema !== 1 || !seqOk(v.seq) || !ms(v.updatedAt) || !Array.isArray(v.log) || v.log.length === 0
@@ -126,7 +160,7 @@ export function validateEntry(v) {
           : row.cause !== 'expiry' || previous !== 'active' || row.state !== 'expired' || row.at < v.notice.body.expiresAt) fail('invalid notice transition');
       }
       if (v.seen !== v.log.some((l) => l.cause === 'seen')) fail('seen lacks evidence');
-      return v;
+      return /** @type {import("../types.js").StoredEntry} */ (v);
     }
     if (v.kind !== 'question' || !keys(v, ['schema', 'id', 'kind', 'question', 'state', 'presentation', 'route', 'answer',
       'handedAt', 'observed', 'withdrawal', 'supersededBy', 'messages', 'observations', 'seq', 'updatedAt', 'log'])
@@ -175,6 +209,7 @@ export function validateEntry(v) {
     if (v.presentation !== (!v.route.handback && v.log.some((l) => l.cause.startsWith('defer:')) ? 'desktop' : 'inbox')) fail('presentation lacks evidence');
     if (!Array.isArray(v.messages)) fail('invalid message history');
     const evidence = [...v.log];
+    /** @param {number} at @param {string[]} causes */
     const consume = (at, causes) => {
       const index = evidence.findIndex((l) => l.at === at && causes.includes(l.cause));
       if (index === -1) fail('history lacks transition evidence');
@@ -195,7 +230,7 @@ export function validateEntry(v) {
         if (withdrawal !== null) fail('multiple accepted withdrawals');
         withdrawal = message.body;
       }
-      const cause = message.kind === 'answer' ? 'answer' : message.kind === 'defer' ? `defer:${message.body.surface}` : `withdrawal:${message.body.reason}`;
+      const cause = message.kind === 'answer' ? 'answer' : message.kind === 'defer' ? `defer:${message.body.surface}` : `withdrawal:${(/** @type {import("../types.js").WithdrawalMessage} */ (message)).body.reason}`;
       consume(row.at, [cause]);
     }
     if (!isDeepStrictEqual(savedAnswer, v.answer) || (withdrawal !== null && !isDeepStrictEqual(withdrawal, v.withdrawal))) fail('history does not match saved outcome');
@@ -208,8 +243,8 @@ export function validateEntry(v) {
     if (evidence.some((l) => ['answer', 'confirm', 'confirm-mismatch', 'native-answer'].includes(l.cause)
       || l.cause.startsWith('defer:') || l.cause.startsWith('withdrawal:'))) fail('transition lacks history');
     if (!isDeepStrictEqual(v.observed, v.observations.at(-1)?.answers ?? null)) fail('observed does not match history');
-    return v;
-  } catch (error) {
+    return /** @type {import("../types.js").StoredEntry} */ (v);
+  } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught);
     if (error.code === 'INVALID_ENTRY') throw error;
     return fail(error.message);
   }

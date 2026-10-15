@@ -18,8 +18,11 @@ node bin/relay.js hook --harness claude-code PreToolUse < payload.json
 ```
 
 The fast and full suites are intentionally identical; there is no affected-only
-selector. The one npm dependency, `jsonc-parser` (bundled), is needed only by
-`relay install`; `just setup` installs it.
+selector. The one runtime npm dependency, `jsonc-parser` (bundled), is needed only by
+`relay install`; `just setup` also installs development-only TypeScript and Node 22
+types. `just check` runs strict JSDoc type checking over every `src/` and `bin/` file
+without emitting code. Shared contracts live in `src/types.js`; compile-time
+regressions live in `test/types/`. JavaScript runs directly, with no build step.
 
 Read the [API contract](docs/api.md) and
 [operator lock-repair procedure](docs/runbooks/registry-lock-repair.md).

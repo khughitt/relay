@@ -1,14 +1,23 @@
+// @ts-check
 import { isAbsolute } from 'node:path';
 export const STATES = Object.freeze(['idle', 'working', 'needs-input', 'needs-approval', 'done', 'error']);
 export const KINDS = Object.freeze(['session-start', 'prompt', 'before-tool', 'activity', 'idle', 'needs-input', 'needs-approval', 'turn-end', 'turn-error', 'session-end']);
+/** @param {string|number|undefined} code @param {string} message @param {unknown} [cause] */
 export const relayError = (code, message, cause) => Object.assign(new Error(message, { cause }), { code });
+/** @type {(message: string) => never} */
 const fail = (message) => { throw relayError('INVALID_SCHEMA', message); };
+/** @param {unknown} v @returns {v is Record<string, any>} */
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+/** @param {unknown} v @returns {v is string} */
 const text = (v) => typeof v === 'string' && v.trim().length > 0;
+/** @param {unknown} v @returns {v is string} */
 const absolute = (v) => text(v) && isAbsolute(v);
+/** @param {number} v */
 const integer = (v) => Number.isSafeInteger(v) && v >= 0;
+/** @param {unknown} v */
 const uuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 const harnesses = ['claude-code', 'codex', 'opencode'];
+/** @param {unknown} text @returns {string} */
 export function parseStart(text) {
   if (typeof text !== 'string' || !/^(0|[1-9][0-9]*)$/.test(text)
       || text.length > 20 || BigInt(text) > 18446744073709551615n) {
@@ -16,16 +25,19 @@ export function parseStart(text) {
   }
   return text;
 }
+/** @param {unknown} v @returns {import("./types.js").Handle} */
 export function validateHandle(v) {
   if (!object(v) || !['linux', 'darwin'].includes(v.platform) || !text(v.host)
       || !Number.isInteger(v.pid) || v.pid <= 0 || v.pid > 4294967295
       || !(v.bootId === null || (v.platform === 'linux' && uuid(v.bootId)))) fail('invalid process handle');
   return { platform: v.platform, host: v.host, bootId: v.bootId, pid: v.pid, start: parseStart(v.start) };
 }
+/** @param {Record<string, any>} v @param {string} id */
 function identity(v, id) {
   if (!harnesses.includes(v.harness) || !text(v.sessionId) || id !== `${v.harness}:${v.sessionId}`
       || !absolute(v.cwd)) fail('invalid agent identity');
 }
+/** @param {unknown} v @param {string} key @returns {import("./types.js").Agent} */
 function validateAgent(v, key) {
   if (!object(v)) fail('invalid agent');
   identity(v, v.id);
@@ -37,11 +49,13 @@ function validateAgent(v, key) {
     repoRoot: v.repoRoot, remote: v.remote, projectKey: v.projectKey, project: v.project,
     state: v.state, updatedAt: v.updatedAt };
 }
+/** @param {unknown} v @returns {import("./types.js").Snapshot} */
 export function validateSnapshot(v) {
   if (!object(v) || v.schema !== 2 || !uuid(v.generation) || !integer(v.revision) || !object(v.agents)) fail('invalid registry snapshot');
   return { schema: 2, generation: v.generation, revision: v.revision,
     agents: Object.fromEntries(Object.entries(v.agents).map(([key, agent]) => [key, validateAgent(agent, key)])) };
 }
+/** @param {unknown} v @returns {import("./types.js").Event} */
 export function validateEvent(v) {
   if (!object(v) || v.schema !== 1 || !KINDS.includes(v.kind) || !text(v.nativeEvent)) fail('invalid event');
   identity(v, v.agentId);

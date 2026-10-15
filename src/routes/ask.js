@@ -1,3 +1,4 @@
+// @ts-check
 import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
 import { relayError, validateHandle } from '../protocol.js';
@@ -10,15 +11,18 @@ import { toQuestion, allowReply, denyReply, observedAnswers } from './claude-cod
 
 const DELAYS = [250, 500, 1000, 2000, 5000];
 const quiet = Object.freeze({ stdout: '', stderr: '', exitCode: 0 });
+/** @param {import("../types.js").Failure} error */
 const passthrough = (error) => ({ stdout: '', stderr: `relay ask: ${error?.code ?? 'ERROR'}: ${error?.message ?? String(error)}\n`, exitCode: 0 });
+/** @param {unknown} value */
 const reply = (value) => ({ stdout: `${JSON.stringify(value)}\n`, stderr: '', exitCode: 0 });
 const WITHDRAWN = 'question withdrawn by the user; do not wait for an answer';
 const EXPIRED = 'question expired before an answer arrived; do not wait for an answer';
 const UNDELIVERABLE = 'saved answer could not be delivered before the question expired; do not wait for an answer';
 
 // Failures leave the native question available; a saved handoff is acknowledged before stdout.
+/** @param {{nativeEvent: string, handback?: boolean, stdin: import("node:stream").Readable, socketPath: string, connect?: typeof connectSocket, processOps?: import("../types.js").ProcessOps, clock?: () => number, sleep?: (ms: number) => Promise<void>, newId?: () => string}} options @returns {Promise<import("../types.js").Output>} */
 export async function runAsk({ nativeEvent, handback = false, stdin, socketPath, connect = connectSocket, processOps,
-  clock = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), newId = randomUUID } = {}) {
+  clock = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), newId = randomUUID } = /** @type {NonNullable<Parameters<typeof runAsk>[0]>} */ ({})) {
   try {
     if (!['PreToolUse', 'PostToolUse'].includes(nativeEvent)) throw relayError('INVALID_INPUT', 'unsupported ask hook event');
     const payload = parsePayload(await readNativeInput(stdin), nativeEvent);
@@ -38,15 +42,18 @@ export async function runAsk({ nativeEvent, handback = false, stdin, socketPath,
         try { conn = await connect(socketPath); attempt = 0; break; } catch { /* still down */ }
       }
     }
-  } catch (error) { return passthrough(error); }
+  } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught); return passthrough(error); }
 }
 
 // null means the service closed before acknowledging a reply: reattach and resume the handoff.
+/** @param {import("../types.js").Connection} conn @param {{question: import("../types.js").QuestionMessage, waiter: import("../types.js").Handle, handback: boolean, payload: Record<string, any>}} route @returns {Promise<import("../types.js").Output|null>} */
 function attend(conn, { question, waiter, handback, payload }) {
   return new Promise((resolve) => {
     let busy = false, finished = false;
+    /** @param {import("../types.js").Output} result */
     const finish = (result) => { if (finished) return; finished = true; stop(); conn.close(); resolve(result); };
     const lost = () => { if (finished) return; finished = true; stop(); conn.close(); resolve(null); };
+    /** @param {import("../types.js").QuestionEntry} entry */
     async function act(entry) {
       if (finished || busy || entry?.id !== question.id) return;
       try {
@@ -67,7 +74,7 @@ function attend(conn, { question, waiter, handback, payload }) {
           case 'withdrawn': return finish(reply(denyReply(WITHDRAWN)));
           default: return finish(passthrough(relayError('UNEXPECTED_STATE', `question is ${entry.state}`)));
         }
-      } catch (error) { finish(passthrough(error)); }
+      } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught); finish(passthrough(error)); }
     }
     const stop = conn.onPush((message) => { if (message.type === 'state') act(message.entry); });
     conn.closed.then(lost);
@@ -80,6 +87,7 @@ function attend(conn, { question, waiter, handback, payload }) {
   });
 }
 
+/** @param {{payload: Record<string, any>, socketPath: string, connect: typeof connectSocket}} options */
 async function confirm({ payload, socketPath, connect }) {
   if (payload.tool_name !== 'AskUserQuestion' || typeof payload.tool_use_id !== 'string' || !payload.tool_use_id.trim()) {
     throw relayError('INVALID_INPUT', 'PostToolUse is not an AskUserQuestion call');

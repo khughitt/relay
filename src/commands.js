@@ -1,6 +1,8 @@
+// @ts-check
 // The declared surface. bin/relay.js keeps its strict, order-sensitive hook parser (the
 // harness protocol depends on it) but takes option names, value sets, and help from here.
 export const HARNESSES = ['claude-code', 'codex', 'opencode'];
+/** @type {import("./types.js").Command[]} */
 export const COMMANDS = [
   { path: ['list'], summary: 'The live-agent registry' },
   { path: ['reap'], summary: 'Reconcile the registry against live processes', options: [{ names: ['--outer-ms'], value: 'int' }] },
@@ -26,15 +28,18 @@ export const COMMANDS = [
 ];
 
 /** The command whose path is the longest prefix of argv; rest is what follows it. */
+/** @param {string[]} argv */
 export function commandFor(argv) {
   const matches = COMMANDS.filter((c) => c.path.every((w, i) => argv[i] === w)).sort((a, b) => b.path.length - a.path.length);
   return matches.length ? { cmd: matches[0], rest: argv.slice(matches[0].path.length) } : null;
 }
+/** @param {...string} words */
 export function commandAt(...words) {
   return COMMANDS.find((c) => c.path.length === words.length && c.path.every((w, i) => w === words[i])) ?? null;
 }
 
 /** Strip --json/--pretty from anywhere; returns { argv, mode } with mode null when unset. */
+/** @param {string[]} argv @param {(message: string) => Error} usage */
 export function stripGlobals(argv, usage) {
   let mode = null;
   const rest = [];
@@ -47,12 +52,14 @@ export function stripGlobals(argv, usage) {
 
 /** The diagnostics format (errors, and results where the command has any) and, separately,
  *  whether a successful run prints anything: `output = "none"` silences success only. */
+/** @param {string|null} flagMode @param {NodeJS.ProcessEnv} env @param {import("./types.js").Command|null} cmd @param {(message: string) => Error} usage */
 export function resolveMode(flagMode, env, cmd, usage) {
   const mode = flagMode ?? env.RELAY_FORMAT ?? (cmd?.output === 'json' ? 'json' : 'pretty');
   if (!['json', 'pretty'].includes(mode)) throw usage(`RELAY_FORMAT must be json or pretty, got ${JSON.stringify(mode)}`);
   return { mode, silent: cmd?.output === 'none' };
 }
 
+/** @param {import("./types.js").Command} cmd */
 export function helpText(cmd) {
   const opts = (cmd.options ?? []).map((o) => `${o.required ? '' : '['}${o.names[0]}${o.value === 'none' ? '' : ` ${o.values ? o.values.join('|') : o.value.toUpperCase()}`}${o.required ? '' : ']'}`);
   const args = (cmd.args ?? []).map((a) => a.name.toUpperCase());

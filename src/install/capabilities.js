@@ -1,12 +1,17 @@
+// @ts-check
 import { adapterFor } from '../adapters/index.js';
 import { budgetFor, checkBudget } from '../subscribers.js';
 import { relayError } from '../protocol.js';
 import { ROUTE_EVIDENCE } from './hooks.js';
 
+/** @param {unknown} value @returns {value is Record<string, any>} */
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+/** @type {(message: string) => never} */
 const fail = message => { throw relayError('INVALID_EVIDENCE', message); };
+/** @param {Record<string, unknown>} value @param {string[]} allowed */
 const fields = (value, allowed) => Object.keys(value).every(key => allowed.includes(key));
 
+/** @param {string} text @returns {import("../types.js").Evidence} */
 export function parseEvidence(text) {
   let value;
   try { value = JSON.parse(text); } catch { fail('evidence must be JSON'); }
@@ -21,7 +26,7 @@ export function parseEvidence(text) {
       || !Number.isInteger(probe.outerMs) || probe.outerMs < 1000 || probe.outerMs % 1000 !== 0
       || typeof probe.passed !== 'boolean' || !fields(probe, ['event', 'reply', 'outerMs', 'passed'])) fail('invalid probe');
     try { adapter.stateForEvent(probe.event); } catch { fail('unsupported probe event'); }
-    if (!adapter.replies[probe.event]?.[probe.reply]) fail('unsupported probe reply');
+    if (!adapter.replies[probe.event]?.[/** @type {keyof import("../types.js").Capability} */ (probe.reply)]) fail('unsupported probe reply');
     const key = `${probe.event}\0${probe.reply}\0${probe.outerMs}`;
     if (seen.has(key)) fail('duplicate probe');
     seen.add(key);
@@ -36,12 +41,14 @@ export function parseEvidence(text) {
       names.add(route.name);
     }
   }
-  return value;
+  return /** @type {import("../types.js").Evidence} */ (value);
 }
 
+/** @param {import("../types.js").Adapter} adapter @param {string} event @param {import("../types.js").Subscriber[]} matching */
 const requiredReplies = (adapter, event, matching) => matching.some(subscriber => subscriber.role === 'guard')
-  ? Object.keys(adapter.replies[event] ?? {}).filter(reply => adapter.replies[event][reply]) : [];
+  ? Object.keys(adapter.replies[event] ?? {}).filter(reply => adapter.replies[event][/** @type {keyof import("../types.js").Capability} */ (reply)]) : [];
 
+/** @param {{harness: string, subscribers: import("../types.js").Subscribers, bindings: import("../types.js").Binding[], evidence?: import("../types.js").Evidence|null}} options */
 export function validateCapabilities({ harness, subscribers, bindings, evidence = null }) {
   const adapter = adapterFor(harness);
   if (!Array.isArray(bindings)) throw relayError('INVALID_CONFIG', 'installer bindings must be an array');

@@ -1,12 +1,17 @@
+// @ts-check
 import { relayError } from '../protocol.js';
 // Claude Code caps hook strings at 10,000 characters and Codex spills large output to a
 // file (both references checked 2026-09-17). Relay treats more as an error, never truncation.
 export const CONTEXT_LIMIT = 10000;
 const NONE = Object.freeze({ refuse: false, context: false });
 const FIELDS = ['decision', 'reason', 'context'];
+/** @param {unknown} v @returns {v is Record<string, any>} */
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+/** @param {unknown} v @returns {v is string} */
 const text = (v) => typeof v === 'string' && v.trim().length > 0;
+/** @type {(message: string, cause?: unknown) => never} */
 const fail = (message, cause) => { throw relayError('INVALID_REPLY', message, cause); };
+/** @param {string} output @param {{limit?: number}} [options] @returns {import("../types.js").Reply} */
 export function parseReply(output, { limit = CONTEXT_LIMIT } = {}) {
   let value;
   try { value = JSON.parse(output); } catch (cause) { fail('subscriber reply is not JSON', cause); }
@@ -24,7 +29,9 @@ export function parseReply(output, { limit = CONTEXT_LIMIT } = {}) {
 // The standard decision model both Claude Code and Codex document: PreToolUse answers inside
 // hookSpecificOutput; UserPromptSubmit and Stop use top-level decision/reason. A refusal is
 // written as JSON and as exit 2 with the reason on stderr, which both harnesses honor together.
+/** @param {string} nativeEvent @param {import("../types.js").Reply} reply @param {import("../types.js").Capability} [capability] */
 export function encodeStandardReply(nativeEvent, reply, capability = NONE) {
+  /** @param {unknown} v */
   const line = (v) => `${JSON.stringify(v)}\n`;
   if (reply.decision === 'deny') {
     if (!capability.refuse) throw relayError('UNSUPPORTED_REPLY', `${nativeEvent} has no refusal channel`);

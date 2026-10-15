@@ -1,10 +1,13 @@
+// @ts-check
 import { randomUUID } from 'node:crypto';
 import { relayError } from '../protocol.js';
 import { connectSocket } from '../serve/client.js';
 
+/** @param {string} message */
 const usage = (message) => relayError('USAGE', message);
+/** @param {import("../types.js").QuestionEntry} entry @param {string[]} tokens @returns {Record<string, import("../types.js").Value>} */
 export function parseValues(entry, tokens) {
-  const items = entry.question.body.items, values = {};
+  const items = entry.question.body.items, values = /** @type {Record<string, import("../types.js").Value>} */ ({});
   for (const token of tokens) {
     const eq = token.indexOf('=');
     if (eq < 1) throw usage(`expected <item>=<value>, got ${JSON.stringify(token)}`);
@@ -30,31 +33,38 @@ export function parseValues(entry, tokens) {
   return values;
 }
 
+/** @template T @param {string} socketPath @param {(conn: import("../types.js").Connection) => Promise<T>} fn */
 async function withSocket(socketPath, fn) {
   const conn = await connectSocket(socketPath);
   try { return await fn(conn); } finally { conn.close(); }
 }
+/** @template T @param {import("../types.js").SocketReply<T>} r @returns {{ok: true} & T} */
 const ok = (r) => {
   if (!r.ok) throw Object.assign(relayError(r.error.code, r.error.message), { entry: r.entry });
   return r;
 };
+/** @type {Record<string, string>} */
 const answerLabels = { answered: 'answer saved', handed: 'handed to the agent', consumed: 'the agent received it', unconfirmed: 'handed, receipt not confirmed' };
+/** @param {import("../types.js").Entry} entry */
 function humanState(entry) {
   if (entry.state !== 'undeliverable') return answerLabels[entry.state] ?? entry.state;
   const cause = entry.log.at(-1)?.cause;
   if (!entry.answer || typeof cause !== 'string') throw relayError('INVALID_ENTRY', 'undeliverable entry is missing its saved answer or recorded cause');
   return `saved answer ${JSON.stringify(entry.answer)}; reason: ${cause}`;
 }
-const line = (e) => `${e.id} ${humanState(e)}${e.presentation === 'desktop' ? ' (desktop)' : ''} ${e.kind === 'notice' ? `notice ${e.notice.body.title}` : `${e.question.from.agentId ?? 'user'} ${e.question.body.items[0].prompt}`}`;
+/** @param {import("../types.js").Entry} e */
+const line = (e) => `${e.id} ${humanState(e)}${e.kind === 'question' && e.presentation === 'desktop' ? ' (desktop)' : ''} ${e.kind === 'notice' ? `notice ${e.notice.body.title}` : `${e.question.from.agentId ?? 'user'} ${e.question.body.items[0].prompt}`}`;
+/** @param {import("../types.js").QuestionEntry} entry @param {string} kind @param {unknown} body @param {() => number} clock @param {() => string} newId */
 const reply = (entry, kind, body, clock, newId) => ({ schema: 1, id: newId(), kind, correlationId: entry.id, from: { kind: 'user' }, to: entry.question.from,
   createdAt: clock(), context: entry.question.context, body });
 
+/** @param {{action: string, args?: string[], decline?: boolean, since?: number, socketPath: string, clock?: () => number, newId?: () => string}} options */
 export function runInbox({ action, args = [], decline = false, since, socketPath, clock = Date.now, newId = randomUUID }) {
   return withSocket(socketPath, async (conn) => {
     if (action === 'list') {
       if (args.length) throw usage('inbox list takes no arguments');
       const r = ok(await conn.request('list', since === undefined ? {} : { since }));
-      return { json: { seq: r.seq, entries: r.entries }, text: r.entries.map((e) => `${line(e)}\n`).join('') };
+      return { json: { seq: r.seq, entries: r.entries }, text: r.entries.map((/** @type {import("../types.js").Entry} */ e) => `${line(e)}\n`).join('') };
     }
     const [id, ...rest] = args;
     if (!id) throw usage(`inbox ${action} needs an id`);
@@ -81,6 +91,7 @@ export function runInbox({ action, args = [], decline = false, since, socketPath
   });
 }
 
+/** @param {{mode?: string, socketPath: string}} options */
 export function runPresence({ mode, socketPath }) {
   return withSocket(socketPath, async (conn) => {
     const r = ok(mode ? await conn.request('presence.set', { mode }) : await conn.request('presence.get'));

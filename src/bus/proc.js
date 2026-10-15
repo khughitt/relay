@@ -1,9 +1,11 @@
+// @ts-check
 import { readFileSync, readlinkSync } from 'node:fs';
 import { basename } from 'node:path';
 import { hostname as osHostname } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { parseStart, validateHandle, relayError } from '../protocol.js';
 
+/** @param {unknown} text @returns {import("../types.js").ProcessRow} */
 export function parseStat(text) {
   if (typeof text !== 'string') throw relayError('PROCESS_UNREADABLE', 'invalid proc stat');
   const open = text.indexOf('('), close = text.lastIndexOf(')');
@@ -25,6 +27,7 @@ const DARWIN_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DARWIN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/** @param {string} raw */
 export function normalizeDarwinTty(raw) {
   if (raw === '??') return null;
   const match = /^(?:tty)?s([0-9a-f]+)$/i.exec(raw);
@@ -32,6 +35,7 @@ export function normalizeDarwinTty(raw) {
   return `ttys${match[1]}`;
 }
 
+/** @param {string} line @returns {import("../types.js").ProcessRow} */
 export function parseDarwinRow(line, { terminal = true } = {}) {
   const match = DARWIN_ROW.exec(line);
   if (!match) throw relayError('PROCESS_UNREADABLE', 'Darwin ps: malformed row');
@@ -65,6 +69,7 @@ export function parseDarwinRow(line, { terminal = true } = {}) {
   };
 }
 
+/** @param {string} tool @param {string[]} args */
 function runDarwinTool(tool, args, { clock = performance.now.bind(performance), deadline = clock() + 2000, spawn = spawnSync } = {}) {
   const remaining = Math.min(2000, deadline - clock());
   if (remaining <= 0) throw relayError('DEADLINE_EXCEEDED', 'process deadline exceeded');
@@ -72,23 +77,27 @@ function runDarwinTool(tool, args, { clock = performance.now.bind(performance), 
     timeout: Math.max(1, Math.floor(remaining)), maxBuffer: 4 * 1024 * 1024, killSignal: 'SIGKILL' });
   // A lookup killed at the caller's deadline, rather than at the 2 s cap, says nothing about
   // the process: ps -p takes 3-6 ms on a Mac, and the last lookup before a deadline gets less.
-  if (result.error?.code === 'ETIMEDOUT' && remaining < 2000) throw relayError('DEADLINE_EXCEEDED', 'process deadline exceeded', result.error);
+  if ((/** @type {NodeJS.ErrnoException|undefined} */ (result.error))?.code === 'ETIMEDOUT' && remaining < 2000) throw relayError('DEADLINE_EXCEEDED', 'process deadline exceeded', result.error);
   if (result.error || result.signal || result.status !== 0) throw relayError('PROCESS_UNAVAILABLE', 'cannot run process lookup', result.error);
   return result.stdout;
 }
 // The reason of an unknown verdict whose process read the caller's deadline cut short.
 export const DEADLINE_CUT = 'deadline exceeded';
+/** @param {string[]} args @param {import("../types.js").Deadline} [options] */
 export const runDarwinPs = (args, options) => runDarwinTool('/bin/ps', args, options);
+/** @param {string[]} args @param {import("../types.js").Deadline} [options] */
 export const runDarwinLsof = (args, options) => runDarwinTool('/usr/sbin/lsof', args, options);
 // lsof -F prints the process as `p<pid>`, then each text file as `n<path>`, some versions
 // preceding it with `ftxt`. The executable is the first; the Darwin probe's D4 checks that
 // order on a Mac.
+/** @param {unknown} output @param {number} pid */
 export function parseDarwinExecutable(output, pid) {
   const lines = typeof output === 'string' ? output.split('\n') : [];
   const name = lines[1] === 'ftxt' ? lines[2] : lines[1];
   if (lines[0] !== `p${pid}` || !name?.startsWith('n/')) throw relayError('PROCESS_UNREADABLE', 'invalid process executable');
   return name.slice(1);
 }
+/** @param {number} pid @param {(pid: number) => import("../types.js").ProcessRow|null} recordOf */
 function walk(pid, recordOf) {
   const seen = new Set(), chain = [];
   while (pid > 1) {
@@ -100,10 +109,12 @@ function walk(pid, recordOf) {
   }
   return chain;
 }
+/** @param {{platform?: string, readText?: (path: string) => string, readLink?: (path: string) => string, runPs?: typeof runDarwinPs, runLsof?: typeof runDarwinLsof, kill?: (pid: number, signal: number) => unknown, hostname?: () => string}} [options] */
 export function createProcessOps({ platform = process.platform, readText = (p) => readFileSync(p, 'utf8'),
   readLink = (p) => readlinkSync(p), runPs = runDarwinPs, runLsof = runDarwinLsof, kill = (pid, signal) => process.kill(pid, signal), hostname = osHostname } = {}) {
   if (!['linux', 'darwin'].includes(platform)) throw relayError('PROCESS_UNAVAILABLE', 'unsupported process platform');
-  const absent = (error) => ['ENOENT', 'ESRCH'].includes(error.code);
+  /** @param {import("../types.js").Failure} error */
+  const absent = (error) => (/** @type {unknown[]} */ (['ENOENT', 'ESRCH'])).includes(error.code);
   const local = () => {
     let host, bootId = null;
     try { host = (platform === 'linux' ? readText('/proc/sys/kernel/hostname') : hostname()).trim(); }
@@ -116,20 +127,22 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     }
     return { platform, host, bootId };
   };
+  /** @param {number} pid */
   const linuxRow = (pid) => {
     let text;
     try { text = readText(`/proc/${pid}/stat`); }
-    catch (cause) { if (absent(cause)) return null; throw relayError('PROCESS_UNREADABLE', 'cannot read process', cause); }
+    catch (caught) { const cause = /** @type {import("../types.js").Failure} */ (caught); if (absent(cause)) return null; throw relayError('PROCESS_UNREADABLE', 'cannot read process', cause); }
     const row = parseStat(text);
     if (row.pid !== pid) throw relayError('PROCESS_UNREADABLE', 'process identity mismatch');
     return row;
   };
+  /** @param {number} pid @param {import("../types.js").Deadline} [options] @param {boolean} [terminal] */
   const darwinRow = (pid, options, terminal) => {
     let output;
     try { output = runPs(['-p', String(pid), '-o', 'pid=,ppid=,tty=,lstart=,comm='], options); }
-    catch (cause) {
+    catch (caught) { const cause = /** @type {import('../types.js').Failure} */ (caught);
       if (cause.code === 'DEADLINE_EXCEEDED') throw cause;
-      try { kill(pid, 0); } catch (error) { if (error.code === 'ESRCH') return null; }
+      try { kill(pid, 0); } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught); if (error.code === 'ESRCH') return null; }
       throw relayError('PROCESS_UNAVAILABLE', 'cannot read process', cause);
     }
     if (typeof output !== 'string') throw relayError('PROCESS_UNREADABLE', 'invalid process output');
@@ -140,8 +153,11 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     if (row.pid !== pid) throw relayError('PROCESS_UNREADABLE', 'process identity mismatch');
     return row;
   };
+  /** @param {number} pid @param {import("../types.js").Deadline} [options] */
   const core = (pid, options) => platform === 'linux' ? linuxRow(pid) : darwinRow(pid, options, false);
+  /** @param {number} pid @param {import("../types.js").Deadline} [options] */
   const recordOf = (pid, options) => platform === 'linux' ? linuxRow(pid) : darwinRow(pid, options, true);
+  /** @param {number} pid @param {import("../types.js").Deadline} [options] */
   const ancestors = (pid, options) => {
     if (platform === 'linux') return walk(pid, (id) => recordOf(id, options));
     const output = runPs(['-axo', 'pid=,ppid=,tty=,lstart=,comm='], options);
@@ -149,13 +165,14 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     const records = new Map();
     for (const line of output.trimEnd().split('\n')) {
       try { const row = parseDarwinRow(line); records.set(row.pid, row); }
-      catch (error) {
+      catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught);
         const id = Number(/^\s*(\d+)/.exec(line)?.[1]);
         if (Number.isInteger(id) && id > 0 && !records.has(id)) records.set(id, error);
       }
     }
     return walk(pid, (id) => { const row = records.get(id); if (row instanceof Error) throw row; return row ?? null; });
   };
+  /** @param {number} pid @param {import("../types.js").Deadline} [options] */
   const handleOf = (pid, options) => {
     const identity = local();
     if (!identity) return null;
@@ -163,9 +180,12 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     if (!row?.starttime) return null;
     return validateHandle({ ...identity, pid, start: row.starttime });
   };
+  /** @param {import("../types.js").Liveness["status"]} status @param {string} reason */
   const verdict = (status, reason) => ({ status, reason });
-  const probe = (handle, options) => {
-    try { handle = validateHandle(handle); } catch { return verdict('unknown', 'missing or invalid handle'); }
+  /** @param {unknown} value @param {import("../types.js").Deadline} [options] */
+  const probe = (value, options) => {
+    let handle;
+    try { handle = validateHandle(value); } catch { return verdict('unknown', 'missing or invalid handle'); }
     if (handle.platform !== platform) return verdict('unknown', 'foreign platform');
     const identity = local();
     if (!identity) return verdict('unknown', 'local identity unavailable');
@@ -176,9 +196,9 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     }
     let row;
     try { row = core(handle.pid, options); }
-    catch (error) { return verdict('unknown', error.code === 'DEADLINE_EXCEEDED' ? DEADLINE_CUT : 'process unreadable'); }
+    catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught); return verdict('unknown', error.code === 'DEADLINE_EXCEEDED' ? DEADLINE_CUT : 'process unreadable'); }
     if (!row) return verdict('dead', 'process absent');
-    if (['Z', 'X', 'x'].includes(row.state)) return verdict('dead', 'process exited');
+    if ((/** @type {unknown[]} */ (['Z', 'X', 'x'])).includes(row.state)) return verdict('dead', 'process exited');
     if (row.starttime !== handle.start) return verdict('dead', 'process replaced');
     return verdict('alive', 'qualified process matches');
   };
@@ -186,6 +206,7 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
   // harness process" and "Non-session roles"). The kernel suffixes the exe link of a binary
   // replaced on disk, which a Claude Code auto-update does to every running session.
   const DELETED = ' (deleted)';
+  /** @param {number} pid @param {import("../types.js").Deadline} [options] */
   const executableOf = (pid, options) => {
     if (platform === 'linux') {
       let target;
@@ -197,6 +218,7 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     // Darwin's ps comm column is argv[0], which the process chooses, so it names no file.
     return parseDarwinExecutable(runLsof(['-w', '-a', '-p', String(pid), '-d', 'txt', '-Fn'], options), pid);
   };
+  /** @param {number} pid @param {import("../types.js").Deadline} [options] */
   const argvOf = (pid, options) => {
     if (platform === 'linux') {
       let text;
