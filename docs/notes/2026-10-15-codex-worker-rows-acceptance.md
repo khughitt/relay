@@ -119,3 +119,43 @@ unchanged
 
 Both refuse with `INVALID_SCHEMA` and the file's bytes are unchanged: the `scope:
 "worker"` tripwire holds (spec, "Older writers").
+
+## Claim acquisition
+
+Run 2026-10-15 (plan Task 6) with `tools/codex-worker-claims/run`: Codex `codex-cli
+0.162.1`, tasks `0.4.0` built after tasks-af3aac landed. Codex ran under `env -i`
+(no `TASKS_SESSION`, `TASKS_SESSION_PID` or `CLAUDE_CODE_SESSION_ID`) with relay's own
+hooks, a private relay state, and private `XDG_CONFIG_HOME`/`XDG_STATE_HOME` holding a
+throwaway tasks project (two todo tasks, A and B) and `[identity] relay = true`.
+`tools/codex-worker-claims/judge.mjs` judged each run from the commands' PostToolUse
+results, the `tasks claims` copies taken in each relay hook, the registry copies and
+`tasks show` after the run.
+
+| Run | Sandbox | Result |
+| --- | --- | --- |
+| positive | danger-full-access | PASS |
+| control | workspace-write | PASS |
+
+Positive run: A's claim was held only by `codex:R` (the root row) and B's only by
+`codex:W` (the worker row, `scope: "worker"`, `root: codex:R`, on the root's handle);
+each task's single `started` note carries its own session's provenance; both stayed
+`doing`. Command results (ids redacted to A, B, R, W; host, pid and path elided):
+
+| By | Command | Result |
+| --- | --- | --- |
+| controller | `tasks start A` | started, exit=0 |
+| worker | `tasks start B` | started, exit=0 |
+| worker | `tasks start A` | `claimed`: claimed by session `codex:R` (live), exit=1 |
+| worker | `tasks park A probe` | `claimed`: claimed by session `codex:R` (live), exit=1 |
+| worker | `tasks done A probe` | `claimed`: claimed by session `codex:R` (live), exit=1 |
+| controller | `tasks start B` | `claimed`: claimed by session `codex:W` (live), exit=1 |
+| controller | `tasks park B probe` | `claimed`: claimed by session `codex:W` (live), exit=1 |
+| controller | `tasks done B probe` | `claimed`: claimed by session `codex:W` (live), exit=1 |
+
+Control: under the workspace-write sandbox, `tasks start A` refused before any row
+matching, and A stayed unclaimed and `todo`:
+
+```
+{"error":{"detail":"relay identity: the nearest codex ancestor is pid 1 with no parent, so this command runs in a PID namespace that hides the harness session process (a sandbox helper is pid 1) and relay cannot match it from here; set TASKS_SESSION to this session's exact id, without TASKS_SESSION_PID (a pid from this namespace keeps the claim held after the session ends), or run with the host PID view","kind":"config"}}
+exit=1
+```
