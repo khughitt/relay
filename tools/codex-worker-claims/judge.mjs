@@ -74,7 +74,8 @@ if (mode === '--sandboxed') {
   if (!rootRow || !workerRow) fail('the registry never held both the root and the worker row');
   else {
     if (workerRow.scope !== 'worker' || workerRow.root !== R) fail(`worker row scope ${workerRow.scope}, root ${workerRow.root}`);
-    if (!isDeepStrictEqual(workerRow.process, rootRow.process)) fail('root and worker rows do not share a handle');
+    if (rootRow.process === null) fail('the root row has no process handle');
+    else if (!isDeepStrictEqual(workerRow.process, rootRow.process)) fail('root and worker rows do not share a handle');
   }
   for (const [name, task, owner] of [['A', A, R], ['B', B, W]]) {
     if (task.task.status !== 'doing') fail(`${name} status ${task.task.status}`);
@@ -83,10 +84,12 @@ if (mode === '--sandboxed') {
     else if (seen.some(session => session !== owner)) fail(`${name} held by ${[...new Set(seen)].join(', ')}, expected only ${owner}`);
     // The owner's row was in the registry when its start ran (the copy its PreToolUse left),
     // and the claim holds that row's process: tasks' native CODEX_THREAD_ID fallback names
-    // the same session but records no pid.
+    // the same session but records no pid. A renamed codex executable hides the boundary from
+    // both, leaving a handle-less row and pid-less claims, so the handle is required.
     const at = acquired[name]?.pre.after?.agents?.[owner];
     if (!at) fail(`${name}: no ${owner} row when its start ran`);
-    else if (claimsOf(ids[name]).some(c => c.pid !== at.process?.pid)) fail(`${name} claimed without the relay row's process (pid ${at.process?.pid})`);
+    else if (!Number.isInteger(at.process?.pid)) fail(`${name}: ${owner} row had no process handle when its start ran`);
+    else if (claimsOf(ids[name]).some(c => c.pid !== at.process.pid)) fail(`${name} claimed without the relay row's process (pid ${at.process.pid})`);
     const lifecycle = markers(task);
     if (lifecycle.length !== 1 || lifecycle[0].text !== 'started') fail(`${name} lifecycle notes ${JSON.stringify(lifecycle.map(n => n.text))}`);
     else if (lifecycle[0].harness_session !== owner) fail(`${name} started by ${lifecycle[0].harness_session}, expected ${owner}`);

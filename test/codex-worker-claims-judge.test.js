@@ -77,3 +77,13 @@ test('the claims judge fails a run in which an owner had no row when it acquired
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stdout, /FAIL: B: no codex:worker-thread row when its start ran/);
 });
+test('the claims judge fails a run whose rows have no process handle and whose claims have no pid', async t => {
+  const run = passingRun();
+  for (const step of run.steps) {
+    for (const agent of Object.values(step.after?.agents ?? {})) agent.process = null;
+    for (const c of step.claims?.claims ?? []) delete c.pid;
+  }
+  const r = await verdict(t, run);
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stdout, /FAIL: A: codex:root-thread row had no process handle when its start ran/);
+});
