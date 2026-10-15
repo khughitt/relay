@@ -1,15 +1,16 @@
 ---
 id: relay-635fdc
 title: Publish Codex worker rows
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: planned
 owner: relay-6825f7
 created: 2026-10-15T10:02:39Z
-updated: 2026-10-15T13:21:17Z
+updated: 2026-10-15T13:22:03Z
 started: 2026-10-15T10:03:07Z
+completed: 2026-10-15T13:22:03Z
 depends: [tasks-af3aac]
 parent: relay-eaca0e
 tags: []
@@ -57,3 +58,7 @@ Implement docs/specs/2026-10-15-codex-worker-rows.md: route agent_id events to c
 - 2026-10-15T13:13:44Z (relay-6825f7): review: impl round 3 — verdict: revise; findings: Important 1, Minor 11; reviewer: claude-code
 - 2026-10-15T13:18:27Z (relay-6825f7): review: impl round 4 — verdict: revise; findings: Important 1, Minor 3; reviewer: claude-code
 - 2026-10-15T13:21:17Z (relay-6825f7): review: impl round 5 — verdict: accept; findings: Minor 1; reviewer: claude-code/claude-opus-5-5
+- 2026-10-15T13:22:03Z (relay-6825f7): done
+  provenance: {"harness_session":"claude-code:783163fb-6924-41d7-a9d8-63a7fc5cb315","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T13:22:03Z (relay-6825f7): Codex worker rows: codex:<agent_id> rows (scope worker, root), SubagentStart/SubagentStop routing and install, cascade on root SessionEnd; registry and claim acceptance PASS live (Codex 0.162.1, tasks 0.4.0); follow-up relay-251fcd
+  provenance: {"harness_session":"claude-code:783163fb-6924-41d7-a9d8-63a7fc5cb315","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
