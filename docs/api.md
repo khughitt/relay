@@ -66,6 +66,11 @@ OpenCode, `session` for Claude Code, and for Codex `session` without `root` or `
 with it; any other combination is `INVALID_SCHEMA`. A relay from before worker rows
 accepts only `session` for Codex, so it refuses a snapshot holding a worker row and
 writes nothing, rather than publishing the rows without their `root`.
+A worker row ends only with its root: the root's SessionEnd removes the root and every
+row naming it as `root` in one publication, and the prune of a dead process removes them
+together, since they share its handle. A worker has no end event of its own, and an
+interrupted or failed worker turn leaves its row in its last state; a worker row's
+`state` is the last event seen, not proof of activity.
 `test/fixtures/registry-workers.json` is the shared example: a root, a worker, a nested
 worker and a Claude row; tasks vendors it.
 
@@ -223,7 +228,8 @@ result remains null/unchanged. Recreation starts a new generation. Revision
 overflow fails before publication.
 Git and agent resolution occur before locking; latest-state reduction and one
 canonical atomic snapshot publication occur under the lock. SessionEnd skips
-Git/process enrichment and removes its exact ID. Confirmed-dead pruning still
+Git/process enrichment and removes its exact ID and, for a Codex root, every row
+whose `root` is that ID, in the same publication. Confirmed-dead pruning still
 occurs under the same lock. OpenCode idle preserves error, turns active into done,
 and otherwise becomes idle. Reap always returns MutationResult, emits no Event,
 and invokes no guard/subscriber. R2 must notify reconciliation observers even on
