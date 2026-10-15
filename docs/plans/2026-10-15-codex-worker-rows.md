@@ -10,7 +10,7 @@
 
 **Spec:** `docs/specs/2026-10-15-codex-worker-rows.md` (approved 2026-10-15 after two review rounds).
 
-**Status:** approved 2026-10-15 after three review rounds. Execution: Native (superpowers:executing-plans) for Tasks 1–5, then a fresh whole-branch review; Task 6 runs only once tasks-af3aac has landed and its `tasks` is installed.
+**Status:** approved 2026-10-15 after three review rounds; executed 2026-10-15 (Native, superpowers:executing-plans). Tasks 1–5 passed a whole-branch review and one corrective round; Task 6 ran after tasks-af3aac landed and passed its own review after two corrective rounds.
 
 ## Global Constraints
 

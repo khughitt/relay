@@ -1,6 +1,8 @@
 # Codex worker rows
 
-Status: draft for review, 2026-10-15.
+Status: approved 2026-10-15; implemented 2026-10-15 (`relay-635fdc`, plan
+`docs/plans/2026-10-15-codex-worker-rows.md`; acceptance in
+`docs/notes/2026-10-15-codex-worker-rows-acceptance.md`).
 Task: `relay-6825f7` (goal `relay-eaca0e`; wakes `relay-f56e30`).
 Evidence: `docs/notes/2026-10-12-codex-worker-registration-brief.md` §7 and §8 (Codex
 0.162.1 captures), reproducible with `tools/codex-subagent-capture/run --case <case>`.
