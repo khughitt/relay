@@ -128,17 +128,99 @@ Findings:
 - The controller cannot learn W from its own spawn: `spawn_agent` returns a task name.
   SubagentStart is the first point where W is visible.
 - Today's relay mapping, if installed, would attribute #7 and #8 to the root row: the
-  Codex adapter keys rows by `session_id` alone, so worker activity would move the
-  controller's row to `working` while the controller is waiting.
+  Codex adapter keys rows by `session_id` alone. Here that is invisible, since the
+  controller sits in `wait_agent` and its row already reads `working`; §8's background
+  case shows where it is not (relay-15b49c).
 
-Not exercised: a worker's second turn (whether SubagentStart repeats; the source says
-startup/fork only), a nested worker (whether `agent_id` names the nested worker and
-nothing names its parent), an interrupted or failed worker, the TUI rather than `exec`,
-and macOS.
+§8 covers the cases this run did not exercise; macOS remains unexercised.
 
 Recommendation: alternative 1, worker rows keyed `codex:<agent_id>`. Every precondition
 the lean named holds. Two design points the capture makes concrete for relay-6825f7:
 the adapter must route an event carrying `agent_id` to the worker row (and never update
 the root row from it), which is a fix needed even if alternative 3 is chosen; and a
 worker row has no end event, so its removal is process death, root SessionEnd, or a
-staleness bound measured from the last SubagentStop.
+staleness bound (§8 sharpens what that bound must cover).
+
+## 8. Further cases (relay-752a6e, 2026-10-15)
+
+Same release and harness as §7, one run per case with
+`tools/codex-subagent-capture/run --case <case>`; tables are
+`tools/codex-subagent-capture/summarize.mjs` output, trimmed to the rows that matter.
+Every hook in every case had the same nearest `codex` process, the root's `session_id`,
+and no `CODEX_*` variable beyond `CODEX_HOME`.
+
+**followup** — the controller gives the same worker a second turn with `followup_task`.
+
+| # | s | Event | Turn | `agent_id` | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 6 | 8.7 | SubagentStart | T2 | W1 | first turn |
+| 9 | 15.9 | SubagentStop | T2 | W1 | |
+| 11 | 21.3 | PreToolUse | T1 | absent | controller's `followup_task` |
+| 14 | 26.8 | PreToolUse | T3 | W1 | second turn: no SubagentStart before it |
+| 16 | 31.3 | SubagentStop | T3 | W1 | |
+
+**interrupted** — the worker runs `sleep 60`; the controller's `wait_agent` times out and
+it calls `interrupt_agent`.
+
+| # | s | Event | Turn | `agent_id` | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 6 | 9.6 | SubagentStart | T2 | W1 | |
+| 7 | 14.0 | PreToolUse | T2 | W1 | `Bash` (the sleep) |
+| 9 | 22.6 | PreToolUse | T1 | absent | controller's `interrupt_agent` |
+| 11 | 27.3 | Stop | T1 | absent | no worker PostToolUse or SubagentStop at any point |
+
+**background** — the controller ends its turn without waiting. `exec` ends the session
+at the controller's Stop, before the worker's first turn starts (no SubagentStart at
+all), so this case runs the interactive TUI in a detached tmux session. (The TUI ran
+`gpt-6-astra` rather than the configured model; identity fields do not depend on it.)
+
+| # | s | Event | Turn | `agent_id` | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 4 | 3.6 | PostToolUse | T1 | absent | controller's `spawn_agent` |
+| 5 | 6.9 | Stop | T1 | absent | controller's turn is over |
+| 6 | 8.3 | SubagentStart | T2 | W1 | after the controller's Stop |
+| 7 | 13.5 | PreToolUse | T2 | W1 | |
+| 8 | 28.7 | PostToolUse | T2 | W1 | |
+| 9 | 32.5 | SubagentStop | T2 | W1 | |
+
+**nested** — `agents.max_depth = 2` (Codex's default is 1, which refuses a worker's own
+spawn); the controller spawns outer, outer spawns inner.
+
+| # | s | Event | Turn | `agent_id` | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 6 | 10.2 | SubagentStart | T2 | W1 | outer; transcript: W1's rollout |
+| 7 | 14.1 | PreToolUse | T2 | W1 | outer's `spawn_agent` |
+| 10 | 18.6 | SubagentStart | T3 | W2 | inner; transcript: W2's rollout |
+| 13 | 25.8 | SubagentStop | T3 | W2 | transcript: **W1's** rollout; agent transcript: W2's |
+| 15 | 29.0 | SubagentStop | T2 | W1 | transcript: R's rollout; agent transcript: W1's |
+
+**badmodel** — the spawn names a model that does not exist. Codex refuses the spawn
+itself (`Unknown model … for spawn_agent`): a PreToolUse for `spawn_agent` with no
+PostToolUse, no worker, no worker events.
+
+Source, for the failed turn this capture could not provoke: Codex runs Stop/SubagentStop
+hooks only where a turn's sampling completes without a follow-up
+(`core/src/session/turn.rs`, the `run_turn_stop_hooks` call); errored, interrupted and
+aborted turns return before it. The interrupted case confirms that live.
+
+Findings:
+
+- SubagentStart fires once per worker, before its first turn only. Later turns have no
+  start event; the first event of a later turn is a tool event or its SubagentStop.
+- SubagentStop marks a *successful* turn end only. An interrupted or failed worker turn
+  ends silently, leaving the worker last seen mid-tool (interrupted: a PreToolUse with no
+  PostToolUse). This is the capacity-error incident noted on relay-6825f7.
+- A worker outlives its controller's turn: in an interactive session every worker event
+  can arrive after the root's Stop. Under `exec` a worker that has not started when the
+  controller stops never runs.
+- A nested worker carries its own `agent_id` and the root `session_id`, and nothing in
+  its payloads names its parent, except SubagentStop's `transcript_path`, which is the
+  immediate parent's rollout (source: `core/src/hook_runtime.rs` resolves the
+  `parent_thread_id`'s rollout path). A parent link is available only at a successful
+  turn end, from a file name.
+- A refused spawn produces no worker events; a consumer must not infer a worker from
+  the controller's spawn PreToolUse.
+
+For relay-6825f7: a worker row's state cannot rest on SubagentStop alone. After an
+interrupted or failed turn the row would read `working` until a staleness rule, root
+SessionEnd or process death clears it. And no worker event ever closes it.
