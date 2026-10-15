@@ -6,9 +6,9 @@ priority: 2
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: fix/ask-undeliverable
 created: 2026-10-13T20:14:23Z
-updated: 2026-10-15T08:22:17Z
+updated: 2026-10-15T08:22:31Z
 started: 2026-10-15T08:22:17Z
 depends: []
 tags: []
@@ -34,4 +34,6 @@ Done:
 ## Notes
 
 - 2026-10-15T08:22:17Z (main): started
+  provenance: {"harness_session":"codex:01a13ea6-4e87-7e12-9ed3-696c55f0a636","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T08:22:31Z (fix/ask-undeliverable): resumed
   provenance: {"harness_session":"codex:01a13ea6-4e87-7e12-9ed3-696c55f0a636","harness_session_source":"CODEX_THREAD_ID"}
