@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: planned
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-15T22:17:41Z
+updated: 2026-10-15T22:17:52Z
 depends: []
 tags: []
 source: "lore:docs/notes/2026-10-02-codex-model-identity-brief.md"
@@ -30,3 +30,7 @@ Done: a reviewed design spec and plan (docs/specs/, docs/plans/), then the resol
 The spec decides, from the original open list: (1) the command's name and home in relay (lean: a subcommand declared in src/commands.js, one Node start per tasks stamp); (2) a rule for processes that inherit CODEX_THREAD_ID from a Codex session, such as a tmux server or another harness (lean: require a codex-named ancestor and print bare codex without one; confirm that a tmux server or setsid process started from a Codex tool call loses it); (3) how to locate the rollout: the UUIDv7 day directory, the glob, state_5.sqlite (node:sqlite, against the Node 22 floor) or app-server thread/read, with archived_sessions covered either way, since the glob misses it; (4) ephemeral sessions (no rollout means bare codex, if confirmed); (5) whether a tool call's CODEX_THREAD_ID follows the TUI's /new, /resume and /fork in one process (relay-3d6c93 records it); (6) whether the effort is printed, and how a fallback to bare codex reports its reason rather than passing silently.
 
 Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surface; src/adapters/codex.js and src/adapters/ancestry.js (resolveSessionPid's codex match); obs's codex_adapter.py:66-69 reads the same turn_context fields; tasks-970049 for the consumer.
+
+## Notes
+
+- 2026-10-15T22:17:52Z (main): scope: scoped; kept the hq-1bd166 evidence and proposal, added what scoping established (no live relay Codex hooks on this host, a codex-named ancestor survives the workspace-write sandbox, 16,287-rollout lookup cost, UUIDv7 day-directory layout) and the spec's six decisions with leans; todo P2 m/mid/planned, since hq-fce47e and tasks-970049 already wait on it and its open choices are bounded design for a reviewed spec
