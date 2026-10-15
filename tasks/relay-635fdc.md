@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: relay-6825f7
 created: 2026-10-15T10:02:39Z
-updated: 2026-10-15T10:47:01Z
+updated: 2026-10-15T10:47:02Z
 started: 2026-10-15T10:03:07Z
 depends: [tasks-af3aac]
 parent: relay-eaca0e
@@ -43,3 +43,5 @@ Implement docs/specs/2026-10-15-codex-worker-rows.md: route agent_id events to c
   provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-15T10:46:58Z (relay-6825f7): review: plan round 3 — verdict: accept; findings: none; reviewer: human
 - 2026-10-15T10:47:01Z (relay-6825f7): Plan approved (round 3). Execution method chosen by user: Native for Tasks 1-5 plus a fresh whole-branch review; Task 6 gated on tasks-af3aac landed and installed.
+- 2026-10-15T10:47:02Z (relay-6825f7): parked (waiting on agent, session): Agent, in a fresh session: open .worktrees/relay-6825f7 (branch relay-6825f7, holds the approved spec and plan), run tasks start relay-635fdc there, run the baseline (just test-fast), then execute Tasks 1-5 of docs/plans/2026-10-15-codex-worker-rows.md with superpowers:executing-plans (start each step task relay-6a20f1, relay-05f42c, relay-1f8894, relay-4626e0, relay-641058 before it), then dispatch a fresh whole-branch review. Task 6 (relay-805fb4) waits for tasks-af3aac landed and installed.
+  provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
