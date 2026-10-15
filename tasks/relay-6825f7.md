@@ -6,9 +6,9 @@ priority: 2
 size: m
 complexity: high
 process: planned
-owner: main
+owner: relay-6825f7
 created: 2026-10-13T01:33:23Z
-updated: 2026-10-15T09:36:30Z
+updated: 2026-10-15T09:36:35Z
 started: 2026-10-15T09:36:30Z
 depends: [relay-ed3f00, relay-752a6e]
 parent: relay-eaca0e
@@ -25,4 +25,6 @@ Ideas it wakes: On completion, run `tasks note relay-f56e30 --no-reviewed "<deci
 - 2026-10-15T09:27:24Z (main): Inputs from relay-ed3f00's capture: worker rows are feasible (brief §7); relay-15b49c fixes worker events landing on the root row in either alternative; relay-752a6e answers the lifecycle cases (repeat turns, failed turn, background, nested) before the spec settles row removal.
 - 2026-10-15T09:35:57Z (relay-752a6e): relay-752a6e (brief §8): no worker end event in any case; SubagentStart once only; interrupted/failed turns emit no SubagentStop; worker events outlive the root's Stop; immediate parent only from SubagentStop transcript_path.
 - 2026-10-15T09:36:30Z (main): started
+  provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T09:36:35Z (relay-6825f7): resumed
   provenance: {"harness_session":"claude-code:91c56343-8f06-4b5e-91e7-7d018e111bd1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
