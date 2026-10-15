@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Capture which Codex hook events reach a configured command hook when a controller
+# spawns one worker, with each payload, the hook's CODEX_* environment and its process
+# ancestry. Runs under a private CODEX_HOME: the user's hook config and the relay
+# registry are never touched. Only auth.json is copied in, and it is removed on exit.
+#
+# Usage: tools/codex-subagent-capture/run [OUT_DIR]
+#   CODEX_BIN (default: codex), CAPTURE_MODEL (default: the user's configured model),
+#   CODEX_AUTH (default: ~/.codex/auth.json), CAPTURE_TIMEOUT seconds (default: 600).
+# Prints OUT_DIR; raw payloads land in OUT_DIR/log, one <seq>-<event>.json each.
+set -euo pipefail
+
+codex=${CODEX_BIN:-codex}
+auth=${CODEX_AUTH:-$HOME/.codex/auth.json}
+out=${1:-$(mktemp -d "${TMPDIR:-/tmp}/codex-subagent-capture.XXXXXX")}
+mkdir -p "$out"/{home,work,log}
+out=$(cd "$out" && pwd -P)
+home=$out/home
+
+[[ -r $auth ]] || { echo "no readable Codex auth at $auth" >&2; exit 2; }
+install -m 600 "$auth" "$home/auth.json"
+model=${CAPTURE_MODEL:-$(sed -n 's/^model = "\(.*\)"$/\1/p' "$HOME/.codex/config.toml" | head -1)}
+[[ -n $model ]] || { echo "set CAPTURE_MODEL: no model in ~/.codex/config.toml" >&2; exit 2; }
+
+child=
+cleanup() {
+  [[ -n $child ]] && kill "$child" 2>/dev/null || true
+  rm -f "$home/auth.json"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+cat >"$out/hook.sh" <<'HOOK'
+#!/usr/bin/env bash
+# One logging hook for every event: payload, CODEX_* env and /proc ancestry, as JSON.
+event=$1 log=$2
+exec 2>>"$log/hook.stderr"
+seq=$(date +%s%N)
+payload=$(cat)
+chain='[' pid=$$ sep=
+while [[ $pid -gt 1 && -r /proc/$pid/stat ]]; do
+  stat=$(</proc/$pid/stat)
+  comm=${stat#*(} comm=${comm%)*}
+  rest=${stat##*) } ppid=$(cut -d' ' -f2 <<<"$rest")
+  argv0=$(tr '\0' '\n' </proc/$pid/cmdline | head -1)
+  chain+="$sep{\"pid\":$pid,\"ppid\":$ppid,\"comm\":$(jq -Rn --arg v "$comm" '$v'),\"argv0\":$(jq -Rn --arg v "$argv0" '$v')}"
+  sep=, pid=$ppid
+done
+chain+=']'
+env_json=$(env | grep '^CODEX_' | jq -Rn '[inputs | capture("^(?<key>[^=]+)=(?<value>.*)$")] | from_entries')
+jq -n --arg event "$event" --argjson payload "$payload" --argjson env "$env_json" --argjson ancestry "$chain" \
+  '{event: $event, payload: $payload, env: $env, ancestry: $ancestry}' >"$log/$seq-$event.json"
+# A failing logger must not block the run: Codex reads exit 2 as a refusal.
+exit 0
+HOOK
+chmod 700 "$out/hook.sh"
+
+events=(SessionStart SubagentStart UserPromptSubmit PreToolUse PostToolUse PermissionRequest Stop SubagentStop SessionEnd)
+jq -n --arg hook "$out/hook.sh" --arg log "$out/log" '
+  {hooks: ($ARGS.positional | map({key: ., value: [{hooks: [{type: "command",
+    command: "\($hook | @sh) \(. | @sh) \($log | @sh)", timeout: 30}]}]}) | from_entries)}' \
+  --args "${events[@]}" >"$home/hooks.json"
+
+cat >"$home/config.toml" <<TOML
+model = "$model"
+approval_policy = "never"
+sandbox_mode = "read-only"
+
+[features]
+hooks = true
+multi_agent = true
+TOML
+
+prompt='Spawn exactly one subagent (worker). Instruct the worker to run the shell command `echo worker-tool-ran` and reply with its output. Wait for the worker to finish, then reply with the single word done. Do not run any tool yourself other than spawning and waiting for the worker.'
+CODEX_HOME=$home timeout "${CAPTURE_TIMEOUT:-600}" "$codex" exec --skip-git-repo-check --dangerously-bypass-hook-trust \
+  -C "$out/work" "$prompt" >"$out/exec.stdout" 2>"$out/exec.stderr" &
+child=$!
+status=0
+wait "$child" || status=$?
+child=
+"$codex" --version >"$out/codex-version"
+echo "$out"
+exit "$status"

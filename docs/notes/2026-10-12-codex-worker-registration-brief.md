@@ -67,9 +67,9 @@ Lean: 1, if live capture shows SubagentStart reaches a relay hook command with
 
 ## 5. Unanswered questions
 
-- Does Codex deliver SubagentStart/SubagentStop to a configured command hook at the
+- ~~Does Codex deliver SubagentStart/SubagentStop to a configured command hook at the
   current release, with which fields, and do a worker's PreToolUse payloads carry
-  `agent_id`? — relay-ed3f00 (live capture).
+  `agent_id`?~~ Yes, at 0.162.1: §7.
 - What ends a worker row, given SubagentStop is per-turn? — design, after capture.
 - Does tasks need anything beyond `sessionId == thread` to accept the row? — the
   design, reviewed with the tasks lane (tasks-2fa8c6).
@@ -84,3 +84,61 @@ Lean: 1, if live capture shows SubagentStart reaches a relay hook command with
     relay-ed3f00. Wakes relay-f56e30.
 - Drops proposed (covered by tasks `a7ffc27`): relay-11829e, relay-60ae9e,
   relay-c85a0f, relay-652c96.
+
+## 7. Capture evidence (relay-ed3f00, 2026-10-15)
+
+Codex 0.162.1 (`codex exec`, linux-x86_64 musl), captured by
+`tools/codex-subagent-capture/run`: a private `CODEX_HOME` with `features.hooks` and
+`features.multi_agent`, one logging command hook on every event, and
+`--dangerously-bypass-hook-trust` so the hooks need no trust record. The controller
+spawned one worker (`spawn_agent`), the worker ran `echo` once and finished its turn, and
+the controller waited (`wait_agent`) and stopped. No relay code ran and no user hook
+config changed. Labels: **R** is the root session id, **W** the worker's thread id (the
+uuid in its rollout file name), **T-R**/**T-W** their turn ids, **P** the one `codex`
+process.
+
+| # | Event | Turn | `session_id` | `agent_id` / `agent_type` | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 1 | SessionStart | — | R | absent | `source: startup` |
+| 2 | UserPromptSubmit | T-R | R | absent | |
+| 3 | PreToolUse | T-R | R | absent | `tool_name: collaborationspawn_agent` |
+| 4 | PostToolUse | T-R | R | absent | response is `{"task_name":"/root/worker"}`, not W |
+| 5 | PreToolUse | T-R | R | absent | `collaborationwait_agent` |
+| 6 | SubagentStart | T-W | R | W / `default` | `transcript_path` is W's rollout; ~6 s after #3 |
+| 7 | PreToolUse | T-W | R | W / `default` | `tool_name: Bash` |
+| 8 | PostToolUse | T-W | R | W / `default` | |
+| 9 | SubagentStop | T-W | R | W / `default` | `transcript_path` is R's, `agent_transcript_path` W's; `stop_hook_active: false` |
+| 10 | PostToolUse | T-R | R | absent | `wait_agent` returned |
+| 11 | Stop | T-R | R | absent | |
+| 12 | SessionEnd | — | R | absent | `reason: other` |
+
+Every hook process's parent was P: controller and worker hooks have the same nearest
+`codex` ancestor. The hook environment held `CODEX_HOME` and no other `CODEX_*`
+variable: neither `CODEX_THREAD_ID` nor `CODEX_SESSION_ID` reaches a hook, so the
+payload is the only identity source.
+
+Findings:
+
+- SubagentStart and SubagentStop reach a configured command hook, carrying the root's
+  `session_id` and the worker's `agent_id`, as the 0.160.1 source trace predicted.
+- A worker's tool events carry `agent_id`; the controller's never do. Presence of
+  `agent_id` separates worker from controller events without process evidence.
+- The worker got no UserPromptSubmit, Stop or SessionEnd. Its turn starts at
+  SubagentStart (first turn) and ends at SubagentStop.
+- The controller cannot learn W from its own spawn: `spawn_agent` returns a task name.
+  SubagentStart is the first point where W is visible.
+- Today's relay mapping, if installed, would attribute #7 and #8 to the root row: the
+  Codex adapter keys rows by `session_id` alone, so worker activity would move the
+  controller's row to `working` while the controller is waiting.
+
+Not exercised: a worker's second turn (whether SubagentStart repeats; the source says
+startup/fork only), a nested worker (whether `agent_id` names the nested worker and
+nothing names its parent), an interrupted or failed worker, the TUI rather than `exec`,
+and macOS.
+
+Recommendation: alternative 1, worker rows keyed `codex:<agent_id>`. Every precondition
+the lean named holds. Two design points the capture makes concrete for relay-6825f7:
+the adapter must route an event carrying `agent_id` to the worker row (and never update
+the root row from it), which is a fix needed even if alternative 3 is chosen; and a
+worker row has no end event, so its removal is process death, root SessionEnd, or a
+staleness bound measured from the last SubagentStop.
