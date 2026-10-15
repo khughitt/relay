@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-15T09:27:07Z
-updated: 2026-10-15T09:27:20Z
+updated: 2026-10-15T10:02:51Z
 depends: []
 parent: relay-eaca0e
 tags: []
@@ -22,3 +22,5 @@ Where: src/adapters/index.js, src/adapters/codex.js, docs/notes/2026-10-12-codex
 ## Notes
 
 - 2026-10-15T09:27:20Z (main): concerns: relay-ed3f00 extension — capture exposed worker events reaching the root row
+- 2026-10-15T10:02:26Z (main): Subsumed by  (approved spec docs/specs/2026-10-15-codex-worker-rows.md routes agent_id events to worker rows); close with it.
+- 2026-10-15T10:02:51Z (main): correction to the previous note: the subsuming task is relay-635fdc
