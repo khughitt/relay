@@ -1,14 +1,35 @@
 #!/usr/bin/env bash
 # Capture which Codex hook events reach a configured command hook when a controller
-# spawns one worker, with each payload, the hook's CODEX_* environment and its process
+# spawns workers, with each payload, the hook's CODEX_* environment and its process
 # ancestry. Runs under a private CODEX_HOME: the user's hook config and the relay
 # registry are never touched. Only auth.json is copied in, and it is removed on exit.
 #
-# Usage: tools/codex-subagent-capture/run [OUT_DIR]
+# Usage: tools/codex-subagent-capture/run [--case CASE] [OUT_DIR]
+#   single      one worker runs one tool and finishes its turn (the default)
+#   followup    the controller gives the same worker a second turn (followup_task)
+#   badmodel    the spawn names a model that does not exist (Codex refuses the spawn)
+#   interrupted the controller interrupts a sleeping worker (interrupt_agent)
+#   background  the controller ends its turn without waiting for a sleeping worker; runs
+#               the interactive TUI in a detached tmux session, since exec ends the
+#               session, and with it the worker, at the controller's Stop
+#   nested      a worker spawns its own worker (agents.max_depth = 2; Codex defaults to 1)
 #   CODEX_BIN (default: codex), CAPTURE_MODEL (default: the user's configured model),
 #   CODEX_AUTH (default: ~/.codex/auth.json), CAPTURE_TIMEOUT seconds (default: 600).
 # Prints OUT_DIR; raw payloads land in OUT_DIR/log, one <seq>-<event>.json each.
 set -euo pipefail
+
+case=single
+if [[ ${1:-} == --case ]]; then case=${2:?--case needs a name}; shift 2; fi
+only='Do not run any tool yourself other than the agent tools named here.'
+case $case in
+  single) prompt="Spawn exactly one subagent (worker). Instruct the worker to run the shell command \`echo worker-tool-ran\` and reply with its output. Wait for the worker to finish, then reply with the single word done. $only" ;;
+  followup) prompt="Spawn exactly one subagent named worker. Instruct it to run the shell command \`echo first-turn\` and reply with its output. Wait for it to finish. Then give the same worker a follow-up task with followup_task: run \`echo second-turn\` and reply with its output. Wait for it to finish again, then reply with the single word done. $only" ;;
+  badmodel) prompt="Spawn exactly one subagent with its model set to \`no-such-model-relay-capture\`. Instruct it to run the shell command \`echo failed-turn\` and reply with its output. If spawning fails, do not retry: reply with the error. Otherwise wait for it to finish, then reply with done and any error the worker reported. $only" ;;
+  interrupted) prompt="Spawn exactly one subagent. Instruct it to run the shell command \`sleep 60; echo late\` and reply with its output. Call wait_agent with a timeout of 10000 ms; it will time out. Then interrupt the subagent with interrupt_agent. Then reply with the single word done. $only" ;;
+  background) prompt="Spawn exactly one subagent. Instruct it to run the shell command \`sleep 15; echo background-ran\` and reply with its output. Do not wait for it: as soon as the spawn returns, reply with the single word done. $only" ;;
+  nested) prompt="Spawn exactly one subagent named outer. Instruct outer to spawn exactly one subagent of its own named inner, which runs the shell command \`echo nested-ran\` and replies with its output; outer waits for inner to finish and then replies done. You wait for outer to finish, then reply with the single word done. $only" ;;
+  *) echo "unknown case: $case" >&2; exit 2 ;;
+esac
 
 codex=${CODEX_BIN:-codex}
 auth=${CODEX_AUTH:-$HOME/.codex/auth.json}
@@ -22,9 +43,10 @@ install -m 600 "$auth" "$home/auth.json"
 model=${CAPTURE_MODEL:-$(sed -n 's/^model = "\(.*\)"$/\1/p' "$HOME/.codex/config.toml" | head -1)}
 [[ -n $model ]] || { echo "set CAPTURE_MODEL: no model in ~/.codex/config.toml" >&2; exit 2; }
 
-child=
+child= tmux_session=
 cleanup() {
   [[ -n $child ]] && kill "$child" 2>/dev/null || true
+  [[ -n $tmux_session ]] && tmux kill-session -t "$tmux_session" 2>/dev/null || true
   rm -f "$home/auth.json"
 }
 trap cleanup EXIT
@@ -70,14 +92,30 @@ sandbox_mode = "read-only"
 hooks = true
 multi_agent = true
 TOML
+[[ $case == nested ]] && printf '\n[agents]\nmax_depth = 2\n' >>"$home/config.toml"
 
-prompt='Spawn exactly one subagent (worker). Instruct the worker to run the shell command `echo worker-tool-ran` and reply with its output. Wait for the worker to finish, then reply with the single word done. Do not run any tool yourself other than spawning and waiting for the worker.'
-CODEX_HOME=$home timeout "${CAPTURE_TIMEOUT:-600}" "$codex" exec --skip-git-repo-check --dangerously-bypass-hook-trust \
-  -C "$out/work" "$prompt" >"$out/exec.stdout" 2>"$out/exec.stderr" &
-child=$!
 status=0
-wait "$child" || status=$?
-child=
+if [[ $case == background ]]; then
+  printf '\n[projects."%s"]\ntrust_level = "trusted"\n' "$out/work" >>"$home/config.toml"
+  tmux_session=relay-capture-$$
+  tmux new-session -d -s "$tmux_session" -x 200 -y 50 \
+    "CODEX_HOME=$(printf %q "$home") $(printf %q "$codex") --dangerously-bypass-hook-trust -C $(printf %q "$out/work") $(printf %q "$prompt")"
+  # The worker's SubagentStop, or the timeout, ends the run; the TUI stays up until then.
+  deadline=$((SECONDS + ${CAPTURE_TIMEOUT:-600}))
+  until compgen -G "$out/log/*-SubagentStop.json" >/dev/null || ((SECONDS >= deadline)); do sleep 1; done
+  compgen -G "$out/log/*-SubagentStop.json" >/dev/null || status=124
+  sleep 3
+  tmux capture-pane -p -t "$tmux_session" >"$out/tui.txt" || true
+  tmux kill-session -t "$tmux_session"
+  tmux_session=
+else
+  CODEX_HOME=$home timeout "${CAPTURE_TIMEOUT:-600}" "$codex" exec --skip-git-repo-check --dangerously-bypass-hook-trust \
+    -C "$out/work" "$prompt" >"$out/exec.stdout" 2>"$out/exec.stderr" &
+  child=$!
+  wait "$child" || status=$?
+  child=
+fi
 "$codex" --version >"$out/codex-version"
+echo "$case" >"$out/case"
 echo "$out"
 exit "$status"
