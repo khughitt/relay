@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: planned
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-16T01:26:58Z
+updated: 2026-10-16T01:38:52Z
 depends: []
 tags: [cross-project]
 source: flows-912ac5
@@ -19,3 +19,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 ## Notes
 
 - 2026-10-16T01:26:58Z (main): CLI shapes flows' flow-gate calls (flows docs/plans/2026-10-15-typed-gates.md, Global Constraints), every call with --json, success {"entry": …}, failure {"error": {"code", "message"}} and a non-zero exit: relay inbox ask --file <question.json>; relay inbox show <qid>; relay inbox answer <qid> decision=<option> reason=text:<text> --surface terminal; relay inbox withdraw <qid> --reason asker; relay inbox take <qid>. Codes flow-gate reads: NOT_FOUND, SERVE_UNAVAILABLE, ANSWERED, WITHDRAWN, EXPIRED, STALE. take moves answered or undeliverable to consumed (a take cause; consumed without handedAt for a detached entry) and returns a consumed entry unchanged.
+- 2026-10-16T01:38:52Z (main): Correction to the CLI note above: flow-gate reads relay's existing --json failure envelope as it is, on stderr, {"error": {"kind": "<cmd>_failed", "detail": "<CODE>: <message>"}}, taking the code from the detail's head; no change to the envelope is asked for. It also treats ALREADY_ANSWERED like ANSWERED.
