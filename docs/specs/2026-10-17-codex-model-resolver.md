@@ -1,7 +1,7 @@
 # Codex model resolver
 
-Status: draft 2026-10-17, revised after review round 1 (turn binding, pid 1, explicit
-`--pretty`); awaiting review.
+Status: draft 2026-10-17, revised after review rounds 1 (turn binding, pid 1, explicit
+`--pretty`) and 2 (conservative boundary, clock requirement); awaiting review.
 Task: `relay-2cd4b1` (goal `hq-fce47e`; consumer `tasks-970049`).
 Evidence: lore `docs/notes/2026-10-02-codex-model-identity-brief.md` §5 (hq-1bd166, Codex
 0.162.1), the scoping note on `relay-2cd4b1`, and the probes in "Facts" below (Codex
@@ -162,32 +162,66 @@ In order; the first condition that holds decides.
 8. If no `turn_context` appears in the last 64 MiB: unverified, `scan-limit`. If none
    appears in a smaller file: unverified, `no-turn-context`. The limit bounds a runaway
    turn (fact 10) at well under a second of reading; ordinary rollouts never reach it.
-9. Turn binding. The model is verified only for a caller whose call process started
-   in the latest turn: its start time must be no earlier than the `timestamp` of the
-   `turn_context` found in step 7, less the platform's start-time resolution `r`
-   (50 ms on Linux, 1 s on Darwin). A call process that started earlier belongs to an
-   earlier turn, such as a background terminal (fact 13) or a server a tool call left
-   running. The command cannot tell which turn that was or what that turn ran, so the
-   answer is unverified, `earlier-turn`. A `timestamp` that is not an ISO 8601 UTC
-   instant is a failure, `INVALID_ROLLOUT`.
+9. Turn binding. The model is verified only when the call process provably started in
+   the latest turn. Let `t` be the `timestamp` of the `turn_context` found in step 7.
+   The process helper gives the call process's start as an interval `[lo, hi]` in
+   wall-clock milliseconds (below). With the clock allowance `m` = 1000 ms:
+   - `lo − m ≥ t`: the process started after the turn's record. Go to step 10.
+   - `hi + m < t`: the process started before the turn's record, so it belongs to an
+     earlier turn, such as a background terminal (fact 13) or a server a tool call left
+     running. The command cannot tell which turn that was or what that turn ran, so the
+     answer is unverified, `earlier-turn`.
+   - Otherwise the interval meets the boundary and the order is unknown: unverified,
+     `turn-boundary`.
+
+   A `timestamp` that is not an ISO 8601 UTC instant is a failure, `INVALID_ROLLOUT`.
 10. Otherwise verified: `agent` is `codex/<model>`.
 
-The lifetime this gives a caller: it is verified from the moment Codex starts its call
-process until the thread's next `turn_context` is written, and refused from then on.
-Its first tool call's process starts seconds after its turn's record (fact 15), so the
-resolution `r` cannot turn a current caller away. A process started in the previous
-turn within `r` of the new turn's record would pass. Before the new record, Codex waits
-for the model's final reply and for the next prompt, so that gap is seconds, not
-milliseconds. If a turn wrote a second `turn_context` partway through, for example when
-a message is sent mid-turn, its earlier calls would get `earlier-turn`: a refusal, never
-a wrong model. Acceptance checks that case.
+The lifetime this gives a caller: it is verified once its call process starts more than
+`m` plus the start-time uncertainty after its turn's record. It is refused from the
+moment the thread's next `turn_context` is written. No minimum gap between turns is
+assumed: a process from the previous turn, however close to the new record, is refused
+as `earlier-turn` or `turn-boundary`, never verified. What it costs: a current caller
+whose call process starts within about a second of its turn's record is refused as
+`turn-boundary`. The probed first command started 7.5 s after its record (fact 15),
+because the model has to reply before any command runs, so such refusals should be
+rare. Acceptance reports how often they happen. If a turn wrote a second
+`turn_context` partway through, for example when a message is sent mid-turn, its
+earlier calls would be refused the same way: a refusal, never a wrong model.
+Acceptance checks that case.
 
-A start time comes from the process helper, which gains one accessor, `startedAtMs(row)`.
-On Linux it is `now − (uptime − starttime / 100) × 1000`, from `/proc/uptime` and the
-row's tick count. That is boot-clock arithmetic, so suspend and wall-clock steps between
-the two reads do not skew it. The user tick (`USER_HZ`) is fixed at 100 in the Linux ABI
-(`getconf CLK_TCK` prints 100 here); until now relay only compared tick counts, so this
-is the first place it converts them. On Darwin it is the row's `lstart` seconds × 1000.
+**Start-time interval.** The process helper gains one accessor,
+`startedAtMs(row) → {lo, hi}`:
+
+- Linux: the kernel records a process's start only on the boot clock, as a tick count
+  (`starttime`, `USER_HZ` = 100 in the Linux ABI; `getconf CLK_TCK` prints 100 here).
+  The accessor converts it as `now − (uptime − starttime / 100) × 1000`, reading
+  `/proc/uptime` and `Date.now()` back to back. Tick truncation and the two clock
+  reads bound the error at ±20 ms, so `lo` and `hi` are that estimate ∓ 20 ms. Until
+  now relay only compared tick counts, so this is the first place it converts them.
+- Darwin: `lstart` is the wall-clock start the kernel recorded, truncated to the
+  second, so `lo = lstart × 1000` and `hi = lo + 999`.
+
+**Clock requirement.** The rule compares a wall-clock record (`t`) with a start time the
+kernel keeps on another footing, so a step of the wall clock can reorder them:
+
+- Linux reconstructs the start through the boot clock at the time of the command. A
+  forward step between `t` and the command moves the estimate later by the full step,
+  because `now` moves and the boot clock does not. A leftover process can then look
+  current. A backward step only makes processes look earlier, so it only refuses.
+- Darwin records the start on the wall clock when the process starts. A backward step
+  between that start and `t` makes `t` look closer to the start, or before it, so a
+  leftover process can look current. A forward step there only refuses. A step after
+  `t` changes neither value.
+
+So the requirement is: **between the call process's start and the command, the wall
+clock moves by less than `m` relative to the boot clock.** NTP slewing and the
+resynchronisation after a suspend (the boot clock counts suspended time) stay well
+within that. A larger step in the harmful direction (forward on Linux, backward on
+Darwin) breaks the guarantee once it exceeds `m` plus the leftover's lead over the
+latest record. Examples are setting the clock by hand, or an NTP daemon stepping a
+large offset. No kernel interface records past steps, so the command cannot detect
+one. This is a stated limit, documented in `docs/api.md`, and not claimed to be handled.
 
 `INVALID_ROLLOUT` is a new error code, added to `docs/api.md`'s list.
 
@@ -270,11 +304,20 @@ directories, with injected environment, ancestry and time zone:
 - `scan-limit` triggers on a file whose last `turn_context` lies before the limit;
 - the combined harness predicate: a `claude` process nearer than `codex` gives
   `not-under-codex`, as does no harness at all;
-- turn binding: a call process started after the last `turn_context` is verified; one
-  started earlier by more than `r` gets `earlier-turn`; one within `r` is verified;
+- turn binding: an interval wholly more than `m` after `t` is verified; wholly more than
+  `m` before is `earlier-turn`; one meeting the boundary from either side is
+  `turn-boundary`, including a Darwin start in the same second as `t` and a Linux
+  start 500 ms before `t`;
+- clock steps, injected as an offset between the wall clock and the boot clock: a step
+  under `m` in either direction leaves a leftover process refused and a current one
+  verified (when it started more than `m` + 20 ms after `t`); a step of any size in the
+  harmless direction (backward on Linux, forward on Darwin) only refuses; one test per
+  platform pins the stated limit, where a harmful step larger than `m` plus the
+  leftover's lead verifies it, so a change to the limit is deliberate;
 - the pid-1 append: a chain whose last row has parent 1 gains pid 1's record, and a
   chain ending elsewhere does not;
-- `startedAtMs` on Linux, from fixture `/proc/uptime` and stat text, and on Darwin.
+- `startedAtMs` intervals on Linux, from fixture `/proc/uptime`, stat text and clock, and
+  on Darwin from `lstart`.
 
 One test uses the real process helper: on Linux it starts, under
 `unshare --user --map-root-user --pid --fork --mount-proc`, an executable named `codex`
