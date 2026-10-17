@@ -1,13 +1,15 @@
 ---
 id: relay-2cd4b1
 title: "Resolve a Codex session's model from its own rollout, keyed on CODEX_THREAD_ID"
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: planned
+owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-15T22:17:52Z
+updated: 2026-10-17T10:34:15Z
+started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
 source: "lore:docs/notes/2026-10-02-codex-model-identity-brief.md"
@@ -34,3 +36,5 @@ Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surf
 ## Notes
 
 - 2026-10-15T22:17:52Z (main): scope: scoped; kept the hq-1bd166 evidence and proposal, added what scoping established (no live relay Codex hooks on this host, a codex-named ancestor survives the workspace-write sandbox, 16,287-rollout lookup cost, UUIDv7 day-directory layout) and the spec's six decisions with leans; todo P2 m/mid/planned, since hq-fce47e and tasks-970049 already wait on it and its open choices are bounded design for a reviewed spec
+- 2026-10-17T10:34:15Z (feat/codex-model-resolver): started
+  provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
