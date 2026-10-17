@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T12:57:54Z
+updated: 2026-10-17T13:01:00Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
@@ -74,3 +74,4 @@ Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surf
 - 2026-10-17T12:57:53Z (feat/codex-model-resolver): resumed
   provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-17T12:57:54Z (feat/codex-model-resolver): review: plan round 1 — verdict: revise; findings: must 3, should 2; reviewer: codex/gpt-6.1-sol
+- 2026-10-17T13:01:00Z (feat/codex-model-resolver): plan revised for plan round 1: surface-test fixtures for model (enum baseline, --json args, CODEX_THREAD_ID pinned empty); linear readers (fragments assembled once; 16 MiB record read in ~54 ms with 4 KiB blocks in a scratch run of the plan's code) with a 5 s timeout regression; acceptance tmux servers named from the outdir; absent-effort test builds the record directly; Node 22 floor through just test-one with a command-scoped PATH. Spec amended for the codex-rollout.js split and null effort
