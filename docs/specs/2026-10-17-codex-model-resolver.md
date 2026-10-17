@@ -1,6 +1,7 @@
 # Codex model resolver
 
-Status: draft 2026-10-17, awaiting review.
+Status: draft 2026-10-17, revised after review round 1 (turn binding, pid 1, explicit
+`--pretty`); awaiting review.
 Task: `relay-2cd4b1` (goal `hq-fce47e`; consumer `tasks-970049`).
 Evidence: lore `docs/notes/2026-10-02-codex-model-identity-brief.md` §5 (hq-1bd166, Codex
 0.162.1), the scoping note on `relay-2cd4b1`, and the probes in "Facts" below (Codex
@@ -49,7 +50,9 @@ Probed on 0.163.0 (2026-10-17, scratch directories, `codex exec`):
    appears at `item_completed`), while the turn's `turn_context` already is. A tool-call
    id cannot be used to tie a rollout to the call.
 8. Under the `workspace-local` permission profile the command runs in a PID namespace:
-   its ancestry ends at pid 1, whose `comm` is `codex`.
+   its ancestry ends at pid 1, whose `comm` is `codex`. relay's ancestry walk
+   (`walk` in `src/bus/proc.js`, documented at `docs/api.md` "stopping before PID 1")
+   never returns pid 1, so it cannot see that process.
 9. Every one of 16,392 rollouts lives in `sessions/YYYY/MM/DD/`, where the date is the
    local date of its thread id's UUIDv7 timestamp. This is an observed layout, not a
    documented contract. Archived rollouts sit flat in `archived_sessions/`.
@@ -58,6 +61,21 @@ Probed on 0.163.0 (2026-10-17, scratch directories, `codex exec`):
     1.2 GB from the end, after a single runaway turn.
 11. relay's CLI starts in about 80 ms. Listing one day directory and matching the name
     takes under 1 ms.
+
+Probed on 0.163.0 in the TUI (2026-10-17, `--dangerously-bypass-approvals-and-sandbox`,
+driven in a detached tmux session through two turns):
+
+12. Tool commands are direct children of the `codex` process.
+13. A command Codex keeps running as a background terminal (`exec_command` with a
+    one-second yield) stayed a direct child of `codex` into the next turn, carrying
+    turn 1's `CODEX_THREAD_ID` and `CODEX_TOOL_CALL_ID`. Its call id never appeared in
+    the rollout, before or after the next turn's `turn_context`. Without a further
+    rule, a command run from it in turn 2 would read turn 2's model, and a model
+    switch between the turns would make that answer wrong.
+14. A `setsid nohup … &` process was reparented at once to the user's systemd manager,
+    so it has no `codex` ancestor.
+15. The turn's `turn_context` was stamped 7.5 s before the turn's first command started
+    (11:22:26.4 against 11:22:33.6), and the next turn's 32 s after it.
 
 ## Decision
 
@@ -88,7 +106,8 @@ The command answers one of two ways and always exits 0 when it answers:
 how far resolution got. `effort` is `null` when the record carries none.
 
 Pretty prints the `agent` value alone on stdout (`codex/gpt-6.1-sol`, or `codex`), so a
-shell can use `$(relay model --harness codex)` directly. An unverified answer adds one
+shell can use `$(relay model --harness codex --pretty)` directly. A caller that captures
+the output always names its mode: `RELAY_FORMAT=json` changes the default. An unverified answer adds one
 line on stderr: `relay: model unverified (<reason>): <detail>`.
 
 A failure, meaning the inputs exist but are not what this design expects, exits 1 with
@@ -108,10 +127,17 @@ In order; the first condition that holds decides.
    including its versioned `comm`; `codex`; `opencode`. If there is none, or it is not
    `codex`: unverified, `not-under-codex`. This catches what inherits the variable
    without running in the thread's tool call: a tmux server or `setsid` daemon once it
-   is reparented, and another harness started from a Codex shell, whose own commands
-   would otherwise borrow the Codex thread. An unreadable process table is a failure,
-   `PROCESS_UNREADABLE`. The sandbox's pid-1 `codex` counts as a Codex ancestor
-   (fact 8).
+   is reparented (fact 14), and another harness started from a Codex shell, whose own
+   commands would otherwise borrow the Codex thread. An unreadable process table is a
+   failure, `PROCESS_UNREADABLE`.
+   The chain includes pid 1. relay's shared walk stops before pid 1 and keeps doing so,
+   since the registry's handles depend on it. When the walk's last row has parent 1,
+   the resolver reads pid 1's record through the same process helper and appends it.
+   In the host namespace that row is init, which no predicate matches. In the sandbox
+   it is the `codex` the command runs under (fact 8).
+   The chain row just below the Codex process is the **call process**: the process
+   Codex started for this tool call (fact 12), or an ancestor of the caller that
+   Codex started. Step 9 uses its start time.
 4. The store is `$CODEX_HOME`, else `$HOME/.codex`. A `CODEX_HOME` that is set but not
    absolute is a failure, `INVALID_CONFIG`.
 5. Locate the rollout. First list the day directory named by the thread id's UUIDv7
@@ -136,7 +162,32 @@ In order; the first condition that holds decides.
 8. If no `turn_context` appears in the last 64 MiB: unverified, `scan-limit`. If none
    appears in a smaller file: unverified, `no-turn-context`. The limit bounds a runaway
    turn (fact 10) at well under a second of reading; ordinary rollouts never reach it.
-9. Otherwise verified: `agent` is `codex/<model>`.
+9. Turn binding. The model is verified only for a caller whose call process started
+   in the latest turn: its start time must be no earlier than the `timestamp` of the
+   `turn_context` found in step 7, less the platform's start-time resolution `r`
+   (50 ms on Linux, 1 s on Darwin). A call process that started earlier belongs to an
+   earlier turn, such as a background terminal (fact 13) or a server a tool call left
+   running. The command cannot tell which turn that was or what that turn ran, so the
+   answer is unverified, `earlier-turn`. A `timestamp` that is not an ISO 8601 UTC
+   instant is a failure, `INVALID_ROLLOUT`.
+10. Otherwise verified: `agent` is `codex/<model>`.
+
+The lifetime this gives a caller: it is verified from the moment Codex starts its call
+process until the thread's next `turn_context` is written, and refused from then on.
+Its first tool call's process starts seconds after its turn's record (fact 15), so the
+resolution `r` cannot turn a current caller away. A process started in the previous
+turn within `r` of the new turn's record would pass. Before the new record, Codex waits
+for the model's final reply and for the next prompt, so that gap is seconds, not
+milliseconds. If a turn wrote a second `turn_context` partway through, for example when
+a message is sent mid-turn, its earlier calls would get `earlier-turn`: a refusal, never
+a wrong model. Acceptance checks that case.
+
+A start time comes from the process helper, which gains one accessor, `startedAtMs(row)`.
+On Linux it is `now − (uptime − starttime / 100) × 1000`, from `/proc/uptime` and the
+row's tick count. That is boot-clock arithmetic, so suspend and wall-clock steps between
+the two reads do not skew it. The user tick (`USER_HZ`) is fixed at 100 in the Linux ABI
+(`getconf CLK_TCK` prints 100 here); until now relay only compared tick counts, so this
+is the first place it converts them. On Darwin it is the row's `lstart` seconds × 1000.
 
 `INVALID_ROLLOUT` is a new error code, added to `docs/api.md`'s list.
 
@@ -150,11 +201,13 @@ the limit.
 
 ### Where it lives
 
-- `src/adapters/codex-model.js`: steps 1–9, with the environment, the ancestry walk,
-  the clock zone and the filesystem passed in, so tests run against fixture stores.
-  Rollout layout is Codex-private knowledge and belongs with the Codex adapter.
+- `src/adapters/codex-model.js`: steps 1–10, with the environment, the process helper,
+  the clock, the time zone and the filesystem passed in, so tests run against fixture
+  stores. Rollout layout is Codex-private knowledge and belongs with the Codex adapter.
 - `src/adapters/*.js`: each adapter exports its harness predicate (`isHarness`), which
   its own `resolveSessionPid` already builds inline. Step 3 combines them.
+- `src/bus/proc.js`: `startedAtMs(row)` (step 9). `walk` and `ancestors` keep their
+  contract; the pid-1 lookup lives in the resolver, through the existing `recordOf`.
 - `bin/relay.js`: one branch for `model`, writing the answer in either mode.
 - `docs/api.md`: the command, its JSON, its reasons, and the call contract below.
 
@@ -162,10 +215,10 @@ the limit.
 
 1. **Name and home**: `relay model --harness codex`, above. A tasks stamp pays one Node
    start (about 80 ms).
-2. **Inherited `CODEX_THREAD_ID`**: step 3. A tmux server that is still a descendant of
-   Codex passes the check while it lives, and its commands then read the thread's
-   current model. That is the same answer the thread's own call would get, so the
-   stamp is right even though the caller is not the turn.
+2. **Inherited `CODEX_THREAD_ID`**: step 3 refuses what is no longer under Codex, and
+   step 9 refuses what Codex still holds but started in an earlier turn: a background
+   terminal, or a tmux server started by a tool call and still its descendant. Such a
+   caller is verified during the turn that started it and refused afterward.
 3. **Locating the rollout**: the UUIDv7 day directory, then the full scan with
    `archived_sessions/`. `state_5.sqlite` is rejected: its schema is private,
    `node:sqlite` is still experimental at relay's Node 22 floor, and when it updates
@@ -186,7 +239,11 @@ the limit.
 
 - **Requiring `CODEX_TOOL_CALL_ID`** to keep hooks out: hooks already lack the thread id
   (fact 6), and every process that inherits one inherits the other, so the variable
-  adds no case step 1 and step 3 miss.
+  adds no case that steps 1, 3 and 9 miss.
+- **Binding a caller to its turn through its tool call's record**: the running call is
+  not in the rollout yet (fact 7), and a background terminal's call never appears there
+  at all (fact 13). So "the call has no completion record" cannot tell a current
+  caller from one left over from an earlier turn.
 - **Checking that the nearest `codex` process holds the rollout open**
   (`/proc/<pid>/fd`): live TUI processes do, but the check is Linux-only, its
   readability inside the sandbox is unprobed, and the only case it adds is a hook of a
@@ -212,7 +269,19 @@ directories, with injected environment, ancestry and time zone:
   miss (a thread whose date differs between two time zones);
 - `scan-limit` triggers on a file whose last `turn_context` lies before the limit;
 - the combined harness predicate: a `claude` process nearer than `codex` gives
-  `not-under-codex`, as does no harness at all.
+  `not-under-codex`, as does no harness at all;
+- turn binding: a call process started after the last `turn_context` is verified; one
+  started earlier by more than `r` gets `earlier-turn`; one within `r` is verified;
+- the pid-1 append: a chain whose last row has parent 1 gains pid 1's record, and a
+  chain ending elsewhere does not;
+- `startedAtMs` on Linux, from fixture `/proc/uptime` and stat text, and on Darwin.
+
+One test uses the real process helper: on Linux it starts, under
+`unshare --user --map-root-user --pid --fork --mount-proc`, an executable named `codex`
+that runs `bin/relay.js model --harness codex --json` against a fixture store. It must
+answer verified, which proves the production pid-1 lookup and start-time path, not only
+fixtures. The test is Linux-only; where `unshare` cannot create the namespace it fails
+with that reason rather than skipping.
 
 CLI tests through `bin/relay.js` cover both output modes, the stderr line, exit codes 0,
 1 and 2, `--harness claude-code` refused, and the new row in `test/cli-surface.test.js`'s
@@ -228,7 +297,12 @@ Live acceptance, recorded in `docs/notes/` and run from scratch directories:
   started from a tool call: `not-under-codex`;
 - `codex exec --ephemeral`, if the flag exists: the reason it gets;
 - TUI in a detached tmux session: `/model` switch, `/new`, `/resume` of a thread on
-  another model, `/fork`: verified as the active thread's model each time.
+  another model, `/fork`: verified as the active thread's model each time;
+- TUI, the case of fact 13: a background terminal started in one turn answers verified
+  in that turn and `earlier-turn` after the next turn begins, with a `/model` switch
+  between them;
+- TUI, a message sent while a tool call runs: whether it writes a second
+  `turn_context`, and the answer the running call then gets.
 
 ## Rollout
 
@@ -239,4 +313,5 @@ Live acceptance, recorded in `docs/notes/` and run from scratch directories:
    `relay model --harness codex --json` with a 2 s limit and stamp `agent`, plus `model`
    when `verified`. Its own design decides how it finds `relay` and reports a failure.
 4. lore: the `review:` note instruction tells a Codex session to take its reviewer
-   identity from `relay model --harness codex`. Filed as its own task under `hq-fce47e`.
+   identity from `relay model --harness codex --pretty`. Filed as `lore-f71994`, a
+   dependency of `hq-fce47e`.
