@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T11:20:34Z
+updated: 2026-10-17T11:20:35Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
@@ -45,3 +45,4 @@ Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surf
 - 2026-10-17T11:20:33Z (feat/codex-model-resolver): resumed
   provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-17T11:20:34Z (feat/codex-model-resolver): review: spec round 1 — verdict: revise; findings: must 1, should 2; reviewer: codex/gpt-6.1-sol
+- 2026-10-17T11:20:35Z (feat/codex-model-resolver): reviewer identity verified from codex rollout 01a14985-3a99-7e12-9643-455088b7d4ec (one turn_context, model gpt-6.1-sol), which holds the review text
