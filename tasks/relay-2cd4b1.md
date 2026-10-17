@@ -8,12 +8,13 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T10:34:15Z
+updated: 2026-10-17T10:44:07Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
 source: "lore:docs/notes/2026-10-02-codex-model-identity-brief.md"
 agent: claude-code/claude-opus-5-5
+spec: docs/specs/2026-10-17-codex-model-resolver.md
 ---
 
 Why: Codex sessions stamp TASKS_AGENT=codex with no model, so task stamps and review notes lose the model half (goal hq-fce47e, which depends on this task; tasks-970049, the consumer, depends on it too).
