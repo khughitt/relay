@@ -109,9 +109,9 @@ function walk(pid, recordOf) {
   }
   return chain;
 }
-/** @param {{platform?: string, readText?: (path: string) => string, readLink?: (path: string) => string, runPs?: typeof runDarwinPs, runLsof?: typeof runDarwinLsof, kill?: (pid: number, signal: number) => unknown, hostname?: () => string}} [options] */
+/** @param {{platform?: string, readText?: (path: string) => string, readLink?: (path: string) => string, runPs?: typeof runDarwinPs, runLsof?: typeof runDarwinLsof, kill?: (pid: number, signal: number) => unknown, hostname?: () => string, now?: () => number}} [options] */
 export function createProcessOps({ platform = process.platform, readText = (p) => readFileSync(p, 'utf8'),
-  readLink = (p) => readlinkSync(p), runPs = runDarwinPs, runLsof = runDarwinLsof, kill = (pid, signal) => process.kill(pid, signal), hostname = osHostname } = {}) {
+  readLink = (p) => readlinkSync(p), runPs = runDarwinPs, runLsof = runDarwinLsof, kill = (pid, signal) => process.kill(pid, signal), hostname = osHostname, now = Date.now } = {}) {
   if (!['linux', 'darwin'].includes(platform)) throw relayError('PROCESS_UNAVAILABLE', 'unsupported process platform');
   /** @param {import("../types.js").Failure} error */
   const absent = (error) => (/** @type {unknown[]} */ (['ENOENT', 'ESRCH'])).includes(error.code);
@@ -242,5 +242,24 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     const rest = line.slice(argv0.length).trim();
     return rest ? [argv0, ...rest.split(/\s+/)] : [argv0];
   };
-  return { recordOf, ancestors, handleOf, probe, executableOf, argvOf };
+  // A start as a wall-clock interval (spec docs/specs/2026-10-17-codex-model-resolver.md,
+  // "Start-time interval"). Linux keeps a start only on the boot clock, in USER_HZ (100) ticks;
+  // one uptime sample bracketed by two wall-clock reads places it however long a pause lasts.
+  // Darwin's lstart is the recorded wall-clock start, truncated to the second.
+  /** @param {import("../types.js").ProcessRow} row @returns {{lo: number, hi: number}} */
+  const startedAtMs = (row) => {
+    const start = Number(row.starttime);
+    if (!Number.isSafeInteger(start)) throw relayError('PROCESS_UNREADABLE', 'process start out of range');
+    if (platform === 'darwin') return { lo: start * 1000, hi: start * 1000 + 999 };
+    const w0 = now();
+    let text;
+    try { text = readText('/proc/uptime'); }
+    catch (cause) { throw relayError('PROCESS_UNREADABLE', 'cannot read uptime', cause); }
+    const w1 = now();
+    const match = typeof text === 'string' ? /^([0-9]+)\.([0-9]{2}) /.exec(text) : null;
+    if (!match) throw relayError('PROCESS_UNREADABLE', 'invalid uptime');
+    const ageMs = Number(match[1]) * 1000 + Number(match[2]) * 10 - start * 10;
+    return { lo: w0 - ageMs - 11, hi: w1 - ageMs + 11 };
+  };
+  return { recordOf, ancestors, handleOf, probe, executableOf, argvOf, startedAtMs };
 }

@@ -233,3 +233,29 @@ test('real local process exposes its own executable and arguments', () => {
   assert.equal(ops.executableOf(process.pid), readlinkSync('/proc/self/exe'));
   assert.equal(ops.argvOf(process.pid)[0], process.argv0);
 });
+
+// Spec docs/specs/2026-10-17-codex-model-resolver.md, "Start-time interval".
+const BOOT = 1_800_000_000_000;
+const linuxClock = ({ uptimeMs, wall }) => {
+  const reads = [...wall];
+  return createProcessOps({ platform: 'linux', now: () => /** @type {number} */ (reads.shift()),
+    readText: (p) => { if (p === '/proc/uptime') return `${(uptimeMs / 1000).toFixed(2)} 0.00\n`; throw Object.assign(new Error('absent'), { code: 'ENOENT' }); } });
+};
+const startRow = (starttime) => ({ pid: 7, ppid: 1, comm: 'sh', tty: null, starttime, state: 'S' });
+test('Linux start interval: no pause between the reads gives the tick uncertainty alone', () => {
+  const ops = linuxClock({ uptimeMs: 130_000, wall: [BOOT + 130_000, BOOT + 130_000] });
+  assert.deepEqual(ops.startedAtMs(startRow('10000')), { lo: BOOT + 99_989, hi: BOOT + 100_011 });
+});
+test('Linux start interval: a pause between the reads widens the interval instead of shifting it', () => {
+  const ops = linuxClock({ uptimeMs: 130_000, wall: [BOOT + 130_000, BOOT + 131_200] });
+  assert.deepEqual(ops.startedAtMs(startRow('10000')), { lo: BOOT + 99_989, hi: BOOT + 101_211 });
+});
+test('Darwin start interval is the recorded second', () => {
+  assert.deepEqual(createProcessOps({ platform: 'darwin' }).startedAtMs(startRow('1800000100')), { lo: 1_800_000_100_000, hi: 1_800_000_100_999 });
+});
+test('an unreadable or malformed uptime, or an unsafe start, is PROCESS_UNREADABLE', () => {
+  const withText = (readText) => createProcessOps({ platform: 'linux', now: () => BOOT, readText });
+  assert.throws(() => withText(() => 'garbage\n').startedAtMs(startRow('1')), { code: 'PROCESS_UNREADABLE' });
+  assert.throws(() => withText(() => { throw Object.assign(new Error('denied'), { code: 'EACCES' }); }).startedAtMs(startRow('1')), { code: 'PROCESS_UNREADABLE' });
+  assert.throws(() => withText(() => '1.00 0.00\n').startedAtMs(startRow('9007199254740993')), { code: 'PROCESS_UNREADABLE' });
+});
