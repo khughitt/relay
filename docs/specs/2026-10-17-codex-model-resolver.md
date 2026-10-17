@@ -2,7 +2,8 @@
 
 Status: approved 2026-10-17 for implementation planning, after review rounds 1 (turn
 binding, pid 1, explicit `--pretty`), 2 (conservative boundary, clock requirement), 3
-(bracketed sampling) and 4 (accept).
+(bracketed sampling) and 4 (accept); amended at plan review (the rollout reader's own
+module, and a `null` effort).
 Task: `relay-2cd4b1` (goal `hq-fce47e`; consumer `tasks-970049`).
 Evidence: lore `docs/notes/2026-10-02-codex-model-identity-brief.md` §5 (hq-1bd166, Codex
 0.162.1), the scoping note on `relay-2cd4b1`, and the probes in "Facts" below (Codex
@@ -158,8 +159,9 @@ In order; the first condition that holds decides.
    final line without a terminating newline is a write in progress and is skipped. Any
    other line in the scanned range that is not valid JSON is a failure,
    `INVALID_ROLLOUT`. A `turn_context` whose `payload.model` is not a non-empty string
-   is also a failure, `INVALID_ROLLOUT`, as is a present `payload.effort` that is not a
-   string.
+   is also a failure, `INVALID_ROLLOUT`. A `payload.effort` that is absent or `null`
+   means the record carries none (`effort: null`); any other value that is not a string
+   is `INVALID_ROLLOUT`.
 8. If no `turn_context` appears in the last 64 MiB: unverified, `scan-limit`. If none
    appears in a smaller file: unverified, `no-turn-context`. The limit bounds a runaway
    turn (fact 10) at well under a second of reading; ordinary rollouts never reach it.
@@ -245,9 +247,14 @@ the limit.
 
 ### Where it lives
 
-- `src/adapters/codex-model.js`: steps 1–10, with the environment, the process helper,
-  the clock, the time zone and the filesystem passed in, so tests run against fixture
-  stores. Rollout layout is Codex-private knowledge and belongs with the Codex adapter.
+- `src/adapters/codex-rollout.js`: Codex's private rollout layout, steps 4–8 (the store,
+  locating the rollout, its first record, the backward scan for the last
+  `turn_context`, and that record's fields). Rollout layout is Codex-private knowledge
+  and belongs with the Codex adapter. Both readers assemble each record once from its
+  blocks, so a record of many blocks costs one pass, not a copy per block.
+- `src/adapters/codex-model.js`: the decision, steps 1–3 and 9–10, calling the rollout
+  reader for 4–8. The environment, the process helper, the time zone and the filesystem
+  are passed in, so tests run against fixture stores.
 - `src/adapters/*.js`: each adapter exports its harness predicate (`isHarness`), which
   its own `resolveSessionPid` already builds inline. Step 3 combines them.
 - `src/bus/proc.js`: `startedAtMs(row)` (step 9). `walk` and `ancestors` keep their

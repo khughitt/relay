@@ -4,7 +4,7 @@
 
 **Goal:** `relay model --harness codex` tells a process running inside a Codex tool call which model its turn runs (`codex/<model>`), or answers bare `codex` with a reason.
 
-**Architecture:** A read-only resolver in relay's Codex adapter layer. Codex's private rollout layout (locating a thread's rollout, reading its first record and its last `turn_context`) lives in `src/adapters/codex-rollout.js`. The decision steps (environment, ancestry including pid 1, turn binding) live in `src/adapters/codex-model.js`. The spec places all steps in `codex-model.js`; splitting the file format into its own module keeps each file to one responsibility. The process helper gains a start-time interval accessor, the adapters export their harness predicates, and `bin/relay.js` gains one command branch. The CLI row lands in ops's `cli.toml` first and is adopted here together with the parser change.
+**Architecture:** A read-only resolver in relay's Codex adapter layer. Codex's private rollout layout (locating a thread's rollout, reading its first record and its last `turn_context`) lives in `src/adapters/codex-rollout.js`. The decision steps (environment, ancestry including pid 1, turn binding) live in `src/adapters/codex-model.js`. The spec records this split ("Where it lives"). The process helper gains a start-time interval accessor, the adapters export their harness predicates, and `bin/relay.js` gains one command branch. The CLI row lands in ops's `cli.toml` first and is adopted here together with the parser change.
 
 **Tech Stack:** Node >=22 ES modules with built-ins only, JSDoc types checked by `tsc --checkJs`, `node:test`. Python unittest in ops for the table.
 
@@ -22,7 +22,7 @@
 - Pretty unverified stderr line: `relay: model unverified (<reason>): <detail>`.
 - Scan limit 64 MiB; read block 64 KiB; clock allowance `m` = 1000 ms; Linux start interval `lo = w0 − age − 11`, `hi = w1 − age + 11` (ms); Darwin `lo = lstart × 1000`, `hi = lo + 999`.
 - Store: `$CODEX_HOME` when set (must be absolute), else `$HOME/.codex`.
-- One clarification of the spec, made here: a `turn_context` whose `payload.effort` is `null` carries no effort (answer `effort: null`); any other non-string value is `INVALID_ROLLOUT`.
+- A `turn_context` whose `payload.effort` is absent or `null` carries no effort (answer `effort: null`); any other non-string value is `INVALID_ROLLOUT` (spec step 7).
 - Conventional commits, no AI attribution. Paths in docs are repository-relative.
 - ops's `cli.toml` is never edited in relay; `tools/cli.toml` changes only through `vendored adopt`.
 
@@ -311,7 +311,7 @@ git commit -m "refactor(adapters): export each harness predicate and find the ne
   - `dayOf(thread: string, timeZone?: string) → [string, string, string]`
   - `listDir(dir: string) → string[] | null`
   - `locateRollout(root: string, thread: string, {timeZone?, list?}) → string[]`
-  - `firstRecord(path: string, limit?: number) → any`
+  - `firstRecord(path: string, {limit?, block?}) → any`
   - `lastTurnContext(path: string, {limit?, block?}) → {record: Record<string, any>|null, limited: boolean}`
   - `turnFields(record) → {model: string, effort: string|null, at: number}`
 - Produces (from `test/helpers/codex-store.js`): `threadAt(ms) → string`, `record(type, payload, timestamp?) → string`, `sessionMeta(id) → string`, `turnContext(model, timestamp, effort?) → string`, `tempStore(t) → {root, day(parts, thread, lines, opts?), archived(thread, lines, opts?)}`.
@@ -332,8 +332,8 @@ export const threadAt = (ms) => { const hex = ms.toString(16).padStart(12, '0');
 export const record = (type, payload, timestamp = '2026-10-17T10:00:00.000Z') => JSON.stringify({ timestamp, type, payload });
 /** @param {string} id */
 export const sessionMeta = (id) => record('session_meta', { id, cwd: '/w', base_instructions: { text: 'x'.repeat(100) } });
-/** @param {string} model @param {string} timestamp @param {string|null|undefined} [effort] */
-export const turnContext = (model, timestamp, effort = 'high') => record('turn_context', { turn_id: 't', model, ...(effort === undefined ? {} : { effort }) }, timestamp);
+/** A turn_context with an effort; build one without the field through `record` directly. @param {string} model @param {string} timestamp @param {string|null} [effort] */
+export const turnContext = (model, timestamp, effort = 'high') => record('turn_context', { turn_id: 't', model, effort }, timestamp);
 
 /** A temporary store; files are named rollout-<stamp>-<thread>.jsonl. @param {import('node:test').TestContext} t */
 export function tempStore(t) {
@@ -438,10 +438,20 @@ test('lastTurnContext: an invalid line in range fails; none at all, or none with
   assert.deepEqual(lastTurnContext(far, { limit: 1024 }), { record: null, limited: true });
   assert.equal(lastTurnContext(far).record?.payload.model, 'm');
 });
+// Review regression: both readers once re-copied the growing record on every block, which is
+// quadratic (a 64 MiB record copied 32 GiB). With 4 KiB blocks a 16 MiB record would copy
+// 32 GiB that way; read linearly it takes well under a second, so the timeout separates them.
+test('records of many blocks are assembled once', { timeout: 5000 }, (t) => {
+  const store = tempStore(t), big = 'w'.repeat(16 * 1024 * 1024);
+  const tc = record('turn_context', { model: 'big', effort: 'high', pad: big }, '2026-10-17T10:00:00.000Z');
+  const file = store.day(['a', 'b', 'c'], thread, [record('session_meta', { id: thread, pad: big }), tc, record('event_msg', {})]);
+  assert.equal(firstRecord(file, { block: 4096 }).payload.id, thread);
+  assert.equal(lastTurnContext(file, { block: 4096 }).record?.payload.model, 'big');
+});
 test('turnFields validates the model, effort and timestamp', () => {
   const parse = (line) => turnFields(JSON.parse(line));
   assert.deepEqual(parse(turnContext('gpt-6-astra', '2026-10-17T10:00:00.000Z')), { model: 'gpt-6-astra', effort: 'high', at: Date.parse('2026-10-17T10:00:00.000Z') });
-  assert.equal(parse(turnContext('m', '2026-10-17T10:00:00Z', undefined)).effort, null);
+  assert.equal(parse(record('turn_context', { model: 'm' }, '2026-10-17T10:00:00Z')).effort, null);
   assert.equal(parse(turnContext('m', '2026-10-17T10:00:00Z', null)).effort, null);
   assert.throws(() => parse(turnContext('', '2026-10-17T10:00:00Z')), { code: 'INVALID_ROLLOUT' });
   assert.throws(() => parse(record('turn_context', { model: 'm', effort: 3 })), { code: 'INVALID_ROLLOUT' });
@@ -539,16 +549,19 @@ function parseLine(bytes) {
   catch (cause) { throw relayError('INVALID_ROLLOUT', 'a rollout line is not valid JSON', cause); }
 }
 
-/** The first record, which must end within `limit` bytes. @param {string} path @param {number} [limit] */
-export function firstRecord(path, limit = SCAN_LIMIT) {
+/** The first record, which must end within `limit` bytes. Each block is read and searched
+ * once; the record is assembled once, when its newline is found.
+ * @param {string} path @param {{limit?: number, block?: number}} [options] */
+export function firstRecord(path, { limit = SCAN_LIMIT, block = BLOCK } = {}) {
   return withFile(path, (fd, size) => {
-    let head = Buffer.alloc(0);
-    for (let pos = 0; pos < Math.min(size, limit); pos += BLOCK) {
-      const chunk = Buffer.alloc(Math.min(BLOCK, size - pos));
+    /** @type {Buffer[]} */
+    const parts = [];
+    for (let pos = 0; pos < Math.min(size, limit); pos += block) {
+      const chunk = Buffer.alloc(Math.min(block, size - pos));
       readExactly(fd, chunk, pos);
-      head = Buffer.concat([head, chunk]);
-      const end = head.indexOf(NEWLINE);
-      if (end >= 0) return parseLine(head.subarray(0, end));
+      const end = chunk.indexOf(NEWLINE);
+      if (end >= 0) return parseLine(Buffer.concat([...parts, chunk.subarray(0, end)]));
+      parts.push(chunk);
     }
     throw relayError('INVALID_ROLLOUT', 'the rollout has no complete first record');
   });
@@ -556,15 +569,19 @@ export function firstRecord(path, limit = SCAN_LIMIT) {
 
 /** The last turn_context within `limit` bytes of the end, read backward. The part after the
  * file's last newline is empty or a write in progress and is skipped; any other line that is
- * not JSON fails. @param {string} path @param {{limit?: number, block?: number}} [options]
+ * not JSON fails. Each block is read and searched once; a record spanning blocks is kept as
+ * its fragments and assembled once, when the newline before it is found.
+ * @param {string} path @param {{limit?: number, block?: number}} [options]
  * @returns {{record: Record<string, any>|null, limited: boolean}} */
 export function lastTurnContext(path, { limit = SCAN_LIMIT, block = BLOCK } = {}) {
   return withFile(path, (fd, size) => {
-    let pos = size, pending = Buffer.alloc(0), final = true;
-    /** @param {Buffer} line */
-    const consider = (line) => {
+    let pos = size, final = true;
+    /** Fragments of the record being read backward, oldest first. @type {Buffer[]} */
+    let tail = [];
+    /** @param {Buffer[]} parts */
+    const consider = (parts) => {
       if (final) { final = false; return null; }
-      const parsed = parseLine(line);
+      const parsed = parseLine(parts.length === 1 ? parts[0] : Buffer.concat(parts));
       return parsed?.type === 'turn_context' ? parsed : null;
     };
     while (pos > 0) {
@@ -573,15 +590,18 @@ export function lastTurnContext(path, { limit = SCAN_LIMIT, block = BLOCK } = {}
       pos -= length;
       const chunk = Buffer.alloc(length);
       readExactly(fd, chunk, pos);
-      let data = Buffer.concat([chunk, pending]);
-      for (let at = data.lastIndexOf(NEWLINE); at >= 0; at = data.lastIndexOf(NEWLINE)) {
-        const found = consider(data.subarray(at + 1));
+      let end = length;
+      while (end > 0) {
+        const at = chunk.lastIndexOf(NEWLINE, end - 1);
+        if (at < 0) break;
+        const found = consider([chunk.subarray(at + 1, end), ...tail]);
+        tail = [];
         if (found) return { record: found, limited: false };
-        data = data.subarray(0, at);
+        end = at;
       }
-      pending = data;
+      if (end > 0) tail.unshift(chunk.subarray(0, end));
     }
-    return { record: consider(pending), limited: false };
+    return { record: consider(tail.length > 0 ? tail : [Buffer.alloc(0)]), limited: false };
   });
 }
 
@@ -818,7 +838,7 @@ export function resolveCodexModel({ env = process.env, ops = createProcessOps(),
   if (found.length === 0) return unverified('no-rollout', `no rollout of thread ${thread} under ${root}`, thread);
   if (found.length > 1) return unverified('ambiguous-rollout', `${found.length} rollouts match thread ${thread}: ${found.join(', ')}`, thread);
   const rollout = found[0];
-  const head = firstRecord(rollout, scanLimit);
+  const head = firstRecord(rollout, { limit: scanLimit });
   if (head?.type !== 'session_meta' || head.payload?.id !== thread) throw relayError('INVALID_ROLLOUT', `${rollout} does not open with the session_meta of thread ${thread}`);
   const { record, limited } = lastTurnContext(rollout, { limit: scanLimit });
   if (!record) {
@@ -854,6 +874,7 @@ git commit -m "feat(codex): resolve a tool call's model, bound to its turn"
 **Files:**
 - Modify: `tools/cli.toml` (only through `vendored adopt`)
 - Modify: `src/commands.js` (`COMMANDS`), `bin/relay.js` (`main`, before `throw usage(\`unknown command …\`)`)
+- Modify: `test/cli-surface.test.js` (the enum baselines and the `--json` command arguments)
 - Test: `test/codex-model-cli.test.js`
 
 **Interfaces:**
@@ -943,12 +964,36 @@ test('in a PID namespace whose pid 1 is codex, the real process helper verifies'
 });
 ```
 
-- [ ] **Step 3: Run them to verify they fail**
+- [ ] **Step 3: Add `model` to the surface test's fixtures**
+
+`test/cli-surface.test.js` checks two things for every command, and `model` needs an entry in each. In `enum baselines cover every enum row`, every enum option needs a baseline. Pin `CODEX_THREAD_ID` empty for these runs, so a suite running inside a Codex tool call still gets the deterministic `no-thread` answer. Change `const env = { PATH: `${bin}:${process.env.PATH}` };` to:
+
+```js
+  const env = { PATH: `${bin}:${process.env.PATH}`, CODEX_THREAD_ID: '' };
+```
+
+and add to `baselines`:
+
+```js
+    [['model'], '--harness', ['model', '--harness', 'codex']],
+```
+
+In `every command without a declared output row emits one JSON value under --json`, every such command runs with its required arguments. Add `model` to `args`, and run every candidate with the thread pinned empty:
+
+```js
+  const args = { 'inbox show': [id], 'inbox answer': [id, 'q1=o1'], 'inbox defer': [id], model: ['--harness', 'codex'] };
+```
+
+```js
+    const r = runCli(p, ['--json', ...cmd.path, ...(args[cmd.path.join(' ')] ?? [])], undefined, { CODEX_THREAD_ID: '' });
+```
+
+- [ ] **Step 4: Run them to verify they fail**
 
 Run: `just test-one test/codex-model-cli.test.js test/cli-surface.test.js`
-Expected: FAIL: `unknown command "model"` (exit 2 where 0 is expected), and the surface test's `tableOnly` rows.
+Expected: FAIL: `unknown command "model"` (exit 2 where 0 is expected), the surface test's `tableOnly` rows, and the two fixture tests' `model` runs.
 
-- [ ] **Step 4: Implement**
+- [ ] **Step 5: Implement**
 
 `src/commands.js`, append to `COMMANDS` after the `presence` row:
 
@@ -971,20 +1016,27 @@ Expected: FAIL: `unknown command "model"` (exit 2 where 0 is expected), and the 
     }
 ```
 
-- [ ] **Step 5: Run the tests and the checks**
+- [ ] **Step 6: Run the tests and the checks**
 
 Run: `just test-one test/codex-model-cli.test.js test/cli-surface.test.js test/cli.test.js`, then `just check`
 Expected: PASS. On Linux the PID-namespace test runs and passes; if `unshare` cannot create the namespace it fails with the reason, by design.
 
-- [ ] **Step 6: Run on the Node 22 floor**
+- [ ] **Step 7: Run on the Node 22 floor**
 
-Run: `just test-fast`, then run the new files with the floor runtime the way README's Node 22.23.2 line describes (the nvm `v22.23.2` binary running `--test --test-concurrency=1` over `test/codex-*.test.js test/proc.test.js test/ancestry.test.js`).
-Expected: PASS on both runtimes.
-
-- [ ] **Step 7: Commit**
+Run `just test-fast`. Then put the floor runtime first on `PATH` for one front-door run only; README's verification lines name Node 22.23.2, installed here through nvm:
 
 ```bash
-git add tools/cli.toml src/commands.js bin/relay.js test/codex-model-cli.test.js
+NODE22_BIN=$(dirname "$(ls -d ~/.nvm/versions/node/v22.*/bin/node | sort -V | tail -1)")
+PATH="$NODE22_BIN:$PATH" node --version   # must print v22.x
+PATH="$NODE22_BIN:$PATH" just test-one --test-concurrency=1 test/codex-rollout.test.js test/codex-model.test.js test/codex-model-cli.test.js test/proc.test.js test/ancestry.test.js test/cli-surface.test.js
+```
+
+Expected: PASS on both runtimes.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add tools/cli.toml src/commands.js bin/relay.js test/cli-surface.test.js test/codex-model-cli.test.js
 git commit -m "feat(cli): relay model names a Codex tool call's model"
 ```
 
@@ -1083,8 +1135,10 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 RELAY="node $ROOT/bin/relay.js model --harness codex --json"
 mode=${1:?exec or tui}; OUT=$(realpath -m "${2:?outdir}"); mkdir -p "$OUT/work"; W=$OUT/work
-SOCK=relay-model-acc-$$
-cleanup() { tmux -L "$SOCK" kill-server 2>/dev/null || true; tmux -L relay-model-acc-tui kill-server 2>/dev/null || true; }
+# Each output directory owns its tmux servers, named from its path, and touches no other.
+ID=relay-model-acc-$(printf %s "$OUT" | sha1sum | cut -c1-12)
+SOCK=$ID-exec; T=$ID-tui
+cleanup() { tmux -L "$SOCK" kill-server 2>/dev/null || true; }
 cx() { codex exec --skip-git-repo-check -C "$W" "$@" </dev/null >>"$OUT/exec.log" 2>&1; }
 
 if [ "$mode" = exec ]; then
@@ -1102,10 +1156,10 @@ if [ "$mode" = exec ]; then
   exit 0
 fi
 
-# TUI: one private tmux server per outdir run; the operator drives it step by step.
-T=relay-model-acc-tui
+# TUI: the outdir's own tmux server ($T); the operator drives it step by step.
 case ${3:-} in
-  start) tmux -L $T new-session -d -s acc -x 200 -y 50 -c "$W" "codex --no-daemon --dangerously-bypass-approvals-and-sandbox -m gpt-6-luna -C $W"; sleep 8 ;;
+  start) if tmux -L $T has-session 2>/dev/null; then echo "$T already runs; stop it first" >&2; exit 2; fi
+         tmux -L $T new-session -d -s acc -x 200 -y 50 -c "$W" "codex --no-daemon --dangerously-bypass-approvals-and-sandbox -m gpt-6-luna -C $W"; sleep 8 ;;
   say)   tmux -L $T send-keys -t acc -l "${4:?text}"; sleep 1; tmux -L $T send-keys -t acc Enter ;;
   keys)  tmux -L $T send-keys -t acc "${@:4}" ;;
   pane)  tmux -L $T capture-pane -p -t acc | grep -v '^\s*$' | tail -${4:-15} | tee -a "$OUT/panes.log" ;;
@@ -1114,7 +1168,7 @@ case ${3:-} in
 esac
 ```
 
-The `tui` subcommand intentionally leaves its server running between calls. The operator ends every TUI session with `run tui <outdir> stop`, and the end-of-turn `host-load --section session` check must show nothing left.
+The `tui` subcommand intentionally leaves its server running between calls. The server's name comes from the output directory, so `exec` cleanup and another output directory's `stop` never touch it. The operator ends every TUI session with `run tui <outdir> stop`, and the end-of-turn `host-load --section session` check must show nothing left.
 
 - [ ] **Step 2: Run the exec cases**
 
