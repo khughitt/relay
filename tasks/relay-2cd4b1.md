@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T11:47:52Z
+updated: 2026-10-17T12:29:01Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
@@ -55,4 +55,6 @@ Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surf
 - 2026-10-17T11:46:39Z (feat/codex-model-resolver): round-2 reviewer verified from the same codex rollout 01a14985-3a99-7e12-9643-455088b7d4ec (second turn_context, gpt-6.1-sol)
 - 2026-10-17T11:47:48Z (feat/codex-model-resolver): spec revised for round 2: verify only when the call process's whole start interval lies more than m=1000 ms after the turn record (else earlier-turn or the new turn-boundary); the boot-clock immunity claim is removed and replaced by a stated wall-clock requirement with per-platform harmful step directions (forward on Linux, backward on Darwin) and tests that pin the limit
 - 2026-10-17T11:47:52Z (feat/codex-model-resolver): parked (waiting on user, review): User reviews the round-2 revision of docs/specs/2026-10-17-codex-model-resolver.md in .worktrees/codex-model (conservative turn boundary, clock requirement); on approval the agent writes the implementation plan
+  provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-17T12:29:01Z (feat/codex-model-resolver): resumed
   provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
