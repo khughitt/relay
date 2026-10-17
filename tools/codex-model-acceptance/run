@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Live acceptance for `relay model` (spec docs/specs/2026-10-17-codex-model-resolver.md, "Testing").
+# Usage: run exec <outdir>  |  run tui start|say|keys|pane|stop <outdir> [text]
+# Every Codex here runs in a scratch work directory; the TUI runs in a private, detached tmux server.
+set -euo pipefail
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+RELAY="node $ROOT/bin/relay.js model --harness codex --json"
+mode=${1:?exec or tui}; OUT=$(realpath -m "${2:?outdir}"); mkdir -p "$OUT/work"; W=$OUT/work
+# Each output directory owns its tmux servers, named from its path, and touches no other.
+ID=relay-model-acc-$(printf %s "$OUT" | sha1sum | cut -c1-12)
+SOCK=$ID-exec; T=$ID-tui
+cleanup() { tmux -L "$SOCK" kill-server 2>/dev/null || true; }
+cx() { codex exec --skip-git-repo-check -C "$W" "$@" </dev/null >>"$OUT/exec.log" 2>&1; }
+
+if [ "$mode" = exec ]; then
+  trap cleanup EXIT TERM INT
+  B=--dangerously-bypass-approvals-and-sandbox
+  cx $B -m gpt-6-luna "Run exactly this shell command once: $RELAY > $W/top.json. Then reply DONE."
+  thread=$(python3 -I -c 'import json,sys;print(json.load(open(sys.argv[1]))["thread"])' "$W/top.json")
+  (cd "$W" && codex exec resume "$thread" --skip-git-repo-check $B -m gpt-6-astra "Run exactly this shell command once: $RELAY > $W/resumed.json. Then reply DONE." </dev/null >>"$OUT/exec.log" 2>&1)
+  cx $B -m gpt-6-luna "Spawn one sub-agent on model gpt-6-astra whose only task is to run this shell command once: $RELAY > $W/child.json. Wait for it. Then run this shell command yourself once: $RELAY > $W/parent.json. Then reply DONE."
+  cx -m gpt-6-luna "Run exactly this shell command once: $RELAY > $W/sandbox.json; echo \$CODEX_PERMISSION_PROFILE > $W/sandbox.profile. Then reply DONE."
+  cx $B "Run exactly this shell command once (it ends with the &): setsid nohup sh -c 'sleep 9; $RELAY > $W/setsid.json 2>&1' >/dev/null 2>&1 & When it returns, run exactly this second shell command once: sleep 8. Then reply DONE."
+  cx $B "Run exactly this shell command once: tmux -L $SOCK new-session -d 'sleep 1; $RELAY > $W/tmux.json 2>&1; sleep 2'; sleep 6. Then reply DONE."
+  cx $B --ephemeral "Run exactly this shell command once: $RELAY > $W/ephemeral.json 2>&1. Then reply DONE."
+  for f in "$W"/*.json; do printf '%s ' "$(basename "$f")"; cat "$f"; done
+  exit 0
+fi
+
+# TUI: the outdir's own tmux server ($T); the operator drives it step by step.
+case ${3:-} in
+  start) if tmux -L $T has-session 2>/dev/null; then echo "$T already runs; stop it first" >&2; exit 2; fi
+         tmux -L $T new-session -d -s acc -x 200 -y 50 -c "$W" "codex --no-daemon --dangerously-bypass-approvals-and-sandbox -m gpt-6-luna -C $W"; sleep 8 ;;
+  say)   tmux -L $T send-keys -t acc -l "${4:?text}"; sleep 1; tmux -L $T send-keys -t acc Enter ;;
+  keys)  tmux -L $T send-keys -t acc "${@:4}" ;;
+  pane)  tmux -L $T capture-pane -p -t acc | grep -v '^\s*$' | tail -${4:-15} | tee -a "$OUT/panes.log" ;;
+  stop)  tmux -L $T kill-server ;;
+  *) echo "tui start|say|keys|pane|stop" >&2; exit 2 ;;
+esac
