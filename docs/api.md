@@ -454,7 +454,7 @@ Callback and cleanup failures are preserved together in AggregateError.
 The CLI's commands are `relay list`, `relay reap [--outer-ms N]`,
 `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`,
 `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--evidence FILE]
-[--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`, and `relay rollback --artifact FILE`; `relay --help`,
+[--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`, `relay rollback --artifact FILE`, and `relay model --harness codex`; `relay --help`,
 `relay help [<command>]`, `relay <command> --help`, and `relay --version` round it out. `--json` and
 `--pretty` are global and mutually exclusive, `RELAY_FORMAT` sets the default (the protocol rows
 `hook` and `ask` ignore it, since they print only the harness reply), and `install` is JSON
@@ -502,7 +502,7 @@ INVALID_SCHEMA, CORRUPT_STATE, PROCESS_UNREADABLE, PROCESS_UNAVAILABLE,
 DEADLINE_EXCEEDED, LOCK_TIMEOUT, LOCK_IDENTITY_UNKNOWN, LOCK_REPAIR_REQUIRED,
 LOCK_CLEANUP_FAILED, LOCK_OWNERSHIP_LOST, IO_ERROR, GIT_ERROR, USAGE,
 INVALID_REPLY, UNSUPPORTED_REPLY, INVALID_CONFIG, INVALID_EVIDENCE, UNSUPPORTED_BINDING,
-GUARD_FAILED and REGISTRY_SUPERSEDED.
+GUARD_FAILED, REGISTRY_SUPERSEDED and INVALID_ROLLOUT.
 Unknown lock ownership at deadline is LOCK_IDENTITY_UNKNOWN;
 a live holder exceeding caller patience is LOCK_TIMEOUT, even when the deadline cut
 short the last check of that holder. Causes may retain OS
@@ -515,6 +515,48 @@ service runbook. The Claude terminal route has version-specific local capability
 evidence; user-present tailnet acceptance, remote/tag portability, physical Darwin
 process behavior, consumer migration and operator cutover remain separate gates.
 
+
+## Codex model resolution
+
+`relay model --harness codex` tells a process running inside a Codex tool call which model
+its turn runs. It reads the thread's own rollout (`CODEX_THREAD_ID` →
+`$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*-<thread>.jsonl`, `$HOME/.codex` when
+`CODEX_HOME` is unset) and takes the last `turn_context`. Codex's layout is private and
+observed, not documented; design and evidence in
+`docs/specs/2026-10-17-codex-model-resolver.md`.
+
+Pretty output (the default) is the agent alone: `codex/<model>` when verified, else `codex`,
+plus `relay: model unverified (<reason>): <detail>` on stderr. Capture it with
+`$(relay model --harness codex --pretty)`, naming the mode, since `RELAY_FORMAT` changes the
+default. `--json` prints one object:
+
+    {"verified":true,"agent":"codex/gpt-6.1-sol","harness":"codex","model":"gpt-6.1-sol","effort":"high","thread":"<id>","rollout":"<path>","reason":null}
+
+| reason | when |
+|---|---|
+| `no-thread` | `CODEX_THREAD_ID` unset or empty: hooks, and every process outside Codex |
+| `not-under-codex` | the nearest harness ancestor is not `codex`, or there is none (a reparented daemon or tmux server, another harness started from a Codex shell) |
+| `no-rollout` | no rollout of the thread (an ephemeral session) |
+| `ambiguous-rollout` | more than one rollout matches |
+| `no-turn-context` | the rollout holds no `turn_context` |
+| `scan-limit` | none within the last 64 MiB |
+| `earlier-turn` | the call process (the one Codex started for the tool call) started before the latest turn's record |
+| `turn-boundary` | its start is too close to that record to order them |
+
+Every answer exits 0. A failure exits 1 with kind `model_failed`: `INVALID_INPUT` (a thread id
+that is not a lowercase UUIDv7), `INVALID_CONFIG` (a relative `CODEX_HOME`, or no usable
+`HOME`), `IO_ERROR`, `PROCESS_UNREADABLE`, or `INVALID_ROLLOUT` (a rollout that does not open
+with its own `session_meta`, an invalid line in the scanned range, or a malformed
+`turn_context`). A caller that needs a stamp treats a failure, or no answer within 2 s,
+like an unverified answer and reports it.
+
+A caller is verified only while its call process provably started in the latest turn:
+the start interval less one second must lie after the turn's record. A background
+terminal or server left from an earlier turn is refused once the next turn begins.
+**Clock requirement:** between the call process's start and the command, the wall clock
+must move by less than one second against the boot clock. A larger step forward on Linux,
+or backward on Darwin, can verify a leftover process with the latest turn's model. No
+interface records past steps, so the command cannot detect one.
 
 ## Interaction messages and relay serve
 
