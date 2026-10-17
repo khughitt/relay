@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T12:29:03Z
+updated: 2026-10-17T12:29:31Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
@@ -60,3 +60,4 @@ Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surf
   provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-17T12:29:02Z (feat/codex-model-resolver): review: spec round 3 — verdict: revise; findings: must 1, should 1; reviewer: codex/gpt-6.1-sol
 - 2026-10-17T12:29:03Z (feat/codex-model-resolver): round-3 reviewer verified from codex rollout 01a14985-3a99-7e12-9643-455088b7d4ec (third turn_context, gpt-6.1-sol)
+- 2026-10-17T12:29:31Z (feat/codex-model-resolver): spec revised for round 3: Linux start interval brackets the uptime read between two Date.now() samples (lo = w0 − age − 11 ms, hi = w1 − age + 11 ms), so a pause widens rather than shifts it; sampling-delay test added; clock-step tests require verification only when the shifted interval satisfies lo − m ≥ t
