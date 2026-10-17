@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T15:41:02Z
+updated: 2026-10-17T15:41:25Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
@@ -92,3 +92,4 @@ Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surf
 - 2026-10-17T14:44:03Z (feat/codex-model-resolver): resumed
   provenance: {"harness_session":"claude-code:942b8363-20e2-40f0-b5f6-41a3faf0da5a","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-17T15:41:02Z (feat/codex-model-resolver): review: impl round 1 — verdict: accept; findings: minor 5; reviewer: claude-code/claude-opus-5-5
+- 2026-10-17T15:41:25Z (feat/codex-model-resolver): landed on feat/codex-model-resolver: 3840680 proc start interval; fa1bf9e adapter predicates + nearestHarness; 9c9ee2f rollout reader; 6baa6c2 resolver; 8ed917e relay model CLI + adopted cli.toml (ops row ef2d147, ops-92d9c8); d106164 docs/api.md; 568e388 live acceptance (codex-cli 0.163.0, all cases pass after the setsid-case timing fix); 51da81f spec implemented. Final review: ready to merge, minors filed as relay-96422d
