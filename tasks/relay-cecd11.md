@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/codex-model-resolver
 created: 2026-10-17T14:48:37Z
-updated: 2026-10-17T14:51:40Z
+updated: 2026-10-17T15:40:52Z
 started: 2026-10-17T14:49:26Z
 completed: 2026-10-17T14:51:40Z
 closed: 2026-10-17T14:51:40Z
@@ -28,3 +28,4 @@ step: "Task 1: Land the `model` row in ops's `cli.toml`"
   provenance: {"harness_session":"claude-code:942b8363-20e2-40f0-b5f6-41a3faf0da5a","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-17T14:51:40Z (feat/codex-model-resolver): ops row landed: ops-92d9c8, ef2d147 on ops main 6020a54
   provenance: {"harness_session":"claude-code:942b8363-20e2-40f0-b5f6-41a3faf0da5a","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-17T15:40:52Z (feat/codex-model-resolver): review: impl round 1 — verdict: accept; findings: minor 1; reviewer: claude-code/claude-sonnet-5-5
