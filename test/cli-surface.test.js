@@ -79,7 +79,7 @@ test('usage errors exit 2 with stderr only', () => {
 
 test('enum baselines cover every enum row', (t) => {
   const { subscribers, target, bin, evidence } = fixture(t);
-  const env = { PATH: `${bin}:${process.env.PATH}` };
+  const env = { PATH: `${bin}:${process.env.PATH}`, CODEX_THREAD_ID: '' };
   const payload = JSON.stringify({ session_id: 's1', hook_event_name: 'SessionStart', cwd: os.tmpdir() });
   const baselines = [
     [['install'], '--harness', ['install', '--harness', 'codex', '--subscribers', subscribers, '--target', target]],
@@ -87,6 +87,7 @@ test('enum baselines cover every enum row', (t) => {
     [['hook'], '--harness', ['hook', '--harness', 'claude-code', '--subscribers', subscribers, 'SessionStart']],
     [['ask'], '--harness', ['ask', '--harness', 'claude-code', 'PostToolUse']],
     [['install'], '--with', ['install', '--harness', 'claude-code', '--subscribers', subscribers, '--target', target, '--evidence', evidence, '--with', 'ask']],
+    [['model'], '--harness', ['model', '--harness', 'codex']],
   ];
   const table = [...tableRows()].map((r) => JSON.parse(r)).filter((r) => r[0] === 'option' && r[3] === 'enum').map((r) => `${r[1].join(' ')} ${r[2][0]}`).sort();
   assert.deepEqual(baselines.map(([p, b]) => `${p.join(' ')} ${b}`).sort(), table, 'every enum row needs a baseline');
@@ -131,12 +132,12 @@ test('every command without a declared output row emits one JSON value under --j
   const p = await tempState(t); await serveCli(t, p);
   assert.equal(runCli(p, ['presence', 'away']).status, 0);
   const hook = askCli(t, p), { id } = await entryForCli(p);
-  const args = { 'inbox show': [id], 'inbox answer': [id, 'q1=o1'], 'inbox defer': [id] };
+  const args = { 'inbox show': [id], 'inbox answer': [id, 'q1=o1'], 'inbox defer': [id], model: ['--harness', 'codex'] };
   const candidates = COMMANDS.filter((cmd) => !cmd.protocol && !cmd.output && cmd.path.join(' ') !== 'inbox withdraw')
     .sort((a, b) => Number(a.path.join(' ') === 'inbox answer') - Number(b.path.join(' ') === 'inbox answer'));
   assert.ok(candidates.length > 0, 'expected at least one plain command row');
   for (const cmd of candidates) {
-    const r = runCli(p, ['--json', ...cmd.path, ...(args[cmd.path.join(' ')] ?? [])]);
+    const r = runCli(p, ['--json', ...cmd.path, ...(args[cmd.path.join(' ')] ?? [])], undefined, { CODEX_THREAD_ID: '' });
     assert.equal(r.status, 0, `${cmd.path.join(' ')}: ${r.stderr}`);
     assert.doesNotThrow(() => JSON.parse(r.stdout), `${cmd.path.join(' ')} stdout was not one JSON value: ${JSON.stringify(r.stdout)}`);
   }

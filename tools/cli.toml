@@ -388,6 +388,9 @@ path = ["show"]
 verb = "show"
 summary = "Show one task with resolved links and dependencies"
 args = [{ name = "id", value = "ref", required = true }]
+options = [
+  { names = ["--no-fetch"], value = "none" },
+]
 
 [[cli.tasks.commands]]
 path = ["doc"]
@@ -398,6 +401,7 @@ args = [{ name = "id", value = "ref", required = true }]
 options = [
   { names = ["--plan"], value = "none" },
   { names = ["--spec"], value = "none" },
+  { names = ["--no-fetch"], value = "none" },
 ]
 
 [[cli.tasks.commands]]
@@ -491,6 +495,7 @@ options = [
   { names = ["--max-complexity"], value = "enum", values = ["low", "mid", "high"] },
   { names = ["--without"], value = "string", repeatable = true },
   { names = ["--under"], value = "ref" },
+  { names = ["--no-fetch"], value = "none" },
   { shared = "project", role = "select", value = "string", repeatable = false },
   { shared = "all_projects", value = "none" },
   { names = ["--group"], value = "string" },
@@ -522,6 +527,7 @@ options = [
   { names = ["--no-parallel"], value = "none" },
   { names = ["--no-lane"], value = "none" },
   { names = ["--no-reviewed"], value = "none" },
+  { names = ["--no-awaiting-user"], value = "none" },
   { names = ["--no-every"], value = "none" },
   { names = ["--no-defer"], value = "none" },
   { names = ["--no-source"], value = "none" },
@@ -546,6 +552,7 @@ options = [
   { names = ["--parallel"], value = "none" },
   { names = ["--lane"], value = "none" },
   { names = ["--reviewed"], value = "none" },
+  { names = ["--awaiting-user"], value = "none" },
   { names = ["--every"], value = "age", role = "set" },
   { names = ["--defer"], value = "when", role = "set" },
   { shared = "tag", role = "set", value = "string", repeatable = true },
@@ -567,6 +574,7 @@ options = [
   { names = ["--stamp"], value = "none" },
   { names = ["--reviewed"], value = "none" },
   { names = ["--no-reviewed"], value = "none" },
+  { names = ["--awaiting-user"], value = "none" },
 ]
 
 [[cli.tasks.commands]]
@@ -617,6 +625,14 @@ options = [
 path = ["drop"]
 summary = "Close a task as dropped"
 args = [{ name = "id", value = "ref", required = true }, { name = "message", value = "string", required = false }]
+
+[[cli.tasks.commands]]
+path = ["release"]
+summary = "Release another session's claim that cannot be judged live, and record why"
+args = [{ name = "id", value = "ref", required = true }, { name = "why", value = "string", required = true }]
+options = [
+  { names = ["--adopting"], value = "string" },
+]
 
 [[cli.tasks.commands]]
 path = ["block"]
@@ -912,6 +928,7 @@ path = ["index"]
 summary = "index local harness transcripts"
 options = [
   { names = ["--full"], value = "none" },
+  { names = ["--replay"], value = "path", repeatable = true },
   { shared = "harness", role = "filter", value = "enum", values = ["claude-code", "codex"], repeatable = false },
   { shared = "project", role = "select", value = "string", repeatable = false },
 ]
@@ -1015,6 +1032,11 @@ summary = "record follow-up link judgments from a JSONL file"
 options = [
   { names = ["--input"], value = "path", required = true },
 ]
+
+[[cli.obs.commands]]
+path = ["index-state"]
+output = "json"
+summary = "print each indexed file's retention readiness and indexed-byte evidence"
 
 # ---- lit
 
@@ -1661,8 +1683,11 @@ options = [
   { names = ["--run"], value = "string", default = "nc1" },
   { names = ["--realizations"], value = "int", default = "16" },
   { names = ["--estimator-pairs"], value = "int", default = "32" },
-  { names = ["--sizepower-realizations"], value = "int", default = "16" },
+  { names = ["--sizepower-null-periodic"], value = "int", default = "256" },
+  { names = ["--sizepower-null-jittered"], value = "int", default = "512" },
+  { names = ["--sizepower-other"], value = "int", default = "32" },
   { names = ["--sizepower-b"], value = "int", default = "199" },
+  { names = ["--seed-generation"], value = "string", default = "g2" },
 ]
 
 [[cli.pilot.commands]]
@@ -1678,6 +1703,7 @@ summary = "Generate one nested partition's trajectories"
 options = [
   { names = ["--run"], value = "string", default = "nc1" },
   { names = ["--partition"], value = "enum", values = ["nested-development", "nested-fresh", "nested-new", "nested-estimator"], required = true },
+  { names = ["--workers"], value = "int", default = "1" },
 ]
 
 [[cli.pilot.commands]]
@@ -1686,7 +1712,7 @@ summary = "Compute both panels on every view for one nested partition"
 options = [
   { names = ["--run"], value = "string", default = "nc1" },
   { names = ["--partition"], value = "enum", values = ["nested-development", "nested-fresh", "nested-new", "nested-estimator"], required = true },
-  { names = ["--workers"], value = "int", default = "1" },
+  { names = ["--workers"], value = "int" },
 ]
 
 [[cli.pilot.commands]]
@@ -1703,7 +1729,7 @@ summary = "Run the surrogate size-and-power check"
 options = [
   { names = ["--run"], value = "string", default = "nc1" },
   { names = ["--workers"], value = "int", default = "1" },
-  { names = ["--surrogate"], value = "enum", values = ["time_shift", "epoch_shuffle_Ps", "epoch_shuffle_frac", "phase_randomize"], repeatable = true },
+  { names = ["--surrogate"], value = "enum", values = ["time_shift", "epoch_0.73", "epoch_1", "epoch_4", "phase_randomize"], repeatable = true },
 ]
 
 [[cli.pilot.commands]]
@@ -1947,6 +1973,7 @@ options = [
   { shared = "via", value = "string" },
   { names = ["--title"], value = "string" },
   { names = ["--body"], value = "string" },
+  { names = ["--body-file"], value = "path" },
   { names = ["--from"], value = "path" },
   { names = ["--etag"], value = "string" },
   { names = ["--interactive", "-i"], value = "none" },
@@ -2752,6 +2779,13 @@ args = [{ name = "id", value = "string", required = true }]
 path = ["presence"]
 summary = "Show or set whether questions go to the inbox"
 args = [{ name = "mode", value = "enum", values = ["here", "away"], required = false }]
+
+[[cli.relay.commands]]
+path = ["model"]
+summary = "The model a Codex tool call's turn runs, read from its rollout"
+options = [
+  { shared = "harness", role = "select", value = "enum", values = ["codex"], required = true, repeatable = false },
+]
 
 # Minimal adoption surface; existing ops-projects commands remain outside this inventory.
 [cli.ops-projects]

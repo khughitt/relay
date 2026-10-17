@@ -247,6 +247,15 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
       (await import('../src/install/atomic.js')).rollbackArtifact(JSON.parse(readFileSync(f['--artifact'], 'utf8')));
       return 0; // output = "none": nothing on success in any mode
     }
+    if (cmd.path[0] === 'model') {
+      const f = flags(rest, cmd);
+      if (f['--harness'] !== 'codex' || Object.keys(f).length !== 1) throw usage('model requires --harness codex');
+      const { answer, detail } = (await import('../src/adapters/codex-model.js')).resolveCodexModel();
+      if (mode === 'json') { await emit(stdout, `${JSON.stringify(answer)}\n`); return 0; }
+      await emit(stdout, `${answer.agent}\n`);
+      if (!answer.verified) await emit(stderr, `relay: model unverified (${answer.reason}): ${detail}\n`);
+      return 0;
+    }
     throw usage(`unknown command "${cmd.path[0]}"`);
   } catch (caught) { const error = /** @type {import('../src/types.js').Failure} */ (caught);
     if (error.code === 'USAGE') { await emit(stderr, `relay: ${error.message}\n`); return 2; }
