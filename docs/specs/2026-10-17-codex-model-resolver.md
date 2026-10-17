@@ -4,6 +4,8 @@ Status: approved 2026-10-17 for implementation planning, after review rounds 1 (
 binding, pid 1, explicit `--pretty`), 2 (conservative boundary, clock requirement), 3
 (bracketed sampling) and 4 (accept); amended at plan review (the rollout reader's own
 module, and a `null` effort).
+Implemented 2026-10-17 by `docs/plans/2026-10-17-codex-model-resolver.md`; live acceptance in
+`docs/notes/2026-10-17-codex-model-acceptance.md` (codex-cli 0.163.0).
 Task: `relay-2cd4b1` (goal `hq-fce47e`; consumer `tasks-970049`).
 Evidence: lore `docs/notes/2026-10-02-codex-model-identity-brief.md` §5 (hq-1bd166, Codex
 0.162.1), the scoping note on `relay-2cd4b1`, and the probes in "Facts" below (Codex
@@ -75,7 +77,9 @@ driven in a detached tmux session through two turns):
     rule, a command run from it in turn 2 would read turn 2's model, and a model
     switch between the turns would make that answer wrong.
 14. A `setsid nohup … &` process was reparented at once to the user's systemd manager,
-    so it has no `codex` ancestor.
+    so it has no `codex` ancestor. Qualified at acceptance: under `zsh -lc` a backgrounded job is not a
+    group leader, so `setsid` does not fork and the job stays a child of the tool shell
+    until the call ends (`docs/notes/2026-10-17-codex-model-acceptance.md`, finding 1).
 15. The turn's `turn_context` was stamped 7.5 s before the turn's first command started
     (11:22:26.4 against 11:22:33.6), and the next turn's 32 s after it.
 
