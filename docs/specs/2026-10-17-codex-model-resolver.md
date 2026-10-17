@@ -1,8 +1,8 @@
 # Codex model resolver
 
-Status: draft 2026-10-17, revised after review rounds 1 (turn binding, pid 1, explicit
-`--pretty`), 2 (conservative boundary, clock requirement) and 3 (bracketed sampling);
-awaiting review.
+Status: approved 2026-10-17 for implementation planning, after review rounds 1 (turn
+binding, pid 1, explicit `--pretty`), 2 (conservative boundary, clock requirement), 3
+(bracketed sampling) and 4 (accept).
 Task: `relay-2cd4b1` (goal `hq-fce47e`; consumer `tasks-970049`).
 Evidence: lore `docs/notes/2026-10-02-codex-model-identity-brief.md` §5 (hq-1bd166, Codex
 0.162.1), the scoping note on `relay-2cd4b1`, and the probes in "Facts" below (Codex
@@ -203,9 +203,11 @@ Acceptance checks that case.
   100`, the process's age at that instant lies within 10 ms of `(u − T) × 1000`: both
   values are truncated to 10 ms. Allowing 1 ms for `Date.now()` resolution gives
   `lo = w0 − (u − T) × 1000 − 11` and `hi = w1 − (u − T) × 1000 + 11`. A pause between
-  the reads widens the interval by its length instead of shifting it, so the interval
-  always contains the true start under the clock requirement. Its width only makes
-  refusals more likely. Until now relay only compared tick counts, so this is the
+  the reads widens the interval by its length instead of shifting it. With a stable
+  clock the interval contains the true start; under the clock requirement, where the
+  wall clock may have moved by up to `m`, it is `[lo − m, hi + m]` that is guaranteed
+  to contain it, which is the allowance the decision rule applies. The width only
+  makes refusals more likely. Until now relay only compared tick counts, so this is the
   first place it converts them.
 - Darwin: `lstart` is the wall-clock start the kernel recorded, truncated to the
   second, so `lo = lstart × 1000` and `hi = lo + 999`.
