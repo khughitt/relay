@@ -41,13 +41,14 @@ export const encodeReply = (nativeEvent, reply) => encodeStandardReply(nativeEve
 // executable and never fire a hook; landing on one means an unmeasured shape, so null.
 const ROLES = Object.freeze(['daemon', 'bg-pty-host']);
 const ops = () => createProcessOps();
+/** A Claude Code process: `claude`, or a versioned binary under claude/versions/. */
+/** @type {import("../types.js").Adapter["isHarness"]} */
+export const isHarness = (row, { executableOf }) => row.comm === 'claude'
+  || (VERSION_COMM.test(row.comm) && executableOf(row.pid).endsWith(`/claude/versions/${row.comm}`));
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid),
   executableOf = (pid) => ops().executableOf(pid), argvOf = (pid) => ops().argvOf(pid) } = {}) {
-  /** @param {import("../types.js").ProcessRow} row */
-  const isHarness = (row) => row.comm === 'claude'
-    || (VERSION_COMM.test(row.comm) && executableOf(row.pid).endsWith(`/claude/versions/${row.comm}`));
-  return nearestSessionPid(ancestors(startPid), { isHarness, roles: ROLES, argvOf });
+  return nearestSessionPid(ancestors(startPid), { isHarness: (row) => isHarness(row, { executableOf }), roles: ROLES, argvOf });
 }
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {

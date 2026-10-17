@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { adapterFor } from '../src/adapters/index.js';
+import { adapterFor, nearestHarness } from '../src/adapters/index.js';
 import { createProcessOps } from '../src/bus/proc.js';
 const corpus = JSON.parse(readFileSync(new URL('./fixtures/ancestry.json', import.meta.url)));
 test('ancestry corpus is versioned and names every harness', () => {
@@ -48,4 +48,19 @@ test('the hook itself is never the session, even when it is a harness process', 
     assert.equal(adapterFor(harness).resolveSessionPid({ ancestors: only, executableOf: () => '', argvOf: () => [] }), null);
     assert.equal(adapterFor(harness).resolveTerminalPid({ ancestors: only }), null);
   }
+});
+
+// Spec docs/specs/2026-10-17-codex-model-resolver.md, "Resolution" step 3.
+const hrow = (pid, comm) => ({ pid, ppid: pid - 1, comm, tty: null, starttime: '1', state: 'S' });
+const noExecutable = { executableOf: () => { throw new Error('executable must not be read'); } };
+test('nearestHarness finds the nearest harness of any kind and never the caller itself', () => {
+  assert.deepEqual(nearestHarness([hrow(9, 'codex'), hrow(8, 'bash'), hrow(7, 'codex')], noExecutable), { harness: 'codex', index: 2 });
+  assert.deepEqual(nearestHarness([hrow(9, 'node'), hrow(8, 'claude'), hrow(7, 'codex')], noExecutable), { harness: 'claude-code', index: 1 });
+  assert.deepEqual(nearestHarness([hrow(9, 'node'), hrow(8, 'opencode')], noExecutable), { harness: 'opencode', index: 1 });
+  assert.equal(nearestHarness([hrow(9, 'node'), hrow(8, 'bash'), hrow(2, 'systemd')], noExecutable), null);
+});
+test('nearestHarness counts a versioned Claude binary only under claude/versions/', () => {
+  const chain = [hrow(9, 'node'), hrow(8, '2.1.280'), hrow(7, 'codex')];
+  assert.deepEqual(nearestHarness(chain, { executableOf: () => '/home/u/.local/share/claude/versions/2.1.280' }), { harness: 'claude-code', index: 1 });
+  assert.deepEqual(nearestHarness(chain, { executableOf: () => '/usr/bin/other' }), { harness: 'codex', index: 2 });
 });

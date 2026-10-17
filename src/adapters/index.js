@@ -11,6 +11,15 @@ export function adapterFor(harness) {
   if (!Object.hasOwn(adapters, harness)) throw relayError('UNSUPPORTED_HARNESS', 'unsupported harness');
   return adapters[harness];
 }
+// The nearest process any adapter recognises, skipping index zero (the caller itself).
+// Spec docs/specs/2026-10-17-codex-model-resolver.md, "Resolution" step 3.
+/** @param {import("../types.js").ProcessRow[]} chain @param {{executableOf: (pid: number) => string}} ops @returns {{harness: string, index: number}|null} */
+export function nearestHarness(chain, ops) {
+  for (let index = 1; index < chain.length; index++) {
+    for (const [harness, adapter] of Object.entries(adapters)) if (adapter.isHarness(chain[index], ops)) return { harness, index };
+  }
+  return null;
+}
 /** @param {string} harness @param {string} nativeEvent @param {unknown} raw */
 export function normalizeEvent(harness, nativeEvent, raw) {
   const adapter = adapterFor(harness);

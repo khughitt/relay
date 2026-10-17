@@ -51,9 +51,11 @@ export function workerIdOf(data, nativeEvent) {
   return id;
 }
 const ops = () => createProcessOps();
+/** @type {import("../types.js").Adapter["isHarness"]} */
+export const isHarness = (row) => row.comm === 'codex';
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
-  return nearestSessionPid(ancestors(startPid), { isHarness: (row) => row.comm === 'codex' });
+  return nearestSessionPid(ancestors(startPid), { isHarness: (row) => isHarness(row, { executableOf: () => '' }) });
 }
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {

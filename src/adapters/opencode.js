@@ -26,9 +26,11 @@ export function reduceState(level, previous) {
   return (/** @type {Set<unknown>} */ (ACTIVE)).has(previous) ? 'done' : 'idle';
 }
 const ops = () => createProcessOps();
+/** @type {import("../types.js").Adapter["isHarness"]} */
+export const isHarness = (row) => row.comm === 'opencode';
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
-  return nearestSessionPid(ancestors(startPid), { isHarness: (row) => row.comm === 'opencode' });
+  return nearestSessionPid(ancestors(startPid), { isHarness: (row) => isHarness(row, { executableOf: () => '' }) });
 }
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
