@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T12:47:48Z
+updated: 2026-10-17T12:57:53Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
@@ -70,4 +70,6 @@ Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surf
 - 2026-10-17T12:34:36Z (feat/codex-model-resolver): round-4 reviewer verified from codex rollout 01a14985-3a99-7e12-9643-455088b7d4ec (fourth turn_context, gpt-6.1-sol); user (Keith) approved the spec for planning; minor wording fix applied: [lo − m, hi + m] is the interval guaranteed under the clock requirement
 - 2026-10-17T12:47:45Z (feat/codex-model-resolver): plan drafted: docs/plans/2026-10-17-codex-model-resolver.md, 8 tasks (ops cli.toml row; proc start interval; adapter predicates; rollout reader; resolver; CLI + adopt + unshare test; api.md; live acceptance); awaiting user review and execution choice
 - 2026-10-17T12:47:48Z (feat/codex-model-resolver): parked (waiting on user, review): User reviews docs/plans/2026-10-17-codex-model-resolver.md in .worktrees/codex-model and picks an execution method; then the agent executes it from Task 1 (ops cli.toml row)
+  provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-17T12:57:53Z (feat/codex-model-resolver): resumed
   provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
