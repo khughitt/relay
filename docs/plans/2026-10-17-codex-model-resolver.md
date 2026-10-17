@@ -361,6 +361,7 @@ export function tempStore(t) {
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { storeRoot, dayOf, listDir, locateRollout, firstRecord, lastTurnContext, turnFields, UUID_V7 } from '../src/adapters/codex-rollout.js';
@@ -440,13 +441,20 @@ test('lastTurnContext: an invalid line in range fails; none at all, or none with
 });
 // Review regression: both readers once re-copied the growing record on every block, which is
 // quadratic (a 64 MiB record copied 32 GiB). With 4 KiB blocks a 16 MiB record would copy
-// 32 GiB that way; read linearly it takes well under a second, so the timeout separates them.
-test('records of many blocks are assembled once', { timeout: 5000 }, (t) => {
+// 32 GiB that way; read linearly it takes well under a second. The reads are synchronous,
+// which would block node:test's own timeout, so they run in a child killed after 5 s.
+test('records of many blocks are assembled once', (t) => {
   const store = tempStore(t), big = 'w'.repeat(16 * 1024 * 1024);
   const tc = record('turn_context', { model: 'big', effort: 'high', pad: big }, '2026-10-17T10:00:00.000Z');
   const file = store.day(['a', 'b', 'c'], thread, [record('session_meta', { id: thread, pad: big }), tc, record('event_msg', {})]);
-  assert.equal(firstRecord(file, { block: 4096 }).payload.id, thread);
-  assert.equal(lastTurnContext(file, { block: 4096 }).record?.payload.model, 'big');
+  const reader = new URL('../src/adapters/codex-rollout.js', import.meta.url).href;
+  const script = `import { firstRecord, lastTurnContext } from ${JSON.stringify(reader)};
+const [file] = process.argv.slice(1);
+process.stdout.write(JSON.stringify([firstRecord(file, { block: 4096 }).payload.id, lastTurnContext(file, { block: 4096 }).record?.payload.model]));`;
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', script, file], { encoding: 'utf8', timeout: 5000, killSignal: 'SIGKILL' });
+  assert.equal(r.signal, null, 'the reads must finish within 5 s');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), [thread, 'big']);
 });
 test('turnFields validates the model, effort and timestamp', () => {
   const parse = (line) => turnFields(JSON.parse(line));
