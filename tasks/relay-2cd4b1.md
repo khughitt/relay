@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T13:07:00Z
+updated: 2026-10-17T13:08:23Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
@@ -80,3 +80,4 @@ Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surf
 - 2026-10-17T13:06:59Z (feat/codex-model-resolver): resumed
   provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-17T13:07:00Z (feat/codex-model-resolver): review: plan round 2 — verdict: revise; findings: should 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-17T13:08:23Z (feat/codex-model-resolver): plan revised for plan round 2: the large-record regression runs both readers in a child killed after 5 s (synchronous reads block node:test's timeout). Checked in scratch against both versions: revised readers 152 ms; the original quadratic lastTurnContext killed at 5010 ms
