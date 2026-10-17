@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-15T13:23:04Z
-updated: 2026-10-15T22:17:20Z
+updated: 2026-10-17T16:18:21Z
 depends: []
 tags: []
 source: relay-635fdc
@@ -25,3 +25,4 @@ Bound: the three cases and the judge changes they need; no change to src/, the r
 ## Notes
 
 - 2026-10-15T22:17:20Z (main): scope: scoped; rewrote as a three-case TUI capture (/new, /resume, /fork) with --relay, checked against main d7ac402 (src/bus/transaction.js:62-67 cascade, tools/codex-subagent-capture background case) and the codex-cli 0.162.1 binary's slash-command strings; added the CODEX_THREAD_ID-after-switch reading relay-2cd4b1's spec needs; todo P2 s/mid/direct
+- 2026-10-17T16:18:21Z (main): relay-2cd4b1's live acceptance (docs/notes/2026-10-17-codex-model-acceptance.md, TUI steps 3-5, codex-cli 0.163.0) answered this task's CODEX_THREAD_ID premise: a tool call's CODEX_THREAD_ID follows /new, /resume and /fork in one TUI process (each names its own active thread). The row-lifecycle questions (SessionEnd on switch, worker rows outliving their root) remain open
