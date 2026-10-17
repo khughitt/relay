@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T14:48:36Z
+updated: 2026-10-17T15:41:02Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
@@ -91,3 +91,4 @@ Where: lore brief §4-§6; src/commands.js and bin/relay.js for the command surf
   provenance: {"harness_session":"claude-code:b66cd6bb-77e6-4908-99ce-76686866c36d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-17T14:44:03Z (feat/codex-model-resolver): resumed
   provenance: {"harness_session":"claude-code:942b8363-20e2-40f0-b5f6-41a3faf0da5a","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-17T15:41:02Z (feat/codex-model-resolver): review: impl round 1 — verdict: accept; findings: minor 5; reviewer: claude-code/claude-opus-5-5
