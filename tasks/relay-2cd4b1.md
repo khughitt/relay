@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/codex-model-resolver
 created: 2026-10-15T00:39:58Z
-updated: 2026-10-17T14:44:03Z
+updated: 2026-10-17T14:48:36Z
 started: 2026-10-17T10:34:15Z
 depends: []
 tags: []
