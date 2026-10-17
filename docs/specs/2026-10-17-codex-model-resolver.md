@@ -1,7 +1,8 @@
 # Codex model resolver
 
 Status: draft 2026-10-17, revised after review rounds 1 (turn binding, pid 1, explicit
-`--pretty`) and 2 (conservative boundary, clock requirement); awaiting review.
+`--pretty`), 2 (conservative boundary, clock requirement) and 3 (bracketed sampling);
+awaiting review.
 Task: `relay-2cd4b1` (goal `hq-fce47e`; consumer `tasks-970049`).
 Evidence: lore `docs/notes/2026-10-02-codex-model-identity-brief.md` §5 (hq-1bd166, Codex
 0.162.1), the scoping note on `relay-2cd4b1`, and the probes in "Facts" below (Codex
@@ -195,10 +196,17 @@ Acceptance checks that case.
 
 - Linux: the kernel records a process's start only on the boot clock, as a tick count
   (`starttime`, `USER_HZ` = 100 in the Linux ABI; `getconf CLK_TCK` prints 100 here).
-  The accessor converts it as `now − (uptime − starttime / 100) × 1000`, reading
-  `/proc/uptime` and `Date.now()` back to back. Tick truncation and the two clock
-  reads bound the error at ±20 ms, so `lo` and `hi` are that estimate ∓ 20 ms. Until
-  now relay only compared tick counts, so this is the first place it converts them.
+  The accessor brackets one boot-clock sample between two wall-clock samples: `w0 =
+  Date.now()`, then `u` = the first field of `/proc/uptime` in seconds, then `w1 =
+  Date.now()`. The uptime sample was taken at some wall instant in `[w0, w1]`,
+  however long the process was descheduled between the reads. With `T = starttime /
+  100`, the process's age at that instant lies within 10 ms of `(u − T) × 1000`: both
+  values are truncated to 10 ms. Allowing 1 ms for `Date.now()` resolution gives
+  `lo = w0 − (u − T) × 1000 − 11` and `hi = w1 − (u − T) × 1000 + 11`. A pause between
+  the reads widens the interval by its length instead of shifting it, so the interval
+  always contains the true start under the clock requirement. Its width only makes
+  refusals more likely. Until now relay only compared tick counts, so this is the
+  first place it converts them.
 - Darwin: `lstart` is the wall-clock start the kernel recorded, truncated to the
   second, so `lo = lstart × 1000` and `hi = lo + 999`.
 
@@ -308,12 +316,18 @@ directories, with injected environment, ancestry and time zone:
   `m` before is `earlier-turn`; one meeting the boundary from either side is
   `turn-boundary`, including a Darwin start in the same second as `t` and a Linux
   start 500 ms before `t`;
+- sampling delay: with injected clocks, a pause of 1.2 s between `w0` and the uptime
+  read, or between it and `w1`, leaves the interval containing the true start, and a
+  process started 100 ms before `t` gets `turn-boundary`, not verified;
 - clock steps, injected as an offset between the wall clock and the boot clock: a step
-  under `m` in either direction leaves a leftover process refused and a current one
-  verified (when it started more than `m` + 20 ms after `t`); a step of any size in the
-  harmless direction (backward on Linux, forward on Darwin) only refuses; one test per
-  platform pins the stated limit, where a harmful step larger than `m` plus the
-  leftover's lead verifies it, so a change to the limit is deliberate;
+  under `m` in either direction never verifies a leftover process; a current process
+  is verified exactly when its shifted interval still satisfies `lo − m ≥ t`, and is
+  otherwise refused as `turn-boundary`, which is a correct conservative result (for
+  example, a Linux process started 1.2 s after `t`, then a 900 ms backward step); a
+  step of any size in the harmless direction (backward on Linux, forward on Darwin)
+  never verifies a leftover; one test per platform pins the stated limit, where a
+  harmful step larger than `m` plus the leftover's lead verifies it, so a change to the
+  limit is deliberate;
 - the pid-1 append: a chain whose last row has parent 1 gains pid 1's record, and a
   chain ending elsewhere does not;
 - `startedAtMs` intervals on Linux, from fixture `/proc/uptime`, stat text and clock, and
