@@ -1,5 +1,9 @@
 # Codex model resolver Implementation Plan
 
+Status: approved 2026-10-17 after plan review rounds 1 (surface fixtures, linear readers, acceptance
+cleanup, absent effort, Node 22 front door), 2 (child-process timing) and 3 (accept).
+Execution: subagent-driven, in a fresh session.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `relay model --harness codex` tells a process running inside a Codex tool call which model its turn runs (`codex/<model>`), or answers bare `codex` with a reason.
