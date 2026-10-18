@@ -234,3 +234,59 @@ v0.1.0 verifies the clauses with evidence above. The others belong to the tasks 
 `just gate` on the release branch with this record, 2026-10-18: 686 of 686 tests pass on
 Node 26.5.0 and 686 of 686 on Node 22.23.2, including the installed-tarball smoke and the
 tracked-files pack check. The publication record repeats the gate for the release commit.
+
+### Publication record
+
+| Item | Value |
+| --- | --- |
+| Tag | `v0.1.0`, annotated, tag object `9362dde74771a4be4b4c8c626e6cb1876dc29c0f` |
+| Release commit (`REL`) | `0f596607ad088be7607a9ff0b30f2073d2ee9147`, the merge of `release/v0.1.0` into main |
+| Pushed | 2026-10-18: main `db4ecd0..0f59660`, then the tag. The tag's commit, the remote's peeled tag and the remote's main were all `REL`, and `git ls-remote --refs` listed exactly main and the tag. |
+| Made public | 2026-10-18T22:33:32Z |
+| Consumer pin | `git+https://github.com/khughitt/relay.git#v0.1.0` |
+
+Before publication, the repository was recreated private, holding only the rewritten main
+(`relay-06b733`). Its activity shows no force-push.
+
+- **Gates at `REL`.** `just gate` passed 687 of 687 on Node 26.5.0 and 687 of 687 on
+  Node 22.23.2. The pre-push hook ran the gate again on the push.
+- **Privacy review at `REL`.**
+  - The controls passed: each pattern file holds real patterns and no blank line, the
+    `pwd -P` control matched, and each term matched on its own.
+  - gitleaks with merge diffs scanned 1073 commits and found no leaks.
+  - No state or transcript files; one author address.
+  - Machine paths: 0. Private identities: 0, over 2 terms. No hosts file was used, by the
+    maintainer's decision.
+  - Published pre-images: 0.
+- **Rehearsal at `REL`.** A `git+file` install from a scratch tag passed on both runtimes.
+- **Private refusals.** Two runs printed the same refusal:
+  `FAIL reach: fatal: could not read Username for 'https://github.com': terminal prompts disabled`. The first ran before anything was pushed (plan Task 3 Step 7), against the
+  earlier private remote's main `fa1d7c9`. The second ran against the pushed tag, before
+  the visibility change.
+- **Portability against the public tag.** The runs below came from
+  `tools/release/portability.mjs` at `REL`. The lockfile records relay as `git+ssh://…`,
+  and `npm ci` installs that entry anonymously over https.
+
+Node 26.5.0 (npm 11):
+
+```
+ok reach: 9362dde74771a4be4b4c8c626e6cb1876dc29c0f	refs/tags/v0.1.0
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.1.0
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.1.0
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#0f596607ad088be7607a9ff0b30f2073d2ee9147; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
+
+Node 22.23.2 (npm 10.9.8):
+
+```
+ok reach: 9362dde74771a4be4b4c8c626e6cb1876dc29c0f	refs/tags/v0.1.0
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.1.0
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.1.0
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#0f596607ad088be7607a9ff0b30f2073d2ee9147; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
