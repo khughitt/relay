@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: release/v0.1.0
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T19:38:29Z
+updated: 2026-10-18T19:46:07Z
 started: 2026-10-18T18:56:31Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
@@ -45,7 +45,7 @@ GH_TOKEN=$(gh auth token --user khughitt) gh api user --jq .login
 GH_TOKEN=$(gh auth token --user khughitt) gh repo view khughitt/relay --json nameWithOwner,visibility,url
 ```
 
-Require the login result to be `khughitt`; `<work-account>` must never be used here.
+Require the login result to be `khughitt`; the work gh account must never be used here.
 If the repository is missing, or is not the private relay whose main matches
 origin/main, stop. When publication is authorized:
 
