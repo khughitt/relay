@@ -53,8 +53,10 @@ The [extraction plan](docs/plans/2026-09-17-extraction.md) and
 [lock-safety addendum](docs/specs/2026-09-17-registry-lock-safety.md) record local work.
 The release goal is `relay-1231bf`; familiar migration is `fam-6e8321`, tasks identity
 is `tasks-c9199a`, live tool/denial proof is `ops-c8e4d1`, and remote/tag portability
-is `relay-c19c0a`. Physical Darwin process/terminal verification remains a release
-requirement; portable Darwin UTC/local-timezone fixtures do not replace it.
+is `relay-c19c0a`. v0.1.0 is verified on Linux; on Darwin it is fixture-tested only, and
+the physical probe (`relay-848c0f`) gates installing relay hooks on a Mac. Portable Darwin
+UTC/local-timezone fixtures do not replace that probe. The
+[release record](https://github.com/khughitt/relay/blob/main/docs/runbooks/release.md) says what v0.1.0 verifies.
 
 Verified 2026-09-17: 187 tests pass through the full gate on Node 26.5.0 and
 Node 22.23.2, including installed-tarball exports, JSON fixture, plugin and CLI.
