@@ -16,24 +16,34 @@ Run every step from the main checkout. Name the gh account on every gh command
    with both gate counts. Every later step uses `REL`, never a moving `main`.
 3. **Privacy review.** Run the commands below over `REL`'s history. Every result must
    match. The whole history becomes public with the repository.
-4. **Account and remote.** `gh api user --jq .login` prints `khughitt`.
+4. **Rehearse `REL`.** Clone the repository bare into a scratch directory, tag `REL` there
+   (`git -C <scratch>/relay.git tag -a v<version>-rehearsal -m rehearsal "$REL"`), and run
+   `node tools/release/portability.mjs --spec git+file://<scratch>/relay.git#v<version>-rehearsal --commit "$REL"`
+   on both runtimes. Both must print `portability: pass`. A tag cannot be moved, so a
+   git-install defect has to be found here, before anything is pushed.
+5. **Account and remote.** `gh api user --jq .login` prints `khughitt`.
    `gh repo view khughitt/relay --json visibility` shows the expected visibility.
-   `git ls-remote --refs origin` lists only `refs/heads/main`, at an ancestor of `REL`.
-5. **Push and tag.** Run `git push origin "$REL:refs/heads/main"`, then
+   `git ls-remote --refs origin` lists `refs/heads/main`, at an ancestor of `REL`, and no
+   refs other than earlier release tags.
+6. **Push and tag.** Run `git push origin "$REL:refs/heads/main"`, then
    `git tag -a v<version> -m "relay v<version>" "$REL"` and
-   `git push origin refs/tags/v<version>`. Then `git ls-remote origin 'refs/tags/v<version>^{}'`
-   must print `REL`, and `git ls-remote --refs origin` must list exactly `main` and the tag.
-6. **Private refusal.** While the repository is private, run
+   `git push origin refs/tags/v<version>`. Then `git ls-remote origin 'refs/tags/v<version>^{}' refs/heads/main`
+   must print `REL` twice, and `git ls-remote --refs origin` must list `main`, the earlier
+   release tags and the new tag, nothing else.
+7. **Private refusal.** While the repository is private, run
    `node tools/release/portability.mjs --spec git+https://github.com/khughitt/relay.git#v<version> --commit "$REL"`.
    It must fail with `FAIL reach: … could not read Username for 'https://github.com': terminal prompts disabled`.
    Any other failure proves nothing. A pass means the check is not isolated.
-7. **Visibility.** Run `gh repo edit khughitt/relay --visibility public --accept-visibility-change-consequences`
+8. **Visibility.** Run `gh repo edit khughitt/relay --visibility public --accept-visibility-change-consequences`
    for the first release. After that, check the repository is already public.
-8. **Portability.** Run the same check against the public tag, on both runtimes. It must
+9. **Portability.** Run the same check against the public tag, on both runtimes. It must
    print `portability: pass`. Record its output in the release's publication record.
 
 A tag is never moved or deleted. A release that fails after its tag is pushed is fixed
-forward with the next patch version.
+forward with the next patch version, but only once the failure reproduces. A network,
+DNS, GitHub 5xx or codeload error, or a newly public repository not yet serving
+anonymous fetches, is rerun after a short wait. It is a defect only when it fails the
+same way with the network healthy.
 
 ### Privacy review
 
@@ -51,6 +61,19 @@ range) to review one release's history.
 | Machine paths | `git log --all -p --diff-merges=first-parent --format= -- . ':(exclude)tasks' \| grep -E '^\+' \| grep -c -F -f "$RELEASE_PRIVATE_PATHS"` | `0` |
 | Private identities | `git log --all -p --diff-merges=first-parent --format='%an%n%cn%n%B' \| grep -i -c -F -f "$RELEASE_PRIVATE_TERMS"` | `0` |
 | Published pre-images | `gh api repos/khughitt/relay/activity --jq '[.[] \| select(.activity_type=="force_push")] \| length'` | `0` |
+
+A count of `0` is clean only once the pattern files are proven to match. `grep -c -F -f`
+also prints `0` for a mistyped term, and how it treats an empty pattern file depends on
+the grep build. So run these controls first, from the main checkout, and stop if any fails:
+
+- `grep -c -v -x -E '[[:space:]]*/?[[:space:]]*' "$RELEASE_PRIVATE_PATHS" "$RELEASE_PRIVATE_TERMS"`
+  is at least `1` for each file: each holds a real pattern.
+- `grep -c -x -E '[[:space:]]*/?[[:space:]]*' "$RELEASE_PRIVATE_PATHS" "$RELEASE_PRIVATE_TERMS"`
+  prints `0` for each file. An empty line or a bare `/` matches everything.
+- `pwd -P | grep -c -F -f "$RELEASE_PRIVATE_PATHS"` is at least `1`.
+- `gh auth status 2>&1 | grep -i -c -F -f "$RELEASE_PRIVATE_TERMS"` is at least `1`.
+
+If a control fails, rebuild that file before reading any search result.
 
 The two pattern files live outside the repository, so no private path or name is ever
 committed:
@@ -75,7 +98,9 @@ in task notes are accepted, as in the public tasks and familiar repositories.
 
 ### Platform status
 
-v0.1.0 is verified on Linux. On Darwin it is fixture-tested only. The physical Mac
+On Linux, the full suite and the git-install portability check pass. The verification map
+below says which spec requirements that covers and which tasks own the rest. On Darwin,
+v0.1.0 is fixture-tested only. The physical Mac
 attempts of 2026-09-25 (`docs/runbooks/darwin-probe.md`) found defects that have since
 been fixed: `relay-6e9410`, `relay-7eef39`, `relay-661946` and `relay-5e4d93`. The
 physical rerun is `relay-848c0f`, which gates installing relay hooks on a Mac. It carries
