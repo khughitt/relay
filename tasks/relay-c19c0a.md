@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: release/v0.1.0
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T19:46:40Z
+updated: 2026-10-18T20:31:16Z
 started: 2026-10-18T18:56:31Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
@@ -81,4 +81,6 @@ Prerequisites: relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1. Release goa
 - 2026-10-18T19:33:08Z (release/v0.1.0): review: plan round 1 — verdict: revise; findings: P1 1, P2 1, P3 1; reviewer: human
 - 2026-10-18T19:38:29Z (release/v0.1.0): review: plan round 2 — verdict: revise; findings: Critical 0, Important 9, Minor 12; reviewer: claude-code/claude-opus-5-5
 - 2026-10-18T19:46:40Z (release/v0.1.0): parked (waiting on user, review): User reviews docs/plans/2026-10-18-v0.1.0-publication.md at 89ba5f0 in .worktrees/relay-c19c0a, including relay-06b733 (rewrite the work account's login out of history and recreate the private repo); on approval the agent executes Task 1 (relay-3d876f) onward inline, runs relay-06b733 between steps once authorized, and dispatches a whole-branch review before Task 5
+  provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-18T20:31:16Z (release/v0.1.0): resumed
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
