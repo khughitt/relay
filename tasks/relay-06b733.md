@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-18T19:43:09Z
-updated: 2026-10-18T19:46:21Z
+updated: 2026-10-18T20:31:18Z
 depends: []
 tags: [git]
 agent: claude-code/claude-opus-5-5
@@ -24,3 +24,4 @@ Authorization: rewriting local refs and deleting and recreating the GitHub repos
 ## Notes
 
 - 2026-10-18T19:46:21Z (release/v0.1.0): Gates relay-286ecb (plan Task 5 of docs/plans/2026-10-18-v0.1.0-publication.md). It rewrites release/v0.1.0 as well as main, so run it between plan steps, with .worktrees/relay-c19c0a clean and no step in progress.
+- 2026-10-18T20:31:18Z (release/v0.1.0): User decision 2026-10-18: rewrite (not recreate-only, not publish as is); the user deletes khughitt/relay manually when the step comes, then the agent recreates it private and pushes main.
