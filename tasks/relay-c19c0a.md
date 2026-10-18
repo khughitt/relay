@@ -1,15 +1,17 @@
 ---
 id: relay-c19c0a
 title: Publish the verified relay v0.1.0 Git dependency
-status: doing
+status: done
 priority: 1
 size: l
 complexity: mid
 process: planned
 owner: release/v0.1.0
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T22:31:13Z
+updated: 2026-10-18T22:36:03Z
 started: 2026-10-18T18:56:31Z
+completed: 2026-10-18T22:36:03Z
+closed: 2026-10-18T22:36:03Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
 tags: []
@@ -97,4 +99,8 @@ Prerequisites: relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1. Release goa
 - 2026-10-18T22:14:29Z (release/v0.1.0): parked (waiting on user, approval): User authorizes Task 6 (push REL 0f59660 as main, tag and push v0.1.0, private-refusal recheck, make khughitt/relay public) and Task 7's record push; optionally names work hosts for a hosts search first. Agent then runs Task 6 (relay-afea64) and Task 7 (relay-f19b1f) from .worktrees/relay-c19c0a, REL from the Task 5 note
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-18T22:31:13Z (release/v0.1.0): resumed
+  provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-18T22:36:03Z (release/v0.1.0): done
+  provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-18T22:36:03Z (release/v0.1.0): Published relay v0.1.0: annotated tag v0.1.0 (object 9362dde) on REL 0f59660 at public khughitt/relay (public 2026-10-18T22:33:32Z); portability check passes against the public tag on both runtimes; consumers pin git+https://github.com/khughitt/relay.git#v0.1.0; record in docs/runbooks/release.md. Darwin moved to relay-848c0f; history purged of the work login (relay-06b733)
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
