@@ -34,6 +34,10 @@ export function isolatedEnv(root, cache) {
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_TERMINAL_PROMPT: '0',
     GIT_SSH_COMMAND: '/usr/bin/false',
+    // Git also reads the config of any repository above its working directory: stop discovery at
+    // the scratch root, and keep every temporary directory (npm's included) inside it.
+    GIT_CEILING_DIRECTORIES: dirname(root),
+    TMPDIR: join(root, 'tmp'),
     RELAY_STATE_DIR: join(root, 'state'),
     XDG_CONFIG_HOME: join(root, 'config'),
   };
@@ -121,7 +125,7 @@ function main() {
   const cleanup = () => { if (existsSync(root)) rmSync(root, { recursive: true, force: true }); };
   process.on('exit', cleanup);
   for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) process.on(signal, () => { cleanup(); process.exit(code); });
-  mkdirSync(join(root, 'home')); mkdirSync(join(root, 'consumer')); writeFileSync(join(root, 'npmrc-user'), ''); writeFileSync(join(root, 'npmrc-global'), '');
+  mkdirSync(join(root, 'home')); mkdirSync(join(root, 'tmp')); mkdirSync(join(root, 'consumer')); writeFileSync(join(root, 'npmrc-user'), ''); writeFileSync(join(root, 'npmrc-global'), '');
 
   for (const [name, check] of checks({ spec, commit, root })) {
     try { process.stdout.write(`ok ${name}: ${check()}\n`); }
