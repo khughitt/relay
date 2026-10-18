@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: release/v0.1.0
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T19:09:13Z
+updated: 2026-10-18T19:33:08Z
 started: 2026-10-18T18:56:31Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
@@ -78,3 +78,4 @@ Prerequisites: relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1. Release goa
 - 2026-10-18T18:58:03Z (release/v0.1.0): resumed
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-18T19:02:16Z (release/v0.1.0): Pre-plan findings 2026-10-18: (1) a git-dependency install omits jsonc-parser: bundledDependencies names it, but a clone has no node_modules, so the packed git package lacks it and npm does not fetch a bundled name; relay list and the exports load, relay install fails ERR_MODULE_NOT_FOUND (rehearsed with git+file of a bare clone at a scratch tag, empty cache). The local tarball smoke passes only because npm pack runs beside node_modules. (2) History is publishable: gitleaks clean over 997 commits; no transcripts, state, credentials or bundles ever tracked; one author email; no user paths outside tasks/, whose machine paths match the public tasks and familiar repos; the tailnet hostname was already rewritten out on 2026-10-13.
+- 2026-10-18T19:33:08Z (release/v0.1.0): review: plan round 1 — verdict: revise; findings: P1 1, P2 1, P3 1; reviewer: human
