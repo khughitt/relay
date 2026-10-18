@@ -8,13 +8,14 @@ complexity: mid
 process: planned
 owner: release/v0.1.0
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T19:02:16Z
+updated: 2026-10-18T19:09:13Z
 started: 2026-10-18T18:56:31Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
 tags: []
 source: ops-998bbb
 agent: codex
+plan: docs/plans/2026-10-18-v0.1.0-publication.md
 ---
 
 Approved source: ops docs/specs/2026-09-16-relay-design.md (reviewed after d7e2c33); execution brief: ops docs/plans/2026-09-16-relay-bootstrap.md (approved after bc53c51 with review corrections).
