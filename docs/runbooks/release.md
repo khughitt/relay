@@ -60,20 +60,27 @@ range) to review one release's history.
 | Authors | `git log --all --format='%ae%n%ce' \| sort -u` | only the maintainer's address |
 | Machine paths | `git log --all -p --diff-merges=first-parent --format= -- . ':(exclude)tasks' \| grep -E '^\+' \| grep -c -F -f "$RELEASE_PRIVATE_PATHS"` | `0` |
 | Private identities | `git log --all -p --diff-merges=first-parent --format='%an%n%cn%n%B' \| grep -i -c -F -f "$RELEASE_PRIVATE_TERMS"` | `0` |
+| Work hosts, if `$RELEASE_PRIVATE_HOSTS` exists | the same command with `-f "$RELEASE_PRIVATE_HOSTS"` | `0` |
 | Published pre-images | `gh api repos/khughitt/relay/activity --jq '[.[] \| select(.activity_type=="force_push")] \| length'` | `0` |
 
-A count of `0` is clean only once the pattern files are proven to match. `grep -c -F -f`
-also prints `0` for a mistyped term, and how it treats an empty pattern file depends on
-the grep build. So run these controls first, from the main checkout, and stop if any fails:
+A count of `0` is clean only once each term is shown to match its source. `grep -c -F -f`
+prints `0` for a mistyped term, and how it treats an empty pattern file depends on the
+grep build. A search that prints no count at all has failed; it is not a `0`. So run
+these controls first, from the main checkout, and stop if any fails:
 
-- `grep -c -v -x -E '[[:space:]]*/?[[:space:]]*' "$RELEASE_PRIVATE_PATHS" "$RELEASE_PRIVATE_TERMS"`
-  is at least `1` for each file: each holds a real pattern.
-- `grep -c -x -E '[[:space:]]*/?[[:space:]]*' "$RELEASE_PRIVATE_PATHS" "$RELEASE_PRIVATE_TERMS"`
-  prints `0` for each file. An empty line or a bare `/` matches everything.
-- `pwd -P | grep -c -F -f "$RELEASE_PRIVATE_PATHS"` is at least `1`.
-- `gh auth status 2>&1 | grep -i -c -F -f "$RELEASE_PRIVATE_TERMS"` is at least `1`.
+- `grep -c -v -x -E '[[:space:]]*/?[[:space:]]*' <file>` is at least `1` for each pattern
+  file: each holds a real pattern.
+- `grep -c -x -E '[[:space:]]*/?[[:space:]]*' <file>` prints `0` for each pattern file.
+  An empty line or a bare `/` matches everything.
+- `pwd -P | grep -c -F -f "$RELEASE_PRIVATE_PATHS"` is at least `1`. The paths file is
+  generated, so one match proves it.
+- Term by term: `while IFS= read -r t; do gh auth status 2>&1 | grep -i -c -F -e "$t"; done < "$RELEASE_PRIVATE_TERMS"`
+  prints a count of at least `1` for every line. A whole-file check would pass with
+  one good term and one mistyped one.
 
-If a control fails, rebuild that file before reading any search result.
+If a control fails, rebuild that file before reading any search result. Work host names
+cannot be proven against a source, so they live in their own file, which the maintainer
+writes and confirms by eye.
 
 The two pattern files live outside the repository, so no private path or name is ever
 committed:
@@ -81,10 +88,13 @@ committed:
 - `$RELEASE_PRIVATE_PATHS` is written at run time from the main checkout:
   `printf '%s\n' "/home/$USER" "/Users/$USER" "$(df --output=target . | tail -1)" "$(df --output=target "$(readlink -f .worktrees)" | tail -1)"`.
   That covers the user directories and the storage mounts of the checkout and the worktree root.
-- `$RELEASE_PRIVATE_TERMS` holds one literal per line: the login of the gh account that
-  `gh auth status` lists besides `khughitt`, the employer token in that login, and any
-  work host names the maintainer adds. The record states how many terms were searched,
-  never the terms.
+- `$RELEASE_PRIVATE_TERMS` holds exactly the terms the term-by-term control can prove:
+  the login of the gh account that `gh auth status` lists besides `khughitt`, and the
+  employer token in that login.
+- `$RELEASE_PRIVATE_HOSTS` is optional: one work host name per line, written by the
+  maintainer.
+
+The record states how many terms and hosts were searched, never the terms.
 
 A non-zero count of published pre-images means GitHub still serves commits that a
 force-push replaced. They stay fetchable by sha. Stop, and decide with the maintainer
