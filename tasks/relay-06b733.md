@@ -1,15 +1,17 @@
 ---
 id: relay-06b733
 title: Rewrite the work account's login out of relay history and recreate the private GitHub repository before v0.1.0
-status: doing
+status: done
 priority: 1
 size: m
 complexity: mid
 process: direct
 owner: release/v0.1.0
 created: 2026-10-18T19:43:09Z
-updated: 2026-10-18T21:27:51Z
+updated: 2026-10-18T21:30:10Z
 started: 2026-10-18T20:57:10Z
+completed: 2026-10-18T21:30:10Z
+closed: 2026-10-18T21:30:10Z
 depends: []
 tags: [git]
 agent: claude-code/claude-opus-5-5
@@ -34,4 +36,8 @@ Authorization: rewriting local refs and deleting and recreating the GitHub repos
 - 2026-10-18T21:04:45Z (release/v0.1.0): parked (waiting on user, environment): User deletes the GitHub repository khughitt/relay (web UI Settings > Delete, or after gh auth refresh -h github.com -s delete_repo); then the agent runs GH_TOKEN=$(gh auth token --user khughitt) gh repo create khughitt/relay --private, git push origin main, checks git ls-remote --refs origin and the activity feed, and closes this task (Europa fsck when reachable)
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-18T21:27:51Z (release/v0.1.0): resumed
+  provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-18T21:30:10Z (release/v0.1.0): done
+  provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-18T21:30:10Z (release/v0.1.0): Rewrote the work account's login out of every branch (1056 commits verified: only login->placeholder blob changes, one short-hash message remap; 0 occurrences left with merge diffs), moved refs in one guarded transaction, repinned transponder (trans-6989fa). User deleted khughitt/relay; recreated it private and pushed main only: ls-remote --refs lists refs/heads/main = db4ecd0, activity shows one branch_creation and no force_push. Europa was unreachable, so its fsck is relay-795a21.
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
