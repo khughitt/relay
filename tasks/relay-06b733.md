@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.1.0
 created: 2026-10-18T19:43:09Z
-updated: 2026-10-18T21:04:45Z
+updated: 2026-10-18T21:27:51Z
 started: 2026-10-18T20:57:10Z
 depends: []
 tags: [git]
@@ -32,4 +32,6 @@ Authorization: rewriting local refs and deleting and recreating the GitHub repos
 - 2026-10-18T21:00:07Z (release/v0.1.0): attached: 2026-10-18-account-rewrite-commit-map.txt (86592 bytes): Account-name rewrite map: 1056 changed commit IDs (old new); resolves SHAs cited in task notes and docs from before 2026-10-18
 - 2026-10-18T21:03:45Z (release/v0.1.0): Local rewrite applied 2026-10-18 (work dir WORK_ROOT/relay/history-rewrite-20261018T205736Z: all.bundle backup, mirror.git, refs-before, ref-transaction). filter-repo --replace-text over main, release/v0.1.0, relay-4c4828, relay-a1510a in a --no-local mirror; verified 1056 changed commits: headers and mapped parents identical, 1048 blob changes each exactly login->placeholder, one message short-hash remap (a7e9888->773818b); login left in rewritten refs: 0 (merge diffs included). One guarded update-ref transaction moved the four branches (main 68cbb46->db4ecd0, release/v0.1.0 95f6d56->59028a9); transponder-fixtures detached HEAD 5e8cdaa->60063d5; tasks/relay-c19c0a.md refreshed in the two checkouts whose tree changed. just test-fast 686/686. Transponder repinned under trans-6989fa (local main ed3aab2, not pushed). Left alone: refs/ops/index-health/* (index trees from ops tooling, local only, never pushed; each holds one file with the login). refs/remotes/origin/* still name the old history until the recreated remote is pushed. Europa unreachable by ssh (timeout), so its fsck waits. Next: the user deletes khughitt/relay; then gh repo create khughitt/relay --private and git push origin main.
 - 2026-10-18T21:04:45Z (release/v0.1.0): parked (waiting on user, environment): User deletes the GitHub repository khughitt/relay (web UI Settings > Delete, or after gh auth refresh -h github.com -s delete_repo); then the agent runs GH_TOKEN=$(gh auth token --user khughitt) gh repo create khughitt/relay --private, git push origin main, checks git ls-remote --refs origin and the activity feed, and closes this task (Europa fsck when reachable)
+  provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-18T21:27:51Z (release/v0.1.0): resumed
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
