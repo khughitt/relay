@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-18T19:43:09Z
-updated: 2026-10-18T19:43:09Z
+updated: 2026-10-18T19:46:21Z
 depends: []
 tags: [git]
 agent: claude-code/claude-opus-5-5
@@ -20,3 +20,7 @@ Procedure (relay-653378's, which follows ops-e5b39c's pilot): no other agent ses
 Done: git log --all -p over every ref has no case-insensitive match for the login or its employer token; GitHub's activity for khughitt/relay shows no force_push; the remote lists only refs/heads/main, equal to local main; other hosts' checkouts (Europa) show the new history and pass git fsck.
 
 Authorization: rewriting local refs and deleting and recreating the GitHub repository are each the user's explicit go-ahead.
+
+## Notes
+
+- 2026-10-18T19:46:21Z (release/v0.1.0): Gates relay-286ecb (plan Task 5 of docs/plans/2026-10-18-v0.1.0-publication.md). It rewrites release/v0.1.0 as well as main, so run it between plan steps, with .worktrees/relay-c19c0a clean and no step in progress.
