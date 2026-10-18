@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: release/v0.1.0
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T20:31:17Z
+updated: 2026-10-18T20:32:50Z
 started: 2026-10-18T18:56:31Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
@@ -85,3 +85,4 @@ Prerequisites: relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1. Release goa
 - 2026-10-18T20:31:16Z (release/v0.1.0): resumed
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-18T20:31:17Z (release/v0.1.0): review: plan round 3 — verdict: revise; findings: P1 1, P2 1; reviewer: human
+- 2026-10-18T20:32:50Z (release/v0.1.0): Plan round 3 fixes applied (merge diffs in every history scan, gitleaks included, both reproduced with a control; --refs remote inventories, checked against the live remote). The user's round-3 verdict was fix-then-execute; executing inline from Task 1. Scans rerun with merge diffs over 1039 commits (14 merges): gitleaks, path and filename searches clean.
