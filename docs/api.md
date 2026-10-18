@@ -6,7 +6,8 @@ guards before optional enrichment/publication and retains their result when obse
 fails. No hooks or plugins are registered by this package.
 
 Node >=22, ES modules, Node built-ins only. No install lifecycle scripts. The one
-runtime dependency, `jsonc-parser` (bundled), is used only by the install path.
+runtime dependency, `jsonc-parser`, is installed by npm with relay and used only by
+the install path.
 Named root exports are exactly those below. Package subpath
 `relay/opencode` exports only the async Relay plugin function; the
 `relay/fixtures/handles.json` subpath supplies portable schema fixtures.

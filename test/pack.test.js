@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp,writeFile,rm,mkdir } from 'node:fs/promises';
+import { mkdtemp,writeFile,rm,mkdir,copyFile,readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join,dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const exec=promisify(execFile),root=fileURLToPath(new URL('..',import.meta.url));
-const exportsExpected=['STATES','paths','adapterFor','normalizeEvent','readNativeInput','createProcessOps','readSnapshot','listAgents','applyEvent','reapRegistry','CONTEXT_LIMIT','parseReply','validateSubscribers','loadSubscribers','matchSubscribers','budgetFor','checkBudget','dispatchHook','reconcile'].sort();
 test('package dry run and installed tarball expose only the documented runtime',{timeout:30000},async t=>{
   const temp=await mkdtemp(join(tmpdir(),'relay-pack-'));t.after(()=>rm(temp,{recursive:true,force:true}));
   const env={...process.env,npm_config_cache:join(temp,'cache'),RELAY_STATE_DIR:join(temp,'state'),XDG_CONFIG_HOME:join(temp,'config')};
@@ -17,18 +17,23 @@ test('package dry run and installed tarball expose only the documented runtime',
   for(const name of names)assert.ok(!/\.test\.|lock-worker|^tasks\/|^\.superpowers\/|agents\.json|subscribers\.json/.test(name),name);
   const pack=JSON.parse((await run('npm',['pack','--json','--pack-destination',temp])).stdout)[0];
   const consumer=join(temp,'consumer');await mkdir(consumer);await writeFile(join(consumer,'package.json'),'{"private":true,"type":"module"}');
-  await run('npm',['install','--offline','--ignore-scripts','--no-audit','--no-fund',join(temp,pack.filename)],consumer);
-  const smoke=`import assert from 'node:assert/strict'; import * as relay from 'relay'; import * as plugin from 'relay/opencode'; import {readFile} from 'node:fs/promises';
-    assert.deepEqual(Object.keys(relay).sort(),${JSON.stringify(exportsExpected)});
-    const packageRoot=new URL('../',import.meta.resolve('relay'));
-    const messageSchema=JSON.parse(await readFile(new URL('schemas/interaction/message.schema.json',packageRoot),'utf8'));assert.equal(messageSchema.$schema,'https://json-schema.org/draft/2020-12/schema');
-    assert.ok((await readFile(new URL('docs/runbooks/inbox-service.md',packageRoot),'utf8')).length>0);
-    assert.deepEqual(Object.keys(plugin),['Relay']);assert.equal(plugin.Relay.constructor.name,'AsyncFunction');
-    const corpus=JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixtures/handles.json')),'utf8'));assert.equal(corpus.schema,1);assert.ok(corpus.starts.some(c=>c.expected==='9007199254740993'));
-    const chains=JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixtures/ancestry.json')),'utf8'));assert.equal(chains.schema,1);assert.ok(chains.chains.some(c=>c.name==='background-under-systemd'));
-    assert.deepEqual(await relay.listAgents(),{snapshot:null,liveness:{}});console.log('installed exports, fixture and plugin verified');`;
-  await writeFile(join(consumer,'smoke.mjs'),smoke);
-  const imported=await run(process.execPath,['smoke.mjs'],consumer);assert.match(imported.stdout,/verified/);
-  const cli=await run(join(consumer,'node_modules/.bin/relay'),['list','--json'],consumer);assert.equal(cli.stdout,'{"snapshot":null,"liveness":{}}\n');
-  const help=await run(join(consumer,'node_modules/.bin/relay'),['--help'],consumer);assert.match(help.stdout,/^Usage: relay /);
+  // jsonc-parser is a plain dependency now; an offline install takes it from a tarball of the local copy.
+  // --ignore-scripts: its own prepack calls rimraf.
+  const dep=JSON.parse((await run('npm',['pack','--json','--ignore-scripts','--pack-destination',temp,join(root,'node_modules/jsonc-parser')])).stdout)[0];
+  await run('npm',['install','--offline','--ignore-scripts','--no-audit','--no-fund',join(temp,pack.filename),join(temp,dep.filename)],consumer);
+  await copyFile(join(root,'test/fixtures/consumer-smoke.mjs'),join(consumer,'consumer-smoke.mjs'));
+  const smoked=await run(process.execPath,['consumer-smoke.mjs'],consumer);assert.match(smoked.stdout,/installed package verified/);
+});
+// A git dependency is packed from a clone, which has no node_modules: what it bundles must be tracked.
+test('a package packed from tracked files alone carries every dependency it bundles',{timeout:60000},async t=>{
+  const temp=await mkdtemp(join(tmpdir(),'relay-clone-pack-'));t.after(()=>rm(temp,{recursive:true,force:true}));
+  const env={...process.env,npm_config_cache:join(temp,'cache')},clone=join(temp,'clone');
+  const tracked=(await exec('git',['ls-files','-z'],{cwd:root,maxBuffer:16*1024*1024})).stdout.split('\0').filter(Boolean);
+  for(const file of tracked){if(!existsSync(join(root,file)))continue;await mkdir(dirname(join(clone,file)),{recursive:true});await copyFile(join(root,file),join(clone,file));}
+  const listing=async cwd=>JSON.parse((await exec('npm',['pack','--dry-run','--json','--ignore-scripts'],{cwd,env,timeout:20000,maxBuffer:4*1024*1024})).stdout)[0].files.map(f=>f.path).sort();
+  const cloned=await listing(clone),rooted=await listing(root);
+  const pkg=JSON.parse(await readFile(join(root,'package.json'),'utf8')),bundled=pkg.bundledDependencies??pkg.bundleDependencies??[];
+  for(const name of bundled)assert.ok(cloned.includes(`node_modules/${name}/package.json`),`bundled ${name} is missing from a package built from a clone`);
+  assert.equal(typeof pkg.dependencies['jsonc-parser'],'string');
+  assert.deepEqual(cloned,rooted);
 });
