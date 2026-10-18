@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-18T18:57:04Z
-updated: 2026-10-18T18:57:04Z
+updated: 2026-10-18T19:46:20Z
 depends: []
 parent: relay-1231bf
 tags: [darwin-probe]
@@ -23,3 +23,8 @@ Steps:
 4. Merge the returned branch, run just darwin-judge <tarball> <ops checkout> in a worktree, commit the attempt section and darwin-evidence.json in docs/runbooks/darwin-probe.md.
 
 Done: release-class checks (D0-D6, D8, ISO, D7w) pass on the physical Mac at a published relay commit, or each remaining failure is filed and relay-1231bf's scope says the Mac cutover is deferred.
+
+## Notes
+
+- 2026-10-18T19:09:34Z (release/v0.1.0): Before step 1 (if relay-c19c0a's plan lands as written, docs/plans/2026-10-18-v0.1.0-publication.md): jsonc-parser stops being bundled, so the probe's bundle builder must ship a jsonc-parser tarball (npm pack --ignore-scripts of node_modules/jsonc-parser) beside relay's, D1 must install both offline, and D2 must copy from the consumer's hoisted node_modules/jsonc-parser instead of node_modules/relay/node_modules/jsonc-parser. Cover them in test/darwin-probe-bundle.test.js and test/darwin-probe-stages-a.test.js.
+- 2026-10-18T19:46:20Z (release/v0.1.0): Correction to the earlier note: relay-c19c0a's plan now carries the probe update as its Task 2 (relay-48a6d3: dependency tarballs in the bundle, D1 installs both offline, D2 copies from the hoisted path), so the probe is runnable at v0.1.0 and this task builds its bundle from the tag.

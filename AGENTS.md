@@ -11,7 +11,8 @@
 - Runtime: Node >=22, ES modules, Node built-ins. No presentation dependencies.
 - GitHub owner is khughitt; check the active gh account before every gh write.
 - Run `just setup` after creating a worktree. It installs the one runtime npm dependency,
-  `jsonc-parser` (bundled; only `relay install` needs it), plus development-only
+  `jsonc-parser` (a regular dependency npm installs with relay; only `relay install`
+  needs it), plus development-only
   TypeScript and Node 22 types.
 - Verify through `just test-fast` while working and `just gate` before integration.
   Fast and full commands intentionally run the same suite. Hooks use the vendored

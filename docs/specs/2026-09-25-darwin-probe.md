@@ -5,12 +5,15 @@ revised after the first review (bundle checkouts, ops closure, harness-parented
 publishers, OpenCode scope, redaction invariance, the `SessionEnd` gate), then after the
 second (OpenCode data and cache isolation, a
 project-scoped request to initialize OpenCode's plugin, D8's own live/dead fixture).
-Task: `relay-b12132`; gates `relay-c19c0a` (publish v0.1.0).
+Task: `relay-b12132`; gated `relay-c19c0a` (publish v0.1.0) until 2026-10-18.
+Status update 2026-10-18: the probe no longer gates publication. The physical run is
+`relay-848c0f`, and it gates installing relay hooks on a Mac; v0.1.0 published on Linux
+evidence (`docs/runbooks/release.md`). "Release gate" below names checks that gate that run.
 Parent design: ops `docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`),
 sections "Handle encodings", "Process identity and liveness" and "Required verification
 for the release". Execution brief: ops `docs/plans/2026-09-16-relay-bootstrap.md`, which
-keeps "physical Darwin validation remains a release gate"; README and `docs/api.md` say
-the same.
+keeps "physical Darwin validation remains a release gate"; README and `docs/api.md` said
+the same until 2026-10-18.
 Scope: a self-contained bundle, run once by the user on a physical Mac, that exercises
 every relay behaviour whose correctness depends on Darwin, returns redacted evidence, and
 is judged on the Linux host. It adds no relay runtime behaviour; the defects it finds are fixed
@@ -149,7 +152,7 @@ this document. Before packing, the raw and the redacted results are scanned for 
 
 Each check has an id and a pass condition the judge evaluates from raw observations.
 Checks fall into three classes:
-- **Release gate** blocks `relay-c19c0a`.
+- **Release gate** blocked `relay-c19c0a`; since 2026-10-18 it gates `relay-848c0f` (Darwin hooks).
 - **Cutover evidence** feeds `ai-539508`: a platform without it stays uncut-over, but the
   release does not wait for it.
 - **Finding** is recorded and reported without gating, because no spec states the Darwin
@@ -445,8 +448,8 @@ move to ops as Darwin variants of `relay-guard-evidence-<harness>.json` during
 ## Failure handling
 
 A failed release gate means a relay defect or a probe defect. The judge names the check
-and its raw observation. The fix is filed as a relay task, `relay-c19c0a` stays blocked
-on `relay-b12132`, and the user reruns a new bundle. A partial run still packs results,
+and its raw observation. The fix is filed as a relay task, the gated task (`relay-848c0f`;
+`relay-c19c0a` until 2026-10-18) stays open until a rerun passes, and the user reruns a new bundle. A partial run still packs results,
 so completed stages are analyzed before any rerun. Expected candidates, filed only if the
 evidence confirms them:
 - `-ww` on every relay `ps` call (item 1);

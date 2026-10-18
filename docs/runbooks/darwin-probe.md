@@ -1,7 +1,8 @@
 # Darwin live probe
 
-The physical Darwin validation relay's release requires (`relay-c19c0a`), run from a
-bundle on a Mac. Design: `docs/specs/2026-09-25-darwin-probe.md`; plan:
+The physical Darwin validation that installing relay hooks on a Mac requires
+(`relay-848c0f`), run from a bundle on a Mac. It does not gate the release: v0.1.0
+published on Linux evidence (`docs/runbooks/release.md`). Design: `docs/specs/2026-09-25-darwin-probe.md`; plan:
 `docs/plans/2026-09-25-darwin-probe.md`.
 
 ## Procedure

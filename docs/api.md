@@ -6,7 +6,8 @@ guards before optional enrichment/publication and retains their result when obse
 fails. No hooks or plugins are registered by this package.
 
 Node >=22, ES modules, Node built-ins only. No install lifecycle scripts. The one
-runtime dependency, `jsonc-parser` (bundled), is used only by the install path.
+runtime dependency, `jsonc-parser`, is installed by npm with relay and used only by
+the install path.
 Named root exports are exactly those below. Package subpath
 `relay/opencode` exports only the async Relay plugin function; the
 `relay/fixtures/handles.json` subpath supplies portable schema fixtures.
@@ -512,8 +513,9 @@ errors internally but are not serialized into diagnostics. See the
 Local tarball smoke tests cover exports, portable JSON, sole plugin export and
 installed CLI. The interaction packaging checks also read the installed schema and
 service runbook. The Claude terminal route has version-specific local capability
-evidence; user-present tailnet acceptance, remote/tag portability, physical Darwin
-process behavior, consumer migration and operator cutover remain separate gates.
+evidence. Remote/tag portability is recorded in the [release record](https://github.com/khughitt/relay/blob/main/docs/runbooks/release.md);
+physical Darwin process behavior is pending under `relay-848c0f`, and user-present tailnet
+acceptance, consumer migration and operator cutover remain separate gates.
 
 
 ## Codex model resolution

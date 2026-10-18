@@ -135,7 +135,8 @@ async function main() {
   else { try { manifest = JSON.parse(readFileSync(join(bundle, 'manifest.json'), 'utf8')); } catch (error) { die(`bundle manifest unreadable: ${firstLine(error.message)}`); } }
   const tampered = verifyManifest(bundle, manifest);
   if (tampered.length) die(`bundle files changed: ${tampered.join(', ')}`);
-  const ctx = { root, results: raw, bundle, env: isolated, t, platform, ambient, token, tarball: manifest.tarball && join(bundle, manifest.tarball) };
+  const ctx = { root, results: raw, bundle, env: isolated, t, platform, ambient, token, tarball: manifest.tarball && join(bundle, manifest.tarball),
+    dependencyTarballs: (manifest.dependency_tarballs ?? []).map((f) => join(bundle, f)) };
   if (!selfTest) {
     try {
       ctx.clone = cloneBundle(join(bundle, 'relay.bundle'), join(root, 'relay'), manifest.relay_commit, root);

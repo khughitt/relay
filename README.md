@@ -18,8 +18,8 @@ node bin/relay.js hook --harness claude-code PreToolUse < payload.json
 ```
 
 The fast and full suites are intentionally identical; there is no affected-only
-selector. The one runtime npm dependency, `jsonc-parser` (bundled), is needed only by
-`relay install`; `just setup` also installs development-only TypeScript and Node 22
+selector. The one runtime npm dependency, `jsonc-parser`, is installed by npm with relay and
+used only by `relay install`; `just setup` also installs development-only TypeScript and Node 22
 types. `just check` runs strict JSDoc type checking over every `src/` and `bin/` file
 without emitting code. Shared contracts live in `src/types.js`; compile-time
 regressions live in `test/types/`. JavaScript runs directly, with no build step.
@@ -53,8 +53,10 @@ The [extraction plan](docs/plans/2026-09-17-extraction.md) and
 [lock-safety addendum](docs/specs/2026-09-17-registry-lock-safety.md) record local work.
 The release goal is `relay-1231bf`; familiar migration is `fam-6e8321`, tasks identity
 is `tasks-c9199a`, live tool/denial proof is `ops-c8e4d1`, and remote/tag portability
-is `relay-c19c0a`. Physical Darwin process/terminal verification remains a release
-requirement; portable Darwin UTC/local-timezone fixtures do not replace it.
+is `relay-c19c0a`. v0.1.0's suite and git-install checks pass on Linux; on Darwin it is fixture-tested only, and
+the physical probe (`relay-848c0f`) gates installing relay hooks on a Mac. Portable Darwin
+UTC/local-timezone fixtures do not replace that probe. The
+[release record](https://github.com/khughitt/relay/blob/main/docs/runbooks/release.md) lists what v0.1.0 verifies and which tasks own the rest.
 
 Verified 2026-09-17: 187 tests pass through the full gate on Node 26.5.0 and
 Node 22.23.2, including installed-tarball exports, JSON fixture, plugin and CLI.

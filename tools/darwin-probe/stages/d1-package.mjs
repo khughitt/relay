@@ -8,7 +8,7 @@ export async function run(ctx) {
   const consumer = join(ctx.root, 'consumer'), cache = join(ctx.root, 'npm-cache'), state = join(ctx.root, 'd1-state');
   mkdirSync(consumer); mkdirSync(state, { mode: 0o700 });
   writeFileSync(join(consumer, 'package.json'), '{"name":"consumer","private":true,"type":"module"}\n');
-  const install = await ctx.t.run('npm', ['install', '--offline', '--no-audit', '--no-fund', '--cache', cache, ctx.tarball], { cwd: consumer, env: ctx.env });
+  const install = await ctx.t.run('npm', ['install', '--offline', '--no-audit', '--no-fund', '--cache', cache, ctx.tarball, ...ctx.dependencyTarballs], { cwd: consumer, env: ctx.env });
   ctx.log(`npm install: ${install.exit}\n${install.stderr}`);
   const bin = join(consumer, 'node_modules/.bin/relay');
   const help = await ctx.t.run(bin, ['--help'], { env: ctx.env });
