@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.1.0
 created: 2026-10-18T19:43:09Z
-updated: 2026-10-18T20:57:10Z
+updated: 2026-10-18T21:00:07Z
 started: 2026-10-18T20:57:10Z
 depends: []
 tags: [git]
@@ -29,3 +29,4 @@ Authorization: rewriting local refs and deleting and recreating the GitHub repos
 - 2026-10-18T20:31:18Z (release/v0.1.0): User decision 2026-10-18: rewrite (not recreate-only, not publish as is); the user deletes khughitt/relay manually when the step comes, then the agent recreates it private and pushes main.
 - 2026-10-18T20:57:10Z (release/v0.1.0): started
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-18T21:00:07Z (release/v0.1.0): attached: 2026-10-18-account-rewrite-commit-map.txt (86592 bytes): Account-name rewrite map: 1056 changed commit IDs (old new); resolves SHAs cited in task notes and docs from before 2026-10-18
