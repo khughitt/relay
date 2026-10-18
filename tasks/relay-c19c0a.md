@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: release/v0.1.0
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T18:58:03Z
+updated: 2026-10-18T19:02:14Z
 started: 2026-10-18T18:56:31Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
@@ -29,8 +29,8 @@ on Linux and fixture-tested on Darwin, with the physical probe pending.
 Create relay `docs/runbooks/release.md` with the reviewed release commit, packaged
 file list, license provenance, passing gates and capability evidence. Verify the
 release contains no private paths, subscriber configuration, transcripts or state.
-The whole history becomes public with the repository, task records included: settle
-relay-480b51's committed tailnet hostname (rewrite history or accept it) first.
+The whole history becomes public with the repository, task records included. The
+2026-10-18 scan was clean (rescope note); rerun it on the release commit.
 Make the repository public only after the implementation and publication artifact are
 reviewable and publication is authorized. Keep `v0.1.0` unused until that commit is
 ready; never move an existing tag to make a failed release look successful.
