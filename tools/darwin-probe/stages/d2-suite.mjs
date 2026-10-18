@@ -18,7 +18,7 @@ export function suiteFiles(clone) {
 export async function run(ctx) {
   // The clone's one runtime dependency comes from D1's installed package, checked against the lock.
   const lock = JSON.parse(readFileSync(join(ctx.clone, 'package-lock.json'), 'utf8')).packages['node_modules/jsonc-parser'].version;
-  const from = join(ctx.consumer, 'node_modules/relay/node_modules/jsonc-parser');
+  const from = join(ctx.consumer, 'node_modules/jsonc-parser');
   const have = JSON.parse(readFileSync(join(from, 'package.json'), 'utf8')).version;
   if (have !== lock) return { status: 'error', reason: `jsonc-parser ${have} does not match the lock's ${lock}`, observations: {} };
   cpSync(from, join(ctx.clone, 'node_modules/jsonc-parser'), { recursive: true });

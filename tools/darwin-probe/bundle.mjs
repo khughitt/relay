@@ -28,6 +28,19 @@ export function gitBundle(repo, dest) {
     return head;
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 }
+// relay's runtime dependencies are not bundled, so the Mac's offline D1 install needs each one's
+// tarball beside relay's, packed from the checkout's own node_modules at the lock's version.
+export function packDependencies(relay, dest) {
+  const deps = Object.keys(JSON.parse(readFileSync(join(relay, 'package.json'), 'utf8')).dependencies ?? {});
+  const lock = JSON.parse(readFileSync(join(relay, 'package-lock.json'), 'utf8')).packages;
+  return deps.map((name) => {
+    const dir = join(relay, 'node_modules', name), have = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).version;
+    const want = lock[`node_modules/${name}`]?.version;
+    if (have !== want) throw new Error(`${name} ${have} does not match the lock's ${want}`);
+    // --ignore-scripts: a dependency's own prepack may need its dev tools (jsonc-parser's calls rimraf).
+    return execFileSync('npm', ['pack', '--silent', '--ignore-scripts', '--pack-destination', dest, resolve(dir)], { encoding: 'utf8' }).trim().split('\n').pop();
+  });
+}
 const files = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? files(p) : [p]; });
 export async function build({ relay, ops, out }) {
   assertClean(relay); assertClean(ops);
@@ -37,6 +50,7 @@ export async function build({ relay, ops, out }) {
     const top = join(stage, name); mkdirSync(join(top, 'expected'), { recursive: true });
     const relayCommit = gitBundle(relay, join(top, 'relay.bundle')), opsCommit = gitBundle(ops, join(top, 'ops.bundle'));
     const tarball = execFileSync('npm', ['pack', '--silent', '--pack-destination', top], { cwd: relay, encoding: 'utf8' }).trim().split('\n').pop();
+    const dependencyTarballs = packDependencies(relay, top);
     cpSync(join(relay, 'tools/darwin-probe'), join(top, 'probe'), { recursive: true });
     cpSync(join(top, 'probe/run'), join(top, 'run')); chmodSync(join(top, 'run'), 0o755);
     // The replies D6 must byte-match what the Mac gets: replayed against a fresh, verified
@@ -46,7 +60,7 @@ export async function build({ relay, ops, out }) {
       const clone = cloneBundle(join(top, 'relay.bundle'), join(root, 'relay'), relayCommit, root);
       writeFileSync(join(top, 'expected/d6.json'), JSON.stringify(await replay({ root, env: isolatedEnv(root), t, clone }), null, 2));
     } finally { await t.killAll(); rmSync(root, { recursive: true, force: true }); }
-    const manifest = { schema: 1, relay_commit: relayCommit, ops_commit: opsCommit, tarball, opencode_pinned: '2.0.15', created: new Date().toISOString(),
+    const manifest = { schema: 1, relay_commit: relayCommit, ops_commit: opsCommit, tarball, dependency_tarballs: dependencyTarballs, opencode_pinned: '2.0.15', created: new Date().toISOString(),
       files: Object.fromEntries(files(top).map((p) => [relative(top, p), createHash('sha256').update(readFileSync(p)).digest('hex')])) };
     writeFileSync(join(top, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     mkdirSync(out, { recursive: true });
