@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: release/v0.1.0
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T22:12:16Z
+updated: 2026-10-18T22:13:12Z
 started: 2026-10-18T18:56:31Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
@@ -92,3 +92,4 @@ Prerequisites: relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1. Release goa
 - 2026-10-18T21:53:05Z (release/v0.1.0): review: impl round 2 — verdict: revise; findings: Critical 0, Important 1, Minor 6; reviewer: claude-code/claude-opus-5-5
 - 2026-10-18T22:02:44Z (release/v0.1.0): review: impl round 3 — verdict: accept; findings: Minor 5; reviewer: claude-code/claude-opus-5-5
 - 2026-10-18T22:12:16Z (release/v0.1.0): review: impl round 4 — verdict: accept; findings: none; reviewer: claude-code/claude-opus-5-5
+- 2026-10-18T22:13:12Z (release/v0.1.0): REL 0f596607ad088be7607a9ff0b30f2073d2ee9147 (merge 0f59660 of release/v0.1.0 into main, 2026-10-18): gates 687/687 on Node 26.5.0 and 687/687 on Node 22.23.2
