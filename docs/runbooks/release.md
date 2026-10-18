@@ -74,9 +74,9 @@ these controls first, from the main checkout, and stop if any fails:
   An empty line or a bare `/` matches everything.
 - `pwd -P | grep -c -F -f "$RELEASE_PRIVATE_PATHS"` is at least `1`. The paths file is
   generated, so one match proves it.
-- Term by term: `while IFS= read -r t; do gh auth status 2>&1 | grep -i -c -F -e "$t"; done < "$RELEASE_PRIVATE_TERMS"`
-  prints a count of at least `1` for every line. A whole-file check would pass with
-  one good term and one mistyped one.
+- Term by term: `while IFS= read -r t || [ -n "$t" ]; do gh auth status 2>&1 | grep -i -c -F -e "$t"; done < "$RELEASE_PRIVATE_TERMS"`
+  prints a count of at least `1` for every line, a final line without a newline included.
+  A whole-file check would pass with one good term and one mistyped one.
 
 If a control fails, rebuild that file before reading any search result. Work host names
 cannot be proven against a source, so they live in their own file, which the maintainer
