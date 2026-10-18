@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T18:57:03Z
+updated: 2026-10-18T18:57:36Z
 started: 2026-10-18T18:56:31Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
@@ -19,38 +19,42 @@ agent: codex
 
 Approved source: ops docs/specs/2026-09-16-relay-design.md (reviewed after d7e2c33); execution brief: ops docs/plans/2026-09-16-relay-bootstrap.md (approved after bc53c51 with review corrections).
 
-Next: write a focused implementation plan against the approved spec for user review; add a spec addendum only if inspection uncovers an unresolved contract.
+Next: write a focused publication plan against the approved spec for user review; add a spec addendum only if inspection uncovers an unresolved contract.
+
+Darwin is not a publication gate (rescope note 2026-10-18). The approved design requires
+a Darwin live probe before changing Darwin's installed hooks; that run is relay-848c0f and
+gates the Mac cutover. The release runbook, README and docs/api.md say v0.1.0 is verified
+on Linux and fixture-tested on Darwin, with the physical probe pending.
 
 Create relay `docs/runbooks/release.md` with the reviewed release commit, packaged
 file list, license provenance, passing gates and capability evidence. Verify the
 release contains no private paths, subscriber configuration, transcripts or state.
-Create the remote only after the implementation and publication artifact are
+The whole history becomes public with the repository, task records included: settle
+relay-480b51's committed tailnet hostname (rewrite history or accept it) first.
+Make the repository public only after the implementation and publication artifact are
 reviewable and publication is authorized. Keep `v0.1.0` unused until that commit is
 ready; never move an existing tag to make a failed release look successful.
 
-The remote is **public `khughitt/relay`**. Immediately before the gh write:
+The remote **`khughitt/relay`** exists and is private (main pushed 2026-10-17).
+Publication makes it public. Name the account on every gh command rather than
+switching the global one:
 
 ```sh
-gh auth status
-# Only if the active account is wrong:
-gh auth switch --user khughitt
-gh api user --jq .login
-gh repo view khughitt/relay --json nameWithOwner,visibility,url
+GH_TOKEN=$(gh auth token --user khughitt) gh api user --jq .login
+GH_TOKEN=$(gh auth token --user khughitt) gh repo view khughitt/relay --json nameWithOwner,visibility,url
 ```
 
 Require the login result to be `khughitt`; `<work-account>` must never be used here.
-Distinguish a verified absent repository from authentication/network errors. If an
-unexpected existing repository appears, stop before pushing into it. When absent
-and creation is authorized, recheck the active account and create without pushing:
+If the repository is missing, or is not the private relay whose main matches
+origin/main, stop. When publication is authorized:
 
 ```sh
-gh repo create khughitt/relay --public --source . --remote origin
+GH_TOKEN=$(gh auth token --user khughitt) gh repo edit khughitt/relay --visibility public --accept-visibility-change-consequences
 ```
 
 Inspect `git remote -v`, require the correct owner, tag the reviewed commit with
 `git tag -a v0.1.0 -m "relay v0.1.0"`, and push that commit/branch and tag through
 normal repository gates. Verify the remote tag resolves to the reviewed commit.
-Account state is global: recheck before every later gh write too.
 
 In an isolated temporary checkout with an empty npm cache, empty Git credential
 configuration, no local relay path and terminal credential prompts disabled,
