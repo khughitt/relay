@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: release/v0.1.0
 created: 2026-09-17T00:50:54Z
-updated: 2026-10-18T19:02:14Z
+updated: 2026-10-18T19:02:16Z
 started: 2026-10-18T18:56:31Z
 depends: [relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1, tasks-2dd094, relay-b12132, relay-6e9410, relay-7eef39, relay-5e4d93]
 parent: relay-1231bf
@@ -76,3 +76,4 @@ Prerequisites: relay-06b1da, relay-4c4828, relay-baa816, ops-c8e4d1. Release goa
 - 2026-10-18T18:57:03Z (main): Rescope 2026-10-18: the approved ops design ('Required verification for the release') requires a Darwin live probe 'before changing its installed hooks', i.e. before the Mac cutover, not before tagging; 'physical Darwin remains a release gate' entered through relay-06b1da's execution note and spread to README, docs/api.md and the probe runbook. Attempt 3's bundle (df6f741, 2026-09-25) is 795 commits behind main, and Darwin paths changed since (proc.js start interval and nearest harness, lock.js, identity.js, transaction.js, the Codex model resolver), so it cannot evidence any release commit. Dependents need only a public pin: fam-6e8321 pins the tag; hq-539508 already records platforms awaiting probes rather than claiming a universal cutover. The Mac run moves to its own child of relay-1231bf, rebuilt at a current commit, gating the Mac cutover and familiar's rollout on the Mac.
 - 2026-10-18T18:58:03Z (release/v0.1.0): resumed
   provenance: {"harness_session":"claude-code:143d6b37-5966-4303-8175-b0a0e4983892","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-18T19:02:16Z (release/v0.1.0): Pre-plan findings 2026-10-18: (1) a git-dependency install omits jsonc-parser: bundledDependencies names it, but a clone has no node_modules, so the packed git package lacks it and npm does not fetch a bundled name; relay list and the exports load, relay install fails ERR_MODULE_NOT_FOUND (rehearsed with git+file of a bare clone at a scratch tag, empty cache). The local tarball smoke passes only because npm pack runs beside node_modules. (2) History is publishable: gitleaks clean over 997 commits; no transcripts, state, credentials or bundles ever tracked; one author email; no user paths outside tasks/, whose machine paths match the public tasks and familiar repos; the tailnet hostname was already rewritten out on 2026-10-13.
