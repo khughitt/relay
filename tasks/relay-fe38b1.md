@@ -8,12 +8,13 @@ complexity: mid
 process: planned
 owner: feat/bg-tasks
 created: 2026-10-19T09:56:30Z
-updated: 2026-10-19T13:23:26Z
+updated: 2026-10-19T13:24:26Z
 started: 2026-10-19T13:18:44Z
 depends: []
 tags: []
 source: fam-6e8321
 agent: claude-code/claude-opus-5-5
+spec: docs/specs/2026-10-19-claude-background-work.md
 ---
 
 Familiar's 0a9e0d7 (2026-10-07, after the extraction baseline) reduces Claude Code's Notification:idle_prompt to idle while the last Stop or SubagentStop listed running background_tasks: an agent waiting on its own command is not waiting on the user. Relay v0.1.0's Claude reducer is the identity and neither Event nor Agent carries the count, so every registry consumer sees needs-input there (familiar's cat, a future notification).
