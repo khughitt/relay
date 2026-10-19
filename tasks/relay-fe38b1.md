@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/bg-tasks
 created: 2026-10-19T09:56:30Z
-updated: 2026-10-19T15:09:02Z
+updated: 2026-10-19T15:09:44Z
 started: 2026-10-19T13:18:44Z
 depends: []
 tags: []
@@ -57,3 +57,4 @@ Consumer: familiar spec docs/specs/2026-10-19-relay-consumer-design.md §8 (acce
 - 2026-10-19T15:00:46Z (feat/bg-tasks): resumed
   provenance: {"harness_session":"codex:01a154aa-ad17-73c0-a6ff-5838b323df99","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-19T15:09:02Z (feat/bg-tasks): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
+- 2026-10-19T15:09:44Z (feat/bg-tasks): REL 4ceec5d2ad22b136b37ee360e7a4ed00949f28d9: gates Node 26.5.0 713/713 / Node 22.23.2 713/713, strict checking clean on both. Main fast-forwarded to REL. Rust consumer src/relay/snapshot.rs parse_agent reads named fields and ignores unknown background, so no consumer validator change is needed.
