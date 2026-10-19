@@ -69,6 +69,7 @@
 - [ ] **Step 5: Run** `just test-one test/protocol.test.js` and `just check`. Expected: pass, and `tsc` clean (the `@ts-expect-error` line is an expected error).
 - [ ] **Step 6: Document** in `docs/api.md`: `background?: { agents: number; other: number }; // Claude Code rows only: in-flight background work last reported by Stop` on `Agent`; `background?: { agents: number; other: number } | null; // Claude Code Stop only; null: reported but unreadable` on `Event`; and in the paragraph after them, that `background` is optional on both.
 - [ ] **Step 7: Commit** after `just test-fast`: `feat(protocol): carry Claude background counts on events and rows`.
+- [ ] **Close the step**: `tasks done relay-9216c2 "<what landed>"` on the branch.
 
 ### Task 2: Read background work from a Claude Code Stop
 
@@ -91,8 +92,9 @@
 - [ ] **Step 2: Run** `just test-one test/claude-code.test.js`. Expected: the new tests fail.
 - [ ] **Step 3: Implement** `backgroundOf` in `src/adapters/claude-code.js` with module constants `AGENT_TYPES = new Set(['subagent', 'workflow', 'teammate', 'cloud session'])` and `IN_FLIGHT = new Set(['running', 'pending'])`. It returns `undefined` unless `nativeEvent === 'Stop'` and `Object.hasOwn(data, 'background_tasks')`; `null` for an unreadable list; otherwise the counts. The list is readable when it is an array and every entry is a non-null, non-array object whose `type` and `status` are strings; nothing else is required of an entry. Check every entry before counting any, so one malformed entry makes the whole report `null`. A comment cites the spec and the Claude Code 2.1.302 label map. In `src/adapters/index.js`, `normalizeEvent` calls `adapter.backgroundOf?.(data, nativeEvent)` and spreads `{ background }` into the event when it is not `undefined`.
 - [ ] **Step 4: Run** `just test-one test/claude-code.test.js` and `just check`. Expected: pass.
-- [ ] **Step 5: Document** in `docs/api.md` under Event mappings: Claude Code `Stop`'s optional `background_tasks` becomes `Event.background` by the rule above (labels, statuses, `null` when unreadable, `session_crons` unread, entry text never copied).
+- [ ] **Step 5: Document** in `docs/api.md` under Event mappings: Claude Code `Stop`'s optional `background_tasks` becomes `Event.background` by the rule above (labels, statuses, `null` when unreadable, `session_crons` unread, entry text never copied). In the documented `Adapter` type, add `backgroundOf?(data: Record<string, unknown>, nativeEvent: string): { agents: number; other: number } | null | undefined; // Claude Code only`.
 - [ ] **Step 6: Commit** after `just test-fast`: `feat(claude-code): count in-flight background work from Stop`.
+- [ ] **Close the step**: `tasks done relay-0559e4 "<what landed>"` on the branch.
 
 ### Task 3: Carry the counts and reduce Stop and idle_prompt
 
@@ -126,6 +128,7 @@
 - [ ] **Step 6: Run** `just test-one test/claude-code.test.js test/payload.test.js test/transaction.test.js` and `just check`. Expected: pass.
 - [ ] **Step 7: Document** in `docs/api.md` under Event mappings: the reduction table and the carry-forward table from the spec, and that observers read the reduced state from the row, since matching uses `event.kind`. In the adapter interface (`docs/api.md`, `reduceState(level: State | null, previous: State | null): State | null;`), make `previous` optional and add `context?: { background?: { agents: number; other: number } }`; say the two-argument call means no counts.
 - [ ] **Step 8: Commit** after `just test-fast`: `feat(registry): reduce Claude Stop and idle prompts by background work`.
+- [ ] **Close the step**: `tasks done relay-dfb9c7 "<what landed>"` on the branch.
 
 ### Task 4: An unreadable report never blocks a Stop
 
@@ -146,8 +149,9 @@
 - [ ] **Step 2: Run** `just test-one test/dispatch.test.js`. Expected: the new tests fail.
 - [ ] **Step 3: Implement** in `dispatchHook`: after `normalizeEvent`, when `event.background === null`, push the diagnostic; the final return's `exitCode` is `1` when `result === null` or the event was unreadable, else `reply.exitCode`. The envelope already spreads the event, so it needs no change.
 - [ ] **Step 4: Run** `just test-one test/dispatch.test.js` and `just check`. Expected: pass.
-- [ ] **Step 5: Document** in `docs/api.md`: in the Hook exit codes section, after "Observer failures never change the exit code; they are stderr diagnostics.", `BACKGROUND_UNREADABLE` with its exact text, that it is a stderr diagnostic, not an error code, and that the event still publishes and observers still run; the exit-code row for `1` adds "or a published event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`); exit 1 does not imply the registry is unchanged"; the observer envelope line notes `event.background`.
+- [ ] **Step 5: Document** in `docs/api.md`: in the Hook exit codes section, after "Observer failures never change the exit code; they are stderr diagnostics.", `BACKGROUND_UNREADABLE` with its exact text, that it is a stderr diagnostic, never a thrown error, and that the event still publishes and observers still run; add it to the codes list under Storage, CLI and failures ("Errors are ordinary Errors carrying code… Codes: …"), noting there that it appears only as a diagnostic, as `REGISTRY_SUPERSEDED` does; the exit-code row for `1` adds "or a published event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`); exit 1 does not imply the registry is unchanged"; the observer envelope line notes `event.background`.
 - [ ] **Step 6: Commit** after `just test-fast`: `fix(dispatch): report an unreadable background list instead of refusing Stop`.
+- [ ] **Close the step**: `tasks done relay-75858a "<what landed>"` on the branch.
 
 ### Task 5: Prepare v0.1.1
 
@@ -163,6 +167,7 @@
 - [ ] **Step 7: Integrate and fix `REL`.** In the main checkout: `git merge --ff-only feat/bg-tasks` when main has not moved, else `git merge --no-ff feat/bg-tasks`; `just gate` on both runtimes on main; `REL=$(git rev-parse HEAD)`; `tasks note relay-fe38b1 "REL <sha>: gates <dev counts> / <node22 counts>"`. Later steps read `REL` from that note.
 - [ ] **Step 8: Privacy review** over `v0.1.0..$REL` by the runbook (its pattern-file controls first; the range in place of `--all`, keeping `--diff-merges=first-parent`; gitleaks with `--log-opts="v0.1.0..$REL --diff-merges=first-parent"`). Expected: every row's expected result. Anything else: stop and report.
 - [ ] **Step 9: Rehearse `REL`** by the runbook's step 4 with tag `v0.1.1-rehearsal`, on both runtimes. Expected: `portability: pass` twice. Remove the scratch directory.
+- [ ] **Close the step**: `tasks done relay-665278 "<REL, gates, privacy review, rehearsal>"` on `feat/bg-tasks`.
 
 ### Task 6: Publish v0.1.1
 
@@ -172,11 +177,12 @@ Runs only on the user's explicit go-ahead for this task. The repository is alrea
 - [ ] **Step 2: Push and tag**: `git push origin "$REL:refs/heads/main"`, `git tag -a v0.1.1 -m "relay v0.1.1" "$REL"`, `git push origin refs/tags/v0.1.1`.
 - [ ] **Step 3: Verify one commit everywhere**: `git ls-remote origin 'refs/tags/v0.1.1^{}' refs/heads/main` prints `REL` twice; `git ls-remote --refs origin` lists exactly `main`, `v0.1.0` and `v0.1.1`.
 - [ ] **Step 4: Portability against the public tag** on both runtimes: `node tools/release/portability.mjs --spec git+https://github.com/khughitt/relay.git#v0.1.1 --commit "$REL"`. Expected: `portability: pass` twice. A network, DNS, GitHub 5xx or codeload failure is rerun after a short wait; only a failure that reproduces with the network healthy is a defect.
+- [ ] **Close the step**: `tasks done relay-535efd "<tag object, REL, portability result>"` on `feat/bg-tasks`.
 
 ### Task 7: Record the release and close out
 
 - [ ] **Step 1: Publication record.** On `feat/bg-tasks`, after `git merge --ff-only main`, append `### Publication record` to the v0.1.1 section: tag object sha, `REL`, push date, `REL`'s gate counts and privacy-review results (Task 5), and both runtimes' portability output verbatim. Commit: `docs(release): v0.1.1 publication record`.
 - [ ] **Step 2: Tell the consumer.** `tasks note fam-6e8321` with the pin `git+https://github.com/khughitt/relay.git#v0.1.1`, `REL`, the field `Agent.background: {agents, other}` (not `backgroundTasks`), and that consumer spec §8 and its parity test need that shape. If the note is refused (`stale_copy`: another session holds the task), give the same text to the user instead.
-- [ ] **Step 3: Close this step, then the task, on the branch**: `tasks done relay-74b012 "<publication record committed; consumer told>"`, then `tasks done relay-fe38b1 "<tag, REL, portability result>"`. The parent refuses while any step task is open, so every earlier step task must already be done (each closes when its commit lands).
+- [ ] **Step 3: Close this step, then the task, on the branch**: `tasks done relay-74b012 "<publication record committed; consumer told>"`, then `tasks done relay-fe38b1 "<tag, REL, portability result>"`. The parent refuses while any step task is open; Tasks 1–6 each closed theirs in their last step, so check with `tasks list --parent relay-fe38b1` that only `relay-74b012` was open before this step.
 - [ ] **Step 4: Integrate and push**: fast-forward main (else `--no-ff` and `just gate`), privacy review over `"$REL"..main`, `git push origin main`. Task 6's go-ahead covers this push.
 - [ ] **Step 5: Remove the worktree** after integration, as cleanup outside the task's record: `tt-report`, the ignored-file check, no host pointer into it, `git worktree unlock`, `git worktree remove`.
