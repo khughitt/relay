@@ -67,11 +67,14 @@ async function mutate(opts, event, context, handle, diagnostics) {
         for (const id of ended) delete agents[id];
       }
       else {
-        const state = adapter.reduceState(level,agents[event.agentId]?.state ?? null);
+        const previous = agents[event.agentId];
+        const background = event.background === undefined ? previous?.background : event.background === null ? undefined : event.background;
+        const state = adapter.reduceState(level,previous?.state ?? null,{background});
         const {remote,repoRoot} = /** @type {{remote: string|null, repoRoot: string|null}} */ (context);
         agents[event.agentId] = {id:event.agentId,harness:event.harness,sessionId:event.sessionId,
           scope:event.harness === 'opencode' ? 'process' : event.root === undefined ? 'session' : 'worker',
-          ...(event.root === undefined ? {} : {root:event.root}),process:handle,cwd:event.cwd,repoRoot,remote,
+          ...(event.root === undefined ? {} : {root:event.root}),
+          ...(background === undefined ? {} : {background}),process:handle,cwd:event.cwd,repoRoot,remote,
           projectKey:projectKeyFor({remote,repoRoot,cwd:event.cwd}),project:displayProject({remote,repoRoot,cwd:event.cwd}),state: /** @type {import("../types.js").State} */ (state),updatedAt:opts.now()};
         changed = true;
       }

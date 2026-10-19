@@ -217,3 +217,73 @@ test('a dead codex process takes its root and every worker with it', async t => 
   assert.deepEqual(reaped.reaped.sort(), [`codex:${R}`, `codex:${W1}`, 'codex:0199f000-0000-7000-8000-000000000003']);
   assert.deepEqual(Object.keys(reaped.snapshot.agents), [`claude-code:${C}`]);
 });
+
+const S = '0199f000-0000-7000-8000-000000000090';
+const claude = (native, fields = {}) => normalizeEvent('claude-code', native, JSON.stringify({ session_id: S, cwd: '/repo', ...fields }));
+const shell = { id: 'b1', type: 'shell', status: 'running', description: 'd' };
+const agent = { ...shell, id: 'a1', type: 'subagent' };
+const bg = (list) => ({ background_tasks: list });
+const claudeRow = (result) => result.snapshot.agents['claude-code:' + S];
+test('a shell left running turns the idle prompt into idle', async t => {
+  const opts = localObservation(await tempState(t));
+  await applyEvent(claude('Stop', bg([shell])), opts);
+  const row = claudeRow(await applyEvent(claude('Notification:idle_prompt'), opts));
+  assert.equal(row.state, 'idle');
+  assert.deepEqual(row.background, { agents: 0, other: 1 });
+});
+test('the idle prompt after the work finished is needs-input again', async t => {
+  const opts = localObservation(await tempState(t));
+  await applyEvent(claude('Stop', bg([shell])), opts);
+  await applyEvent(claude('Stop', bg([{ ...shell, status: 'completed' }])), opts);
+  const row = claudeRow(await applyEvent(claude('Notification:idle_prompt'), opts));
+  assert.equal(row.state, 'needs-input');
+  assert.deepEqual(row.background, { agents: 0, other: 0 });
+});
+test('an event that does not report carries the counts forward', async t => {
+  const opts = localObservation(await tempState(t));
+  await applyEvent(claude('Stop', bg([shell])), opts);
+  const row = claudeRow(await applyEvent(claude('PreToolUse', { tool_name: 'Bash', tool_input: {} }), opts));
+  assert.deepEqual(row.background, { agents: 0, other: 1 });
+  assert.deepEqual((await readSnapshot(opts)).agents['claude-code:' + S].background, { agents: 0, other: 1 });
+});
+test('a Stop handing work to an agent stays working', async t => {
+  const opts = localObservation(await tempState(t));
+  assert.equal(claudeRow(await applyEvent(claude('Stop', bg([agent])), opts)).state, 'working');
+});
+test('agent and shell, then shell only, then the idle prompt', async t => {
+  const opts = localObservation(await tempState(t));
+  assert.equal(claudeRow(await applyEvent(claude('Stop', bg([agent, shell])), opts)).state, 'working');
+  assert.equal(claudeRow(await applyEvent(claude('Stop', bg([shell])), opts)).state, 'done');
+  assert.equal(claudeRow(await applyEvent(claude('Notification:idle_prompt'), opts)).state, 'idle');
+});
+test('an agent-only Stop then the idle prompt is needs-input', async t => {
+  const opts = localObservation(await tempState(t));
+  await applyEvent(claude('Stop', bg([agent])), opts);
+  assert.equal(claudeRow(await applyEvent(claude('Notification:idle_prompt'), opts)).state, 'needs-input');
+});
+test('an unreadable report clears the counts', async t => {
+  const opts = localObservation(await tempState(t));
+  await applyEvent(claude('Stop', bg([shell])), opts);
+  await applyEvent(claude('Stop', bg('x')), opts);
+  const row = claudeRow(await applyEvent(claude('Notification:idle_prompt'), opts));
+  assert.equal(row.state, 'needs-input');
+  assert.equal(Object.hasOwn(row, 'background'), false);
+  await applyEvent(claude('Stop', bg([agent])), opts);
+  const cleared = claudeRow(await applyEvent(claude('Stop', bg('x')), opts));
+  assert.equal(cleared.state, 'done');
+  assert.equal(Object.hasOwn(cleared, 'background'), false);
+});
+test('failure and approval prompts ignore the counts and keep them', async t => {
+  const opts = localObservation(await tempState(t));
+  await applyEvent(claude('Stop', bg([agent, shell])), opts);
+  const failed = claudeRow(await applyEvent(claude('StopFailure'), opts));
+  assert.equal(failed.state, 'error');
+  assert.deepEqual(failed.background, { agents: 1, other: 1 });
+  const approval = claudeRow(await applyEvent(claude('Notification:permission_prompt'), opts));
+  assert.equal(approval.state, 'needs-approval');
+  assert.deepEqual(approval.background, { agents: 1, other: 1 });
+});
+test('a session row without a report has no background', async t => {
+  const opts = localObservation(await tempState(t));
+  assert.equal(Object.hasOwn(claudeRow(await applyEvent(claude('SessionStart'), opts)), 'background'), false);
+});

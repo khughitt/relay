@@ -20,8 +20,14 @@ export function stateForEvent(event) {
   if (!Object.hasOwn(events, event)) throw relayError('UNSUPPORTED_EVENT', 'unsupported harness event');
   return events[event].level;
 }
-/** @param {import("../types.js").State|null} level */
-export const reduceState = (level) => level;
+// Spec docs/specs/2026-10-19-claude-background-work.md, Reduction: agents hand work
+// back to the session; a shell wait is idle rather than a request for user input.
+/** @type {import("../types.js").Adapter["reduceState"]} */
+export function reduceState(level, _previous, { background } = {}) {
+  if (level === 'done' && (background?.agents ?? 0) > 0) return 'working';
+  if (level === 'needs-input' && (background?.other ?? 0) > 0) return 'idle';
+  return level;
+}
 // Spec docs/specs/2026-10-19-claude-background-work.md: Claude Code 2.1.302 label map.
 const AGENT_TYPES = new Set(['subagent', 'workflow', 'teammate', 'cloud session']);
 const IN_FLIGHT = new Set(['running', 'pending']);

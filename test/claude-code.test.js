@@ -44,3 +44,27 @@ test('only a Claude Stop is read', () => {
     assert.equal(Object.hasOwn(event, 'background'), false);
   }
 });
+
+import { reduceState } from '../src/adapters/claude-code.js';
+import { STATES } from '../src/protocol.js';
+test('Claude reduction is the identity without counts', () => {
+  for (const level of [...STATES, null]) {
+    assert.equal(reduceState(level, 'done'), level);
+    assert.equal(reduceState(level, 'done', {}), level);
+    assert.equal(reduceState(level, 'done', { background: { agents: 0, other: 0 } }), level);
+  }
+});
+test('a Stop with agent work in flight stays working', () => {
+  for (const background of [{ agents: 1, other: 0 }, { agents: 2, other: 3 }]) {
+    assert.equal(reduceState('done', 'working', { background }), 'working');
+  }
+});
+test('idle_prompt with other work in flight is idle; agent counts do not count', () => {
+  assert.equal(reduceState('needs-input', 'done', { background: { agents: 0, other: 1 } }), 'idle');
+  assert.equal(reduceState('needs-input', 'done', { background: { agents: 2, other: 0 } }), 'needs-input');
+});
+test('other levels ignore the counts', () => {
+  for (const level of ['idle', 'working', 'needs-approval', 'error']) {
+    assert.equal(reduceState(level, 'done', { background: { agents: 1, other: 1 } }), level);
+  }
+});

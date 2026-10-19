@@ -147,7 +147,8 @@ type ProcessOps = {
 type Adapter = {
   events: Readonly<Record<string, { kind: Event['kind']; level: State | null }>>;
   stateForEvent(nativeEvent: string): State | null;
-  reduceState(level: State | null, previous: State | null): State | null;
+  reduceState(level: State | null, previous?: State | null,
+    context?: { background?: { agents: number; other: number } }): State | null;
   backgroundOf?(data: Record<string, unknown>, nativeEvent: string): { agents: number; other: number } | null | undefined; // Claude Code only
   resolveSessionPid(options?: { startPid?: number; ancestors?: (pid: number) => ProcessRow[];
     executableOf?: (pid: number) => string; argvOf?: (pid: number) => string[] }): number | null;
@@ -279,6 +280,30 @@ and toward `other` for every other type, including unmapped raw kinds. An empty 
 reports zero counts; an absent field reports nothing; any unreadable entry or list
 reports `null`. Only Claude Code `Stop` is read. `session_crons` is unread, and entry
 text (including descriptions and commands) is never copied into the event.
+
+Claude Code reduces the level using the row's background counts:
+
+| Level | Condition | State |
+| --- | --- | --- |
+| `done` (`Stop`) | `background.agents > 0` | `working` |
+| `needs-input` (`idle_prompt`) | `background.other > 0` | `idle` |
+| any | otherwise | the level |
+
+Agent counts do not change an idle prompt: Claude Code already withholds it for
+active agent work. Failure and approval levels remain unchanged. The reducer's
+two-argument call means no counts; Codex and OpenCode ignore the optional context.
+For each event that sets a level, the registry carries counts as follows:
+
+| `event.background` | Row's `background` |
+| --- | --- |
+| absent | the previous row's, if any |
+| an object | the event's |
+| `null` | none: the key is dropped |
+
+Rows without a report have no background key. SessionEnd removes the row and its
+counts. Observers match on `event.kind`, which reduction does not change, and read
+the reduced state from the registry row; the envelope's `registry.revision` names
+the publication.
 
 Unlisted events fail; kind and level derive from one immutable table. Native input
 must supply a nonempty session_id, absolute cwd and optional boolean
