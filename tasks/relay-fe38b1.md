@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/bg-tasks
 created: 2026-10-19T09:56:30Z
-updated: 2026-10-19T14:36:37Z
+updated: 2026-10-19T14:36:38Z
 started: 2026-10-19T13:18:44Z
 depends: []
 tags: []
@@ -52,3 +52,5 @@ Consumer: familiar spec docs/specs/2026-10-19-relay-consumer-design.md §8 (acce
 - 2026-10-19T14:26:46Z (feat/bg-tasks): Plan round 3 dispositions: (1) Task 7 already closed relay-74b012 before the parent since 78f812c; hardened anyway: Tasks 1-6 each end with an explicit 'tasks done <step id>' and Task 7 checks only relay-74b012 is open first. (2) Task 2 documents backgroundOf on api.md's Adapter type (reduceState's signature was already Task 3 Step 7); Task 4 adds BACKGROUND_UNREADABLE to api.md's codes list as diagnostic-only, beside the exit-code row. Commit 0ee76fc.
 - 2026-10-19T14:36:35Z (feat/bg-tasks): review: plan round 4 — verdict: accept; findings: should-fix 1; reviewer: human
 - 2026-10-19T14:36:37Z (feat/bg-tasks): Plan round 4: Task 7 Step 1 now does a normal 'git merge main' (resolve record conflicts keeping both sides' notes, tasks check, just gate; REL unchanged), and Task 5 Step 7's REL note runs from the worktree so record commits stay on feat/bg-tasks. Plan approved by the user for Native execution (superpowers:executing-plans) in a fresh session. Commit 0fbde32.
+- 2026-10-19T14:36:38Z (feat/bg-tasks): parked (waiting on agent, session): Fresh session, Native execution: in .worktrees/bg-tasks run 'tasks start relay-fe38b1', run the deferred baseline (just test-fast, just check), then follow docs/plans/2026-10-19-claude-background-work.md with superpowers:executing-plans from Task 1 (tasks start relay-9216c2). Task 6 (publish) needs the user's explicit go-ahead.
+  provenance: {"harness_session":"claude-code:0f09e241-608f-420b-abd4-4ce9eb9dee01","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
