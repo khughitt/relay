@@ -42,6 +42,7 @@ type Agent = {
   project: string;       // display label, not a unique key
   state: State;
   updatedAt: number;     // Unix milliseconds
+  background?: { agents: number; other: number }; // Claude Code rows only: in-flight background work last reported by Stop
 };
 type Snapshot = {
   schema: 2;
@@ -88,11 +89,14 @@ type Event = {
   root?: string;         // Codex worker events only
   cwd: string;
   stopHookActive?: boolean;
+  background?: { agents: number; other: number } | null; // Claude Code Stop only; null: reported but unreadable
   tool: null | { name: string; input: Record<string, unknown>; command: string | null };
 };
 ```
 
-All parent fields are required except stopHookActive. Validators construct known
+All parent fields are required except stopHookActive, root and background;
+background is optional on both Agent and Event. Counts are nonnegative safe integers,
+valid only on Claude Code rows and Stop events (null only on the event). Validators construct known
 fields and ignore unknown optional fields; unknown schema versions fail. Objects
 must be non-null and non-array. PID is positive u32, timestamps/revision are
 nonnegative safe integers, generation is a UUID, and paths are absolute. Agent

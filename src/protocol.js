@@ -14,6 +14,11 @@ const text = (v) => typeof v === 'string' && v.trim().length > 0;
 const absolute = (v) => text(v) && isAbsolute(v);
 /** @param {number} v */
 const integer = (v) => Number.isSafeInteger(v) && v >= 0;
+/** @param {unknown} v @returns {import("./types.js").Background} */
+function counts(v) {
+  if (!object(v) || !integer(v.agents) || !integer(v.other)) fail('invalid background');
+  return { agents: v.agents, other: v.other };
+}
 /** @param {unknown} v */
 const uuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 const harnesses = ['claude-code', 'codex', 'opencode'];
@@ -45,6 +50,7 @@ const rootOf = (root, id) => text(root) && root.startsWith('codex:') && text(roo
 function validateAgent(v, key) {
   if (!object(v)) fail('invalid agent');
   identity(v, v.id);
+  if (Object.hasOwn(v, 'background') && v.harness !== 'claude-code') fail('invalid background harness');
   const worker = v.scope === 'worker';
   if (v.id !== key || !(worker ? v.harness === 'codex' && rootOf(v.root, v.id)
       : v.scope === (v.harness === 'opencode' ? 'process' : 'session') && !Object.hasOwn(v, 'root'))
@@ -53,7 +59,8 @@ function validateAgent(v, key) {
   return { id: v.id, harness: v.harness, sessionId: v.sessionId, scope: v.scope, ...(worker ? { root: v.root } : {}),
     process: v.process === null ? null : validateHandle(v.process), cwd: v.cwd,
     repoRoot: v.repoRoot, remote: v.remote, projectKey: v.projectKey, project: v.project,
-    state: v.state, updatedAt: v.updatedAt };
+    state: v.state, updatedAt: v.updatedAt,
+    ...(Object.hasOwn(v, 'background') ? { background: counts(v.background) } : {}) };
 }
 /** @param {unknown} v @returns {import("./types.js").Snapshot} */
 export function validateSnapshot(v) {
@@ -67,6 +74,7 @@ export function validateEvent(v) {
   identity(v, v.agentId);
   if (Object.hasOwn(v, 'root') && !(v.harness === 'codex' && rootOf(v.root, v.agentId))) fail('invalid event root');
   if (Object.hasOwn(v, 'stopHookActive') && typeof v.stopHookActive !== 'boolean') fail('invalid stop flag');
+  if (Object.hasOwn(v, 'background') && !(v.harness === 'claude-code' && v.nativeEvent === 'Stop')) fail('invalid background event');
   let tool = null;
   if (v.kind === 'before-tool') {
     if (!object(v.tool) || !text(v.tool.name) || !object(v.tool.input)
@@ -76,5 +84,6 @@ export function validateEvent(v) {
   return { schema: 1, kind: v.kind, harness: v.harness, nativeEvent: v.nativeEvent,
     agentId: v.agentId, sessionId: v.sessionId,
     ...(Object.hasOwn(v, 'root') ? { root: v.root } : {}), cwd: v.cwd,
-    ...(Object.hasOwn(v, 'stopHookActive') ? { stopHookActive: v.stopHookActive } : {}), tool };
+    ...(Object.hasOwn(v, 'stopHookActive') ? { stopHookActive: v.stopHookActive } : {}),
+    ...(Object.hasOwn(v, 'background') ? { background: v.background === null ? null : counts(v.background) } : {}), tool };
 }

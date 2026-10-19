@@ -12,6 +12,8 @@ const sameHandle = handle;
 handle.start = 123;
 
 const event = validateEvent({});
+// @ts-expect-error Background counts are numbers.
+event.background = { agents: '1', other: 0 };
 // @ts-expect-error Event kinds use the normalized vocabulary.
 event.kind = 'PreToolUse';
 // @ts-expect-error Registry tools have a name.

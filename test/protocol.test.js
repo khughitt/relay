@@ -72,3 +72,40 @@ test('an event root is a Codex root other than the event itself', () => {
   }
   assert.throws(() => validateEvent({ ...base, harness: 'claude-code', agentId: 'claude-code:w', root: 'codex:r' }), { code: 'INVALID_SCHEMA' });
 });
+
+const claudeRow = { ...agent, id: 'claude-code:s:1', harness: 'claude-code' };
+const alone = (row) => ({ ...snapshot, agents: { [row.id]: row } });
+const badCounts = [{ agents: -1, other: 0 }, { agents: 0.5, other: 0 },
+  { agents: 0, other: Number.MAX_SAFE_INTEGER + 1 }, { agents: 0 }, []];
+test('a Claude row keeps its background counts through validation', () => {
+  const row = { ...claudeRow, background: { agents: 1, other: 2, extra: 3 } };
+  assert.deepEqual(validateSnapshot(alone(row)), alone({ ...claudeRow, background: { agents: 1, other: 2 } }));
+  assert.equal(Object.hasOwn(validateSnapshot(alone(claudeRow)).agents[claudeRow.id], 'background'), false);
+});
+test('row background is counts on a Claude row only', () => {
+  for (const row of [agent, { ...agent, id: 'opencode:s:1', harness: 'opencode', scope: 'process' }]) {
+    assert.throws(() => validateSnapshot(alone({ ...row, background: { agents: 0, other: 0 } })), { code: 'INVALID_SCHEMA' });
+  }
+  for (const background of [null, ...badCounts]) {
+    assert.throws(() => validateSnapshot(alone({ ...claudeRow, background })), { code: 'INVALID_SCHEMA' });
+  }
+});
+const claudeStop = { schema: 1, kind: 'turn-end', harness: 'claude-code', nativeEvent: 'Stop',
+  agentId: claudeRow.id, sessionId: claudeRow.sessionId, cwd: '/repo', tool: null };
+test('event background is counts or null on a Claude Stop only', () => {
+  assert.deepEqual(validateEvent({ ...claudeStop, background: { agents: 1, other: 2, extra: 3 } }),
+    { ...claudeStop, background: { agents: 1, other: 2 } });
+  assert.deepEqual(validateEvent({ ...claudeStop, background: null }), { ...claudeStop, background: null });
+  for (const event of [
+    { ...claudeStop, kind: 'before-tool', nativeEvent: 'PreToolUse', tool: { name: 'Bash', input: {}, command: null } },
+    { ...claudeStop, harness: 'codex', agentId: agent.id },
+    { ...claudeStop, harness: 'opencode', agentId: 'opencode:s:1', nativeEvent: 'init', kind: 'session-start' },
+  ]) {
+    for (const background of [{ agents: 0, other: 0 }, null]) {
+      assert.throws(() => validateEvent({ ...event, background }), { code: 'INVALID_SCHEMA' });
+    }
+  }
+  for (const background of badCounts) {
+    assert.throws(() => validateEvent({ ...claudeStop, background }), { code: 'INVALID_SCHEMA' });
+  }
+});
