@@ -110,6 +110,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
     checkBudget(config, budget, { harness, kind: adapter.events[nativeEvent].kind });
     const raw = await readInput(input, { clock, deadline: Math.min(workDeadline, start + budget.inputMs) });
     event = normalizeEvent(harness, nativeEvent, raw);
+    if (event.background === null) diagnostics.push('BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries');
     const matching = matchSubscribers(config, event);
     guards = matching.filter((subscriber) => subscriber.role === 'guard');
     observers = matching.filter((subscriber) => subscriber.role === 'observer');
@@ -127,7 +128,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   if (result === null) for (const observer of observers) diagnostics.push(`SUBSCRIBER_SKIPPED: ${observer.name} skipped after registry failure`);
   else await runObservers(observers, (observer) => envelope('event', observer, event, result), { clock, workDeadline, run }, diagnostics);
   const reply = adapter.encodeReply(nativeEvent, context ? { decision: 'allow', context } : { decision: 'allow' });
-  return { stdout: reply.stdout, stderr: lines(diagnostics), exitCode: result === null ? 1 : reply.exitCode };
+  return { stdout: reply.stdout, stderr: lines(diagnostics), exitCode: result === null || event.background === null ? 1 : reply.exitCode };
 }
 
 // relay reap: prune confirmed deaths, publish if changed, then tell reconcile observers to

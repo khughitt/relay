@@ -392,3 +392,38 @@ test('a malformed Codex agent_id refuses even with no guard, and publishes nothi
   assert.deepEqual(r, { stdout: '', stderr: 'INVALID_INPUT: a subagent event requires agent_id\n', exitCode: 1 });
   assert.equal(await readSnapshot({ paths: p }), null);
 });
+
+const stopBody = (list) => JSON.stringify({ session_id: 'sess', cwd: '/repo', stop_hook_active: false, background_tasks: list });
+test('an unreadable background report publishes and exits 1 without refusing', async t => {
+  const p = await tempPaths(t);
+  assert.deepEqual(await hook(p, { nativeEvent: 'Stop', body: stopBody('x') }), {
+    stdout: '', stderr: 'BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries\n', exitCode: 1,
+  });
+  const row = (await readSnapshot({ paths: p })).agents['claude-code:sess'];
+  assert.equal(row.state, 'done');
+  assert.equal(Object.hasOwn(row, 'background'), false);
+});
+test('a refusing Stop guard still wins over an unreadable report', async t => {
+  const p = await tempPaths(t);
+  await writeSubscribers(p, [strip(guard('g', 'deny', { kinds: ['turn-end'] }))]);
+  const result = await hook(p, { nativeEvent: 'Stop', body: stopBody('x') });
+  assert.equal(result.exitCode, 2);
+  assert.equal(result.stdout, '{"decision":"block","reason":"denied by fixture"}\n');
+  assert.equal(await readSnapshot({ paths: p }), null);
+});
+test('observers see the counts, or null when unreadable', async t => {
+  const p = await tempPaths(t), file = join(p.stateDir, '..', 'background-observer.json');
+  await writeSubscribers(p, [strip(observer('seen', 'record', { kinds: ['turn-end'], file }))]);
+  const readable = await hook(p, { nativeEvent: 'Stop', body: stopBody([{ id: 'a', type: 'subagent', status: 'running', description: 'PRIVATE_DESCRIPTION' }]) });
+  assert.equal(readable.exitCode, 0);
+  const text = await readFile(file, 'utf8');
+  assert.deepEqual(JSON.parse(text).event.background, { agents: 1, other: 0 });
+  assert.equal(text.includes('PRIVATE_DESCRIPTION'), false);
+  const unreadable = await hook(p, { nativeEvent: 'Stop', body: stopBody('x') });
+  assert.equal(unreadable.exitCode, 1);
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).event.background, null);
+});
+test('a readable empty background report still allows without diagnostics', async t => {
+  const p = await tempPaths(t);
+  assert.deepEqual(await hook(p, { nativeEvent: 'Stop', body: stopBody([]) }), { stdout: '', stderr: '', exitCode: 0 });
+});

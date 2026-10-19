@@ -438,7 +438,8 @@ A guard error is a refusal with reason `relay refused: <CODE>: <message>`.
 `{"schema":1,"type":"event"|"reconcile","subscriber":"<name>","event":<Event with tool reduced to {name}>|null,"registry":{"generation":string|null,"revision":number|null},"changed":boolean,"reaped":string[]}`.
 Observers run only after a successful registry publication (changed or not) or a
 reap; after a registry failure they are skipped with a diagnostic and healed by
-reconciliation. `type: "reconcile"` carries `event: null`.
+reconciliation. `event.background` carries counts or null when reported by Claude
+Code Stop. `type: "reconcile"` carries `event: null`.
 
 ### Hook exit codes
 
@@ -446,9 +447,13 @@ reconciliation. `type: "reconcile"` carries `event: null`.
 | --- | --- |
 | 0 | An allow reply (with or without context). |
 | 2 | The JSON refusal on stdout and the reason on stderr for any refusal. |
-| 1 | An error on an event without a refusal channel, or an allow reply whose registry publication failed (the harness shows a non-blocking notice; the guard result stands). |
+| 1 | An error on an event without a refusal channel, or an allow reply whose registry publication failed, or a published event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`). The harness shows a non-blocking notice; the guard result stands. Exit 1 does not imply the registry is unchanged. |
 
 Observer failures never change the exit code; they are stderr diagnostics.
+`BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries`
+is a stderr diagnostic, never a thrown error: an unreadable report still publishes
+and observers still run, with an allow reply and exit 1. A guard refusal still wins
+with exit 2 and no publication or observers.
 
 ### Child termination
 
@@ -542,7 +547,9 @@ INVALID_SCHEMA, CORRUPT_STATE, PROCESS_UNREADABLE, PROCESS_UNAVAILABLE,
 DEADLINE_EXCEEDED, LOCK_TIMEOUT, LOCK_IDENTITY_UNKNOWN, LOCK_REPAIR_REQUIRED,
 LOCK_CLEANUP_FAILED, LOCK_OWNERSHIP_LOST, IO_ERROR, GIT_ERROR, USAGE,
 INVALID_REPLY, UNSUPPORTED_REPLY, INVALID_CONFIG, INVALID_EVIDENCE, UNSUPPORTED_BINDING,
-GUARD_FAILED, REGISTRY_SUPERSEDED and INVALID_ROLLOUT.
+GUARD_FAILED, REGISTRY_SUPERSEDED, BACKGROUND_UNREADABLE and INVALID_ROLLOUT.
+BACKGROUND_UNREADABLE appears only as a diagnostic; REGISTRY_SUPERSEDED also appears
+as a diagnostic when a mutation replaces a schema-1 registry.
 Unknown lock ownership at deadline is LOCK_IDENTITY_UNKNOWN;
 a live holder exceeding caller patience is LOCK_TIMEOUT, even when the deadline cut
 short the last check of that holder. Causes may retain OS
