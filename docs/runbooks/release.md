@@ -118,6 +118,53 @@ Platform status and capability evidence are unchanged from v0.1.0.
 `just gate` on the release branch, 2026-10-19: 713 of 713 tests pass on
 Node 26.5.0 and 713 of 713 on Node 22.23.2, with strict checking clean on both.
 
+### Publication record
+
+| Item | Value |
+| --- | --- |
+| Tag | `v0.1.1`, annotated, tag object `f050d52192840e434a095e27dd89af940588d027` |
+| Release commit (`REL`) | `4ceec5d2ad22b136b37ee360e7a4ed00949f28d9` |
+| Pushed | 2026-10-19: main `990e8b7..4ceec5d`, then the tag. Remote main and the peeled tag both equalled `REL`; the only remote refs were main, v0.1.0 and v0.1.1. |
+| Consumer pin | `git+https://github.com/khughitt/relay.git#v0.1.1` |
+
+- **Gates at `REL`.** `just gate` passed 713 of 713 on Node 26.5.0 and 713 of 713
+  on Node 22.23.2, with strict checking clean on both. The pre-push hooks also passed.
+- **Privacy review at `REL`** (`v0.1.0..REL`, including first-parent merge diffs).
+  Four real path patterns and two private terms passed the nonblank and source-match
+  controls. gitleaks scanned 83 commits and found no leaks. No state or transcript
+  filenames; one maintainer author address; machine paths 0; private identities 0;
+  published pre-images 0. No optional work-host file was used, following v0.1.0's
+  recorded decision.
+- **Rehearsal at `REL`.** The scratch `v0.1.1-rehearsal` tag passed installation,
+  manifest/lockfile, smoke and empty-cache `npm ci` checks on both runtimes; the
+  scratch directory was removed.
+- **Portability against the public tag.** Anonymous HTTPS installation and empty-cache
+  `npm ci` passed on both runtimes. The verbatim outputs follow.
+
+Node 26.5.0 (npm 11):
+
+```
+ok reach: f050d52192840e434a095e27dd89af940588d027	refs/tags/v0.1.1
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.1.1
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.1.1
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#4ceec5d2ad22b136b37ee360e7a4ed00949f28d9; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
+
+Node 22.23.2 (npm 10.9.8):
+
+```
+ok reach: f050d52192840e434a095e27dd89af940588d027	refs/tags/v0.1.1
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.1.1
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.1.1
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#4ceec5d2ad22b136b37ee360e7a4ed00949f28d9; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
+
 ## v0.1.0
 
 ### Platform status
