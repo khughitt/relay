@@ -6,9 +6,9 @@ priority: 2
 size: m
 complexity: mid
 process: planned
-owner: main
+owner: feat/bg-tasks
 created: 2026-10-19T09:56:30Z
-updated: 2026-10-19T13:18:44Z
+updated: 2026-10-19T13:18:52Z
 started: 2026-10-19T13:18:44Z
 depends: []
 tags: []
@@ -25,4 +25,6 @@ Consumer: familiar spec docs/specs/2026-10-19-relay-consumer-design.md §8 (acce
 ## Notes
 
 - 2026-10-19T13:18:44Z (main): started
+  provenance: {"harness_session":"claude-code:0f09e241-608f-420b-abd4-4ce9eb9dee01","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-19T13:18:52Z (feat/bg-tasks): resumed
   provenance: {"harness_session":"claude-code:0f09e241-608f-420b-abd4-4ce9eb9dee01","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
