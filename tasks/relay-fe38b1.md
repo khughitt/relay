@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/bg-tasks
 created: 2026-10-19T09:56:30Z
-updated: 2026-10-19T14:18:24Z
+updated: 2026-10-19T14:18:26Z
 started: 2026-10-19T13:18:44Z
 depends: []
 tags: []
@@ -46,3 +46,5 @@ Consumer: familiar spec docs/specs/2026-10-19-relay-consumer-design.md §8 (acce
   provenance: {"harness_session":"claude-code:0f09e241-608f-420b-abd4-4ce9eb9dee01","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-19T14:16:16Z (feat/bg-tasks): review: plan round 1 — verdict: revise; findings: P1 2, P2 3; reviewer: codex/gpt-6.1-sol
 - 2026-10-19T14:18:24Z (feat/bg-tasks): review: plan round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-19T14:18:26Z (feat/bg-tasks): parked (waiting on user, review): User reviews docs/plans/2026-10-19-claude-background-work.md (feat/bg-tasks) and picks subagent-driven or native execution; then start relay-9216c2 (Task 1)
+  provenance: {"harness_session":"claude-code:0f09e241-608f-420b-abd4-4ce9eb9dee01","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
