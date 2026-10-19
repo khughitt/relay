@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/bg-tasks
 created: 2026-10-19T09:56:30Z
-updated: 2026-10-19T15:35:00Z
+updated: 2026-10-19T15:35:02Z
 started: 2026-10-19T13:18:44Z
 depends: []
 tags: []
@@ -62,3 +62,4 @@ Consumer: familiar spec docs/specs/2026-10-19-relay-consumer-design.md §8 (acce
   provenance: {"harness_session":"codex:01a154aa-ad17-73c0-a6ff-5838b323df99","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-19T15:35:00Z (feat/bg-tasks): resumed
   provenance: {"harness_session":"codex:01a154aa-ad17-73c0-a6ff-5838b323df99","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-19T15:35:02Z (feat/bg-tasks): User approved publication: Publish. Proceed with Tasks 6–7, including both pushes, public portability checks, consumer notification and cleanup.
