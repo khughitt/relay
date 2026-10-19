@@ -10,7 +10,7 @@
 
 **Spec:** `docs/specs/2026-10-19-claude-background-work.md` (approved by the user 2026-10-19 after three review rounds).
 
-**Status:** draft for user review, after plan review rounds 1 (strict-tsc comparisons, step-task closing order, entry readability rule, api.md anchors, OpenCode rejection) and 2 (accept).
+**Status:** approved by the user 2026-10-19 for Native execution, after plan review rounds 1 (strict-tsc comparisons, step-task closing order, entry readability rule, api.md anchors, OpenCode rejection), 2 (accept), 3 (user: explicit step-task closes, `backgroundOf` and the diagnostic code in `docs/api.md`) and 4 (user: Task 7's merge of a diverged main).
 
 ## Global Constraints
 
@@ -164,7 +164,7 @@
 - [ ] **Step 4: Gate the branch** with `just gate` and `PATH="$NODE22_BIN:$PATH" just gate`. Expected: both pass; record both counts in the `### Gates` line.
 - [ ] **Step 5: Commit**: `chore(release): prepare v0.1.1`.
 - [ ] **Step 6: Final whole-branch review** (fresh reviewer), then corrective rounds per the execution skill, before integration.
-- [ ] **Step 7: Integrate and fix `REL`.** In the main checkout: `git merge --ff-only feat/bg-tasks` when main has not moved, else `git merge --no-ff feat/bg-tasks`; `just gate` on both runtimes on main; `REL=$(git rev-parse HEAD)`; `tasks note relay-fe38b1 "REL <sha>: gates <dev counts> / <node22 counts>"`. Later steps read `REL` from that note.
+- [ ] **Step 7: Integrate and fix `REL`.** In the main checkout: `git merge --ff-only feat/bg-tasks` when main has not moved, else `git merge --no-ff feat/bg-tasks`; `just gate` on both runtimes on main; `REL=$(git rev-parse HEAD)`. Then, from `.worktrees/bg-tasks` (where the task's claim lives, so the record commit lands on `feat/bg-tasks`, not main), `tasks note relay-fe38b1 "REL <sha>: gates <dev counts> / <node22 counts>"`. Later steps read `REL` from that note. From here on, record commits land on the branch while main stays at `REL` until Task 7.
 - [ ] **Step 8: Privacy review** over `v0.1.0..$REL` by the runbook (its pattern-file controls first; the range in place of `--all`, keeping `--diff-merges=first-parent`; gitleaks with `--log-opts="v0.1.0..$REL --diff-merges=first-parent"`). Expected: every row's expected result. Anything else: stop and report.
 - [ ] **Step 9: Rehearse `REL`** by the runbook's step 4 with tag `v0.1.1-rehearsal`, on both runtimes. Expected: `portability: pass` twice. Remove the scratch directory.
 - [ ] **Close the step**: `tasks done relay-665278 "<REL, gates, privacy review, rehearsal>"` on `feat/bg-tasks`.
@@ -181,7 +181,7 @@ Runs only on the user's explicit go-ahead for this task. The repository is alrea
 
 ### Task 7: Record the release and close out
 
-- [ ] **Step 1: Publication record.** On `feat/bg-tasks`, after `git merge --ff-only main`, append `### Publication record` to the v0.1.1 section: tag object sha, `REL`, push date, `REL`'s gate counts and privacy-review results (Task 5), and both runtimes' portability output verbatim. Commit: `docs(release): v0.1.1 publication record`.
+- [ ] **Step 1: Publication record.** On `feat/bg-tasks`, first `git merge main`. When main is still at `REL` this is a no-op; when main has moved, the branch and main have diverged (the branch holds the Task 5–6 record commits), so this is a normal merge: resolve any conflict, in a `tasks/*.md` record by keeping both sides' notes in time order, then `tasks check` and `just gate`. `REL` stays as recorded; nothing here retags or re-records it. Then append `### Publication record` to the v0.1.1 section: tag object sha, `REL`, push date, `REL`'s gate counts and privacy-review results (Task 5), and both runtimes' portability output verbatim. Commit: `docs(release): v0.1.1 publication record`.
 - [ ] **Step 2: Tell the consumer.** `tasks note fam-6e8321` with the pin `git+https://github.com/khughitt/relay.git#v0.1.1`, `REL`, the field `Agent.background: {agents, other}` (not `backgroundTasks`), and that consumer spec §8 and its parity test need that shape. If the note is refused (`stale_copy`: another session holds the task), give the same text to the user instead.
 - [ ] **Step 3: Close this step, then the task, on the branch**: `tasks done relay-74b012 "<publication record committed; consumer told>"`, then `tasks done relay-fe38b1 "<tag, REL, portability result>"`. The parent refuses while any step task is open; Tasks 1–6 each closed theirs in their last step, so check with `tasks list --parent relay-fe38b1` that only `relay-74b012` was open before this step.
 - [ ] **Step 4: Integrate and push**: fast-forward main (else `--no-ff` and `just gate`), privacy review over `"$REL"..main`, `git push origin main`. Task 6's go-ahead covers this push.
