@@ -1,13 +1,15 @@
 ---
 id: relay-fe38b1
 title: Carry Claude Code background tasks and reduce needs-input to idle while they run; release v0.1.1
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: planned
+owner: main
 created: 2026-10-19T09:56:30Z
-updated: 2026-10-19T09:56:30Z
+updated: 2026-10-19T13:18:44Z
+started: 2026-10-19T13:18:44Z
 depends: []
 tags: []
 source: fam-6e8321
@@ -19,3 +21,8 @@ Familiar's 0a9e0d7 (2026-10-07, after the extraction baseline) reduces Claude Co
 Scope: parse background_tasks (a list; count entries with status running; absent means not reported) from Stop and SubagentStop; carry it as an optional additive Agent.backgroundTasks, forwarded across events that do not report it; reduce needs-input to idle while it is above zero. Additive optional field keeps schema 2 (parent design §4); check tasks' Rust mirror of the validators (relay-4a5559) ignores it. Release as v0.1.1 by docs/runbooks/release.md.
 
 Consumer: familiar spec docs/specs/2026-10-19-relay-consumer-design.md §8 (accepted 2026-10-19); familiar's final pin-bump step waits on this release.
+
+## Notes
+
+- 2026-10-19T13:18:44Z (main): started
+  provenance: {"harness_session":"claude-code:0f09e241-608f-420b-abd4-4ce9eb9dee01","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
