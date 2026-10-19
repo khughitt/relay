@@ -1,6 +1,6 @@
 # Claude Code background work
 
-Status: approved by the user 2026-10-19 for implementation planning, after review rounds 1 (builder check: Stop refusal on a malformed list, observers read state from the row, measured type labels), 2 (optional reducer argument, exit-1 contract, idle-notice exceptions) and 3 (accept).
+Status: approved by the user 2026-10-19 for implementation planning, after review rounds 1 (builder check: Stop refusal on a malformed list, observers read state from the row, measured type labels), 2 (optional reducer argument, exit-1 contract, idle-notice exceptions) and 3 (accept). Implemented 2026-10-19 by docs/plans/2026-10-19-claude-background-work.md.
 Task: `relay-fe38b1`. Consumer: familiar `fam-6e8321`, spec
 `docs/specs/2026-10-19-relay-consumer-design.md` §8 (accepted 2026-10-19), whose last
 step pins the release this spec produces. Parent design: ops

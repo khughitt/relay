@@ -104,6 +104,20 @@ The acceptance criterion: no secrets, credentials, transcripts, registry or subs
 state, user paths outside `tasks/`, or private identities. Machine paths and host names
 in task notes are accepted, as in the public tasks and familiar repositories.
 
+## v0.1.1
+
+Claude Code background work is carried as `Agent.background: { agents, other }` and
+optional `Event.background` on Stop. Agent work in flight keeps Stop at `working`;
+other work turns the later idle prompt into `idle`. An unreadable report clears the
+counts and publishes with the non-blocking `BACKGROUND_UNREADABLE` diagnostic and
+exit 1. Spec: `docs/specs/2026-10-19-claude-background-work.md`; task: `relay-fe38b1`.
+Platform status and capability evidence are unchanged from v0.1.0.
+
+### Gates
+
+`just gate` on the release branch, 2026-10-19: 713 of 713 tests pass on
+Node 26.5.0 and 713 of 713 on Node 22.23.2, with strict checking clean on both.
+
 ## v0.1.0
 
 ### Platform status
