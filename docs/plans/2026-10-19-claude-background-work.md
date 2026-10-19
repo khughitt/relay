@@ -10,6 +10,8 @@
 
 **Spec:** `docs/specs/2026-10-19-claude-background-work.md` (approved by the user 2026-10-19 after three review rounds).
 
+**Status:** draft for user review, after plan review rounds 1 (strict-tsc comparisons, step-task closing order, entry readability rule, api.md anchors, OpenCode rejection) and 2 (accept).
+
 ## Global Constraints
 
 - Node >=22, ES modules and built-ins only; the one runtime dependency stays `jsonc-parser`.
