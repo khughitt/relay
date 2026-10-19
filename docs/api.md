@@ -148,6 +148,7 @@ type Adapter = {
   events: Readonly<Record<string, { kind: Event['kind']; level: State | null }>>;
   stateForEvent(nativeEvent: string): State | null;
   reduceState(level: State | null, previous: State | null): State | null;
+  backgroundOf?(data: Record<string, unknown>, nativeEvent: string): { agents: number; other: number } | null | undefined; // Claude Code only
   resolveSessionPid(options?: { startPid?: number; ancestors?: (pid: number) => ProcessRow[];
     executableOf?: (pid: number) => string; argvOf?: (pid: number) => string[] }): number | null;
   resolveTerminalPid(options?: { startPid?: number;
@@ -269,6 +270,15 @@ abort. Timestamps are sampled at write time, never derived from process start.
 | OpenCode | session.error | turn-error | error |
 | OpenCode | session.idle | idle | reduce against prior |
 | OpenCode | dispose | session-end | remove |
+
+Claude Code `Stop`'s optional `background_tasks` becomes `Event.background`.
+A readable report is an array of non-null, non-array objects with string `type` and
+`status`; no other entry fields are required. Entries with status `running` or `pending`
+count toward `agents` for types `subagent`, `workflow`, `teammate`, or `cloud session`,
+and toward `other` for every other type, including unmapped raw kinds. An empty list
+reports zero counts; an absent field reports nothing; any unreadable entry or list
+reports `null`. Only Claude Code `Stop` is read. `session_crons` is unread, and entry
+text (including descriptions and commands) is never copied into the event.
 
 Unlisted events fail; kind and level derive from one immutable table. Native input
 must supply a nonempty session_id, absolute cwd and optional boolean

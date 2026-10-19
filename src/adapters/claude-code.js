@@ -22,6 +22,21 @@ export function stateForEvent(event) {
 }
 /** @param {import("../types.js").State|null} level */
 export const reduceState = (level) => level;
+// Spec docs/specs/2026-10-19-claude-background-work.md: Claude Code 2.1.302 label map.
+const AGENT_TYPES = new Set(['subagent', 'workflow', 'teammate', 'cloud session']);
+const IN_FLIGHT = new Set(['running', 'pending']);
+/** @param {Record<string, any>} data @param {string} nativeEvent @returns {import("../types.js").Background|null|undefined} */
+export function backgroundOf(data, nativeEvent) {
+  if (nativeEvent !== 'Stop' || !Object.hasOwn(data, 'background_tasks')) return undefined;
+  const list = data.background_tasks;
+  if (!Array.isArray(list) || !list.every((entry) => entry !== null && typeof entry === 'object'
+      && !Array.isArray(entry) && typeof entry.type === 'string' && typeof entry.status === 'string')) return null;
+  const background = { agents: 0, other: 0 };
+  for (const entry of list) {
+    if (IN_FLIGHT.has(entry.status)) background[AGENT_TYPES.has(entry.type) ? 'agents' : 'other']++;
+  }
+  return background;
+}
 // Reply channels verified against the Claude hooks reference on 2026-09-17: PreToolUse,
 // UserPromptSubmit and Stop block; only the first two carry additionalContext.
 /** @type {Readonly<Record<string, import("../types.js").Capability>>} */
