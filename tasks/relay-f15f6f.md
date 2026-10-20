@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-14T22:36:05Z
-updated: 2026-10-20T02:07:49Z
+updated: 2026-10-20T02:07:50Z
 depends: []
 tags: [feedback, friction, "from:relay"]
 agent: claude-code/claude-opus-5-5
@@ -27,3 +27,4 @@ Where to look: justfile lines 17-50; ops templates/justfile lines 20, 59-72 and 
 - 2026-10-15T12:34:49Z (main): scope: drop; the ops front-door template has forwarded test-one arguments intact since 597989f (2026-09-28: set positional-arguments, sh -c '... "$@"' test-one "$@"), and 15 of 17 project test-one recipes use that form. The unquoted recipe is relay's own justfile:49-50 (test-one *args: node --test {{args}}, no set positional-arguments). obs's justfile:8-9 is also unquoted, and unwrapped by tt. Fix belongs to relay; proposal: move to relay with tasks move ops-418bcd --to relay (adopt the template's test-one form), or drop here naming relay as owner
 - 2026-10-15T12:37:17Z (main): moved from ops-418bcd
   provenance: {"harness_session":"claude-code:975fb220-f6ce-4fc5-b44f-6fba336111ae","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-20T02:07:50Z (main): scope: scoped; confirmed at a0945f1: justfile:49-50 still interpolates {{args}} without set positional-arguments, while the ops template (597989f) uses sh -c '... "$@"' test-one "$@"; rated xs/low/direct; title and body rewritten, original report and its ops-418bcd history kept in the body
