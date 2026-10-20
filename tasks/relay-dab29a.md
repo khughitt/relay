@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: planned
 created: 2026-10-19T09:56:33Z
-updated: 2026-10-20T02:08:17Z
+updated: 2026-10-20T02:08:19Z
 depends: []
 tags: [feedback, gap, "from:fam"]
 agent: claude-code/claude-opus-5-5
@@ -22,3 +22,7 @@ Decision the design gate settles: (a) the plugin recognises relay's own diagnost
 Done when: a failing observer under the OpenCode binding produces one plugin-log line carrying the event, SUBSCRIBER_FAILED and the subscriber name, and nothing from the subscriber's own output; integrations/opencode/hook.test.mjs and binding.test.mjs cover a failing observer, a skipped observer and a subscriber that prints a forged `SUBSCRIBER_FAILED:` line; docs/api.md's OpenCode paragraph says what the plugin log records.
 
 Where to look: integrations/opencode/hook.js, queue.js, binding.js (logError); src/dispatch.js runObservers; bin/relay.js line 154 (how diagnostics reach stderr); docs/plans/2026-09-17-extraction.md Phase 5.
+
+## Notes
+
+- 2026-10-20T02:08:19Z (main): scope: scoped (planned); confirmed at a0945f1: hook.js counts stderr bytes and discards them, queue.js logs a sanitized code only on hook rejection, and dispatch.js exits 0 on observer failure by the release contract; the open decision (parse relay's own stderr lines vs a structured diagnostics channel) is framed in the body for the design gate, lean (a); rated s/mid/planned; title and body rewritten, original report kept in the body
