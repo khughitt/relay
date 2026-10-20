@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-20T01:45:38Z
-updated: 2026-10-20T02:07:08Z
+updated: 2026-10-20T02:07:10Z
 depends: []
 tags: [feedback, friction, "from:hq"]
 agent: codex
@@ -20,3 +20,7 @@ Report (hq, friction): Two package smoke tests assume npm pack --json returns an
 Done when: one helper in test/pack.test.js takes the parsed `npm pack --json` output and returns its single entry whichever shape it has (an array's first element, or the one value of a name-keyed object), asserting exactly one entry; all four call sites use it; and `just test-fast` passes under both npm 11 (the nvm node's npm) and npm 12 (`PATH=/usr/bin:$PATH`). Name both runs in the done message.
 
 Where to look: test/pack.test.js; npm/cli#9247 for the upstream change; docs/api.md "Local tarball smoke tests" paragraph if the wording should name the npm range.
+
+## Notes
+
+- 2026-10-20T02:07:10Z (main): scope: scoped; confirmed against npm/cli#9247 (npm 12.0.0 breaking change) and a local dry run under /usr/bin/npm 12.2.1 (name-keyed object) vs nvm npm 11.17.0 (array); all four pack --json reads in test/pack.test.js index [0]; rated xs/low/direct; title and body rewritten, original report kept in the body
