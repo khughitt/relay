@@ -1,10 +1,13 @@
 ---
 id: relay-cfd24b
 title: "claude-code adapter: resolveTerminalPid matches only comm 'claude', while isHarness also accepts the native installer's versioned binary, so a session launched by its real path has no resolvable terminal"
-status: idea
+status: todo
 priority: 2
+size: s
+complexity: mid
+process: direct
 created: 2026-10-22T11:53:17Z
-updated: 2026-10-22T11:53:17Z
+updated: 2026-10-22T17:59:01Z
 depends: []
 tags: [feedback, friction, "from:hq"]
 agent: claude-code
