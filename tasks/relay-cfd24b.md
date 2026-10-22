@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/terminal-version-binary
 created: 2026-10-22T11:53:17Z
-updated: 2026-10-22T18:06:24Z
+updated: 2026-10-22T18:07:34Z
 started: 2026-10-22T17:59:03Z
 depends: []
 tags: [feedback, friction, "from:hq"]
@@ -25,3 +25,4 @@ Observed with relay v0.1.1 and Claude Code 2.1.304 on Linux. When Claude Code is
 - 2026-10-22T17:59:15Z (fix/terminal-version-binary): resumed
   provenance: {"harness_session":"claude-code:dcd3ea42-060c-46b1-b295-eae716432110","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-22T18:06:24Z (fix/terminal-version-binary): review: impl round 1 — verdict: accept; findings: Critical 0, Important 0, Minor 6; reviewer: claude-code/claude-opus-5-5
+- 2026-10-22T18:07:34Z (fix/terminal-version-binary): follow-up: familiar passes the new readers on upgrade (fam-bf283d)
