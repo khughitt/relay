@@ -73,11 +73,12 @@ export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) =>
 }
 // A session started by its versioned path is named after its version, as a background
 // session is. The background session's terminal belongs to its bg-pty-host parent and
-// displays nothing, so a versioned process is a terminal only when that is not its parent.
+// displays nothing, so a versioned process is a terminal only when its parent holds no
+// hosting role.
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid),
   executableOf = (pid) => ops().executableOf(pid), argvOf = (pid) => ops().argvOf(pid) } = {}) {
   const chain = ancestors(startPid);
   return nearestTerminalPid(chain, (row, index) => row.comm === 'claude' || (isHarness(row, { executableOf })
-    && (index + 1 === chain.length || argvOf(chain[index + 1].pid)[1] !== 'bg-pty-host')));
+    && (index + 1 === chain.length || !ROLES.includes(argvOf(chain[index + 1].pid)[1]))));
 }

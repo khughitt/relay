@@ -21,7 +21,7 @@
       "rows": [
         { "pid": 900, "ppid": 800, "comm": "node", "tty": null, "exe": null, "argv": null },
         { "pid": 800, "ppid": 790, "comm": "2.1.280", "tty": true, "exe": "/home/user/.local/share/claude/versions/2.1.280", "argv": ["/home/user/.local/share/claude/versions/2.1.280", "--session-id", "9a2732d5-47a7-432b-a3c7-3f7bc08ac4f1"] },
-        { "pid": 790, "ppid": 780, "comm": "2.1.280", "tty": null, "exe": "/home/user/.local/share/claude/versions/2.1.280", "argv": ["claude", "bg-pty-host", "--bg-pty-host", "/tmp/cc/pty/9a2732d5.sock"] },
+        { "pid": 790, "ppid": 780, "comm": "2.1.280", "tty": null, "exe": null, "argv": ["claude", "bg-pty-host"] },
         { "pid": 780, "ppid": 700, "comm": "claude", "tty": null, "exe": null, "argv": null },
         { "pid": 700, "ppid": 1, "comm": "systemd", "tty": null, "exe": null, "argv": null } ],
       "session": 800, "terminal": null },

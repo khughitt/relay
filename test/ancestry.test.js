@@ -30,6 +30,22 @@ test('unreadable executable or arguments of the process under test is an error, 
   const plain = () => [{ pid: 5, comm: 'node', tty: null }, { pid: 3, comm: 'claude', tty: true }];
   assert.throws(() => claude.resolveSessionPid({ ancestors: plain, executableOf: unreadable, argvOf: unreadable }), { code: 'PROCESS_UNREADABLE' });
 });
+test('the terminal walk surfaces an unreadable executable or parent arguments, never a skip', () => {
+  const claude = adapterFor('claude-code');
+  const unreadable = () => { throw Object.assign(new Error('denied'), { code: 'PROCESS_UNREADABLE' }); };
+  const exe = () => '/home/user/.local/share/claude/versions/2.1.304';
+  const chain = () => [{ pid: 5, comm: 'node', tty: null }, { pid: 4, comm: '2.1.304', tty: true }, { pid: 3, comm: 'zsh', tty: true }];
+  assert.throws(() => claude.resolveTerminalPid({ ancestors: chain, executableOf: unreadable, argvOf: () => ['zsh'] }), { code: 'PROCESS_UNREADABLE' });
+  assert.throws(() => claude.resolveTerminalPid({ ancestors: chain, executableOf: exe, argvOf: unreadable }), { code: 'PROCESS_UNREADABLE' });
+});
+test('a terminal-owning version process is the terminal unless its parent holds a hosting role', () => {
+  const claude = adapterFor('claude-code');
+  const exe = () => '/home/user/.local/share/claude/versions/2.1.304';
+  const under = (parent) => () => [{ pid: 5, comm: 'node', tty: null }, { pid: 4, comm: '2.1.304', tty: true }, ...parent];
+  const argvOf = (pid) => ({ 3: ['claude', 'daemon', 'run'] })[pid] ?? (() => { throw new Error(`argv of ${pid} must not be read`); })();
+  assert.equal(claude.resolveTerminalPid({ ancestors: under([]), executableOf: exe, argvOf }), 4, 'parent outside the chain');
+  assert.equal(claude.resolveTerminalPid({ ancestors: under([{ pid: 3, comm: 'claude', tty: null }]), executableOf: exe, argvOf }), null, 'daemon parent');
+});
 test('an empty cmdline on the nearest Claude process is no role, so its pid is published', () => {
   const chain = () => [{ pid: 5, comm: 'node', tty: null }, { pid: 3, comm: 'claude', tty: null }];
   assert.equal(adapterFor('claude-code').resolveSessionPid({ ancestors: chain, executableOf: () => { throw new Error('not read'); }, argvOf: () => [] }), 3);

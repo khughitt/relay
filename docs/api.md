@@ -213,7 +213,7 @@ ends in `/claude/versions/<comm>`), with no terminal requirement, and yields nul
 there is none or when the nearest Claude Code process has `argv[1]` `daemon` or
 `bg-pty-host`. `resolveTerminalPid` takes the nearest ancestor after index zero that owns
 a terminal and whose `comm` is the harness name; for Claude Code, a version-binary
-process that owns a terminal also qualifies unless its parent has `argv[1]`
+process that owns a terminal also qualifies unless its parent has `argv[1]` `daemon` or
 `bg-pty-host` (a background session, whose terminal belongs to its host). `executableOf`
 is read only for a version-shaped `comm`, and `argvOf` only for the nearest Claude Code
 process and, in the terminal walk, the parent of a version-binary process that owns a
