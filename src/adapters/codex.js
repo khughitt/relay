@@ -59,5 +59,5 @@ export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) =>
 }
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
-  return nearestTerminalPid(ancestors(startPid), 'codex');
+  return nearestTerminalPid(ancestors(startPid), (row) => row.comm === 'codex');
 }

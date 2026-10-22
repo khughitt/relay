@@ -34,7 +34,7 @@ export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) =>
 }
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
-  return nearestTerminalPid(ancestors(startPid), 'opencode');
+  return nearestTerminalPid(ancestors(startPid), (row) => row.comm === 'opencode');
 }
 // The server plugin observes only; its spawnHook lifetime is five seconds.
 /** @type {Readonly<Record<string, import("../types.js").Capability>>} */

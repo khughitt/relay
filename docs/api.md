@@ -152,8 +152,8 @@ type Adapter = {
   backgroundOf?(data: Record<string, unknown>, nativeEvent: string): { agents: number; other: number } | null | undefined; // Claude Code only
   resolveSessionPid(options?: { startPid?: number; ancestors?: (pid: number) => ProcessRow[];
     executableOf?: (pid: number) => string; argvOf?: (pid: number) => string[] }): number | null;
-  resolveTerminalPid(options?: { startPid?: number;
-    ancestors?: (pid: number) => ProcessRow[] }): number | null;
+  resolveTerminalPid(options?: { startPid?: number; ancestors?: (pid: number) => ProcessRow[];
+    executableOf?: (pid: number) => string; argvOf?: (pid: number) => string[] }): number | null;
 };
 type ReadOptions = ClockOptions & { paths?: Paths; processOps?: ProcessOps };
 type MutationOptions = ReadOptions & {
@@ -211,10 +211,13 @@ normalization is required for ancestor resolution, independently of process proo
 the harness (Claude Code: `comm` `claude`, or a version-shaped `comm` whose executable
 ends in `/claude/versions/<comm>`), with no terminal requirement, and yields null when
 there is none or when the nearest Claude Code process has `argv[1]` `daemon` or
-`bg-pty-host`. `resolveTerminalPid` keeps the measured predicate: the nearest ancestor
-after index zero whose `comm` is the harness name and which owns a terminal.
-`executableOf` is read only for a version-shaped `comm` and `argvOf` only for the
-nearest Claude Code process; an unreadable one is `PROCESS_UNREADABLE`. The shared
+`bg-pty-host`. `resolveTerminalPid` takes the nearest ancestor after index zero that owns
+a terminal and whose `comm` is the harness name; for Claude Code, a version-binary
+process that owns a terminal also qualifies unless its parent has `argv[1]`
+`bg-pty-host` (a background session, whose terminal belongs to its host). `executableOf`
+is read only for a version-shaped `comm`, and `argvOf` only for the nearest Claude Code
+process and, in the terminal walk, the parent of a version-binary process that owns a
+terminal; an unreadable one is `PROCESS_UNREADABLE`. The shared
 chains are `relay/fixtures/ancestry.json`.
 A hook PID or shell session ID is never substituted for a missing harness process.
 

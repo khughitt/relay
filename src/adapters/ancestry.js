@@ -14,7 +14,8 @@ export function nearestSessionPid(chain, { isHarness, roles = [], argvOf }) {
   if (roles.length > 0 && roles.includes((/** @type {(pid: number) => string[]} */ (argvOf))(nearest.pid)[1])) return null;
   return nearest.pid;
 }
-/** @param {import("../types.js").ProcessRow[]} chain @param {string} comm */
-export function nearestTerminalPid(chain, comm) {
-  return chain.find((row, index) => index > 0 && row.comm === comm && row.tty !== null)?.pid ?? null;
+// The predicate sees only processes that own a terminal, so any read it makes is gated by it.
+/** @param {import("../types.js").ProcessRow[]} chain @param {(row: import("../types.js").ProcessRow, index: number) => boolean} isTerminal */
+export function nearestTerminalPid(chain, isTerminal) {
+  return chain.find((row, index) => index > 0 && row.tty !== null && isTerminal(row, index))?.pid ?? null;
 }

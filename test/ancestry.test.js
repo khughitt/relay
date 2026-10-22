@@ -19,7 +19,7 @@ for (const chain of corpus.chains) {
     };
     const startPid = chain.rows[0].pid;
     assert.equal(adapter.resolveSessionPid({ startPid, ancestors, executableOf: gated('exe'), argvOf: gated('argv') }), chain.session, 'session');
-    assert.equal(adapter.resolveTerminalPid({ startPid, ancestors }), chain.terminal, 'terminal');
+    assert.equal(adapter.resolveTerminalPid({ startPid, ancestors, executableOf: gated('exe'), argvOf: gated('argv') }), chain.terminal, 'terminal');
   });
 }
 test('unreadable executable or arguments of the process under test is an error, never a skip', () => {

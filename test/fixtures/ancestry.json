@@ -21,7 +21,7 @@
       "rows": [
         { "pid": 900, "ppid": 800, "comm": "node", "tty": null, "exe": null, "argv": null },
         { "pid": 800, "ppid": 790, "comm": "2.1.280", "tty": true, "exe": "/home/user/.local/share/claude/versions/2.1.280", "argv": ["/home/user/.local/share/claude/versions/2.1.280", "--session-id", "9a2732d5-47a7-432b-a3c7-3f7bc08ac4f1"] },
-        { "pid": 790, "ppid": 780, "comm": "2.1.280", "tty": null, "exe": null, "argv": null },
+        { "pid": 790, "ppid": 780, "comm": "2.1.280", "tty": null, "exe": "/home/user/.local/share/claude/versions/2.1.280", "argv": ["claude", "bg-pty-host", "--bg-pty-host", "/tmp/cc/pty/9a2732d5.sock"] },
         { "pid": 780, "ppid": 700, "comm": "claude", "tty": null, "exe": null, "argv": null },
         { "pid": 700, "ppid": 1, "comm": "systemd", "tty": null, "exe": null, "argv": null } ],
       "session": 800, "terminal": null },
@@ -32,6 +32,13 @@
         { "pid": 500, "ppid": 400, "comm": "claude", "tty": true, "exe": null, "argv": null },
         { "pid": 400, "ppid": 1, "comm": "zsh", "tty": true, "exe": null, "argv": null } ],
       "session": 600, "terminal": 500 },
+    { "name": "version-binary-interactive", "source": "measured 2026-10-22, Claude Code 2.1.304 started by its versioned path", "harness": "claude-code",
+      "rows": [
+        { "pid": 610, "ppid": 600, "comm": "node", "tty": null, "exe": null, "argv": null },
+        { "pid": 600, "ppid": 400, "comm": "2.1.304", "tty": true, "exe": "/home/user/.local/share/claude/versions/2.1.304", "argv": ["/home/user/.local/share/claude/versions/2.1.304"] },
+        { "pid": 400, "ppid": 300, "comm": "zsh", "tty": true, "exe": null, "argv": ["/bin/zsh"] },
+        { "pid": 300, "ppid": 1, "comm": "kitty", "tty": null, "exe": null, "argv": null } ],
+      "session": 600, "terminal": 600 },
     { "name": "nested-headless-claude", "source": "measured 2026-09-23, claude -p inside an interactive session", "harness": "claude-code",
       "rows": [
         { "pid": 700, "ppid": 690, "comm": "node", "tty": null, "exe": null, "argv": null },
