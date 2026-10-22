@@ -69,10 +69,19 @@ walk never continues past the nearest harness process. A borrowed pid is worse t
 which the parent design already requires ("must not borrow the hook PID or a
 terminal-session PID and call it the agent").
 
-**Terminal process** (familiar's paint target): the existing measured predicate,
-unchanged: the nearest ancestor whose `comm` is the harness name and which owns a
-terminal. Relay keeps exporting it, because familiar's observers run under the relay hook
+**Terminal process** (familiar's paint target): the existing measured predicate, the
+nearest ancestor whose `comm` is the harness name and which owns a terminal (extended for
+Claude Code by the amendment below). Relay keeps exporting it, because familiar's observers run under the relay hook
 and inherit the same ancestry. Relay itself no longer calls it.
+
+Amended 2026-10-22 (relay-cfd24b): a session started through its versioned executable
+rather than the `claude` link is named after its version, owns the terminal, and was
+missed. For Claude Code the terminal predicate also accepts a version-binary process that
+owns a terminal, unless its parent holds a non-session role (below): a background
+session's terminal is the pty its `bg-pty-host` allocated, which nothing displays, and a
+daemon parent is unmeasured, so it fails closed. The chain `version-binary-interactive`
+measures the first shape; `background-under-systemd`, whose host row now carries its
+measured `argv` prefix, holds the second at null.
 
 Rejected: keep the terminal predicate for the handle and add a daemon exclusion by
 command line, publishing null for every other terminal-less harness process. That fixes
@@ -114,9 +123,10 @@ the walk would otherwise land on them:
 | `bg-pty-host` | the pty host of one background session |
 
 When the nearest Claude Code process has one of these roles, the result is null with the
-existing `PROCESS_UNAVAILABLE` diagnostic. The arguments are read for that one process
-only: Linux `/proc/<pid>/cmdline`, which keeps argument boundaries; Darwin `ps -p <pid>
--o args=`, which joins arguments with spaces and so cannot. On Darwin, argv[0] is located
+existing `PROCESS_UNAVAILABLE` diagnostic. The session walk reads the arguments of that
+one process only, and the terminal walk those of the parent of a terminal-owning
+version-binary process: Linux `/proc/<pid>/cmdline`, which keeps argument boundaries;
+Darwin `ps -p <pid> -o args=`, which joins arguments with spaces and so cannot. On Darwin, argv[0] is located
 by the `comm` column, which is argv[0] itself, so a home directory with a space in it
 cannot shift `argv[1]`; when `args` does not start with `comm`, the read is
 `PROCESS_UNREADABLE` and the handle null. Later arguments are split
@@ -134,8 +144,8 @@ type Adapter = {
   // …events, stateForEvent, reduceState unchanged
   resolveSessionPid(options?: { startPid?: number; ancestors?: (pid: number) => ProcessRow[];
     executableOf?: (pid: number) => string; argvOf?: (pid: number) => string[] }): number | null;
-  resolveTerminalPid(options?: { startPid?: number;
-    ancestors?: (pid: number) => ProcessRow[] }): number | null;
+  resolveTerminalPid(options?: { startPid?: number; ancestors?: (pid: number) => ProcessRow[];
+    executableOf?: (pid: number) => string; argvOf?: (pid: number) => string[] }): number | null;
 };
 ```
 
@@ -258,7 +268,8 @@ in familiar changes now.
 - `ancestry.json` chains, each asserting both lookups: interactive Claude (session =
   terminal = `claude`); spike background shape (session = the `2.1.207` process,
   terminal = the depth-4 `claude`; its `exe` reconstructed from the spike's recorded command line); 2.1.280 background shape under systemd (session =
-  `2.1.280`, terminal = null); nested `claude -p` (session = nested `claude`, terminal =
+  `2.1.280`, terminal = null); an interactive session started by its versioned path
+  (session = terminal = the `2.1.304` process, added 2026-10-22); nested `claude -p` (session = nested `claude`, terminal =
   outer `claude`); a chain whose nearest Claude process is `daemon` and one that is
   `bg-pty-host` (session = null); standalone `codex exec` (session = `codex`, terminal =
   null); interactive Codex; the three Darwin chains unchanged.
