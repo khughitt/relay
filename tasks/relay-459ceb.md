@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-24T15:44:19Z
-updated: 2026-10-24T15:46:14Z
+updated: 2026-10-24T15:46:17Z
 depends: []
 tags: []
 source: relay-8d8e86
@@ -21,3 +21,4 @@ The completed detached-ask implementation keeps four exact RED-test logs off-tre
 - 2026-10-24T15:46:11Z (main): Created on titan: $WORK_ROOT/relay/relay-8d8e86 and raw-red-evidence for exact RED-test logs refused by the layout gate; owned by relay-459ceb; contents mutable, not yet checkpointed.
 - 2026-10-24T15:46:12Z (main): Portable derivative mapping for raw-red-evidence: <WORK_ROOT> = /mnt/ssd3/work; <HOME> = /home/keith. Exact raw files are unchanged; derivatives are attached to relay-8d8e86.
 - 2026-10-24T15:46:14Z (main): retained: {"host": "titan", "kind": "evidence", "path": "$WORK_ROOT/relay/relay-8d8e86/raw-red-evidence", "state": "kept", "verification": "verified", "purpose": "Exact raw RED logs retained after layout refusal; portable derivatives attached to completed implementation task", "next_owner": "task:relay-459ceb", "cleanup_trigger": "A shipped executing checker accepts these ledger-backed raw attachments; verify hashes, attach originals normally, then reassess copies", "manifest": "$WORK_ROOT/relay/relay-8d8e86/raw-red-evidence/sha256-manifest.json", "sha256": "39eb9312654f82d63bff1f9d04c82ec94b7345a923bb75fe319c53ca06e81840"}
+- 2026-10-24T15:46:17Z (main): retained: {"host": "titan", "kind": "scratch", "path": "$WORK_ROOT/relay/relay-8d8e86", "state": "kept", "verification": "verified", "purpose": "Exact raw RED logs retained after layout refusal; portable derivatives attached to completed implementation task", "next_owner": "task:relay-459ceb", "cleanup_trigger": "A shipped executing checker accepts these ledger-backed raw attachments; verify hashes, attach originals normally, then reassess copies", "manifest": "$WORK_ROOT/relay/relay-8d8e86/sha256-manifest.json", "sha256": "21d08290083a8bd9b337ba4fc0c4f30bcd58dc070bf43234ed98f3baa4461de6"}
