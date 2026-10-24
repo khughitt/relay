@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-24T15:44:19Z
-updated: 2026-10-24T15:47:24Z
+updated: 2026-10-24T16:13:27Z
 depends: []
 tags: []
 source: relay-8d8e86
@@ -24,3 +24,4 @@ The completed detached-ask implementation keeps four exact RED-test logs off-tre
 - 2026-10-24T15:46:17Z (main): retained: {"host": "titan", "kind": "scratch", "path": "$WORK_ROOT/relay/relay-8d8e86", "state": "kept", "verification": "verified", "purpose": "Exact raw RED logs retained after layout refusal; portable derivatives attached to completed implementation task", "next_owner": "task:relay-459ceb", "cleanup_trigger": "A shipped executing checker accepts these ledger-backed raw attachments; verify hashes, attach originals normally, then reassess copies", "manifest": "$WORK_ROOT/relay/relay-8d8e86/sha256-manifest.json", "sha256": "21d08290083a8bd9b337ba4fc0c4f30bcd58dc070bf43234ed98f3baa4461de6"}
 - 2026-10-24T15:47:24Z (main): Raw evidence retained until a shipped executing checker admits ledger-backed host paths; then verify manifests and attach originals normally. Design completion alone is not the trigger.
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T16:13:27Z (main): Related policy/remedy work: ops-941e4f designs the attachment exemption; its own task explicitly says design completion does not unblock raw-evidence cleanup. Keep the actual shipped-checker acceptance trigger recorded here.
