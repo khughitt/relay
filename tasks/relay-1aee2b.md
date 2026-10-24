@@ -1,13 +1,15 @@
 ---
 id: relay-1aee2b
 title: Persist detached consumption and stale refusal history
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: feat/detached-ask
 created: 2026-10-24T14:50:01Z
-updated: 2026-10-24T15:06:42Z
+updated: 2026-10-24T15:06:47Z
+started: 2026-10-24T15:06:47Z
 depends: []
 parent: relay-8d8e86
 tags: []
@@ -22,4 +24,6 @@ Implement plan Task 1: pure detached take, no native receipt or asker-loss path,
 ## Notes
 
 - 2026-10-24T14:50:24Z (feat/detached-ask): Implementation plan awaits user approval; unblock at execution Setup.
+  provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T15:06:47Z (feat/detached-ask): started
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
