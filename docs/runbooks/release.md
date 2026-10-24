@@ -104,6 +104,36 @@ The acceptance criterion: no secrets, credentials, transcripts, registry or subs
 state, user paths outside `tasks/`, or private identities. Machine paths and host names
 in task notes are accepted, as in the public tasks and familiar repositories.
 
+## v0.2.0
+
+Adds detached inbox questions: `relay inbox ask --file PATH` durably posts an
+agent's question in either presence mode, and `relay inbox take ID` consumes its
+saved answer without a native handoff. Repeated take returns the same entry.
+Detached questions survive asker loss and connection close; they expire no later
+than seven days after creation. A saved answer remains takeable as undeliverable.
+The service records stale revision refusals without retaining rejected answer
+content. Identical refused retries each add a history row; those rows cannot
+identify unique answers or surfaces.
+
+The store now persists `take` transitions and `refusal:STALE` attempts. Older
+binaries may reject and quarantine entries containing those histories. Binary
+downgrade against such a store is not safe; use a version that understands them.
+Taking an undeliverable answer restarts its 30-day terminal retention window;
+idempotent take does not. See `docs/api.md` and
+`docs/runbooks/inbox-service.md` for the contracts and recovery guidance.
+
+Also includes the Claude Code terminal-parent fixes for sessions launched by a
+versioned executable path and for hosting processes that are not terminal parents.
+Platform status and capability evidence remain as recorded for v0.1.0; this release
+does not establish new live harness or Darwin acceptance.
+
+### Publication status
+
+Prepared for release verification. The immutable annotated `v0.2.0` tag, frozen
+commit, runtime gate counts, privacy review and installation results will be
+recorded after verification. Publication requires the user's approval; no live
+installation or service changes belong to this release task.
+
 ## v0.1.1
 
 Claude Code background work is carried as `Agent.background: { agents, other }` and
