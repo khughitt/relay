@@ -127,12 +127,60 @@ versioned executable path and for hosting processes that are not terminal parent
 Platform status and capability evidence remain as recorded for v0.1.0; this release
 does not establish new live harness or Darwin acceptance.
 
-### Publication status
+### Publication record
 
-Prepared for release verification. The immutable annotated `v0.2.0` tag, frozen
-commit, runtime gate counts, privacy review and installation results will be
-recorded after verification. Publication requires the user's approval; no live
-installation or service changes belong to this release task.
+| Item | Value |
+| --- | --- |
+| Tag | `v0.2.0`, annotated, tag object `03a0983187d7088c9486c510bf1277f426e9ff9a` |
+| Release commit (`REL`) | `067c63921602e694682d47bdb2412862359c75ff` |
+| Pushed | 2026-10-24, after user approval: main `5a0638d..067c639`, then the tag. Remote main and the peeled tag both equalled `REL`; only main, v0.1.0, v0.1.1 and v0.2.0 were present. |
+| Consumer pin | `git+https://github.com/khughitt/relay.git#v0.2.0` |
+| Runtime adoption | `hq-536849`; no live installation or service change in this release task. |
+
+- **Gates at `REL`.** `just gate` passed 739 of 739 tests on Node 26.5.0 and
+  739 of 739 on Node 22.23.2, with strict checking clean on both. Both pre-push
+  hooks also passed 739 of 739 on Node 26.5.0. The hydrated baseline and fast
+  suite each passed 739 of 739.
+- **Privacy review at `REL`** (`v0.1.1..REL`, including first-parent merge diffs).
+  Four real path patterns and two private terms passed the nonblank/non-root and
+  source-match controls. gitleaks scanned 146 commits and found no leaks. No state
+  or transcript filenames; one maintainer author address; machine paths 0; private
+  identities 0; published pre-images 0. No optional work-host file was used,
+  following the earlier releases' recorded decision.
+- **Rehearsal at `REL`.** A local annotated rehearsal tag passed git installation,
+  manifest/lockfile, installed-package smoke and empty-cache `npm ci` on both
+  runtimes. The regenerable bare rehearsal clone was removed.
+- **Independent release review.** Accepted without findings by codex/gpt-6.1-sol
+  at `REL`. Prior implementation correctness and new live harness/Darwin
+  acceptance were outside that review; runtime and privacy evidence were checked
+  by the controller. Full review and rulings are attached to `relay-adb97d`.
+- **Portability against the public tag.** Anonymous HTTPS installation and
+  empty-cache `npm ci` passed on both runtimes. SSH, credentials and host npm/git
+  configuration were excluded by the portability tool. The verbatim outputs follow.
+
+Node 26.5.0 (npm 11):
+
+```text
+ok reach: 03a0983187d7088c9486c510bf1277f426e9ff9a	refs/tags/v0.2.0
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.2.0
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.2.0
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#067c63921602e694682d47bdb2412862359c75ff; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
+
+Node 22.23.2 (npm 10.9.8):
+
+```text
+ok reach: 03a0983187d7088c9486c510bf1277f426e9ff9a	refs/tags/v0.2.0
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.2.0
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.2.0
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#067c63921602e694682d47bdb2412862359c75ff; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
 
 ## v0.1.1
 
