@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:47:13Z
+updated: 2026-10-24T15:47:15Z
 started: 2026-10-24T13:58:59Z
 completed: 2026-10-24T15:39:12Z
 closed: 2026-10-24T15:39:12Z
@@ -87,3 +87,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:46:15Z (main): retained: {"host": "titan", "kind": "evidence", "path": "$WORK_ROOT/relay/relay-8d8e86/raw-red-evidence", "state": "kept", "verification": "verified", "purpose": "Exact raw RED logs retained after layout refusal; portable derivatives attached to completed implementation task", "next_owner": "task:relay-459ceb", "cleanup_trigger": "A shipped executing checker accepts these ledger-backed raw attachments; verify hashes, attach originals normally, then reassess copies", "manifest": "$WORK_ROOT/relay/relay-8d8e86/raw-red-evidence/sha256-manifest.json", "sha256": "39eb9312654f82d63bff1f9d04c82ec94b7345a923bb75fe319c53ca06e81840"}
 - 2026-10-24T15:47:12Z (main): detached: task-1-red.log: Exact raw bytes preserved under relay-459ceb; replace layout-refused attachment with a portable derivative
 - 2026-10-24T15:47:13Z (main): detached: task-2-inbox-red.log: Exact raw bytes preserved under relay-459ceb; replace layout-refused attachment with a portable derivative
+- 2026-10-24T15:47:15Z (main): detached: task-2-socket-red.log: Exact raw bytes preserved under relay-459ceb; replace layout-refused attachment with a portable derivative
