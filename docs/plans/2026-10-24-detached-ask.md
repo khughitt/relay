@@ -183,8 +183,9 @@ version; do not replace a shared launcher or install a runtime as a fallback.
 
 - [ ] **Step 4: Verify GREEN and commit.** Rerun the focused command, then
   `just test-fast`, `just check`, `git diff --check`. All must exit 0 with actual
-  tests selected. Close this child task and commit its code/tests with
-  `feat: persist detached question consumption and stale refusals`.
+  tests selected. Commit its code/tests with
+  `feat: persist detached question consumption and stale refusals`, then close
+  this child task with the commit and verification evidence.
 
 ### Task 2: Route detached questions through the service and private socket
 
@@ -302,8 +303,9 @@ test `test/serve-inbox.test.js`, `test/serve-socket.test.js`,
   typed response. Expected: all selected tests pass and strict checking exits 0.
 
 - [ ] **Step 5: Verify and commit.** Run the Task 2 focused files together,
-  `just test-fast`, `just check`, and `git diff --check`. Close the child and
-  commit with `feat: serve detached inbox questions and explicit take`.
+  `just test-fast`, `just check`, and `git diff --check`. Commit with
+  `feat: serve detached inbox questions and explicit take`, then close the child
+  with the commit and verification evidence.
 
 ### Task 3: Expose detached asks and receipt through the CLI
 
@@ -404,13 +406,15 @@ test `test/serve-inbox.test.js`, `test/serve-socket.test.js`,
   counting, and older-reader quarantine risk. Verify the packaged schema still
   accepts existing native-null messages and needs no format change.
   Rerun focused CLI tests, then `just test-fast`, `just check`, `git diff --check`.
-  Close the child and commit with `feat: add detached inbox ask and take commands`.
+  Commit with `feat: add detached inbox ask and take commands`; keep the child
+  open through the whole-branch gates in Step 5.
 
 - [ ] **Step 5: Verify the whole branch and hand it to review.** Run `just gate`
   on the development runtime and `PATH="<node 22 bin>:$PATH" just gate` on the
   installed floor. Record versions, commands and actual counts. Use only the
   worktree executable in any further smoke test. No live service is required.
-  Dispatch the independent whole-branch review required by executing-plans;
+  Once both gates pass, close this child with the code commit and verification
+  evidence. Dispatch the independent whole-branch review required by executing-plans;
   persist its full report and note the review before acting. Apply the repository's
   corrective-round and ruling rules to findings. Complete the parent task only
   after verification/review, on this branch before local integration. A local
