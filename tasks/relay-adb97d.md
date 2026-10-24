@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.2.0
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:34:37Z
+updated: 2026-10-24T16:35:01Z
 started: 2026-10-24T16:20:18Z
 depends: [relay-8d8e86]
 tags: []
@@ -58,3 +58,4 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
 - 2026-10-24T16:34:34Z (release/v0.2.0): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/relay/relay-adb97d/evidence","state":"released","verification":"verified","purpose":"Retention ownership transferred to hq-536849, whose task notes record the verified manifest; files remain at this path","next_owner":"none","cleanup_trigger":"none"}
 - 2026-10-24T16:34:35Z (release/v0.2.0): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/relay/relay-adb97d","state":"released","verification":"verified","purpose":"Retention ownership transferred to hq-536849, whose task notes record the verified manifest; files remain at this path","next_owner":"none","cleanup_trigger":"none"}
 - 2026-10-24T16:34:37Z (release/v0.2.0): retained: {"host":"titan","kind":"worktree","path":".worktrees/release-v0.2.0","state":"kept","verification":"verified","purpose":"Immediate local integration of the closed release record followed by checked removal","next_owner":"session:codex:01a16eb5-aa54-7053-9184-86423a7ca4e4","cleanup_trigger":"After done is committed, fast-forward local main, check ignored files and host pointers, then remove this task worktree"}
+- 2026-10-24T16:35:01Z (release/v0.2.0): Final integration gate: just gate on Node26.5.0 passed strict checking and 739/739 tests after the publication record update. No deferred minors. Worktree removal inventory: only ignored node_modules/ (regenerable via just setup); no submodules or plan workspaces. tt-report ran. Launcher/user-unit and known-config checks found no pointer into this worktree; no host pointer was changed. Raw release provenance ownership transferred to open hq-536849 with verified evidence/scratch manifests; the portable preflight placeholder <RELEASE_SCRATCH> denotes $WORK_ROOT/relay/relay-adb97d. Close on this branch, fast-forward local main, then remove only this task worktree. Post-publication evidence/record commits remain local, outside the approved frozen-REL push.
