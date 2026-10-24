@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.2.0
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:34:31Z
+updated: 2026-10-24T16:34:34Z
 started: 2026-10-24T16:20:18Z
 depends: [relay-8d8e86]
 tags: []
@@ -55,3 +55,4 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
 - 2026-10-24T16:32:47Z (release/v0.2.0): Published approved immutable annotated v0.2.0 (tag object 03a0983187d7088c9486c510bf1277f426e9ff9a) at REL=067c63921602e694682d47bdb2412862359c75ff. Remote main and peeled tag equal REL; only main/v0.1.0/v0.1.1/v0.2.0 exist. Both pre-push gates passed 739/739. Anonymous public-tag portability passed on Node26.5.0 and Node22.23.2, including exact lock resolution, installed-package smoke and empty-cache npm ci. No live runtime changes.
 - 2026-10-24T16:34:31Z (release/v0.2.0): Integration owner for immediate local merge and checked worktree removal
   provenance: {"harness_session":"codex:01a16eb5-aa54-7053-9184-86423a7ca4e4","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T16:34:34Z (release/v0.2.0): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/relay/relay-adb97d/evidence","state":"released","verification":"verified","purpose":"Retention ownership transferred to hq-536849, whose task notes record the verified manifest; files remain at this path","next_owner":"none","cleanup_trigger":"none"}
