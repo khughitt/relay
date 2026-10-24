@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.2.0
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:25:46Z
+updated: 2026-10-24T16:29:30Z
 started: 2026-10-24T16:20:18Z
 depends: [relay-8d8e86]
 tags: []
@@ -43,4 +43,6 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
 - 2026-10-24T16:25:30Z (release/v0.2.0): retained: {"host":"titan","state":"kept","verification":"verified","next_owner":"task:relay-adb97d","cleanup_trigger":"After approved publication, public-tag checks and hq handoff, inspect and preserve needed evidence before checked cleanup","kind":"evidence","path":"$WORK_ROOT/relay/relay-adb97d/evidence","purpose":"Raw runtime gate, privacy and rehearsal outputs plus full review and rulings","manifest":"$WORK_ROOT/relay/relay-adb97d/evidence/manifest.sha256","sha256":"030f98f52983db049a6c6a17eb9d58fbcbb1d030a582626537d8db7dc75f1a34"}
 - 2026-10-24T16:25:31Z (release/v0.2.0): retained: {"host":"titan","state":"kept","verification":"verified","next_owner":"task:relay-adb97d","cleanup_trigger":"After approved publication, public-tag checks and hq handoff, inspect and preserve needed evidence before checked cleanup","kind":"scratch","path":"$WORK_ROOT/relay/relay-adb97d","purpose":"Release evidence container and attached preflight source; bare clone and private controls removed","manifest":"$WORK_ROOT/relay/relay-adb97d/manifest.sha256","sha256":"9405e57b075801f630b3c1abe9086924867458723e4907d614834143da7d30d2"}
 - 2026-10-24T16:25:46Z (release/v0.2.0): parked (waiting on user, approval): User approves pushing frozen REL 067c63921602e694682d47bdb2412862359c75ff to origin main and publishing annotated immutable v0.2.0; agent then rechecks remote/account, publishes, verifies anonymous installation on Node26 and Node22, records evidence and hands the exact pin to hq-536849.
+  provenance: {"harness_session":"codex:01a16eb5-aa54-7053-9184-86423a7ca4e4","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T16:29:30Z (release/v0.2.0): resumed
   provenance: {"harness_session":"codex:01a16eb5-aa54-7053-9184-86423a7ca4e4","harness_session_source":"CODEX_THREAD_ID"}
