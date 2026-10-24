@@ -55,7 +55,7 @@ test('an expiry within the route maximum is stored as sent', async (t) => {
 });
 test('a question with no v1 route has no route maximum and is refused before any entry exists', async (t) => {
   const { inbox } = await setup(t);
-  for (const native of [null, { harness: 'codex', sessionId: 's1', callId: 'c1' }]) {
+  for (const native of [{ harness: 'codex', sessionId: 's1', callId: 'c1' }, { harness: 'opencode', sessionId: 's1', callId: 'c1' }]) {
     const q = questionMessage({ body: { native } });
     await assert.rejects(ask(inbox, q), { code: 'UNSUPPORTED_ROUTE' });
     assert.equal(inbox.get(q.id), null);
@@ -387,4 +387,147 @@ test('sweep uses the same timestamp for every entry when the clock crosses expir
   crossing = true; await inbox.sweep();
   assert.deepEqual([inbox.get(a.id).state, inbox.get(b.id).state], ['pending', 'pending']);
   assert.equal(reads, 1);
+});
+
+const detachedRoute = { handback: false, waiter: null };
+const detachedQuestion = (patch = {}) => questionMessage({ ...patch, body: { native: null, ...(patch.body ?? {}) } });
+test('detached ask is stored here and away with a seven-day bound', async (t) => {
+  for (const mode of ['here', 'away']) {
+    const { inbox, advance, open } = await setup(t, { mode });
+    const q = detachedQuestion({ body: { expiresAt: NOW + 30 * 24 * 3_600_000 } });
+    const first = await inbox.ask(q, detachedRoute);
+    assert.equal(first.entry.state, 'pending');
+    assert.equal(first.entry.question.body.expiresAt, NOW + 604800000);
+    advance(1000);
+    assert.deepEqual(await inbox.ask(q, detachedRoute), first);
+    assert.deepEqual((await open()).inbox.get(q.id), first.entry);
+    const short = detachedQuestion();
+    assert.equal((await inbox.ask(short, detachedRoute)).entry.question.body.expiresAt, short.body.expiresAt);
+  }
+});
+test('detached admission checks timestamp and parties before replay', async (t) => {
+  const { inbox, advance } = await setup(t);
+  for (const createdAt of [NOW + 1001, NOW * 1000]) {
+    const q = detachedQuestion({ createdAt });
+    await assert.rejects(inbox.ask(q, detachedRoute), { code: 'INVALID_MESSAGE' });
+    assert.equal(inbox.get(q.id), null);
+    assert.equal(inbox.seq(), 0);
+  }
+  const q = detachedQuestion({ createdAt: NOW + 1000 });
+  const first = await inbox.ask(q, detachedRoute);
+  for (const route of [{ handback: true, waiter: null }, { handback: false, waiter: HANDLE }, { handback: false }]) {
+    await assert.rejects(inbox.ask(q, route), { code: 'INVALID_MESSAGE' });
+    assert.equal(inbox.seq(), first.entry.seq);
+  }
+  for (const parties of [{ from: { kind: 'user' } }, { to: q.from }]) {
+    await assert.rejects(inbox.ask({ ...q, ...parties }, detachedRoute), { code: 'INVALID_MESSAGE' });
+  }
+  advance(-1);
+  await assert.rejects(inbox.ask(q, detachedRoute), { code: 'INVALID_MESSAGE' });
+  assert.deepEqual(inbox.get(q.id), first.entry);
+  advance(1002);
+  assert.deepEqual(await inbox.ask(q, detachedRoute), first);
+});
+test('queued detached admission uses its operation time', async (t) => {
+  const p = await tempState(t), hit = Promise.withResolvers(), release = Promise.withResolvers();
+  let now = NOW, armed = false;
+  const io = { ...fs, rename: async (from, to) => {
+    if (armed && to.endsWith('presence.json')) { armed = false; hit.resolve(); await release.promise; }
+    return fs.rename(from, to);
+  } };
+  const { inbox } = await openInbox({ stateDir: p.stateDir, clock: () => now, io, expectAnswers: () => ({}) });
+  armed = true;
+  const held = inbox.setPresence('away'); await hit.promise;
+  const q = detachedQuestion({ createdAt: NOW + 2000 });
+  const asking = inbox.ask(q, detachedRoute);
+  now += 1000; release.resolve(); await held;
+  assert.equal((await asking).entry.id, q.id);
+});
+test('detached supersession preserves existing ownership and answer rules', async (t) => {
+  const { inbox } = await setup(t);
+  for (const native of [null, questionMessage().body.native]) {
+    const q = questionMessage({ body: { native } });
+    await inbox.ask(q, native ? { handback: false, waiter: HANDLE } : detachedRoute);
+    const replacement = detachedQuestion({ body: { supersedes: q.id } }), seen = [];
+    const stop = inbox.subscribe((e) => seen.push(e.entry.id));
+    assert.equal((await inbox.ask(replacement, detachedRoute)).entry.state, 'pending');
+    stop(); assert.deepEqual(seen, [replacement.id, q.id]);
+    assert.equal(inbox.get(q.id).state, 'withdrawn');
+    const other = detachedQuestion({ from: { kind: 'agent', agentId: 'codex:other' }, body: { supersedes: replacement.id } });
+    assert.equal((await inbox.ask(other, detachedRoute)).error.code, 'NOT_SUPERSEDABLE');
+    const old = detachedQuestion({ createdAt: NOW - 604800000, body: { supersedes: replacement.id, expiresAt: NOW + 1 } });
+    assert.equal((await inbox.ask(old, detachedRoute)).error.code, 'EXPIRED');
+    assert.equal(inbox.get(replacement.id).state, 'pending');
+    await inbox.answer(replacement.id, answerMessage(replacement));
+    assert.equal((await inbox.ask(detachedQuestion({ body: { supersedes: replacement.id } }), detachedRoute)).error.code, 'ANSWERED');
+  }
+});
+test('take consumes after show crosses expiry and is concurrent-idempotent', async (t) => {
+  const { inbox, advance, open } = await setup(t), q = detachedQuestion();
+  await inbox.ask(q, detachedRoute);
+  assert.deepEqual(await inbox.askerGone(q.id), { entry: inbox.get(q.id), error: null });
+  const answers = await Promise.all([inbox.answer(q.id, answerMessage(q)), inbox.answer(q.id, answerMessage(q))]);
+  assert.equal(answers.filter((r) => !r.error).length, 1);
+  const show = inbox.get(q.id);
+  assert.equal(show.state, 'answered');
+  advance(q.body.expiresAt - NOW);
+  const [first, again] = await Promise.all([inbox.take(q.id), inbox.take(q.id)]);
+  assert.deepEqual(first, again);
+  assert.equal(first.entry.state, 'consumed');
+  assert.deepEqual(first.entry.answer, show.answer);
+  assert.deepEqual(first.entry.log.slice(-2).map((r) => r.cause), ['expiry', 'take']);
+  assert.deepEqual((await open()).inbox.get(q.id), first.entry);
+  assert.equal((await inbox.take(questionMessage().id)).error.code, 'NOT_FOUND');
+});
+test('detached pending and answered entries survive restart and sweep', async (t) => {
+  const { inbox, advance, open } = await setup(t), pending = detachedQuestion(), answered = detachedQuestion();
+  await inbox.ask(pending, detachedRoute); await inbox.ask(answered, detachedRoute);
+  await inbox.answer(answered.id, answerMessage(answered));
+  const before = await open(); assert.deepEqual(before.rejected, []);
+  assert.deepEqual([before.inbox.get(pending.id).state, before.inbox.get(answered.id).state], ['pending', 'answered']);
+  advance(3_600_000);
+  const after = await open(); assert.deepEqual(after.rejected, []);
+  assert.deepEqual([after.inbox.get(pending.id).state, after.inbox.get(answered.id).state], ['expired', 'undeliverable']);
+  assert.equal((await after.inbox.take(answered.id)).entry.state, 'consumed');
+});
+test('detached retention starts at undeliverable and resets once at take', async (t) => {
+  for (const take of [false, true]) {
+    const { inbox, advance, at, open } = await setup(t), q = detachedQuestion();
+    await inbox.ask(q, detachedRoute); await inbox.answer(q.id, answerMessage(q));
+    advance(3_600_000); await inbox.sweep();
+    let terminalAt = at();
+    if (take) {
+      advance(1000); const consumed = (await inbox.take(q.id)).entry; terminalAt = consumed.updatedAt;
+      advance(1000); assert.deepEqual((await inbox.take(q.id)).entry, consumed);
+    }
+    advance(terminalAt + RETENTION_MS - 1 - at()); await inbox.prune();
+    assert.ok(inbox.get(q.id));
+    advance(1); await inbox.prune();
+    assert.equal((await inbox.take(q.id)).error.code, 'NOT_FOUND');
+    assert.equal((await open()).inbox.seq(), inbox.seq());
+  }
+});
+test('stale refusal persists before error publication and fails closed on IO', async (t) => {
+  const p = await tempState(t); let fail = false;
+  const io = { ...fs, rename: async (from, to) => {
+    if (fail && to.endsWith('.json')) { fail = false; throw Object.assign(new Error('disk'), { code: 'EIO' }); }
+    return fs.rename(from, to);
+  } };
+  const open = () => openInbox({ stateDir: p.stateDir, clock: () => NOW, io, expectAnswers: () => ({}) });
+  const { inbox } = await open(), q = detachedQuestion({ body: { artifact: { ref: 'design', revision: 'r1' } } });
+  await inbox.ask(q, detachedRoute);
+  const seen = [], watch = await inbox.watch(inbox.seq(), (e) => seen.push(e.entry));
+  const message = answerMessage(q, { artifactRevision: 'r0' });
+  for (const count of [1, 2]) {
+    const result = await inbox.answer(q.id, message);
+    assert.equal(result.error.code, 'STALE'); assert.equal(seen.length, count);
+    assert.equal(seen.at(-1).seq, result.entry.seq);
+    assert.equal(seen.at(-1).log.at(-1).cause, 'refusal:STALE');
+  }
+  const saved = inbox.get(q.id);
+  assert.deepEqual((await open()).inbox.get(q.id), saved);
+  fail = true; await assert.rejects(inbox.answer(q.id, message), { code: 'STORE_FAILED' });
+  assert.equal(seen.length, 2); assert.equal((await inbox.halted).code, 'STORE_FAILED');
+  await assert.rejects(inbox.snapshot(), { code: 'STORE_FAILED' });
+  assert.deepEqual((await open()).inbox.get(q.id), saved); watch.unsubscribe();
 });

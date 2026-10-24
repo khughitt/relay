@@ -756,18 +756,34 @@ or 60 seconds without confirmation after handoff, yields unconfirmed. Late match
 confirmation still consumes it. Released/expired native receipts are recorded without
 changing that terminal state.
 
+A question with `native: null` is detached: its sender is an agent, recipient is
+the user, and route is `{waiter: null, handback: false}`. It is stored in either
+presence mode and survives connection close and asker loss. `take` moves its
+answered or undeliverable entry to consumed with cause `take`, without handedAt
+or native observations; a second take returns the same entry unchanged.
+Detached questions never enter handed, unconfirmed or released. Pending take
+gets `NOT_ANSWERED`, closed take gets `WITHDRAWN`/`EXPIRED`, and taking a native
+question gets `UNSUPPORTED_ROUTE`. Any same-user socket client can take by id.
+
 Defer releases a handback route; otherwise it leaves pending with desktop presentation.
 Withdrawal, expiry, asker loss or supersession closes a pending question. Asker loss
 with an answer saved yields undeliverable, and so does reaching `expiresAt` while the
 answer is still `answered` (logged `expiry`). Sender withdrawals log `withdrawal:<reason>`;
 service-generated loss and supersession log distinct `asker-gone` and `superseded` causes.
 Consumed, unconfirmed, undeliverable, released, withdrawn and expired are terminal,
-except that unconfirmed can still receive confirmation. Notices are active until expiry
+except that unconfirmed can still receive confirmation and a detached undeliverable
+answer can still be taken. Notices are active until expiry
 and separately carry a seen mark.
 
 A retry with the saved `answerId` returns the entry in every answer-holding state;
 another answer or defer gets `ALREADY_ANSWERED` with the winner, and withdrawal gets
 `ANSWERED`. Clock expiry is applied before mutations, including after host sleep.
+An artifact revision mismatch logs a pending `refusal:STALE` row before returning
+`STALE` with the expected revision. Each request refused as stale adds an attempt,
+including identical retries; accepted-message history excludes refused content.
+These rows identify neither answer id nor surface, so consumers cannot deduplicate
+attempts or attribute them to surfaces. HTTP and direct socket clients can submit
+stale revisions; the inbox CLI copies the stored question's revision.
 See [spec §5.1–5.2](specs/2026-10-11-typed-interaction-messages.md#51-states)
 for the full transition table and validation/revision ordering.
 
@@ -782,6 +798,10 @@ Terminal entries older than 30 days are pruned at startup and daily; a predecess
 referenced by a nonterminal replacement is retained. Invalid/reconciliation-failed
 entries go to `inbox/rejected/`, never automatically cleaned. A failed write stops
 service operations with `STORE_FAILED`; restart reconciles disk before serving.
+Retention is measured from the last durable change: taking an undeliverable answer
+restarts its 30-day terminal window, while idempotent take does not. After pruning,
+take returns `NOT_FOUND`. Older binaries reject the new take/refusal histories and
+can quarantine them; do not downgrade against a store containing these entries.
 
 ### Local socket protocol
 
@@ -794,8 +814,9 @@ replies have no line cap so full retained histories can be read.
 
 | Op | Fields | Result / pushes |
 | --- | --- | --- |
-| `ask` | `message` (question), `waiter` (Handle), `handback` (boolean) | `entry`, or `passthrough:true` while here; `{type:"state",entry}` on later transitions for the attached waiter. `expiresAt` is stored lowered to `createdAt` plus the route maximum (23 h for `claude-code`), and an identical resend reattaches; a question with no v1 route (`native` null or another harness) is `UNSUPPORTED_ROUTE`. |
+| `ask` | `message` (question), `waiter` (Handle or null), `handback` (boolean) | Detached asks require null waiter and false handback, always return `entry`, and create no waiter or state subscription. Native asks can return `passthrough:true` while here, or `entry` with later `{type:"state",entry}` pushes. Expiry is clamped deterministically to createdAt plus 7 days for detached or 23 h for Claude; identical resends return the saved entry. Other native harnesses remain `UNSUPPORTED_ROUTE`. |
 | `handed` | `id`, `waiter` (Handle) | `entry`; only the recorded waiter may take the answer; replay is idempotent. |
+| `take` | `id` (question UUID) | `entry`; consumes a detached answered/undeliverable question, or returns its consumed entry unchanged. Malformed id is `INVALID_MESSAGE`. |
 | `confirm` | `harness`, `callId`, `observed` (native answers map) | `entry`. |
 | `answer` / `defer` / `withdraw` | `message` of the matching kind | `entry`; socket withdrawal permits only user/asker reasons. |
 | `notify` | `message` (notice) | `entry`; resending the identical notice returns it unchanged, and any other entry under that id is `ID_CONFLICT` with the existing entry, as for `ask`. No v1 producer is wired. |
@@ -809,6 +830,12 @@ replies have no line cap so full retained histories can be read.
 saved answers undeliverable. Unknown liveness is not death; an answer that no waiter
 has taken by the question's `expiresAt` becomes undeliverable. Closing an attached
 waiter connection while the service runs records asker loss; service shutdown does not.
+Detached asks validate their party direction, route and `createdAt` before replay
+lookup. A timestamp later than the queued operation's service time plus 1000 ms
+is `INVALID_MESSAGE`. Equality is allowed; the deadline is thus bounded by seven
+days plus that allowance from acceptance. Backward wall-clock movement can make
+a replay fail this admission check until time catches up, without changing the
+saved entry. The service does not change the supplied timestamp.
 
 ### HTTP protocol and guard
 

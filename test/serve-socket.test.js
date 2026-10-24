@@ -22,7 +22,7 @@ async function setup(t, { io } = {}) {
   const server = await serveSocket({ inbox, socketPath, processOps: createProcessOps(), reattachMs: 60000, log: () => {} });
   t.after(() => server.close());
   const client = await connectSocket(socketPath); t.after(() => client.close());
-  return { p, inbox, socketPath, client };
+  return { p, inbox, socketPath, client, server };
 }
 async function waiter(t, ctx, handback = false) {
   const q = questionMessage({ createdAt: Date.now(), body: { expiresAt: Date.now() + 3_600_000 } });
@@ -501,4 +501,77 @@ test('shutdown suppresses recovery blocked behind an inbox write and waits for c
   try { await client.closed; await turn(); await turn(); assert.equal(closed, false); } finally { release(); } // close has dropped the client, and still waits for the recheck
   await closing; await writing; await inbox.idle();
   assert.equal(probes, 0); assert.equal(inbox.get(q.id).state, 'pending');
+});
+
+test('detached ask has no owner and survives socket close and restart', async (t) => {
+  const ctx = await setup(t), { conn, close } = await closable(t, ctx);
+  await ctx.inbox.setPresence('here');
+  const now = Date.now(), q = questionMessage({ createdAt: now, body: { native: null, expiresAt: now + 604800000 } });
+  const pushes = []; conn.onPush((e) => { if (e.entry?.id === q.id) pushes.push(e); });
+  const spy = t.mock.method(ctx.inbox, 'askerGone');
+  assert.equal((await conn.request('ask', { message: q, handback: false, waiter: null })).ok, true);
+  await close(); await ctx.inbox.idle();
+  assert.equal(ctx.inbox.get(q.id).state, 'pending');
+  assert.ok(spy.mock.calls.every((c) => c.arguments[0] !== q.id));
+  assert.deepEqual(pushes, []);
+  await ctx.server.close();
+  const { inbox } = await openInbox({ stateDir: ctx.p.stateDir, expectAnswers });
+  // A native sentinel after the detached row proves the restart recheck passed it.
+  const sentinel = questionMessage({ createdAt: Date.now() });
+  await inbox.setPresence('away'); await inbox.ask(sentinel, { handback: false, waiter: HANDLE });
+  const probed = Promise.withResolvers(), handles = [];
+  const server = await serveSocket({ inbox, socketPath: ctx.socketPath, reattachMs: 1, log: () => {},
+    processOps: { ...createProcessOps(), probe: (handle) => { handles.push(handle); probed.resolve(); return { status: 'alive' }; } } });
+  t.after(() => server.close()); await probed.promise;
+  assert.deepEqual(handles, [HANDLE]);
+  const client = await connectSocket(ctx.socketPath); t.after(() => client.close());
+  const answer = answerMessage(q);
+  assert.equal((await client.request('answer', { message: answer })).ok, true);
+  const taken = await client.request('take', { id: q.id });
+  assert.equal(taken.ok, true, JSON.stringify(taken));
+  assert.deepEqual([taken.entry.state, taken.entry.handedAt], ['consumed', null]);
+  assert.deepEqual(taken.entry.answer, answer);
+  assert.deepEqual((await client.request('take', { id: q.id })).entry, taken.entry);
+});
+test('detached collision cannot steal a native waiter', async (t) => {
+  const ctx = await setup(t), { conn } = await closable(t, ctx);
+  const now = Date.now(), q = questionMessage({ createdAt: now, body: { expiresAt: now + 3600000 } });
+  assert.equal((await conn.request('ask', { message: q, handback: false, waiter: HANDLE })).ok, true);
+  const detached = { ...q, body: { ...q.body, native: null } };
+  const collision = await ctx.client.request('ask', { message: detached, handback: false, waiter: null });
+  assert.equal(collision.error.code, 'ID_CONFLICT');
+  for (const route of [{ handback: true, waiter: null }, { handback: false, waiter: HANDLE }, { handback: false }]) {
+    const r = await ctx.client.request('ask', { message: detached, ...route });
+    assert.equal(r.error.code, 'INVALID_MESSAGE');
+  }
+  const arrived = Promise.withResolvers();
+  conn.onPush((e) => { if (e.entry?.id === q.id && e.entry.state === 'answered') arrived.resolve(e.entry); });
+  await ctx.client.request('answer', { message: answerMessage(q) });
+  assert.equal((await arrived.promise).id, q.id);
+});
+test('socket take validates ids and route states and publishes consumption', async (t) => {
+  const { client, inbox } = await setup(t), now = Date.now();
+  for (const id of [undefined, '../entry', 1]) assert.equal((await client.request('take', { id })).error.code, 'INVALID_MESSAGE');
+  assert.equal((await client.request('take', { id: questionMessage().id })).error.code, 'NOT_FOUND');
+  const notice = noticeMessage({ createdAt: now });
+  await client.request('notify', { message: notice });
+  assert.equal((await client.request('take', { id: notice.id })).error.code, 'NOT_A_QUESTION');
+  const native = questionMessage({ createdAt: now });
+  await inbox.ask(native, { handback: false, waiter: HANDLE });
+  assert.equal((await client.request('take', { id: native.id })).error.code, 'UNSUPPORTED_ROUTE');
+  const q = questionMessage({ createdAt: now, body: { native: null, expiresAt: now + 3600000 } });
+  assert.equal((await client.request('ask', { message: q, waiter: null, handback: false })).ok, true);
+  assert.equal((await client.request('take', { id: q.id })).error.code, 'NOT_ANSWERED');
+  const watched = Promise.withResolvers();
+  client.onPush((e) => { if (e.entry?.id === q.id && e.entry.state === 'consumed') watched.resolve(e.entry); });
+  await client.request('watch', { since: inbox.seq() });
+  await client.request('answer', { message: answerMessage(q) });
+  const taken = await client.request('take', { id: q.id });
+  assert.equal(taken.ok, true); assert.deepEqual(await watched.promise, taken.entry);
+  for (const [state, code] of [['withdrawn', 'WITHDRAWN'], ['expired', 'EXPIRED']]) {
+    const closed = questionMessage({ createdAt: now, body: { native: null, expiresAt: state === 'expired' ? now : now + 3600000 } });
+    await client.request('ask', { message: closed, waiter: null, handback: false });
+    if (state === 'withdrawn') await client.request('withdraw', { message: withdrawalMessage(closed) });
+    assert.equal((await client.request('take', { id: closed.id })).error.code, code);
+  }
 });

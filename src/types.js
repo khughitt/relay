@@ -81,7 +81,7 @@ export {};
 /**
  * The private socket is JSON on the wire; callers get an operation's response shape.
  * @typedef {QuestionEntry & {answer: AnswerMessage}} AnsweredEntry
- * @typedef {{ask: {entry: QuestionEntry, passthrough?: false}|{passthrough: true, entry?: never}, handed: {entry: AnsweredEntry}, confirm: {entry: QuestionEntry}, answer: {entry: QuestionEntry}, defer: {entry: QuestionEntry}, withdraw: {entry: QuestionEntry}, notify: {entry: NoticeEntry}, list: {seq: number, entries: StoredEntry[]}, get: {entry: StoredEntry}, 'presence.get': {presence: {mode: string, updatedAt: number}}, 'presence.set': {presence: {mode: string, updatedAt: number}}, watch: {seq: number}}} SocketResponses
+ * @typedef {{ask: {entry: QuestionEntry, passthrough?: false}|{passthrough: true, entry?: never}, handed: {entry: AnsweredEntry}, take: {entry: AnsweredEntry}, confirm: {entry: QuestionEntry}, answer: {entry: QuestionEntry}, defer: {entry: QuestionEntry}, withdraw: {entry: QuestionEntry}, notify: {entry: NoticeEntry}, list: {seq: number, entries: StoredEntry[]}, get: {entry: StoredEntry}, 'presence.get': {presence: {mode: string, updatedAt: number}}, 'presence.set': {presence: {mode: string, updatedAt: number}}, watch: {seq: number}}} SocketResponses
  * @typedef {{ok: false, error: Refusal & {message: string}, entry?: Entry|null, passthrough?: never}} SocketFailure
  * @typedef {{type: 'state', entry: QuestionEntry}|InboxEvent} SocketPush
  */

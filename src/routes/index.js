@@ -19,4 +19,4 @@ export function expectAnswers(entry) {
 
 // The longest a question may wait on its route after createdAt (spec §5.4).
 /** @param {import("../types.js").QuestionMessage} question */
-export const expiryLimit = (question) => routeOf(question).EXPIRY_MS;
+export const expiryLimit = (question) => question.body.native === null ? 7 * 24 * 3600 * 1000 : routeOf(question).EXPIRY_MS;
