@@ -41,7 +41,9 @@ test('answers to closed entries name the closure', () => {
 test('validation and revision run after the state checks, in that order', () => {
   const { q, e } = fresh({ question: { body: { class: 'artifact-review', artifact: { ref: 'a', revision: 'r1' } } } });
   refused(L.applyAnswer(e, answerMessage(q, { values: {} , artifactRevision: 'r0' }), T), 'INVALID_ANSWER');
-  assert.equal(refused(L.applyAnswer(e, answerMessage(q, { artifactRevision: 'r0' }), T), 'STALE').error.revision, 'r1');
+  const stale = L.applyAnswer(e, answerMessage(q, { artifactRevision: 'r0' }), T);
+  assert.equal(stale.changed, true);
+  assert.deepEqual(stale.error, { code: 'STALE', revision: 'r1' });
   assert.equal(step(L.applyAnswer(e, answerMessage(q, { artifactRevision: 'r1' }), T)).state, 'answered');
 });
 test('authorization questions take an answer only from a local surface', () => {
@@ -369,4 +371,86 @@ test('conflicting accepted envelope IDs are refused without changing the entry',
   refused(L.applyWithdraw(saved, { ...withdrawalMessage(q), id: q.id }, T + 2), 'ANSWERED');
   refused(L.applyDefer(saved, { ...deferMessage(q), id: q.id }, T + 2), 'ALREADY_ANSWERED');
   refused(L.applyAnswer(e, { ...answerMessage(q, { values: {} }), id: q.id }, T), 'INVALID_ANSWER');
+});
+
+const detached = (body = {}) => {
+  const q = questionMessage({ body: { native: null, ...body } });
+  return { q, e: L.createEntry(q, { handback: false, waiter: null, now: NOW }) };
+};
+test('detached take consumes an answer without native handoff', () => {
+  const { q, e } = detached(), a = step(L.applyAnswer(e, answerMessage(q), T));
+  const taken = step(L.applyTake(a, T + 1));
+  assert.deepEqual([taken.state, taken.handedAt, taken.observed, taken.observations], ['consumed', null, null, []]);
+  assert.deepEqual(taken.answer, a.answer);
+  assert.equal(taken.log.at(-1).cause, 'take');
+  assert.deepEqual(L.applyTake(taken, T + 2), { entry: taken, changed: false, error: null });
+  assert.deepEqual(roundtrip(taken), stamped(taken));
+});
+test('detached take accepts expiry-held answers and declines', () => {
+  for (const decline of [false, true]) {
+    const { q, e } = detached();
+    const message = answerMessage(q, decline ? { outcome: 'declined', values: {} } : {});
+    const a = step(L.applyAnswer(e, message, T));
+    const expired = step(L.applyClock(a, q.body.expiresAt));
+    assert.equal(expired.state, 'undeliverable');
+    const taken = step(L.applyTake(expired, q.body.expiresAt + 1));
+    assert.equal(taken.state, 'consumed');
+    assert.deepEqual(taken.answer, message);
+    assert.deepEqual(roundtrip(taken), stamped(taken));
+  }
+});
+test('detached receipt paths and take refusals preserve the entry', () => {
+  const { q, e } = detached(), a = step(L.applyAnswer(e, answerMessage(q), T));
+  const expired = step(L.applyClock(e, q.body.expiresAt));
+  for (const [entry, code] of [[e, 'NOT_ANSWERED'], [step(L.applyWithdraw(e, withdrawalMessage(q), T)), 'WITHDRAWN'],
+    [expired, 'EXPIRED'], [answered().e, 'UNSUPPORTED_ROUTE'], [L.createNotice(noticeMessage(), { now: NOW }), 'NOT_A_QUESTION']]) {
+    assert.deepEqual(refused(L.applyTake(entry, T), code).entry, entry);
+  }
+  for (const entry of [e, a, step(L.applyClock(a, q.body.expiresAt)), step(L.applyTake(a, T))]) {
+    assert.deepEqual(L.applyAskerGone(entry, T), { entry, changed: false, error: null });
+    for (const waiter of [null, HANDLE]) refused(L.applyHanded(entry, waiter, T), 'NOT_WAITER');
+    refused(L.applyConfirm(entry, { matches: true, observed: {} }, T), 'NOT_HANDED');
+  }
+  refused(L.applyConfirm(expired, { matches: false, observed: {} }, T), 'NOT_HANDED');
+  const message = deferMessage(q), deferred = step(L.applyDefer(e, message, T));
+  assert.deepEqual([deferred.state, deferred.presentation], ['pending', 'desktop']);
+  assert.equal(L.applyDefer(deferred, message, T + 1).changed, false);
+  for (const entry of [deferred, expired, step(L.applyWithdraw(e, withdrawalMessage(q), T)), step(L.applySuperseded(e, questionMessage().id, T))]) {
+    assert.deepEqual(roundtrip(entry), stamped(entry));
+  }
+});
+test('stale refusal records each attempt without accepted message content', () => {
+  for (const native of [null, questionMessage().body.native]) {
+    const { q, e } = detached({ native, artifact: { ref: 'design', revision: 'r1' } });
+    const initial = native ? { ...e, route: { handback: false, waiter: HANDLE } } : e;
+    const message = answerMessage(q, { artifactRevision: 'r0' });
+    const first = L.applyAnswer(initial, message, T), second = L.applyAnswer(first.entry, message, T + 1);
+    for (const result of [first, second]) {
+      assert.deepEqual(result.error, { code: 'STALE', revision: 'r1' });
+      assert.equal(result.changed, true);
+      assert.deepEqual([result.entry.state, result.entry.answer, result.entry.messages], ['pending', null, []]);
+      assert.equal(result.entry.log.at(-1).cause, 'refusal:STALE');
+      assert.deepEqual(roundtrip(result.entry), stamped(result.entry));
+    }
+    assert.equal(second.entry.updatedAt, T + 1);
+    assert.equal(second.entry.log.length, initial.log.length + 2);
+    const correct = answerMessage(q, { artifactRevision: 'r1' }), saved = step(L.applyAnswer(second.entry, correct, T + 2));
+    assert.equal(L.applyAnswer(saved, correct, T + 3).changed, false);
+  }
+});
+test('strict validation distinguishes detached and native receipt evidence', () => {
+  const { q, e } = detached(), a = step(L.applyAnswer(e, answerMessage(q), T)), taken = step(L.applyTake(a, T + 1));
+  const badRow = (entry, state, cause) => ({ ...entry, state, log: [...entry.log, { seq: null, at: T + 1, state, cause }], updatedAt: T + 1 });
+  const native = handed();
+  for (const broken of [
+    { ...e, route: { handback: true, waiter: null } }, { ...e, route: { handback: false, waiter: HANDLE } },
+    { ...e, question: { ...q, from: { kind: 'user' } } }, { ...e, question: { ...q, to: q.from } },
+    { ...taken, handedAt: T }, { ...taken, observed: {} },
+    { ...taken, observations: [{ at: T, surface: 'terminal', answers: {} }] },
+    badRow(a, 'consumed', 'confirm'), badRow(a, 'handed', 'handed'), badRow(a, 'undeliverable', 'asker-gone'),
+    badRow(e, 'released', 'defer:phone'), badRow(e, 'pending', 'refusal:STALE'),
+    badRow(taken, 'consumed', 'take'), badRow(e, 'consumed', 'take'),
+    badRow(native.e, 'consumed', 'take'),
+    badRow({ ...a, question: { ...q, body: { ...q.body, artifact: { ref: 'design', revision: 'r1' } } } }, 'answered', 'refusal:STALE'),
+  ]) assert.throws(() => L.validateEntry(stamped(broken)), { code: 'INVALID_ENTRY' });
 });
