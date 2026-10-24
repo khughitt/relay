@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:34:10Z
+updated: 2026-10-24T15:34:13Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -60,3 +60,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:31:57Z (feat/detached-ask): retained: {"host": "titan", "state": "kept", "verification": "verified", "next_owner": "task:relay-8d8e86", "cleanup_trigger": "After final review and local integration, inspect evidence and complete removal checks", "kind": "worktree", "path": ".worktrees/detached-ask", "purpose": "Independent final branch review and integration"}
 - 2026-10-24T15:31:59Z (feat/detached-ask): retained: {"host": "titan", "state": "kept", "verification": "verified", "next_owner": "task:relay-8d8e86", "cleanup_trigger": "After final review and local integration, inspect evidence and complete removal checks", "kind": "scratch", "path": "$WORK_ROOT/relay/.worktrees/detached-ask/.superpowers/sdd/2026-10-24-detached-ask", "purpose": "Review package, ledger and passing runtime gate evidence", "manifest": "$WORK_ROOT/relay/.worktrees/detached-ask/.superpowers/sdd/2026-10-24-detached-ask/sha256-manifest.json", "sha256": "0723f2770dfe00968695042d9b72dc7ef9345aeae89a0d78377123289f8d15cc"}
 - 2026-10-24T15:34:10Z (feat/detached-ask): attached: gate-dev.log (62550 bytes): Final just gate on Node 26.5.0: 739/739 tests, zero failures/skips, strict check passed
+- 2026-10-24T15:34:13Z (feat/detached-ask): attached: gate-node22.log (151478 bytes): Final just gate on Node 22.23.2: 739/739 tests, zero failures/skips, strict check passed
