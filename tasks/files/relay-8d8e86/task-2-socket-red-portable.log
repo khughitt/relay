@@ -1,0 +1,139 @@
+✔ config: off without a port; host and login together; port and paths checked (3.786401ms)
+✔ guard: proxied needs exact login and host and no Funnel; local needs loopback host on the port (0.601998ms)
+✔ every path, static included, is 403 for a refused request (58.578653ms)
+✔ answer from the phone: surface set by the guard, retry replays, second device refused (34.992036ms)
+✔ POST needs the matching origin and JSON, under 64 KiB (31.960717ms)
+✔ a queued answer to a question that expired while the host slept gets EXPIRED (30.565416ms)
+✔ inbox listing, one entry, defer, presence, agents (49.415448ms)
+✔ an event stream closed while its registration is queued leaves no listener (65.547934ms)
+✔ events: Last-Event-ID resumes after its cursor, replaying exactly the newer entries before live ones (108.378355ms)
+✔ events: ?since= resumes after its cursor, replaying exactly the newer entries before live ones (102.081052ms)
+✔ configuration rejects lone, empty, malformed and explicitly invalid values before creating state (3.020879ms)
+✔ any forwarding header triggers proxy classification and mutations use the exact local or ported origin (48.240878ms)
+✔ static reads reject encoded traversal, outside symlinks and directories, and never write files (28.029477ms)
+✔ remote authorization cannot spoof a local answer surface; decline and defer remain available (38.648866ms)
+✔ local answer preserves its full normalized envelope and point reads include terminal history (54.56451ms)
+✔ invalid JSON, scalar bodies and non-JSON media types receive client errors (41.699671ms)
+✔ an invalid SSE cursor is refused with 400 INVALID_INPUT instead of replaying from 0 (56.227948ms)
+✔ routes match their entire path and absent static configuration is readonly 404 (23.680832ms)
+✔ point GET waits for a queued supersession to commit both entries (40.604687ms)
+✔ close ends SSE and drains an accepted write before returning; repeated close is safe (30.953106ms)
+✔ close releases a half-written request without a mutation (18.791965ms)
+✔ agent display is filtered from the actual registry without mutating or pruning it (29.965733ms)
+✔ HTTP startup failure releases the service lock and closes the already-started socket (10.070299ms)
+✔ close owns TCP connections even before a complete HTTP request arrives (32.379715ms)
+✔ configuration accepts ordinary DNS hyphens without accepting leading or trailing label hyphens (0.352484ms)
+✔ non-443 tailnet authority keeps its port in Host and mutation Origin (34.060296ms)
+✔ list includes newer terminal entries and reports answer conflicts with their details (49.210407ms)
+✔ static configuration must name an existing directory before a listener starts (1.416971ms)
+✔ close drains a complete request before disposing its incomplete pipelined successor (33.286138ms)
+✔ the socket is private and answers unknown ops and bad JSON with errors (29.748389ms)
+✔ a waiter receives state lines: answered, then its own handed (113.894127ms)
+✔ a waiter killed while pending withdraws its question (asker-gone) (97.153712ms)
+✔ a waiter killed after an answer leaves it undeliverable; a replay still returns it (106.803971ms)
+✔ socket ask stores the clamped expiry, reattaches an identical resend and refuses a question with no route (28.156063ms)
+✔ handed from another process is NOT_WAITER (95.088247ms)
+✔ a defer on a handback route reaches the waiter as released (80.381278ms)
+✔ watch replays since a seq and then pushes changes and presence (101.250479ms)
+✔ watch resumes after its cursor, replaying exactly the newer entries before live ones (88.982108ms)
+✔ watch refuses a present cursor that is not a nonnegative safe integer, and the connection can still watch (15.652455ms)
+✔ list refuses an invalid since or states instead of widening or substring-matching the selection (95.850843ms)
+✔ a watcher that disconnects while its registration is queued leaves no listener (117.816481ms)
+✔ withdraw over the socket accepts only user and asker reasons (90.948279ms)
+✔ an oversized unfinished ASCII request closes before dispatch (31.828942ms)
+✔ an oversized complete ASCII request closes before dispatch (23.738109ms)
+✔ an oversized unfinished Unicode request closes before dispatch (26.839047ms)
+✔ an oversized complete Unicode request closes before dispatch (20.959209ms)
+✔ bad JSON returns INVALID_REQUEST and leaves the socket usable (10.227852ms)
+✔ socket withdrawal persists the complete normalized envelope (79.917396ms)
+✔ concurrent watch requests reserve one listener before registration (9.67219ms)
+✔ client get waits for a supersession to finish committing (89.241861ms)
+✔ the real client receives a valid entry and list larger than the request cap (211.928825ms)
+✔ closing the socket service waits for queued writes without withdrawing live routes (20.136321ms)
+✔ a conflicting ask disconnected while queued cannot withdraw the original route (95.34861ms)
+✔ the accepted waiter keeps state delivery while a conflicting ask is queued (79.481797ms)
+✔ a new ask disconnected while queued loses its route only after acceptance (46.025944ms)
+✔ confirm rejects a raw or non-string answer map without changing the handed entry (83.564308ms)
+✔ startup recheck preserves alive evidence unless death is confirmed (28.451681ms)
+✔ startup recheck preserves unknown evidence unless death is confirmed (29.276292ms)
+✔ startup recheck preserves dead evidence unless death is confirmed (37.408542ms)
+✔ service refuses a non-socket path without deleting it or retaining a subscriber (8.058604ms)
+✔ each socket message operation rejects a valid envelope of the wrong kind (12.674434ms)
+✔ a different waiter cannot take an identical replay or the original route liveness (61.661738ms)
+✔ startup recovery still probes a dead pending waiter after a queued conflict spans grace (71.555089ms)
+✔ startup recovery still probes a dead answered waiter after a queued conflict spans grace (78.243328ms)
+✔ same-handle reattachment queued before the grace snapshot preserves delivery and ownership (82.143309ms)
+✔ same-handle reattachment queued after the grace snapshot preserves delivery and ownership (83.298153ms)
+✔ shutdown suppresses recovery blocked behind an inbox write and waits for cleanup (59.829225ms)
+✖ detached ask has no owner and survives socket close and restart (27.118626ms)
+✖ detached collision cannot steal a native waiter (30.821943ms)
+✖ socket take validates ids and route states and publishes consumption (28.858085ms)
+ℹ tests 70
+ℹ suites 0
+ℹ pass 67
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2641.317042
+
+✖ failing tests:
+
+test at test/serve-socket.test.js:506:1
+✖ detached ask has no owner and survives socket close and restart (27.118626ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file://<WORK_ROOT>/relay/.worktrees/detached-ask/test/serve-socket.test.js:512:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/serve-socket.test.js:536:1
+✖ detached collision cannot steal a native waiter (30.821943ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'INVALID_SCHEMA'
+  - 'ID_CONFLICT'
+  
+      at TestContext.<anonymous> (file://<WORK_ROOT>/relay/.worktrees/detached-ask/test/serve-socket.test.js:542:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'INVALID_SCHEMA',
+    expected: 'ID_CONFLICT',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test/serve-socket.test.js:552:1
+✖ socket take validates ids and route states and publishes consumption (28.858085ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'UNKNOWN_OP'
+  - 'INVALID_MESSAGE'
+  
+      at TestContext.<anonymous> (file://<WORK_ROOT>/relay/.worktrees/detached-ask/test/serve-socket.test.js:554:55)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'UNKNOWN_OP',
+    expected: 'INVALID_MESSAGE',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+error: recipe `test-one` failed on line 50 with exit code 1
