@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T14:31:59Z
+updated: 2026-10-24T14:42:02Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -40,4 +40,6 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T14:31:52Z (feat/detached-ask): review: spec round 3 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-24T14:31:57Z (feat/detached-ask): attached: spec-round-3-report.md (1760 bytes): Full scoped spec re-review against 9455516: accept, no findings; all six round-2 findings resolved; reviewer codex/gpt-6.1-sol
 - 2026-10-24T14:31:59Z (feat/detached-ask): parked (waiting on user, review): User: approve revised spec at relay commit 94555165894c8bb47d314020aa1296b3895911fe, .worktrees/detached-ask/docs/specs/2026-10-24-detached-ask-design.md. All round-2 findings addressed; scoped round 3 accepted with no findings. After approval, agent drafts the implementation plan for review. Full-suite baseline remains deferred to execution Setup before code changes.
+  provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T14:42:02Z (feat/detached-ask): resumed
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
