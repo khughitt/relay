@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:39:09Z
+updated: 2026-10-24T15:39:11Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -68,3 +68,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:38:09Z (feat/detached-ask): Identify current local integration owner
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T15:39:09Z (feat/detached-ask): retained: {"host": "titan", "state": "kept", "verification": "verified", "next_owner": "session:codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a", "cleanup_trigger": "Immediate local integration, merged-tree check, then evidence disposition and checked worktree removal in this turn", "kind": "worktree", "path": ".worktrees/detached-ask", "purpose": "Reviewed and verified source branch ready for local merge and cleanup"}
+- 2026-10-24T15:39:11Z (feat/detached-ask): retained: {"host": "titan", "state": "kept", "verification": "verified", "next_owner": "session:codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a", "cleanup_trigger": "Immediate local integration, merged-tree check, then evidence disposition and checked worktree removal in this turn", "kind": "scratch", "path": "$WORK_ROOT/relay/.worktrees/detached-ask/.superpowers/sdd/2026-10-24-detached-ask", "purpose": "Integration evidence; final review, ledger and runtime gates attached; remaining logs regenerable", "manifest": "$WORK_ROOT/relay/.worktrees/detached-ask/.superpowers/sdd/2026-10-24-detached-ask/sha256-manifest.json", "sha256": "c430969154df4fb9dca9d6dee5d5f71080c8bbd4a4f8e3287799857c0ab2502c"}
