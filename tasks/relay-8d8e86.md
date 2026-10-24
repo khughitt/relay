@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:43:22Z
+updated: 2026-10-24T15:46:15Z
 started: 2026-10-24T13:58:59Z
 completed: 2026-10-24T15:39:12Z
 closed: 2026-10-24T15:39:12Z
@@ -84,3 +84,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:43:19Z (main): attached: task-1-tests.log (5589 bytes): Task 1 completion check: 64 lifecycle/store tests pass
 - 2026-10-24T15:43:21Z (main): attached: task-2-tests.log (10640 bytes): Task 2 completion check: 114 inbox/socket/HTTP tests pass
 - 2026-10-24T15:43:22Z (main): attached: task-3-tests.log (2218 bytes): Task 3 completion check: 27 CLI/desk/surface tests pass
+- 2026-10-24T15:46:15Z (main): retained: {"host": "titan", "kind": "evidence", "path": "$WORK_ROOT/relay/relay-8d8e86/raw-red-evidence", "state": "kept", "verification": "verified", "purpose": "Exact raw RED logs retained after layout refusal; portable derivatives attached to completed implementation task", "next_owner": "task:relay-459ceb", "cleanup_trigger": "A shipped executing checker accepts these ledger-backed raw attachments; verify hashes, attach originals normally, then reassess copies", "manifest": "$WORK_ROOT/relay/relay-8d8e86/raw-red-evidence/sha256-manifest.json", "sha256": "39eb9312654f82d63bff1f9d04c82ec94b7345a923bb75fe319c53ca06e81840"}
