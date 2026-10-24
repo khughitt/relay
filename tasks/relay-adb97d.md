@@ -1,13 +1,15 @@
 ---
 id: relay-adb97d
 title: Release detached inbox support for pinned consumers
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:12:22Z
+updated: 2026-10-24T16:20:18Z
+started: 2026-10-24T16:20:18Z
 depends: [relay-8d8e86]
 tags: []
 source: "relay-8d8e86:release"
@@ -24,3 +26,5 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
 ## Notes
 
 - 2026-10-24T16:12:22Z (main): concerns: relay-8d8e86 extension — Publish the completed detached-question capability for version-pinned consumers; no implementation defect was found.
+- 2026-10-24T16:20:18Z (main): started
+  provenance: {"harness_session":"codex:01a16eb5-aa54-7053-9184-86423a7ca4e4","harness_session_source":"CODEX_THREAD_ID"}
