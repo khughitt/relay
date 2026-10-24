@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { questionMessage, noticeMessage } from './helpers/interaction.js';
 import { tempState } from './helpers/fixture.js';
 import { runCli, serveCli, askCli, entryForCli, preInput } from './helpers/cli-interaction.js';
 
@@ -92,7 +95,7 @@ test('new command usage errors fail before connecting to a service', async (t) =
     assert.equal(r.stdout, '', args.join(' '));
     assert.match(r.stderr, /^relay: /, args.join(' '));
   }
-  assert.match(runCli(p, ['inbox']).stderr, /list, show, answer, defer, withdraw/);
+  assert.match(runCli(p, ['inbox']).stderr, /list, ask, take, show, answer, defer, withdraw/);
   assert.match(runCli(p, ['ask', '--harness', 'codex', 'PreToolUse']).stderr, /the ask route exists only for claude-code/);
   assert.match(runCli(p, ['ask', '--harness', 'invalid', 'PreToolUse']).stderr,
     /--harness must be one of claude-code, codex, opencode, got "invalid"/);
@@ -117,4 +120,109 @@ test('ask configuration failures pass through while invalid argv still exits 2',
   }
   const invalid = runCli(p, ['ask', '--harness', 'claude-code', 'Stop'], preInput(), env);
   assert.equal(invalid.status, 2, invalid.stderr);
+});
+
+test('CLI subprocess fixtures isolate parent secrets and own their home', async (t) => {
+  const { cliEnv } = await import('./helpers/cli-interaction.js');
+  const { spawnSync } = await import('node:child_process');
+  const { spawnLines } = await import('./helpers/spawn-lines.js');
+  const { writeFile } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  const p = await tempState(t);
+  process.env.RELAY_TEST_PARENT_SECRET = 'synthetic-parent-only';
+  t.after(() => { delete process.env.RELAY_TEST_PARENT_SECRET; });
+  const code = 'console.log(JSON.stringify({secret: process.env.RELAY_TEST_PARENT_SECRET ?? null, home: process.env.HOME}))';
+  const direct = spawnSync(process.execPath, ['-e', code], { env: cliEnv(p), encoding: 'utf8' });
+  assert.equal(direct.status, 0, direct.stderr);
+  assert.deepEqual(JSON.parse(direct.stdout), { secret: null, home: join(p.stateDir, 'home') });
+  const fixture = join(p.stateDir, 'environment.mjs'); await writeFile(fixture, code);
+  const child = spawnLines(t, fixture), row = await child.next(() => true);
+  assert.equal(row.secret, null); assert.ok(row.home); assert.notEqual(row.home, process.env.HOME);
+  await child.exited;
+});
+
+async function questionFile(p, patch = {}) {
+  const now = Date.now(), q = questionMessage({ createdAt: now, ...patch,
+    body: { native: null, expiresAt: now + 604800000, ...(patch.body ?? {}) } });
+  const file = join(p.stateDir, `${q.id}.json`); await writeFile(file, JSON.stringify(q));
+  return { q, file };
+}
+test('detached CLI ask survives its process and take is idempotent', async (t) => {
+  const p = await tempState(t); await serveCli(t, p);
+  for (const mode of ['here', 'away']) {
+    runCli(p, ['presence', mode]); const { q, file } = await questionFile(p);
+    const ask = runCli(p, ['inbox', 'ask', '--file', file, '--json']);
+    assert.equal(ask.status, 0, ask.stderr);
+    assert.equal(JSON.parse(ask.stdout).entry.state, 'pending');
+    assert.equal(JSON.parse(runCli(p, ['inbox', 'show', q.id, '--json']).stdout).entry.state, 'pending');
+    const answered = runCli(p, ['inbox', 'answer', q.id, 'q1=o2', '--surface', 'terminal', '--json']);
+    assert.equal(answered.status, 0, answered.stderr);
+    assert.equal(JSON.parse(answered.stdout).entry.answer.body.surface, 'terminal');
+    const first = runCli(p, ['inbox', 'take', q.id, '--json']), again = runCli(p, ['--json', 'inbox', 'take', q.id]);
+    assert.equal(first.status, 0, first.stderr); assert.equal(again.status, 0, again.stderr);
+    assert.equal(JSON.parse(first.stdout).entry.state, 'consumed');
+    assert.deepEqual(JSON.parse(first.stdout), JSON.parse(again.stdout));
+    assert.match(runCli(p, ['inbox', 'take', q.id]).stdout, /the agent received it/);
+  }
+});
+test('detached CLI surfaces, decline and withdrawal preserve sender direction', async (t) => {
+  const p = await tempState(t); await serveCli(t, p);
+  for (const decline of [false, true]) {
+    const { q, file } = await questionFile(p); assert.equal(runCli(p, ['inbox', 'ask', '--file', file]).status, 0);
+    const args = decline ? ['--decline', '--surface', 'terminal'] : ['q1=o1'];
+    const r = runCli(p, ['inbox', 'answer', q.id, ...args, '--json']);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(JSON.parse(r.stdout).entry.answer.body.surface, decline ? 'terminal' : 'cli');
+    assert.equal(JSON.parse(r.stdout).entry.answer.body.outcome, decline ? 'declined' : 'answered');
+  }
+  for (const reason of ['user', 'asker']) {
+    const { q, file } = await questionFile(p); runCli(p, ['inbox', 'ask', '--file', file]);
+    const r = runCli(p, ['inbox', 'withdraw', q.id, ...(reason === 'asker' ? ['--reason', 'asker'] : []), '--json']);
+    assert.equal(r.status, 0, r.stderr);
+    const e = JSON.parse(r.stdout).entry, withdrawal = e.messages.at(-1).message;
+    assert.equal(e.withdrawal.reason, reason);
+    assert.deepEqual([withdrawal.from, withdrawal.to], reason === 'asker' ? [q.from, { kind: 'user' }] : [{ kind: 'user' }, q.from]);
+    const take = runCli(p, ['inbox', 'take', q.id, '--json']);
+    assert.equal(take.status, 1); assert.match(JSON.parse(take.stderr).error.detail, /^WITHDRAWN:/);
+  }
+});
+test('ask-file local validation and service validation stay distinct', async (t) => {
+  const p = await tempState(t), file = join(p.stateDir, 'question.json');
+  const check = (code) => {
+    const r = runCli(p, ['inbox', 'ask', '--file', file, '--json']);
+    assert.equal(r.status, 1, r.stderr); assert.equal(r.stdout, '');
+    const error = JSON.parse(r.stderr).error;
+    assert.equal(error.kind, 'inbox-ask_failed'); assert.ok(error.detail.startsWith(`${code}:`), error.detail);
+    return error;
+  };
+  const missing = check('ENOENT'); assert.ok(missing.detail.includes(file));
+  assert.equal(missing.detail.split('ENOENT').length, 2);
+  for (const input of ['{', JSON.stringify(noticeMessage()), JSON.stringify({})]) { await writeFile(file, input); check('INVALID_MESSAGE'); }
+  const now = Date.now(), native = questionMessage({ createdAt: now });
+  await writeFile(file, JSON.stringify(native)); check('UNSUPPORTED_ROUTE');
+  const { q } = await questionFile(p);
+  for (const extra of [{ typo: 'extra' }, { body: { ...q.body, expireAt: q.body.expiresAt } }, { from: { ...q.from, typo: 'extra' } }]) {
+    await writeFile(file, JSON.stringify({ ...q, ...extra })); check('INVALID_MESSAGE');
+  }
+  const wrongParties = [{ ...q, from: { kind: 'user' } }, { ...q, to: q.from }];
+  for (const message of wrongParties) { await writeFile(file, JSON.stringify(message)); check('SERVE_UNAVAILABLE'); }
+  await serveCli(t, p);
+  for (const message of wrongParties) { await writeFile(file, JSON.stringify(message)); check('INVALID_MESSAGE'); }
+  assert.deepEqual(JSON.parse(runCli(p, ['inbox', 'list', '--json']).stdout).entries, []);
+});
+test('detached command usage fails before connecting', async (t) => {
+  const p = await tempState(t);
+  for (const args of [
+    ['inbox', 'ask'], ['inbox', 'ask', '--file'], ['inbox', 'ask', '--file', 'a', '--file', 'b'],
+    ['inbox', 'ask', 'id', '--file', 'a'], ['inbox', 'take'], ['inbox', 'take', 'id', 'extra'],
+    ['inbox', 'answer', 'id', '--surface', 'phone'], ['inbox', 'answer', 'id', '--surface', 'desktop'],
+    ['inbox', 'answer', 'id', '--surface', 'unknown'], ['inbox', 'answer', 'id', '--surface'],
+    ['inbox', 'answer', 'id', '--surface', 'cli', '--surface', 'terminal'],
+    ['inbox', 'withdraw', 'id', '--reason', 'asker-gone'], ['inbox', 'withdraw', 'id', '--reason'],
+    ['inbox', 'withdraw', 'id', '--reason', 'asker', '--reason', 'user'],
+    ['inbox', 'answer', 'id', 'q1=o1', '--decline'],
+  ]) {
+    const r = runCli(p, args); assert.equal(r.status, 2, `${args}: ${r.stderr}`); assert.equal(r.stdout, '');
+  }
+  assert.match(runCli(p, ['inbox']).stderr, /ask.*take/);
 });

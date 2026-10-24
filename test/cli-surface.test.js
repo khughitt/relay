@@ -9,7 +9,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMMANDS } from '../src/commands.js';
 import { tempState } from './helpers/fixture.js';
-import { serveCli, askCli, entryForCli, runCli } from './helpers/cli-interaction.js';
+import { questionMessage } from './helpers/interaction.js';
+import { serveCli, askCli, entryForCli, runCli, cliEnv } from './helpers/cli-interaction.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BIN = path.join(ROOT, 'bin', 'relay.js');
@@ -30,14 +31,14 @@ function liveRows() {
 }
 
 function tableRows() {
-  const text = execFileSync('python3', [path.join(ROOT, 'tools', 'cli_surface.py'), 'rows', 'relay', path.join(ROOT, 'tools', 'cli.toml')], { encoding: 'utf8' });
+  const text = execFileSync('python3', [path.join(ROOT, 'tools', 'cli_surface.py'), 'rows', 'relay', path.join(ROOT, 'tools', 'cli.toml')], { encoding: 'utf8', env: cliEnv({ stateDir: STATE }) });
   return new Set(text.trim().split('\n').map((line) => key(JSON.parse(line))));
 }
 
 // Every spawn gets its own registry: `hook` publishes to RELAY_STATE_DIR even with no subscribers.
 const STATE = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-state-'));
 after(() => fs.rmSync(STATE, { recursive: true, force: true }));
-const run = (args, env = {}, input) => spawnSync(process.execPath, [BIN, ...args], { encoding: 'utf8', env: { ...process.env, RELAY_STATE_DIR: STATE, ...env }, input });
+const run = (args, env = {}, input) => spawnSync(process.execPath, [BIN, ...args], { encoding: 'utf8', env: cliEnv({ stateDir: STATE }, env), input });
 
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-cli-'));
@@ -77,9 +78,12 @@ test('usage errors exit 2 with stderr only', () => {
   }
 });
 
-test('enum baselines cover every enum row', (t) => {
+test('enum baselines cover every enum row', async (t) => {
   const { subscribers, target, bin, evidence } = fixture(t);
-  const env = { PATH: `${bin}:${process.env.PATH}`, CODEX_THREAD_ID: '' };
+  const p = await tempState(t); await serveCli(t, p); runCli(p, ['presence', 'away']);
+  const first = askCli(t, p, [], 'enum_answer'), answer = await entryForCli(p, 'enum_answer');
+  const second = askCli(t, p, [], 'enum_withdraw'), withdrawal = await entryForCli(p, 'enum_withdraw');
+  const env = { PATH: `${bin}:${process.env.PATH}`, CODEX_THREAD_ID: '', RELAY_STATE_DIR: p.stateDir };
   const payload = JSON.stringify({ session_id: 's1', hook_event_name: 'SessionStart', cwd: os.tmpdir() });
   const baselines = [
     [['install'], '--harness', ['install', '--harness', 'codex', '--subscribers', subscribers, '--target', target]],
@@ -88,6 +92,8 @@ test('enum baselines cover every enum row', (t) => {
     [['ask'], '--harness', ['ask', '--harness', 'claude-code', 'PostToolUse']],
     [['install'], '--with', ['install', '--harness', 'claude-code', '--subscribers', subscribers, '--target', target, '--evidence', evidence, '--with', 'ask']],
     [['model'], '--harness', ['model', '--harness', 'codex']],
+    [['inbox', 'answer'], '--surface', ['inbox', 'answer', answer.id, 'q1=o1', '--surface', 'terminal']],
+    [['inbox', 'withdraw'], '--reason', ['inbox', 'withdraw', withdrawal.id, '--reason', 'asker']],
   ];
   const table = [...tableRows()].map((r) => JSON.parse(r)).filter((r) => r[0] === 'option' && r[3] === 'enum').map((r) => `${r[1].join(' ')} ${r[2][0]}`).sort();
   assert.deepEqual(baselines.map(([p, b]) => `${p.join(' ')} ${b}`).sort(), table, 'every enum row needs a baseline');
@@ -98,6 +104,7 @@ test('enum baselines cover every enum row', (t) => {
     const r = run(bad, env, payload);
     assert.equal(r.status, 2, bad.join(' ')); assert.ok(r.stderr.includes(binding) && r.stderr.includes('__not_in_set__'), r.stderr);
   }
+  await first.exited; await second.exited;
 });
 
 test('global routing, output rows, precedence, json failure', (t) => {
@@ -132,7 +139,11 @@ test('every command without a declared output row emits one JSON value under --j
   const p = await tempState(t); await serveCli(t, p);
   assert.equal(runCli(p, ['presence', 'away']).status, 0);
   const hook = askCli(t, p), { id } = await entryForCli(p);
-  const args = { 'inbox show': [id], 'inbox answer': [id, 'q1=o1'], 'inbox defer': [id], model: ['--harness', 'codex'] };
+  const now = Date.now(), q = questionMessage({ createdAt: now, body: { native: null, expiresAt: now + 3600000 } });
+  const file = path.join(p.stateDir, 'detached.json'); fs.writeFileSync(file, JSON.stringify(q));
+  assert.equal(runCli(p, ['inbox', 'ask', '--file', file]).status, 0);
+  assert.equal(runCli(p, ['inbox', 'answer', q.id, 'q1=o1']).status, 0);
+  const args = { 'inbox ask': ['--file', file], 'inbox take': [q.id], 'inbox show': [id], 'inbox answer': [id, 'q1=o1'], 'inbox defer': [id], model: ['--harness', 'codex'] };
   const candidates = COMMANDS.filter((cmd) => !cmd.protocol && !cmd.output && cmd.path.join(' ') !== 'inbox withdraw')
     .sort((a, b) => Number(a.path.join(' ') === 'inbox answer') - Number(b.path.join(' ') === 'inbox answer'));
   assert.ok(candidates.length > 0, 'expected at least one plain command row');

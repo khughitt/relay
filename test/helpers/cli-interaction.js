@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
 import { spawnLines } from './spawn-lines.js';
 
 export const BIN = new URL('../../bin/relay.js', import.meta.url).pathname;
 export function cliEnv(p, extra = {}) {
-  const env = { ...process.env, RELAY_STATE_DIR: p.stateDir, XDG_CONFIG_HOME: join(p.stateDir, 'config') };
-  for (const name of ['RELAY_FORMAT', 'RELAY_HTTP_PORT', 'RELAY_SERVE_HOST', 'RELAY_SERVE_LOGIN', 'RELAY_CLIENT_DIR']) env[name] = undefined;
-  return { ...env, ...extra };
+  const home = join(p.stateDir, 'home'); mkdirSync(home, { recursive: true });
+  return { PATH: process.env.PATH, HOME: home, USER: 'test-user', RELAY_STATE_DIR: p.stateDir,
+    XDG_CONFIG_HOME: join(p.stateDir, 'config'), XDG_STATE_HOME: join(p.stateDir, 'xdg-state'),
+    GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', ...extra };
 }
 export const runCli = (p, args, input, extra = {}) => spawnSync(process.execPath, [BIN, ...args], {
   encoding: 'utf8', input, env: cliEnv(p, extra), timeout: 10000, killSignal: 'SIGKILL',
@@ -32,7 +34,7 @@ export async function entryForCli(p, callId = 'toolu_cli') {
   for (let i = 0; i < 100; i++) {
     const r = runCli(p, ['--json', 'inbox', 'list']);
     assert.equal(r.status, 0, r.stderr);
-    const entry = JSON.parse(r.stdout).entries.find((e) => e.question?.body.native.callId === callId);
+    const entry = JSON.parse(r.stdout).entries.find((e) => e.question?.body.native?.callId === callId);
     if (entry) return entry;
     await new Promise((r) => setTimeout(r, 50));
   }

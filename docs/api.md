@@ -878,10 +878,12 @@ shutdown as 503 `UNAVAILABLE`. Host sleep serves nothing; retry with the same
 | `relay serve` | Foreground service; SIGTERM/SIGINT drains active work and exits. |
 | `relay ask --harness claude-code [--handback] PreToolUse\|PostToolUse` | Hook route; strict option order; always exits 0, stdout is the hook reply; errors diagnose and pass through. |
 | `relay inbox list [--since SEQ]` | List current entries plus terminal entries changed after the sequence. |
+| `relay inbox ask --file PATH` | Validate and post one detached question envelope from a UTF-8 JSON file, print the saved entry, and exit without waiting. |
+| `relay inbox take ID` | Consume a detached answered/undeliverable question; repeated take returns its consumed entry unchanged. |
 | `relay inbox show ID` | Full entry and history. |
-| `relay inbox answer ID ITEM=VALUE...` | Supply every item's value using the tokens below. |
-| `relay inbox answer ID --decline` | Decline, with no values. |
-| `relay inbox defer ID` / `relay inbox withdraw ID` | Defer to desktop/native UI, or withdraw. |
+| `relay inbox answer ID ITEM=VALUE... [--surface cli\|terminal]` | Supply every item's value using the tokens below. Surface defaults to cli; terminal records an answer relayed through the session. |
+| `relay inbox answer ID --decline [--surface cli\|terminal]` | Decline, with no values. |
+| `relay inbox defer ID` / `relay inbox withdraw ID [--reason user\|asker]` | Defer to desktop/native UI, or withdraw (default user). Asker withdrawal uses the question's agent as sender and the user as recipient. |
 | `relay presence [here\|away]` | Read/set durable presence; here is the initial default. |
 | `relay install --harness claude-code --subscribers FILE --target FILE --evidence FILE --with ask [--apply --artifact FILE]` | Plan/apply the evidence-gated route. Every Claude install reconciles the route: without `--with ask` it removes relay's own `ask` entries. |
 
@@ -894,8 +896,20 @@ Boolean tokens are `ITEM=true`/`false`; choice tokens use option ids
 (`ITEM=o1`, multi `ITEM=o1,o2`); free text uses quoted `ITEM=other:text` or
 `ITEM=text:text`. Inbox/presence use the socket and fail `SERVE_UNAVAILABLE` if absent.
 Away routes new questions into the inbox; here passes new questions to the native UI.
+This presence behavior applies to native questions; detached questions are always stored.
 Existing pending questions remain pending; defer one explicitly to return it to the
 native UI when handback is available.
+
+Ask-file refuses malformed, non-question, or unknown-field content with
+`INVALID_MESSAGE`, rather than silently dropping fields during normalization.
+A valid native question file fails `UNSUPPORTED_ROUTE` before connecting.
+Detached party direction and future timestamps are checked by the service:
+a wrong-party file makes one connection, reporting `SERVE_UNAVAILABLE` if the
+service is down and `INVALID_MESSAGE` if it is running. File read failures retain
+their filesystem code once (for example `ENOENT: cannot read question file ...`).
+All new commands preserve the existing JSON envelopes and exit codes. Phone and
+desktop are not accepted by the CLI surface flag; the trusted socket still
+accepts every declared surface and HTTP still assigns its own guarded surface.
 
 For `relay ask`, an `undeliverable` entry (including one replayed on reattach) or a
 `handed` refusal with `UNDELIVERABLE` follows expiry handling: with `--handback`,
