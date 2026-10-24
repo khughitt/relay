@@ -1,13 +1,13 @@
 ---
 id: relay-1aee2b
 title: Persist detached consumption and stale refusal history
-status: blocked
+status: todo
 priority: 2
 size: s
 complexity: mid
 process: direct
 created: 2026-10-24T14:50:01Z
-updated: 2026-10-24T14:50:24Z
+updated: 2026-10-24T15:06:42Z
 depends: []
 parent: relay-8d8e86
 tags: []
