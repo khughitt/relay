@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:43:19Z
+updated: 2026-10-24T15:43:22Z
 started: 2026-10-24T13:58:59Z
 completed: 2026-10-24T15:39:12Z
 closed: 2026-10-24T15:39:12Z
@@ -82,3 +82,5 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:41:39Z (main): attached: task-2-socket-red.log (9058 bytes): Task 2 RED evidence: null waiter rejected and take unknown before implementation
 - 2026-10-24T15:41:40Z (main): attached: task-3-red.log (6049 bytes): Task 3 RED evidence: detached commands and flags missing before CLI implementation
 - 2026-10-24T15:43:19Z (main): attached: task-1-tests.log (5589 bytes): Task 1 completion check: 64 lifecycle/store tests pass
+- 2026-10-24T15:43:21Z (main): attached: task-2-tests.log (10640 bytes): Task 2 completion check: 114 inbox/socket/HTTP tests pass
+- 2026-10-24T15:43:22Z (main): attached: task-3-tests.log (2218 bytes): Task 3 completion check: 27 CLI/desk/surface tests pass
