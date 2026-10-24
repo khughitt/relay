@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T14:30:33Z
+updated: 2026-10-24T14:31:52Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -37,3 +37,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T14:27:50Z (feat/detached-ask): review: spec round 2 — verdict: revise; findings: Important 1, Minor 5; reviewer: claude-code/claude-opus-5-5
 - 2026-10-24T14:30:30Z (feat/detached-ask): attached: spec-round-2-report.md (5229 bytes): Full spec round 2 review against feea755: revise, Important 1 and Minor 5; reviewer claude-code/claude-opus-5-5
 - 2026-10-24T14:30:33Z (feat/detached-ask): Spec revision 2 frozen at 94555165894c8bb47d314020aa1296b3895911fe, docs/specs/2026-10-24-detached-ask-design.md. Important 1 and Minors 2-6 addressed with Ruling/Why/Cost entries in the spec. Minor 4 qualified: direct socket clients also submit stale revisions; identical retries count attempts without deduplication or surface attribution. No findings deferred. just check and git diff --check passed; scoped fresh builder re-review dispatched.
+- 2026-10-24T14:31:52Z (feat/detached-ask): review: spec round 3 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
