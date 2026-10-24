@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.2.0
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:23:46Z
+updated: 2026-10-24T16:24:34Z
 started: 2026-10-24T16:20:18Z
 depends: [relay-8d8e86]
 tags: []
@@ -34,3 +34,4 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
 - 2026-10-24T16:20:46Z (release/v0.2.0): Scratch created on titan: $WORK_ROOT/relay/relay-adb97d/ for release gate logs, portability evidence and privacy controls; owner relay-adb97d; contents mutable and not yet checkpointed.
 - 2026-10-24T16:21:33Z (release/v0.2.0): Baseline: just test on Node 26.5.0 ran 739 tests, all passed. Release scope reaches package.json, package-lock.json and docs/runbooks/release.md; public API/service downgrade warnings are already current. Runbook commands execute from the task worktree to honor isolation, with privacy path controls derived from the main checkout.
 - 2026-10-24T16:23:46Z (release/v0.2.0): Frozen release REL=067c63921602e694682d47bdb2412862359c75ff (do not amend/rebase). just gate: Node 26.5.0 739/739 and Node 22.23.2 739/739, strict checking clean on both. git-install rehearsal on Node26 passed; Node22 rehearsal pending. Fast suite 739/739 also passed, but its completion was confirmed after the preparation commit; frozen-commit gates are subsequent and green. Privacy v0.1.1..REL: 146 commits, first-parent merge diffs, gitleaks no leaks; 4 path patterns and 2 private terms controlled, both scans 0; state/transcript filenames 0; one maintainer address; force-push preimages 0. No optional host file, following earlier releases. Remote main is an ancestor; only main/v0.1.0/v0.1.1 exist. Independent release review dispatched.
+- 2026-10-24T16:24:34Z (release/v0.2.0): attached: release-preflight.md (3777 bytes): v0.2.0 frozen-commit preflight, both runtime gates and portable rehearsal outputs; raw outputs retained on task
