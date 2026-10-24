@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:38:06Z
+updated: 2026-10-24T15:38:08Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -64,3 +64,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:34:16Z (feat/detached-ask): All step tasks done. Code commits f9c8a8e (lifecycle), 65e226e (service), 8a97252 (CLI); gates 739/739 on both runtimes. Final fresh whole-branch reviewer dispatched on 084ce35..5bf0ef0; no source edits during review. ops-50dfa0 canonical inventory locally merged and adopted normally; its temporary worktree removed with retained-item release records. No host pointers changed or remote writes.
 - 2026-10-24T15:36:40Z (feat/detached-ask): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
 - 2026-10-24T15:38:06Z (feat/detached-ask): attached: impl-round-1-report.md (4393 bytes): Full independent whole-branch review of 084ce35..5bf0ef0: accepted, no findings; reviewer codex/gpt-6-astra
+- 2026-10-24T15:38:08Z (feat/detached-ask): attached: execution-ledger.md (4938 bytes): Complete inline execution ledger, test evidence and all rulings including the final review's three scope limits
