@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:47:21Z
+updated: 2026-10-24T15:47:22Z
 started: 2026-10-24T13:58:59Z
 completed: 2026-10-24T15:39:12Z
 closed: 2026-10-24T15:39:12Z
@@ -92,3 +92,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:47:18Z (main): attached: task-1-red-portable.log (11108 bytes): Portable derivative: Task 1 RED evidence, host values replaced; raw bytes and mapping retained by relay-459ceb
 - 2026-10-24T15:47:19Z (main): attached: task-2-inbox-red-portable.log (10864 bytes): Portable derivative: Task 2 service RED evidence; raw bytes and mapping retained by relay-459ceb
 - 2026-10-24T15:47:21Z (main): attached: task-2-socket-red-portable.log (9049 bytes): Portable derivative: Task 2 socket RED evidence; raw bytes and mapping retained by relay-459ceb
+- 2026-10-24T15:47:22Z (main): attached: task-3-red-portable.log (6019 bytes): Portable derivative: Task 3 CLI RED evidence; raw bytes and mapping retained by relay-459ceb
