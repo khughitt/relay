@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T14:05:09Z
+updated: 2026-10-24T14:05:11Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -30,3 +30,5 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T14:02:38Z (feat/detached-ask): Planning in .worktrees/detached-ask (feat/detached-ask); just setup succeeded. Full-suite baseline deferred to execution Setup as required for planned work. Required flows spec found on feat/typed-gates at 9d119d7182b568c7f4e80c9d3181f8e9a647fd26, docs/specs/2026-10-15-typed-gates-design.md section 9; its plan Global Constraints also requires withdraw --reason asker. Existing applyAnswer returns STALE without persistence; design will specify refusal history explicitly.
 - 2026-10-24T14:05:07Z (feat/detached-ask): review: spec round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-24T14:05:09Z (feat/detached-ask): attached: builder-check-report.md (631 bytes): Full read-only builder check: spec feea755 accepted with no material questions; reviewer codex/gpt-6.1-sol
+- 2026-10-24T14:05:11Z (feat/detached-ask): parked (waiting on user, review): User: review docs/specs/2026-10-24-detached-ask-design.md at relay commit feea75566eb471a4c8affcf5c25e9c044805a728 in .worktrees/detached-ask. After approval, agent drafts and reviews the implementation plan; implementation baseline has not run and must precede code changes.
+  provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
