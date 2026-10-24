@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/detached-ask
 created: 2026-10-24T14:50:37Z
-updated: 2026-10-24T15:12:29Z
+updated: 2026-10-24T15:17:35Z
 started: 2026-10-24T15:12:29Z
 depends: [relay-420059]
 parent: relay-8d8e86
@@ -27,3 +27,4 @@ Implement plan Task 3: inbox ask-file and take, cli/terminal surface, user/asker
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T15:12:29Z (feat/detached-ask): started
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T15:17:35Z (feat/detached-ask): Ruling: tools/cli.toml is vendored and the repository gate requires its rows to land in ops first. Prepare a small direct ops task in its own worktree, then use its vendored adopt executable to bring the landed inventory into this implementation. Why: preserve canonical source and normal gate checks. Cost: cross-project metadata commit and its required baseline; no runtime/deployment change.
