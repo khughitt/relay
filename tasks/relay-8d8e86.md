@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T14:53:18Z
+updated: 2026-10-24T15:05:54Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -49,4 +49,6 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T14:53:14Z (feat/detached-ask): review: plan round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-24T14:53:16Z (feat/detached-ask): attached: plan-round-1-report.md (3802 bytes): Plan self-review at d9a405d: accept, no findings; spec coverage, interfaces, five failure cases and validation-boundary nit checked; reviewer codex/gpt-6.1-sol
 - 2026-10-24T14:53:18Z (feat/detached-ask): parked (waiting on user, review): User: review and approve frozen relay plan d9a405dde5cda86bdcc01f2ab2d5ea42f354357a at .worktrees/detached-ask/docs/plans/2026-10-24-detached-ask.md. Spec 9455516 is approved. Plan self-review round 1 accepted with no findings; inline execution is the recommended default. After approval agent re-enters worktree Setup, runs just test baseline and records count, unblocks relay-1aee2b/relay-420059/relay-83f587, then implements them in dependency order. No code or runtime tests changed yet.
+  provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T15:05:54Z (feat/detached-ask): resumed
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
