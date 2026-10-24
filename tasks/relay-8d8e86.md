@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:38:09Z
+updated: 2026-10-24T15:39:09Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -67,3 +67,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:38:08Z (feat/detached-ask): attached: execution-ledger.md (4938 bytes): Complete inline execution ledger, test evidence and all rulings including the final review's three scope limits
 - 2026-10-24T15:38:09Z (feat/detached-ask): Identify current local integration owner
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T15:39:09Z (feat/detached-ask): retained: {"host": "titan", "state": "kept", "verification": "verified", "next_owner": "session:codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a", "cleanup_trigger": "Immediate local integration, merged-tree check, then evidence disposition and checked worktree removal in this turn", "kind": "worktree", "path": ".worktrees/detached-ask", "purpose": "Reviewed and verified source branch ready for local merge and cleanup"}
