@@ -1,0 +1,11 @@
+{
+  "range": "v0.1.1..067c63921602e694682d47bdb2412862359c75ff",
+  "state_transcript_files": 0,
+  "maintainer_author_addresses": 1,
+  "path_patterns": 4,
+  "private_terms": 2,
+  "machine_path_matches": 0,
+  "private_identity_matches": 0,
+  "optional_host_file": false,
+  "controls": "nonblank/non-root and source match passed"
+}
