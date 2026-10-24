@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:41:35Z
+updated: 2026-10-24T15:43:19Z
 started: 2026-10-24T13:58:59Z
 completed: 2026-10-24T15:39:12Z
 closed: 2026-10-24T15:39:12Z
@@ -77,3 +77,8 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T15:41:34Z (main): attached: gate-merged.log (62509 bytes): Post-merge just gate at 9e72787: 739/739 tests on Node 26.5.0, zero failures/skips, strict checks pass
 - 2026-10-24T15:41:35Z (main): attached: baseline.log (60624 bytes): Required pre-implementation baseline: 716/716 tests on Node 26.5.0
+- 2026-10-24T15:41:37Z (main): attached: task-1-red.log (11141 bytes): Task 1 RED evidence: missing detached take and unchanged STALE behavior
+- 2026-10-24T15:41:38Z (main): attached: task-2-inbox-red.log (11011 bytes): Task 2 RED evidence: detached service asks refused as unsupported
+- 2026-10-24T15:41:39Z (main): attached: task-2-socket-red.log (9058 bytes): Task 2 RED evidence: null waiter rejected and take unknown before implementation
+- 2026-10-24T15:41:40Z (main): attached: task-3-red.log (6049 bytes): Task 3 RED evidence: detached commands and flags missing before CLI implementation
+- 2026-10-24T15:43:19Z (main): attached: task-1-tests.log (5589 bytes): Task 1 completion check: 64 lifecycle/store tests pass
