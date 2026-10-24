@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.2.0
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:29:32Z
+updated: 2026-10-24T16:32:39Z
 started: 2026-10-24T16:20:18Z
 depends: [relay-8d8e86]
 tags: []
@@ -47,3 +47,4 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
 - 2026-10-24T16:29:30Z (release/v0.2.0): resumed
   provenance: {"harness_session":"codex:01a16eb5-aa54-7053-9184-86423a7ca4e4","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T16:29:32Z (release/v0.2.0): User approved the exact frozen REL push and annotated immutable v0.2.0 publication in this session. Resume publication, verify anonymous git installation on both runtimes, then record evidence and hand the exact pin to hq-536849; no live install or service changes.
+- 2026-10-24T16:32:39Z (release/v0.2.0): attached: public-node26.log (639 bytes): Anonymous public v0.2.0 git install and empty-cache npm ci passed on Node26.5.0
