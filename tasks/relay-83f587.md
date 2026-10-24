@@ -1,13 +1,13 @@
 ---
 id: relay-83f587
 title: Expose detached ask and take through the CLI
-status: blocked
+status: todo
 priority: 2
 size: s
 complexity: mid
 process: direct
 created: 2026-10-24T14:50:37Z
-updated: 2026-10-24T14:50:49Z
+updated: 2026-10-24T15:06:45Z
 depends: [relay-420059]
 parent: relay-8d8e86
 tags: []
