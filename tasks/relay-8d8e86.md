@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T14:27:47Z
+updated: 2026-10-24T14:27:50Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -34,3 +34,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T14:27:47Z (feat/detached-ask): resumed
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T14:27:50Z (feat/detached-ask): review: spec round 2 — verdict: revise; findings: Important 1, Minor 5; reviewer: claude-code/claude-opus-5-5
