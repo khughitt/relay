@@ -401,8 +401,13 @@ test('non-443 tailnet authority keeps its port in Host and mutation Origin', asy
 test('list includes newer terminal entries and reports answer conflicts with their details', async (t) => {
   const { port, q, inbox } = await setup(t, { question: { artifact: { ref: 'doc:design', revision: 'r2' } } });
   const headers = { ...phone, origin: `https://${HOST}` }, path = `/v1/inbox/${q.id}/answer`;
-  const stale = await call(port, { method: 'POST', path, headers, body: answerBody({ artifactRevision: 'r1' }) });
+  const staleBody = answerBody({ artifactRevision: 'r1' });
+  const stale = await call(port, { method: 'POST', path, headers, body: staleBody });
   assert.deepEqual([stale.status, stale.json.error.code, stale.json.revision, stale.json.entry.state], [409, 'STALE', 'r2', 'pending']);
+  assert.equal(stale.json.entry.log.at(-1).cause, 'refusal:STALE');
+  const retry = await call(port, { method: 'POST', path, headers, body: staleBody });
+  assert.equal(retry.json.entry.seq, stale.json.entry.seq + 1);
+  assert.equal(retry.json.entry.messages.length, 0);
   const invalid = await call(port, { method: 'POST', path, headers, body: answerBody({ artifactRevision: 'r2', values: {} }) });
   assert.deepEqual([invalid.status, invalid.json.error.code, invalid.json.entry.state], [409, 'INVALID_ANSWER', 'pending']);
   const mark = inbox.seq(); await inbox.withdraw(q.id, withdrawalMessage(q));

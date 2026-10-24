@@ -54,3 +54,10 @@ const row = { id: 'codex:w', harness: 'codex', sessionId: 'w', scope: 'worker', 
 row.scope = 'thread';
 // @ts-expect-error A root is an agent id, never a number.
 row.root = 1;
+
+const taken = await connection.request('take', { id: 'unused' });
+if (taken.ok) {
+  const body = taken.entry.answer.body;
+  // @ts-expect-error A take reply is an entry, not a list.
+  taken.entries;
+}

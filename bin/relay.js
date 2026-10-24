@@ -125,7 +125,7 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     }
     const { cmd, rest } = routed;
     cmdName = cmd.path.join('-');
-    if (cmdName === 'inbox' && !(rest.length === 1 && hasHelp(rest))) throw usage('inbox requires one of list, show, answer, defer, withdraw');
+    if (cmdName === 'inbox' && !(rest.length === 1 && hasHelp(rest))) throw usage('inbox requires one of list, ask, take, show, answer, defer, withdraw');
     if (hasHelp(rest)) { await emit(stdout, helpText(cmd)); return 0; }
 
     // Protocol rows (hook, ask) print only the harness reply, so RELAY_FORMAT does not apply:
@@ -190,6 +190,7 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     if (cmd.path[0] === 'inbox') {
       const action = cmd.path[1], args = /** @type {string[]} */ ([]), f = flags(rest, cmd, args);
       if (action === 'list') { if (args.length) throw usage('inbox list takes no arguments'); }
+      else if (action === 'ask') { if (!f['--file'] || args.length) throw usage('inbox ask requires only --file PATH'); }
       else {
         if (!args[0]) throw usage(`inbox ${action} needs an id`);
         if (action !== 'answer' && args.length !== 1) throw usage(`inbox ${action} takes only an id`);
@@ -200,7 +201,9 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
         if (!/^[0-9]+$/.test(f['--since']) || !Number.isSafeInteger(Number(f['--since']))) throw usage('--since must be a nonnegative safe integer');
         since = Number(f['--since']);
       }
-      const r = await runInbox({ action, args, decline: f['--decline'] === true, since, socketPath: servePaths(paths().stateDir).socketPath });
+      const r = await runInbox({ action, args, decline: f['--decline'] === true, since, file: f['--file'],
+        surface: /** @type {'cli'|'terminal'|undefined} */ (f['--surface']), reason: /** @type {'user'|'asker'|undefined} */ (f['--reason']),
+        socketPath: servePaths(paths().stateDir).socketPath });
       await emit(stdout, mode === 'json' ? `${JSON.stringify(r.json)}\n` : r.text);
       return 0;
     }

@@ -399,3 +399,23 @@ test('quarantine preserves previous rejected bytes when a name repeats', async (
   assert.equal(files.length, 2);
   assert.deepEqual((await Promise.all(files.map((name) => fs.readFile(join(ip.rejectedDir, name), 'utf8')))).sort(), ['first', 'second']);
 });
+
+test('detached take and stale evidence survive strict reload', async (t) => {
+  const p = await tempState(t), { store } = await loadStore(p.stateDir, { now: NOW });
+  const q = questionMessage({ body: { native: null, artifact: { ref: 'design', revision: 'r1' } } });
+  let e = await store.put(L.createEntry(q, { handback: false, waiter: null, now: NOW }));
+  const stale = answerMessage(q, { artifactRevision: 'r0' });
+  for (const at of [NOW + 1, NOW + 2]) e = await store.put(L.applyAnswer(e, stale, at).entry);
+  e = await store.put(L.applyAnswer(e, answerMessage(q, { artifactRevision: 'r1' }), NOW + 3).entry);
+  e = await store.put(L.applyTake(e, NOW + 4).entry);
+  const reopened = await loadStore(p.stateDir, { now: NOW + 5 });
+  assert.deepEqual(reopened.rejected, []);
+  assert.deepEqual(reopened.store.get(q.id), e);
+  assert.deepEqual(e.log.map((r) => r.cause), ['question', 'refusal:STALE', 'refusal:STALE', 'answer', 'take']);
+  assert.equal(e.messages.length, 1);
+  assert.deepEqual([e.handedAt, e.observed, e.observations], [null, null, []]);
+  const seq = store.seq();
+  const forged = { ...e, question: { ...q, body: { ...q.body, native: questionMessage().body.native } } };
+  await assert.rejects(store.put(forged), { code: 'INVALID_ENTRY' });
+  assert.equal(store.seq(), seq);
+});

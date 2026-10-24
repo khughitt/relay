@@ -81,11 +81,14 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
   const inbox = {
     /** @param {import("../types.js").QuestionMessage} message @param {{handback: boolean, waiter: import("../types.js").Handle|null}} route @returns {Promise<import("../types.js").InboxResult>} */
     ask: (message, { handback, waiter }) => serial(async (now) => {
+      const detached = message.body.native === null;
+      if (detached && (waiter !== null || handback !== false || message.from.kind !== 'agent' || message.to.kind !== 'user'
+        || message.createdAt > now + 1000)) throw relayError('INVALID_MESSAGE', 'detached ask requires an agent sender, user recipient, null waiter, false handback, and createdAt no more than one second ahead');
       const question = bounded(message);
       const existing = await current(question.id, now);
       if (existing) return existing.kind === 'question' && isDeepStrictEqual(existing.question, question)
         ? { entry: existing, error: null } : { entry: existing, error: { code: 'ID_CONFLICT' } };
-      if (presence.mode === 'here') return { passthrough: true };
+      if (presence.mode === 'here' && !detached) return { passthrough: true };
       const entry = L.applyClock(L.createEntry(question, { handback, waiter, now }), now).entry;
       const x = question.body.supersedes;
       if (x === null) return commit({ entry, changed: true, error: null });
@@ -107,6 +110,8 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
     withdraw: (id, message) => on(id, (e, now) => e.kind === 'question' ? L.applyWithdraw(e, message, now) : { entry: e, changed: false, error: { code: 'NOT_A_QUESTION' } }),
     /** @param {string} id @param {import("../types.js").Handle|null} waiter */
     handed: (id, waiter) => on(id, (e, now) => L.applyHanded(/** @type {import("../types.js").QuestionEntry} */ (e), waiter, now)),
+    /** @param {string} id */
+    take: (id) => on(id, (e, now) => L.applyTake(e, now)),
     /** @param {string} id */
     askerGone: (id) => on(id, (e, now) => L.applyAskerGone(/** @type {import("../types.js").QuestionEntry} */ (e), now)),
     /** @param {string} id */

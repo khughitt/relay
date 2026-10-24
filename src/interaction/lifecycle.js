@@ -53,7 +53,9 @@ export function applyAnswer(entry, message, now) {
   if (entry.state !== 'pending') return refuse(entry, CLOSED[entry.state]);
   try { checkAnswer(q, body); } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught); return refuse(entry, 'INVALID_ANSWER', { message: error.message }); }
   if (q.class === 'authorization' && body.outcome === 'answered' && !LOCAL_SURFACES.includes(body.surface)) return refuse(entry, 'LOCAL_ONLY');
-  if (q.artifact !== null && body.artifactRevision !== q.artifact.revision) return refuse(entry, 'STALE', { revision: q.artifact.revision });
+  if (q.artifact !== null && body.artifactRevision !== q.artifact.revision) {
+    return { ...annotate(entry, now, 'refusal:STALE', {}), error: { code: 'STALE', revision: q.artifact.revision } };
+  }
   if (conflictingId(entry, message)) return refuse(entry, 'ID_CONFLICT');
   return move(entry, now, 'answered', 'answer', { answer: message, messages: accepted(entry, message, now) });
 }
@@ -94,6 +96,7 @@ export function applyHanded(entry, waiter, now) {
 }
 /** @param {import("../types.js").QuestionEntry} entry @param {{matches: boolean, observed: Record<string, string>}} observation @param {number} now */
 export function applyConfirm(entry, { matches, observed }, now) {
+  if (entry.question.body.native === null) return refuse(entry, 'NOT_HANDED');
   const native = entry.state === 'released' || entry.state === 'expired';
   if (!native && entry.state !== 'handed' && entry.state !== 'unconfirmed') return refuse(entry, 'NOT_HANDED');
   if ((native || (entry.state === 'unconfirmed' && !matches)) && isDeepStrictEqual(entry.observed, observed)) return keep(entry);
@@ -103,15 +106,25 @@ export function applyConfirm(entry, { matches, observed }, now) {
 }
 /** @param {import("../types.js").QuestionEntry} entry @param {number} now */
 export function applyAskerGone(entry, now) {
+  if (entry.question.body.native === null) return keep(entry);
   if (entry.state === 'pending') return move(entry, now, 'withdrawn', 'asker-gone', { withdrawal: { reason: 'asker-gone' } });
   if (entry.state === 'answered') return move(entry, now, 'undeliverable', 'asker-gone');
   return keep(entry);
+}
+/** @param {import("../types.js").Entry} entry @param {number} now */
+export function applyTake(entry, now) {
+  if (entry.kind !== 'question') return refuse(entry, 'NOT_A_QUESTION');
+  if (entry.question.body.native !== null) return refuse(entry, 'UNSUPPORTED_ROUTE');
+  if (entry.state === 'consumed') return keep(entry);
+  if (entry.state === 'pending') return refuse(entry, 'NOT_ANSWERED');
+  if (entry.state !== 'answered' && entry.state !== 'undeliverable') return refuse(entry, CLOSED[entry.state]);
+  return move(entry, now, 'consumed', 'take');
 }
 /** @template {import("../types.js").Entry} E @param {E} entry @param {number} now @returns {import("../types.js").Result<E>} */
 export function applyClock(entry, now) {
   if (entry.kind === 'notice') return entry.state === 'active' && now >= entry.notice.body.expiresAt ? move(entry, now, 'expired', 'expiry') : keep(entry);
   if (entry.state === 'pending' && now >= entry.question.body.expiresAt) return move(entry, now, 'expired', 'expiry');
-  // A saved answer no route took by the deadline will never be taken: the waiter is gone or stuck.
+  // Native handoff expires here; detached answers remain available through take until pruning.
   if (entry.state === 'answered' && now >= entry.question.body.expiresAt) return move(entry, now, 'undeliverable', 'expiry');
   if (entry.state === 'handed' && now >= (/** @type {number} */ (entry.handedAt)) + CONFIRM_WINDOW_MS) return move(entry, now, 'unconfirmed', 'window');
   return keep(entry);
@@ -169,6 +182,10 @@ export function validateEntry(v) {
     if (!['inbox', 'desktop'].includes(v.presentation) || !object(v.route) || !keys(v.route, ['handback', 'waiter'])
       || typeof v.route.handback !== 'boolean') fail('invalid route');
     if (v.route.waiter !== null && !isDeepStrictEqual(validateHandle(v.route.waiter), v.route.waiter)) fail('invalid waiter');
+    const detached = v.question.body.native === null;
+    if (detached && (v.route.waiter !== null || v.route.handback || v.question.from.kind !== 'agent' || v.question.to.kind !== 'user'
+      || v.handedAt !== null || v.observed !== null || !Array.isArray(v.observations) || v.observations.length !== 0
+      || ['handed', 'unconfirmed', 'released'].includes(v.state))) fail('invalid detached entry');
     if (ANSWER_HOLDING.includes(v.state) !== (v.answer !== null)) fail('answer does not match state');
     if (v.answer !== null) {
       if (normalized(v.answer).kind !== 'answer' || v.answer.correlationId !== v.id) fail('invalid answer');
@@ -177,7 +194,7 @@ export function validateEntry(v) {
       if (v.question.body.class === 'authorization' && v.answer.body.outcome === 'answered'
         && !LOCAL_SURFACES.includes(v.answer.body.surface)) fail('nonlocal authorization');
     }
-    if (['handed', 'consumed', 'unconfirmed'].includes(v.state) ? !ms(v.handedAt) : v.handedAt !== null) fail('invalid handedAt');
+    if (!detached && (['handed', 'consumed', 'unconfirmed'].includes(v.state) ? !ms(v.handedAt) : v.handedAt !== null)) fail('invalid handedAt');
     if (v.state === 'withdrawn' ? !object(v.withdrawal) || !keys(v.withdrawal, ['reason'])
       || !WITHDRAWAL_REASONS.includes(v.withdrawal.reason) : v.withdrawal !== null) fail('invalid withdrawal');
     if (v.supersededBy !== null) {
@@ -188,7 +205,10 @@ export function validateEntry(v) {
     for (let i = 1; i < v.log.length; i++) {
       const previous = v.log[i - 1].state, row = v.log[i];
       let valid = false;
+      if (detached && ['handed', 'confirm', 'confirm-mismatch', 'window', 'native-answer', 'asker-gone'].includes(row.cause)) fail('invalid detached transition');
       if (row.cause === 'answer') valid = previous === 'pending' && row.state === 'answered';
+      else if (row.cause === 'take') valid = detached && ['answered', 'undeliverable'].includes(previous) && row.state === 'consumed';
+      else if (row.cause === 'refusal:STALE') valid = previous === 'pending' && row.state === 'pending' && v.question.body.artifact !== null;
       else if (row.cause.startsWith('defer:')) valid = previous === 'pending' && row.state === (v.route.handback ? 'released' : 'pending');
       else if (row.cause.startsWith('withdrawal:')) valid = previous === 'pending' && row.state === 'withdrawn'
         && WITHDRAWAL_REASONS.includes(row.cause.slice('withdrawal:'.length)) && v.withdrawal?.reason === row.cause.slice('withdrawal:'.length);

@@ -127,7 +127,8 @@ Rollback restores only bytes matching the artifact's `after`; an already restore
 
 Before leaving the desk, run `relay presence away`; on return, run
 `relay presence here`. Presence is persisted; the initial default is here. Here
-passes new questions to the native UI. Existing pending questions stay pending:
+passes new native questions to the native UI. Detached questions (`native: null`)
+are stored in both modes and survive the asking process exiting. Existing pending questions stay pending:
 use `relay inbox defer ID` to return one to the native UI when handback is available.
 Away routes new questions into the inbox.
 
@@ -135,12 +136,34 @@ The phone can read `GET /v1/presence` and set `PUT /v1/presence` with JSON
 `{"mode":"away"}` or `{"mode":"here"}` and the guard's matching Origin.
 `relay inbox list`, `relay inbox show ID`, `relay inbox answer ID ITEM=VALUE...`,
 `relay inbox defer ID` and `relay inbox withdraw ID` provide the desk surface;
+`relay inbox ask --file PATH` posts a detached question envelope from a JSON file,
+and `relay inbox take ID` consumes its saved answer. Native files and malformed
+or unknown-field messages are refused before connecting; detached party direction
+and future timestamps are service checks, so a wrong-party file costs one
+connection and reports service unavailability first when the service is down.
+File errors name the file and retain a single filesystem-code prefix.
+`relay inbox answer` accepts `--surface cli|terminal` (default cli), including
+with `--decline`. Use terminal when relaying a person's answer from a session.
+`relay inbox withdraw` accepts `--reason user|asker` (default user); asker uses
+the question's agent sender. The socket still trusts same-user clients and
+HTTP still assigns phone/desktop itself; CLI surface is not authenticated origin.
+
 `relay inbox` alone is a usage error. `--since SEQ` is an integer durable sequence,
 not a date. `--json` preserves machine states; human output distinguishes “answer
 saved”, “handed to the agent”, “the agent received it” and “handed, receipt not
 confirmed”. Only consumed means confirmed receipt. If answer, defer or withdraw
 loses to a saved answer, exit 1 shows the winner's values, surface and save time;
 JSON preserves the usual error kind/detail and adds the saved entry at `error.entry`.
+
+Detached questions expire at no later than createdAt plus seven days, and the
+service refuses createdAt more than one second ahead of its queued operation
+time. Pending expiry is expired; saved-answer expiry is undeliverable and keeps
+the answer. Take consumes answered or undeliverable with no native handoff;
+repeated take is unchanged. A revision mismatch saves a `refusal:STALE` attempt
+row before returning the error, without rejected answer content. Identical
+refused retries count again; these rows cannot identify unique answers or surfaces.
+The inbox CLI copies the saved revision, while HTTP or direct socket clients can
+submit a stale one.
 
 ## Recovery
 
@@ -149,6 +172,10 @@ The service reports their filenames and reasons and never cleans this directory
 automatically. Preserve them for diagnosis; do not move them back without resolving
 the rejection. Terminal entries older than 30 days are pruned separately, except
 predecessors referenced by nonterminal replacements.
+The 30 days run from the last durable change. Taking an undeliverable answer
+restarts that window; repeated take does not. Once pruned, take returns NOT_FOUND.
+Older relay versions can quarantine entries with take/refusal histories; use a
+version that understands these entries rather than downgrading against the store.
 
 `STORE_FAILED` stops the service after a failed durable write; restart reconciles
 what reached disk before accepting clients. Startup syncs every directory on the

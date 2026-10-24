@@ -1,7 +1,10 @@
 // @ts-check
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { isDeepStrictEqual } from 'node:util';
 import { relayError } from '../protocol.js';
 import { connectSocket } from '../serve/client.js';
+import { validateMessage } from '../interaction/message.js';
 
 /** @param {string} message */
 const usage = (message) => relayError('USAGE', message);
@@ -58,9 +61,28 @@ const line = (e) => `${e.id} ${humanState(e)}${e.kind === 'question' && e.presen
 const reply = (entry, kind, body, clock, newId) => ({ schema: 1, id: newId(), kind, correlationId: entry.id, from: { kind: 'user' }, to: entry.question.from,
   createdAt: clock(), context: entry.question.context, body });
 
-/** @param {{action: string, args?: string[], decline?: boolean, since?: number, socketPath: string, clock?: () => number, newId?: () => string}} options */
-export function runInbox({ action, args = [], decline = false, since, socketPath, clock = Date.now, newId = randomUUID }) {
+/** @param {{action: string, args?: string[], decline?: boolean, since?: number, file?: string, surface?: 'cli'|'terminal', reason?: 'user'|'asker', socketPath: string, clock?: () => number, newId?: () => string}} options */
+export async function runInbox({ action, args = [], decline = false, since, file, surface = 'cli', reason = 'user', socketPath, clock = Date.now, newId = randomUUID }) {
+  /** @type {import('../types.js').QuestionMessage|undefined} */
+  let question;
+  if (action === 'ask') {
+    if (!file || args.length) throw usage('inbox ask requires only --file PATH');
+    let text;
+    try { text = await readFile(file, 'utf8'); }
+    catch (caught) { const error = /** @type {NodeJS.ErrnoException} */ (caught); throw relayError(/** @type {string} */ (error.code), `cannot read question file ${JSON.stringify(file)}`, error); }
+    let raw;
+    try { raw = JSON.parse(text); } catch { throw relayError('INVALID_MESSAGE', 'question file is not valid JSON'); }
+    const message = validateMessage(raw);
+    if (message.kind !== 'question' || !isDeepStrictEqual(message, raw)) throw relayError('INVALID_MESSAGE', 'question file must contain a question with only recognized fields');
+    if (message.body.native !== null) throw relayError('UNSUPPORTED_ROUTE', 'inbox ask accepts only detached questions');
+    question = message;
+  }
   return withSocket(socketPath, async (conn) => {
+    if (question) {
+      const r = ok(await conn.request('ask', { message: question, waiter: null, handback: false }));
+      if (r.passthrough) throw relayError('UNEXPECTED_STATE', 'detached question was passed through');
+      return { json: { entry: r.entry }, text: `${r.entry.id} ${humanState(r.entry)}\n` };
+    }
     if (action === 'list') {
       if (args.length) throw usage('inbox list takes no arguments');
       const r = ok(await conn.request('list', since === undefined ? {} : { since }));
@@ -68,6 +90,11 @@ export function runInbox({ action, args = [], decline = false, since, socketPath
     }
     const [id, ...rest] = args;
     if (!id) throw usage(`inbox ${action} needs an id`);
+    if (action === 'take') {
+      if (rest.length) throw usage('inbox take takes only an id');
+      const r = ok(await conn.request('take', { id }));
+      return { json: { entry: r.entry }, text: `${r.entry.id} ${humanState(r.entry)}\n` };
+    }
     const entry = ok(await conn.request('get', { id })).entry;
     if (action === 'show') {
       if (rest.length) throw usage('inbox show takes only an id');
@@ -78,14 +105,16 @@ export function runInbox({ action, args = [], decline = false, since, socketPath
     if (action === 'answer') {
       if (decline && rest.length) throw usage('--decline takes no values');
       const values = decline ? {} : parseValues(entry, rest);
-      r = ok(await conn.request('answer', { message: reply(entry, 'answer', { answerId: newId(), surface: 'cli', outcome: decline ? 'declined' : 'answered',
+      r = ok(await conn.request('answer', { message: reply(entry, 'answer', { answerId: newId(), surface, outcome: decline ? 'declined' : 'answered',
         artifactRevision: entry.question.body.artifact?.revision ?? null, values }, clock, newId) }));
     } else if (action === 'defer') {
       if (rest.length) throw usage('inbox defer takes only an id');
       r = ok(await conn.request('defer', { message: reply(entry, 'defer', { surface: 'cli' }, clock, newId) }));
     } else if (action === 'withdraw') {
       if (rest.length) throw usage('inbox withdraw takes only an id');
-      r = ok(await conn.request('withdraw', { message: reply(entry, 'withdrawal', { reason: 'user' }, clock, newId) }));
+      const message = reply(entry, 'withdrawal', { reason }, clock, newId);
+      if (reason === 'asker') { message.from = entry.question.from; message.to = { kind: 'user' }; }
+      r = ok(await conn.request('withdraw', { message }));
     } else throw usage(`unknown inbox action ${JSON.stringify(action)}`);
     return { json: { entry: r.entry }, text: `${r.entry.id} ${humanState(r.entry)}\n` };
   });

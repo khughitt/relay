@@ -150,3 +150,15 @@ test('real CLI conflict errors retain and explain the saved phone answer', { tim
     assert.ok(pretty.stderr.includes(new Date(savedAt).toISOString()), pretty.stderr);
   }
 });
+
+test('desk take consumes an undeliverable detached answer with receipt labels', async (t) => {
+  const p = await tempState(t), socketPath = join(p.stateDir, 'serve.sock'); let now = NOW;
+  const { inbox } = await openInbox({ stateDir: p.stateDir, clock: () => now, expectAnswers });
+  const server = await serveSocket({ inbox, socketPath, processOps: createProcessOps(), log: () => {} }); t.after(() => server.close());
+  const q = questionMessage({ body: { native: null } });
+  await inbox.ask(q, { waiter: null, handback: false }); await inbox.answer(q.id, answerMessage(q));
+  now = q.body.expiresAt;
+  const taken = await runInbox({ action: 'take', args: [q.id], socketPath });
+  assert.equal(taken.json.entry.state, 'consumed'); assert.match(taken.text, /the agent received it/);
+  assert.equal(taken.json.entry.handedAt, null);
+});

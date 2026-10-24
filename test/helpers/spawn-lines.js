@@ -1,14 +1,21 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 // A child that speaks JSON lines on stdout; next(match) waits for the first unclaimed line that
 // matches. Every child is SIGKILLed at test end if still running.
 export function spawnLines(t, file, args = [], { env = {}, input } = {}) {
-  const child = spawn(process.execPath, [file, ...args], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const home = env.HOME ?? mkdtempSync(join(tmpdir(), 'relay-child-'));
+  const child = spawn(process.execPath, [file, ...args], { env: { PATH: process.env.PATH, HOME: home, USER: 'test-user',
+    XDG_CONFIG_HOME: join(home, 'config'), XDG_STATE_HOME: join(home, 'state'),
+    GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
   let stderr = ''; child.stderr.on('data', (d) => { stderr += d; });
   t.after(async () => {
     for (const w of waiters) clearTimeout(w.timer);
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
     await exited;
+    if (!env.HOME) rmSync(home, { recursive: true, force: true });
   });
   const unclaimed = [], waiters = [];
   createInterface({ input: child.stdout }).on('line', (line) => {

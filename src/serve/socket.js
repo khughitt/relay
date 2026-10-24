@@ -5,7 +5,7 @@ import { dirname } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { ensurePrivateDir } from '../bus/store.js';
 import { relayError, validateHandle } from '../protocol.js';
-import { validateMessage } from '../interaction/message.js';
+import { isUuid, validateMessage } from '../interaction/message.js';
 import { lineReader } from './lines.js';
 /** @typedef {import("node:net").Socket & {waiting: Map<string, Owner>, watching?: boolean, unwatch?: () => void}} ServiceSocket */
 /** @typedef {{socket: ServiceSocket, previous: Owner|null|undefined, accepted: boolean, refused: boolean}} Owner */
@@ -66,6 +66,10 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
     async ask(req, socket) {
       const message = kind(validateMessage(req.message), 'question');
       if (typeof req.handback !== 'boolean') throw relayError('INVALID_MESSAGE', 'ask needs a boolean handback');
+      if (message.body.native === null) {
+        if (req.waiter !== null) throw relayError('INVALID_MESSAGE', 'detached ask needs a null waiter');
+        return inbox.ask(message, { handback: req.handback, waiter: null });
+      }
       const waiter = validateHandle(req.waiter);
       /** @type {Owner} */
       const owner = { socket, previous: waiters.get(message.id), accepted: false, refused: false };
@@ -86,6 +90,10 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
       return result.passthrough ? { passthrough: true } : result;
     },
     handed: (req) => inbox.handed(req.id, validateHandle(req.waiter)),
+    take: (req) => {
+      if (!isUuid(req.id)) throw relayError('INVALID_MESSAGE', 'take needs a question UUID');
+      return inbox.take(req.id);
+    },
     confirm: (req) => {
       if (typeof req.harness !== 'string' || typeof req.callId !== 'string' || req.observed === null || typeof req.observed !== 'object' || Array.isArray(req.observed) || !Object.values(req.observed).every((v) => typeof v === 'string')) throw relayError('INVALID_MESSAGE', 'confirm needs harness, callId and observed');
       return inbox.confirm({ harness: req.harness, callId: req.callId, observed: req.observed });
