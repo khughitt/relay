@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.2.0
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:35:02Z
+updated: 2026-10-24T16:35:36Z
 started: 2026-10-24T16:20:18Z
 completed: 2026-10-24T16:35:02Z
 closed: 2026-10-24T16:35:02Z
@@ -65,3 +65,4 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
   provenance: {"harness_session":"codex:01a16eb5-aa54-7053-9184-86423a7ca4e4","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T16:35:02Z (release/v0.2.0): Published approved immutable annotated v0.2.0 at 067c63921602e694682d47bdb2412862359c75ff; remote refs verified; anonymous install and empty-cache npm ci passed on Node26.5.0 and Node22.23.2; both runtime gates 739/739; publication record and attachments saved; exact pin handed to hq-536849. No live install/services changed.
   provenance: {"harness_session":"codex:01a16eb5-aa54-7053-9184-86423a7ca4e4","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T16:35:36Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/release-v0.2.0","state":"released","verification":"verified","purpose":"Fast-forwarded closed release branch into local main; checked attachments and ignored-file dispositions, no host pointers, no submodules; tt-report ran; worktree removed and merged branch deleted","next_owner":"none","cleanup_trigger":"none"}
