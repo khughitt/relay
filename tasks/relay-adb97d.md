@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:12:06Z
+updated: 2026-10-24T16:12:22Z
 depends: [relay-8d8e86]
 tags: []
 source: "relay-8d8e86:release"
@@ -20,3 +20,7 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
 
 - release-guide (input, required, kind=runbook): docs/runbooks/release.md — release procedure and portability checks
 - inbox-api (input, kind=guide): docs/api.md — detached ask and take contracts
+
+## Notes
+
+- 2026-10-24T16:12:22Z (main): concerns: relay-8d8e86 extension — Publish the completed detached-question capability for version-pinned consumers; no implementation defect was found.
