@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:05:57Z
+updated: 2026-10-24T15:05:59Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -53,3 +53,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:05:54Z (feat/detached-ask): resumed
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T15:05:57Z (feat/detached-ask): review: plan round 2 — verdict: accept; findings: Minor 3; reviewer: claude-code/claude-opus-5-5
+- 2026-10-24T15:05:59Z (feat/detached-ask): User delegated plan approval decision; approved frozen plan d9a405dde5cda86bdcc01f2ab2d5ea42f354357a for inline execution. Round-2 Minors accepted as execution clarifications without a plan revision: explicitly guard detached applyAskerGone/applyConfirm; CLI ask-file refuses normalization changes as INVALID_MESSAGE; update inbox parent usage to include ask/take. Why: preserve detached semantics and fail early on file mistakes. Cost: unknown-field question files are refused rather than normalized; users must correct them. No findings deferred.
