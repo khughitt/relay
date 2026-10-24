@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.2.0
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:32:45Z
+updated: 2026-10-24T16:32:47Z
 started: 2026-10-24T16:20:18Z
 depends: [relay-8d8e86]
 tags: []
@@ -52,3 +52,4 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
 - 2026-10-24T16:32:42Z (release/v0.2.0): attached: remote-refs.txt (231 bytes): Published remote refs: only main and three release tags
 - 2026-10-24T16:32:44Z (release/v0.2.0): attached: privacy-gitleaks.log (115 bytes): Release history secret scan: 146 commits, no leaks
 - 2026-10-24T16:32:45Z (release/v0.2.0): attached: privacy.json (329 bytes): Controlled release-history privacy checks and zero-match counts
+- 2026-10-24T16:32:47Z (release/v0.2.0): Published approved immutable annotated v0.2.0 (tag object 03a0983187d7088c9486c510bf1277f426e9ff9a) at REL=067c63921602e694682d47bdb2412862359c75ff. Remote main and peeled tag equal REL; only main/v0.1.0/v0.1.1/v0.2.0 exist. Both pre-push gates passed 739/739. Anonymous public-tag portability passed on Node26.5.0 and Node22.23.2, including exact lock resolution, installed-package smoke and empty-cache npm ci. No live runtime changes.
