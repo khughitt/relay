@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: release/v0.2.0
 created: 2026-10-24T16:12:06Z
-updated: 2026-10-24T16:25:16Z
+updated: 2026-10-24T16:25:18Z
 started: 2026-10-24T16:20:18Z
 depends: [relay-8d8e86]
 tags: []
@@ -38,3 +38,4 @@ Detached ask/take is merged at 9e72787, but the published tag and hq launcher re
 - 2026-10-24T16:25:04Z (release/v0.2.0): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-24T16:25:15Z (release/v0.2.0): attached: release-review-report.md (2292 bytes): Full independent release review by codex/gpt-6.1-sol at frozen REL; no findings
 - 2026-10-24T16:25:16Z (release/v0.2.0): attached: release-review-ledger.md (1505 bytes): Controller rulings for review scope and completed pending checks; no deferred minors
+- 2026-10-24T16:25:18Z (release/v0.2.0): Node22 git-install rehearsal also passed; both rehearsals verified manifest, exact REL lock resolution, installed-package smoke and empty-cache npm ci. Regenerable bare rehearsal clone and private pattern files removed. Full independent review and controller rulings attached. Public-tag portability remains pending publication approval. Scope handoff: hq-536849 will receive v0.2.0 / 067c63921602e694682d47bdb2412862359c75ff only after successful anonymous public-tag checks.
