@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T15:47:22Z
+updated: 2026-10-24T15:48:44Z
 started: 2026-10-24T13:58:59Z
 completed: 2026-10-24T15:39:12Z
 closed: 2026-10-24T15:39:12Z
@@ -93,3 +93,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T15:47:19Z (main): attached: task-2-inbox-red-portable.log (10864 bytes): Portable derivative: Task 2 service RED evidence; raw bytes and mapping retained by relay-459ceb
 - 2026-10-24T15:47:21Z (main): attached: task-2-socket-red-portable.log (9049 bytes): Portable derivative: Task 2 socket RED evidence; raw bytes and mapping retained by relay-459ceb
 - 2026-10-24T15:47:22Z (main): attached: task-3-red-portable.log (6019 bytes): Portable derivative: Task 3 CLI RED evidence; raw bytes and mapping retained by relay-459ceb
+- 2026-10-24T15:48:44Z (main): retained: {"host": "titan", "kind": "scratch", "path": "$WORK_ROOT/relay/.worktrees/detached-ask/.superpowers/sdd/2026-10-24-detached-ask", "state": "kept", "verification": "verified", "purpose": "Verified all needed evidence attached or copied to relay-459ceb; duplicate reports/logs, generated briefs/diff/timing output and superseded inventory patch are disposable after worktree checks", "next_owner": "session:codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a", "cleanup_trigger": "Immediate checked worktree removal this turn; canonical raw RED evidence stays under relay-459ceb", "manifest": "$WORK_ROOT/relay/.worktrees/detached-ask/.superpowers/sdd/2026-10-24-detached-ask/sha256-manifest.json", "sha256": "15c617067ad55f783d7f91b8b7502a961baccfac89eafe0c4bc319ba9bf25e1f"}
