@@ -1,13 +1,13 @@
 ---
 id: relay-83f587
 title: Expose detached ask and take through the CLI
-status: todo
+status: blocked
 priority: 2
 size: s
 complexity: mid
 process: direct
 created: 2026-10-24T14:50:37Z
-updated: 2026-10-24T14:50:37Z
+updated: 2026-10-24T14:50:49Z
 depends: [relay-420059]
 parent: relay-8d8e86
 tags: []
@@ -18,3 +18,8 @@ step: "Task 3: Expose detached asks and receipt through the CLI"
 ---
 
 Implement plan Task 3: inbox ask-file and take, cli/terminal surface, user/asker withdrawal, existing CLI envelopes, safe subprocess fixtures, API and service-runbook updates, real CLI regression tests, development/Node 22 gates and final whole-branch review. Preserve service-side party validation and its one-connection cost as noted by the user. Requires Task 2 and parent plan approval.
+
+## Notes
+
+- 2026-10-24T14:50:49Z (feat/detached-ask): Implementation plan awaits user approval; unblock at execution Setup.
+  provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
