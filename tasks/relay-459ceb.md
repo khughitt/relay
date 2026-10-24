@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-24T15:44:19Z
-updated: 2026-10-24T15:46:11Z
+updated: 2026-10-24T15:46:12Z
 depends: []
 tags: []
 source: relay-8d8e86
@@ -19,3 +19,4 @@ The completed detached-ask implementation keeps four exact RED-test logs off-tre
 ## Notes
 
 - 2026-10-24T15:46:11Z (main): Created on titan: $WORK_ROOT/relay/relay-8d8e86 and raw-red-evidence for exact RED-test logs refused by the layout gate; owned by relay-459ceb; contents mutable, not yet checkpointed.
+- 2026-10-24T15:46:12Z (main): Portable derivative mapping for raw-red-evidence: <WORK_ROOT> = /mnt/ssd3/work; <HOME> = /home/keith. Exact raw files are unchanged; derivatives are attached to relay-8d8e86.
