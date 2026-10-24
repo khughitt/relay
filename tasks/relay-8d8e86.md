@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/detached-ask
 created: 2026-10-16T00:59:56Z
-updated: 2026-10-24T14:42:05Z
+updated: 2026-10-24T14:42:07Z
 started: 2026-10-24T13:58:59Z
 depends: []
 tags: [cross-project]
@@ -44,3 +44,4 @@ Piece of ops-cb50a8, needed by flows' typed gates (flows docs/specs/2026-10-15-t
 - 2026-10-24T14:42:02Z (feat/detached-ask): resumed
   provenance: {"harness_session":"codex:01a16e34-23e9-7383-a3ce-8a9e9991a96a","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T14:42:05Z (feat/detached-ask): review: spec round 4 — verdict: accept; findings: Minor 1; reviewer: human
+- 2026-10-24T14:42:07Z (feat/detached-ask): User approved relay spec 94555165894c8bb47d314020aa1296b3895911fe for planning. Nonblocking Minor: a detached question file with wrong sender/recipient reaches service validation (one connection), whereas a native question file is refused by the CLI before connecting. Record this boundary in the plan; no spec revision required.
