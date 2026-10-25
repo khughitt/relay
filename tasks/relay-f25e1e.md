@@ -6,9 +6,9 @@ priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: docs/cli-mappings
 created: 2026-10-25T00:55:50Z
-updated: 2026-10-25T02:21:04Z
+updated: 2026-10-25T02:21:27Z
 started: 2026-10-25T02:21:04Z
 depends: []
 tags: [docs]
@@ -21,4 +21,6 @@ Documentation review finding F5 at c2f0b07a18f24376189ce524d7aeb2b3f15c87c9: REA
 ## Notes
 
 - 2026-10-25T02:21:04Z (main): started
+  provenance: {"harness_session":"codex:01a170db-326b-7210-974d-9e3001240e5f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T02:21:27Z (docs/cli-mappings): resumed
   provenance: {"harness_session":"codex:01a170db-326b-7210-974d-9e3001240e5f","harness_session_source":"CODEX_THREAD_ID"}
