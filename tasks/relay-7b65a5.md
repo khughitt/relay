@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-23T20:15:07Z
-updated: 2026-10-23T20:15:07Z
+updated: 2026-10-25T00:55:14Z
 depends: []
 tags: []
 source: ops-2c5fbc
@@ -25,3 +25,7 @@ At 2026-10-23: README.md 68 lines, AGENTS.md 28, no CLAUDE.md. tools/ops-check, 
 Done when: `tools/ops-docs check` exits 0 here with identity.toml present; the project's check route runs it (and so its pre-commit hook, where it has one); and `bin/ops-projects check` in ops no longer lists relay and still exits 0.
 
 Profile: personal; integrate under this repository's own rules.
+
+## Notes
+
+- 2026-10-25T00:55:14Z (main): curate-docs: relay-a36561 at c2f0b07a18f24376189ce524d7aeb2b3f15c87c9 confirms: F1 mechanical adoption gap (identity.toml and tools/ops-docs absent; ops-docs exits 2, ops-check exits 0); F2 AGENTS.md repeats global/profile/task rules; F4 its R2 sentence says no installer although src/install and the CLI implement one. The existing guide-contract adoption owns all three; preserve installation/capability preconditions while replacing obsolete stage prose.
