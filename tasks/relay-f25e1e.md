@@ -1,15 +1,17 @@
 ---
 id: relay-f25e1e
 title: Correct the README harness event mapping count
-status: doing
+status: done
 priority: 3
 size: xs
 complexity: low
 process: direct
 owner: docs/cli-mappings
 created: 2026-10-25T00:55:50Z
-updated: 2026-10-25T02:26:44Z
+updated: 2026-10-25T02:26:59Z
 started: 2026-10-25T02:21:04Z
+completed: 2026-10-25T02:26:59Z
+closed: 2026-10-25T02:26:59Z
 depends: []
 tags: [docs]
 source: relay-a36561
@@ -30,3 +32,7 @@ Documentation review finding F5 at c2f0b07a18f24376189ce524d7aeb2b3f15c87c9: REA
 - 2026-10-25T02:26:13Z (docs/cli-mappings): attached: docs-review-report.md (2299 bytes): Full read-only branch review by codex/gpt-6.1-sol of frozen revision 1c83f33; accepted with no findings.
 - 2026-10-25T02:26:40Z (docs/cli-mappings): Ruling: accept the review exclusions at 1c83f33. Why: dated verification prose has its own scoped owner relay-480b51, and this diff changes no executable code; runtime, live-hook and deployment behavior need no new acceptance exercise. Cost: dated verification prose remains stale until relay-480b51, and existing runtime behavior is outside this review. No Critical, Important or deferred Minor findings.
 - 2026-10-25T02:26:44Z (docs/cli-mappings): retained: {"host":"titan","kind":"worktree","path":".worktrees/docs-cli-mappings","state":"kept","verification":"verified","purpose":"Immediate local integration of the reviewed documentation fixes and checked removal in this turn","next_owner":"session:codex:01a170db-326b-7210-974d-9e3001240e5f","cleanup_trigger":"After local merge and merged gate, harvest timings, inspect ignored files and host pointers, then remove the task worktree"}
+- 2026-10-25T02:26:59Z (docs/cli-mappings): done
+  provenance: {"harness_session":"codex:01a170db-326b-7210-974d-9e3001240e5f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T02:26:59Z (docs/cli-mappings): Removed the unnecessary README event count after checking the 22 source mappings. Accepted review at 1c83f33; Node 26 fast suite and Node 22 gate each passed 739 tests. Dated verification cleanup remains with relay-480b51.
+  provenance: {"harness_session":"codex:01a170db-326b-7210-974d-9e3001240e5f","harness_session_source":"CODEX_THREAD_ID"}
