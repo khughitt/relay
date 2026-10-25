@@ -499,11 +499,13 @@ failure returns the committed snapshot and a cleanup diagnostic; CLI exits nonze
 and says publication completed. Do not blindly retry as if publication rolled back.
 Callback and cleanup failures are preserved together in AggregateError.
 
-The CLI's commands are `relay list`, `relay reap [--outer-ms N]`,
+The registry, hook dispatch, installation and model commands are `relay list`, `relay reap [--outer-ms N]`,
 `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`,
 `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--evidence FILE]
 [--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`, `relay rollback --artifact FILE`, and `relay model --harness codex`; `relay --help`,
-`relay help [<command>]`, `relay <command> --help`, and `relay --version` round it out. `--json` and
+`relay help [<command>]`, `relay <command> --help`, and `relay --version` provide help and version information.
+The interaction commands (`serve`, `ask`, `inbox` and `presence`) are documented in
+[CLI and capability gate](#cli-and-capability-gate). `--json` and
 `--pretty` are global and mutually exclusive, `RELAY_FORMAT` sets the default (the protocol rows
 `hook` and `ask` ignore it, since they print only the harness reply), and `install` is JSON
 by default (its value is the installation artifact). Each hook command it writes runs

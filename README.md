@@ -2,8 +2,8 @@
 
 Normalized harness observation and a host-local live-agent registry.
 
-R2 adds bounded guard and observer dispatch to qualified process identity, twenty
-event mappings, safe atomic registry publication, read-only listing and explicit
+R2 adds bounded guard and observer dispatch to qualified process identity,
+harness event mappings, safe atomic registry publication, read-only listing and explicit
 reaping. Node >=22; ES modules and built-ins only, except the installer's
 jsonc-parser. Familiar retains presentation;
 ohai remains the notification client.
