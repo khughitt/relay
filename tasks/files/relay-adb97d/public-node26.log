@@ -1,7 +1,0 @@
-ok reach: 03a0983187d7088c9486c510bf1277f426e9ff9a	refs/tags/v0.2.0
-ok install: npm install of git+https://github.com/khughitt/relay.git#v0.2.0
-ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.2.0
-ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#067c63921602e694682d47bdb2412862359c75ff; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
-ok smoke: installed package verified
-ok ci: npm ci from the lockfile with an empty cache; installed package verified
-portability: pass

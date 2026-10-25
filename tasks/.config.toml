@@ -1,8 +1,0 @@
-prefix = "relay"
-color = "#9c65bc"
-
-[feedback]
-scope = "Harness adapters, hook dispatch to non-Claude harnesses, the live-agent registry, and relay identity."
-
-[git]
-commit = true
