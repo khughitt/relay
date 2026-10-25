@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/cli-mappings
 created: 2026-10-25T00:55:59Z
-updated: 2026-10-25T02:26:10Z
+updated: 2026-10-25T02:26:38Z
 started: 2026-10-25T02:20:51Z
 depends: []
 tags: [docs]
@@ -29,3 +29,4 @@ Documentation review finding F7 at c2f0b07a18f24376189ce524d7aeb2b3f15c87c9: doc
 - 2026-10-25T02:24:23Z (docs/cli-mappings): Verification at 1c83f33: just test-fast on Node v26.5.0 passed 739/739, 0 skipped; just gate on Node v22.23.2 passed hygiene/tasks/type checks and 739/739 tests, 0 skipped. Manual comparison confirms documented general commands/options and interaction table against src/commands.js; an assertion check verified interaction command coverage and the #cli-and-capability-gate destination. No runtime behavior changed.
 - 2026-10-25T02:26:06Z (docs/cli-mappings): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-25T02:26:10Z (docs/cli-mappings): attached: docs-review-report.md (2299 bytes): Full read-only branch review by codex/gpt-6.1-sol of frozen revision 1c83f33; accepted with no findings.
+- 2026-10-25T02:26:38Z (docs/cli-mappings): Ruling: accept the review exclusions at 1c83f33. Why: dated verification prose has its own scoped owner relay-480b51, and this diff changes no executable code; runtime, live-hook and deployment behavior need no new acceptance exercise. Cost: dated verification prose remains stale until relay-480b51, and existing runtime behavior is outside this review. No Critical, Important or deferred Minor findings.
