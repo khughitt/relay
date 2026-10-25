@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/cli-mappings
 created: 2026-10-25T00:55:50Z
-updated: 2026-10-25T02:26:59Z
+updated: 2026-10-25T02:28:18Z
 started: 2026-10-25T02:21:04Z
 completed: 2026-10-25T02:26:59Z
 closed: 2026-10-25T02:26:59Z
@@ -36,3 +36,4 @@ Documentation review finding F5 at c2f0b07a18f24376189ce524d7aeb2b3f15c87c9: REA
   provenance: {"harness_session":"codex:01a170db-326b-7210-974d-9e3001240e5f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T02:26:59Z (docs/cli-mappings): Removed the unnecessary README event count after checking the 22 source mappings. Accepted review at 1c83f33; Node 26 fast suite and Node 22 gate each passed 739 tests. Dated verification cleanup remains with relay-480b51.
   provenance: {"harness_session":"codex:01a170db-326b-7210-974d-9e3001240e5f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T02:28:18Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/docs-cli-mappings","state":"released","verification":"verified","purpose":"Removed after local fast-forward merge, successful merged gate (739 tests on Node v26.5.0), tt-report, clean tracked state and host-pointer check. Ignored node_modules was discarded as regenerable; scratch logs were discarded after recording verdicts and the scratch review report after verifying both exact task attachments.","next_owner":"none","cleanup_trigger":"none"}
