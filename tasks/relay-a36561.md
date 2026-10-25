@@ -1,13 +1,15 @@
 ---
 id: relay-a36561
 title: Documentation review
-status: todo
+status: doing
 priority: 1
 size: s
 complexity: low
 process: direct
+owner: main
 created: 2026-10-24T12:49:45Z
-updated: 2026-10-24T18:56:23Z
+updated: 2026-10-25T00:49:28Z
+started: 2026-10-25T00:49:28Z
 depends: []
 tags: [docs]
 source: curate-docs
@@ -20,3 +22,5 @@ The reusable record of curate-docs passes over this project: one note per pass n
 
 - 2026-10-24T12:49:48Z (main): doc-review: eligible since 2026-10-24: baseline
 - 2026-10-24T18:56:23Z (main): Raised to P1 and undeferred on 2026-10-24 at the owner's request: first-pass documentation reviews of active projects run now rather than three a week under the doc-review cap. Run /curate-docs in this project's checkout; the next doc-review run acknowledges the pass as volunteered.
+- 2026-10-25T00:49:28Z (main): started
+  provenance: {"harness_session":"codex:01a17087-eb91-7c13-a9f7-0ac68f49faae","harness_session_source":"CODEX_THREAD_ID"}
