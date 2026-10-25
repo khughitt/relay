@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/cli-mappings
 created: 2026-10-25T00:55:50Z
-updated: 2026-10-25T02:22:16Z
+updated: 2026-10-25T02:24:26Z
 started: 2026-10-25T02:21:04Z
 depends: []
 tags: [docs]
@@ -25,3 +25,4 @@ Documentation review finding F5 at c2f0b07a18f24376189ce524d7aeb2b3f15c87c9: REA
 - 2026-10-25T02:21:27Z (docs/cli-mappings): resumed
   provenance: {"harness_session":"codex:01a170db-326b-7210-974d-9e3001240e5f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T02:22:16Z (docs/cli-mappings): Baseline: just test on Node v26.5.0 after just setup in .worktrees/docs-cli-mappings; 739 tests passed, 0 failed, 0 skipped. Source event tables are 8 + 8 + 6 = 22; remove the unnecessary count to avoid recurring drift. Scope is README.md only; dated verification text stays with relay-480b51.
+- 2026-10-25T02:24:26Z (docs/cli-mappings): Verification at 1c83f33: source tables confirmed 8 + 8 + 6 = 22; README removes the unnecessary count. just test-fast on Node v26.5.0 and just gate on Node v22.23.2 each passed 739/739 tests, 0 skipped, with gate hygiene/tasks/type checks clean. No new runtime tests were needed for this wording correction.
