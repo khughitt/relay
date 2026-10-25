@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-13T18:16:14Z
-updated: 2026-10-18T22:46:40Z
+updated: 2026-10-25T00:55:25Z
 depends: []
 tags: []
 source: "review:bc4ef2f"
@@ -40,3 +40,4 @@ Done:
 - 2026-10-13T18:16:27Z (main): concerns: relay-f58531 defect — docs still report acceptance pending; ask help and exit-code text inaccurate
 - 2026-10-18T19:02:06Z (main): The decision paragraph is settled: the private tailnet hostname was removed by the 2026-10-13 history rewrite (relay-4dfc10's redaction note); full history holds no occurrence as of 2026-10-18 (checked under relay-c19c0a, gitleaks clean over 997 commits).
 - 2026-10-18T22:46:40Z (main): Also stale in the shipped README: the dated paragraphs 'Verified 2026-09-17: 187 tests …' and 'Typed interaction verification, 2026-10-13: …'. docs/runbooks/release.md now records release verification; trim them or point there (found in relay-c19c0a's final review).
+- 2026-10-25T00:55:25Z (main): curate-docs: relay-a36561 at c2f0b07a18f24376189ce524d7aeb2b3f15c87c9 confirms: F3 README.md 61-68 retains the dated 187-test and 576-test verification paragraphs already named in this task; F6 docs/api.md 566-567 still calls user-present tailnet acceptance a separate gate although README records the acceptance passed. Both existing cleanup items remain unresolved; no prose was edited by this pass.
