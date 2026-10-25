@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/cli-mappings
 created: 2026-10-25T00:55:59Z
-updated: 2026-10-25T02:26:57Z
+updated: 2026-10-25T02:28:16Z
 started: 2026-10-25T02:20:51Z
 completed: 2026-10-25T02:26:57Z
 closed: 2026-10-25T02:26:57Z
@@ -37,3 +37,4 @@ Documentation review finding F7 at c2f0b07a18f24376189ce524d7aeb2b3f15c87c9: doc
   provenance: {"harness_session":"codex:01a170db-326b-7210-974d-9e3001240e5f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T02:26:57Z (docs/cli-mappings): Scoped the API inventory to registry, hook dispatch, installation and model commands and linked the verified interaction CLI table. Accepted review at 1c83f33; Node 26 fast suite and Node 22 gate each passed 739 tests.
   provenance: {"harness_session":"codex:01a170db-326b-7210-974d-9e3001240e5f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T02:28:16Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/docs-cli-mappings","state":"released","verification":"verified","purpose":"Removed after local fast-forward merge, successful merged gate (739 tests on Node v26.5.0), tt-report, clean tracked state and host-pointer check. Ignored node_modules was discarded as regenerable; scratch logs were discarded after recording verdicts and the scratch review report after verifying both exact task attachments.","next_owner":"none","cleanup_trigger":"none"}
