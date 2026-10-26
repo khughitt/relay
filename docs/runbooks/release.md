@@ -127,12 +127,63 @@ capability evidence remain as recorded for v0.1.0; this release does not establi
 new live harness or Darwin acceptance. Live activation belongs to the runtime
 adoption task, not this release.
 
-### Publication status
+### Publication record
 
-Prepared for release verification. The immutable annotated `v0.2.1` tag, frozen
-commit, runtime gate counts, privacy review and installation results will be
-recorded after verification. Publication requires the user's approval; no live
-installation or service changes belong to this release task.
+| Item | Value |
+| --- | --- |
+| Tag | `v0.2.1`, annotated, tag object `7d795ceedca5c3d244c82cb341f162079144c578` |
+| Release commit (`REL`) | `78a70be9b318511d88e0f8ca8d31f54807ed2540` |
+| Pushed | 2026-10-26, after user approval: main `9e21b2e..78a70be`, then the tag. Remote main and the peeled tag both equalled `REL`; only main, v0.1.0, v0.1.1, v0.2.0 and v0.2.1 were present. |
+| Consumer pin | `git+https://github.com/khughitt/relay.git#v0.2.1` |
+| Runtime adoption | `hq-101302`; no live installation or service change in this release task. |
+
+- **Gates at `REL`.** `just gate` passed 772 of 772 tests on Node 26.5.0 and
+  772 of 772 on Node 22.23.2, with strict checking clean on both. The pre-push
+  hook passed 772 of 772 on Node 26.5.0 for both the main and the tag push.
+- **Privacy review at `REL`** (`v0.2.0..REL`, 68 commits, including first-parent
+  merge diffs). Four real path patterns and two private terms passed the
+  nonblank/non-root and source-match controls. gitleaks scanned 67 commits and
+  found no leaks; the remaining commit only deletes files. No state or transcript
+  filenames; one maintainer author address; machine paths 0; private identities 0;
+  published pre-images 0. No optional work-host file was used, following the
+  earlier releases' recorded decision.
+- **Rehearsal at `REL`.** A local annotated rehearsal tag passed git installation,
+  manifest/lockfile, installed-package smoke and empty-cache `npm ci` on both
+  runtimes. The regenerable bare rehearsal clone was removed.
+- **Independent release review.** Round 1 at `7bb4626` asked for one Important
+  correction (state the one-root-per-process assumption and its shared-handle
+  consequence) and four minors; three minors were fixed with it in `REL` and the
+  fourth adopted as procedure (main fast-forwarded to `REL` before the push).
+  Round 2, a fresh reviewer at `REL`, accepted with four wording minors deferred to
+  `relay-66b9bc`. Both reviewers were claude-code/claude-opus-5-5; reviews and
+  rulings are recorded on `relay-5b1fd5`.
+- **Portability against the public tag.** Anonymous HTTPS installation and
+  empty-cache `npm ci` passed on both runtimes. The repository was already public,
+  so the private-refusal step did not apply. The verbatim outputs follow.
+
+Node 26.5.0 (npm 11.17.0):
+
+```text
+ok reach: 7d795ceedca5c3d244c82cb341f162079144c578	refs/tags/v0.2.1
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.2.1
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.2.1
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#78a70be9b318511d88e0f8ca8d31f54807ed2540; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
+
+Node 22.23.2 (npm 10.9.8):
+
+```text
+ok reach: 7d795ceedca5c3d244c82cb341f162079144c578	refs/tags/v0.2.1
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.2.1
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.2.1
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#78a70be9b318511d88e0f8ca8d31f54807ed2540; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
 
 ## v0.2.0
 
