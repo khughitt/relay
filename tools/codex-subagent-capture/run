@@ -97,12 +97,6 @@ multi_agent = true
 TOML
 [[ $case == nested ]] && printf '\n[agents]\nmax_depth = 2\n' >>"$home/config.toml"
 
-# The first record of EVENT whose payload matches the jq condition, or failure.
-logged() {
-  local f
-  for f in "$out"/log/*-"$1".json; do [[ -e $f ]] && jq -e ".payload | $2" "$f" >/dev/null && { echo "$f"; return 0; }; done
-  return 1
-}
 # Poll a command once a second for up to SECONDS seconds; its last result is the return.
 wait_for() {
   local deadline=$((SECONDS + $1)); shift
@@ -128,8 +122,11 @@ if [[ $case == background || $case == switch-* ]]; then
     # The worker's SubagentStop, or the timeout, ends the run; the TUI stays up until then.
     wait_for "${CAPTURE_TIMEOUT:-600}" logged SubagentStop true || status=124
     sleep 3
-  elif wait_for "${CAPTURE_TIMEOUT:-600}" logged PreToolUse '.agent_id != null'; then
-    root=$(jq -r .payload.session_id "$(logged SessionStart true)")
+  elif ! wait_for "${CAPTURE_TIMEOUT:-600}" logged SessionStart '.agent_id == null'; then
+    note "no initial root SessionStart within the capture timeout; switch not sent"
+    status=1
+  elif root=$(jq -r .payload.session_id "$(logged SessionStart '.agent_id == null')") &&
+       wait_for "${CAPTURE_TIMEOUT:-600}" switch_ready "$root"; then
     pane tui-1-worker-running.txt
     case $case in
       switch-new) submit /new ;;
@@ -149,6 +146,7 @@ if [[ $case == background || $case == switch-* ]]; then
     ((hold > 0)) && sleep "$hold"
     if [[ -r $out/relay-state/agents.json ]]; then cp "$out/relay-state/agents.json" "$out/before-quit-agents.json"; fi
   else
+    note "root Stop and worker PreToolUse were not both logged within the capture timeout; switch not sent"
     status=124
   fi
   pane tui.txt

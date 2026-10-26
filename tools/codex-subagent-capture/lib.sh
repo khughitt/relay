@@ -50,6 +50,20 @@ HOOK
 
 scrub_auth() { rm -f "$1/home/auth.json"; }
 
+# The first record of EVENT whose payload matches the jq condition, or failure.
+logged() {
+  local f
+  for f in "$out"/log/*-"$1".json; do [[ -e $f ]] && jq -e ".payload | $2" "$f" >/dev/null && { echo "$f"; return 0; }; done
+  return 1
+}
+
+switch_ready() {
+  local root_json
+  root_json=$(jq -Rn --arg root "$1" '$root')
+  logged Stop ".session_id == $root_json and .agent_id == null" >/dev/null &&
+    logged PreToolUse ".session_id == $root_json and .agent_id != null" >/dev/null
+}
+
 CAPTURE_EVENTS=(SessionStart SubagentStart UserPromptSubmit PreToolUse PostToolUse PermissionRequest Stop SubagentStop SessionEnd)
 
 # The logging hook alone, on every event.

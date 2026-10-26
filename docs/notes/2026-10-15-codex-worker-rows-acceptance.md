@@ -165,6 +165,41 @@ exit=1
 
 ## Root switches in one process
 
+### Replacement-policy replay, 2026-10-26
+
+relay-1ba6de replayed the three original Codex 0.164.0 switch captures against
+the writer at `b66b39a` on Node v26.5.0, with the judge changes committed with
+this note. The original capture manifest's SHA-256 was verified before use:
+`49381bd115ec1540574525ffd2f46196aaa929c0e15293c203236764337e1bdc`; all entries
+matched. Original files were unchanged. Each replay used normalizeEvent/applyEvent
+with the handles from the captured registry copies and injected liveness, Git
+context and time; it did not resolve the replay runner as a Codex process.
+Log-only native events were skipped. A switch-new pilot ran end to end through
+the judge before the other cases.
+
+| Replay | Handled events | Before quit | Result |
+| --- | --- | --- | --- |
+| switch-new | 13 | 1 root, 0 workers | PASS |
+| switch-resume | 13 | 1 root, 0 workers | PASS |
+| switch-fork | 13 | 1 root, 0 workers | PASS |
+| synthetic active worker across replacement | 10 | 1 root, 0 workers | PASS |
+| synthetic missing SessionStart | 9 | 2 roots, 1 done worker | ACCEPTED: replacement-not-proven-missing-start |
+| synthetic handle-less SessionStart, later proof recovery | 10 | 2 roots, 1 done worker | ACCEPTED: replacement-not-proven-process |
+| synthetic late old-root event after proven replacement | 11 | 2 roots, 1 done worker | ACCEPTED: root-recreated-after-replacement |
+
+All three recorded cases and the active-worker synthetic case retained the
+unfinished worker under its original root at the new root's SessionStart, then
+removed it at its admitted SubagentStop. Final injected process death/reap left
+no rows. The accepted fallback cases remain visible duplicates, as approved;
+those labels do not excuse an earlier missed proven replacement or unrelated
+worker/cascade/reap violations. Judge tests cover those negative cases.
+
+The task attachments `replay-results.txt` and `replay.mjs` record the verdicts,
+source hashes and replay method; original raw captures remain task-retained.
+This is deterministic policy acceptance, not another live capture: it establishes
+neither current Codex event delivery nor daemon-hosted behavior. Capture readiness
+changes were checked with synthetic logs and shell syntax, without a fresh TUI run.
+
 Run 2026-10-25 for `relay-3d6c93`. Codex `codex-cli 0.164.0`; relay at `1a2198b` plus
 the capture tool changes committed with this section. Each case ran
 `tools/codex-subagent-capture/run --relay bin/relay.js --case switch-<new|resume|fork>`:
