@@ -104,6 +104,32 @@ The acceptance criterion: no secrets, credentials, transcripts, registry or subs
 state, user paths outside `tasks/`, or private identities. Machine paths and host names
 in task notes are accepted, as in the public tasks and familiar repositories.
 
+## v0.2.1
+
+Retires replaced Codex roots. A root Codex SessionStart now removes the other Codex
+session rows on the same proven process, and the `done` workers there that belong to
+a different root, in one publication. Proof is equal non-null handles; Linux also
+needs a non-null boot id. Unfinished workers keep their original root. A worker
+SubagentStop removes its row when its root row is gone and a different Codex session
+row proves the same process. Without that proof, rows behave as in v0.2.0. Retiring a
+row neither releases nor transfers a tasks claim. `docs/api.md` states the contract
+and its limits: late old-root events, unverified hook completion order, and
+daemon-hosted sessions (`relay-511e14`).
+
+Also includes the Codex subagent capture's root-switch cases (`/new`, `/resume`,
+`/fork`) with per-root judging, and corrections to the README's event-mapping prose
+and the API's CLI inventory. Task records moved out of this repository to the records
+root. Platform status and capability evidence remain as recorded for v0.1.0; this
+release does not establish new live harness or Darwin acceptance. Live activation
+belongs to the runtime adoption task, not this release.
+
+### Publication status
+
+Prepared for release verification. The immutable annotated `v0.2.1` tag, frozen
+commit, runtime gate counts, privacy review and installation results will be
+recorded after verification. Publication requires the user's approval; no live
+installation or service changes belong to this release task.
+
 ## v0.2.0
 
 Adds detached inbox questions: `relay inbox ask --file PATH` durably posts an
