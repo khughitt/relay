@@ -347,6 +347,27 @@ test('Codex SessionEnd fits its one-second default and OpenCode events observe o
   assert.equal((await readSnapshot({ paths: p })).agents['opencode:opencode:42'].state, 'working');
 });
 
+test('a replaced worker stop still reaches guards and observers; a refusal preserves its row',async t=>{
+  for(const deny of [false,true]){
+    const p=await tempPaths(t),seen=[];
+    const native=(event,fields={})=>normalizeEvent('codex',event,payload({session_id:'old',...fields}));
+    await applyEvent(native('SessionStart'),{paths:p,...local});
+    await applyEvent(native('SubagentStart',{agent_id:'worker'}),{paths:p,...local});
+    await applyEvent(native('SessionStart',{session_id:'next'}),{paths:p,...local});
+    const before=await readSnapshot({paths:p}),bytes=await readFile(p.agentsPath,'utf8');
+    await writeSubscribers(p,[strip(guard('g','allow',{kinds:['turn-end']})),strip(observer('o','allow',{kinds:['turn-end']}))]);
+    const result=await hook(p,{harness:'codex',nativeEvent:'SubagentStop',body:payload({session_id:'old',agent_id:'worker',stop_hook_active:false}),
+      deps:{run:async(_argv,input)=>{const message=JSON.parse(input);seen.push(message);
+        return{status:'exited',exitCode:0,stderr:'',stdout:JSON.stringify(deny?{decision:'deny',reason:'continue'}:{decision:'allow'})};}}});
+    assert.equal(result.exitCode,deny?2:0);
+    assert.equal(seen[0].event.agentId,'codex:worker');assert.equal(seen[0].event.root,'codex:old');
+    if(deny){assert.equal(seen.length,1);assert.equal(await readFile(p.agentsPath,'utf8'),bytes);}
+    else{const after=await readSnapshot({paths:p});assert.equal(after.agents['codex:worker'],undefined);
+      assert.equal(seen[1].event.agentId,'codex:worker');assert.equal(seen[1].registry.revision,before.revision+1);
+      assert.equal(seen[1].changed,true);assert.deepEqual(after.agents['codex:next'],before.agents['codex:next']);}
+  }
+});
+
 test('reconcile prunes, then notifies reconcile observers even when nothing changed', async (t) => {
   const p = await tempPaths(t), file = join(p.stateDir, '..', 'reconcile.json');
   await writeSubscribers(p, [strip(observer('r', 'record', { kinds: [RECONCILE], file, timeoutMs: 500 })), strip(observer('never', 'record', { kinds: ['session-end'], file: join(p.stateDir, '..', 'never') }))]);

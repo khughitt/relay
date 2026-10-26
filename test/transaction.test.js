@@ -66,7 +66,7 @@ test('Git and unexpected process errors abort before lock or state creation',asy
 test('read/list never prune and explicit reap removes only confirmed dead',async t=>{
   const p=await tempState(t),opts=localObservation(p);
   await applyEvent(event('codex','SessionStart','live'),opts);await applyEvent(event('codex','SessionStart','unknown'),{...opts,resolveSessionPid:()=>null});
-  const r=await applyEvent(event('codex','SessionStart','dead'),opts);r.snapshot.agents['codex:dead'].process.start=String(BigInt(r.snapshot.agents['codex:dead'].process.start)+1n);
+  const r=await applyEvent(event('codex','SessionStart','dead'),{...opts,resolveSessionPid:()=>process.ppid});r.snapshot.agents['codex:dead'].process.start=String(BigInt(r.snapshot.agents['codex:dead'].process.start)+1n);
   await fs.writeFile(p.agentsPath,JSON.stringify(r.snapshot));const bytes=await fs.readFile(p.agentsPath,'utf8');
   const listed=await listAgents({paths:p});assert.deepEqual(Object.values(listed.liveness).map(v=>v.status),['alive','unknown','dead']);assert.equal(await fs.readFile(p.agentsPath,'utf8'),bytes);
   const reaped=await reapRegistry({paths:p});assert.deepEqual(reaped.reaped,['codex:dead']);assert.equal(reaped.snapshot.revision,4);assert.ok(reaped.diagnostics.some(d=>d.agentId==='codex:unknown'));
@@ -216,6 +216,116 @@ test('a dead codex process takes its root and every worker with it', async t => 
   const reaped = await reapRegistry({ paths: p });
   assert.deepEqual(reaped.reaped.sort(), [`codex:${R}`, `codex:${W1}`, 'codex:0199f000-0000-7000-8000-000000000003']);
   assert.deepEqual(Object.keys(reaped.snapshot.agents), [`claude-code:${C}`]);
+});
+
+const R2 = '0199f000-0000-7000-8000-000000000004';
+const W2 = '0199f000-0000-7000-8000-000000000005', W3 = '0199f000-0000-7000-8000-000000000006';
+const proof = {platform:'linux',host:'h',bootId:'12345678-1234-1234-8234-123456789abc',pid:100,start:'1'};
+const codexOptions = (p, handle = proof) => ({...observe(p,{...chainOps({}),handleOf:pid=>pid===100?handle:{...proof,pid}}),resolveSessionPid:()=>100});
+const secondRoot = native => codex(native,{session_id:R2});
+
+test('a proven new root retires the old root and done workers but retains unfinished workers', async t => {
+  const p=await tempState(t), o=codexOptions(p);
+  await applyEvent(codex('SessionStart'),o);
+  await applyEvent(worker('SubagentStart'),o);
+  await applyEvent(codex('SubagentStop',{agent_id:W2,stop_hook_active:false}),o);
+  await applyEvent(codex('PermissionRequest',{agent_id:W3,...tool}),o);
+  const before=(await applyEvent(claudeEvent(C),o)).snapshot;
+  const after=(await applyEvent(secondRoot('SessionStart'),o)).snapshot;
+  assert.equal(after.agents[`codex:${R}`],undefined);
+  assert.equal(after.agents[`codex:${W2}`],undefined);
+  for(const id of [`codex:${W1}`,`codex:${W3}`,`claude-code:${C}`]) assert.deepEqual(after.agents[id],before.agents[id]);
+  assert.equal(after.agents[`codex:${R2}`].scope,'session');
+  assert.equal(after.revision,before.revision+1);assert.equal(after.generation,before.generation);
+});
+test('a worker SubagentStart never retires a root or its done workers',async t=>{
+  const p=await tempState(t),o=codexOptions(p);
+  await applyEvent(codex('SessionStart'),o);
+  const before=(await applyEvent(codex('SubagentStop',{agent_id:W2,stop_hook_active:false}),o)).snapshot;
+  const after=(await applyEvent(worker('SubagentStart'),o)).snapshot;
+  assert.deepEqual(after.agents[`codex:${R}`],before.agents[`codex:${R}`]);
+  assert.deepEqual(after.agents[`codex:${W2}`],before.agents[`codex:${W2}`]);
+  assert.equal(after.agents[`codex:${W1}`].state,'working');
+});
+test('a replaced worker leaves on Stop and returns on a later tool event',async t=>{
+  const p=await tempState(t),o=codexOptions(p);
+  await applyEvent(codex('SessionStart'),o);await applyEvent(worker('SubagentStart'),o);
+  const before=(await applyEvent(secondRoot('SessionStart'),o)).snapshot;
+  const stopped=await applyEvent(worker('SubagentStop',{stop_hook_active:false}),o);
+  assert.equal(stopped.snapshot.agents[`codex:${W1}`],undefined);
+  assert.equal(stopped.snapshot.revision,before.revision+1);
+  const bytes=await fs.readFile(p.agentsPath,'utf8');
+  assert.equal((await applyEvent(worker('SubagentStop',{stop_hook_active:false}),o)).changed,false);
+  assert.equal(await fs.readFile(p.agentsPath,'utf8'),bytes);
+  const resumed=(await applyEvent(worker('PreToolUse',tool),o)).snapshot;
+  assert.equal(resumed.agents[`codex:${W1}`].root,`codex:${R}`);
+  assert.equal(resumed.agents[`codex:${W1}`].state,'working');
+  assert.deepEqual(resumed.agents[`codex:${R2}`],before.agents[`codex:${R2}`]);
+  const ended=(await applyEvent(codex('SessionEnd'),o)).snapshot;
+  assert.deepEqual(Object.keys(ended.agents),[`codex:${R2}`]);
+});
+test('a worker without replacement evidence keeps ordinary upserts',async t=>{
+  const p=await tempState(t),o=codexOptions(p);
+  await applyEvent(worker('PreToolUse',tool),o);
+  assert.equal((await applyEvent(worker('SubagentStop',{stop_hook_active:false}),o)).snapshot.agents[`codex:${W1}`].state,'done');
+  await applyEvent(secondRoot('SessionStart'),o);await applyEvent(secondRoot('SessionEnd'),o);
+  const after=(await applyEvent(worker('SubagentStop',{stop_hook_active:false}),o)).snapshot;
+  assert.equal(after.agents[`codex:${W1}`].state,'done');
+});
+test('a missing start or missing handle never suppresses the active root',async t=>{
+  for(const missing of ['start','handle']) {
+    const p=await tempState(t),o=codexOptions(p);await applyEvent(codex('SessionStart'),o);
+    if(missing==='handle')await applyEvent(secondRoot('SessionStart'),{...o,resolveSessionPid:()=>null});
+    for(const native of ['UserPromptSubmit','PreToolUse']) {
+      const after=(await applyEvent(codex(native,{session_id:R2,...tool}),o)).snapshot;
+      assert.ok(after.agents[`codex:${R}`]);
+      assert.deepEqual(after.agents[`codex:${R2}`].process,proof);
+      assert.equal(after.agents[`codex:${R2}`].state,'working');
+    }
+  }
+});
+test('prompt first and late old-root events remain visible',async t=>{
+  const p=await tempState(t),o=codexOptions(p);await applyEvent(codex('SessionStart'),o);
+  assert.equal((await applyEvent(secondRoot('UserPromptSubmit'),o)).snapshot.agents[`codex:${R2}`].state,'working');
+  const started=(await applyEvent(secondRoot('SessionStart'),o)).snapshot;
+  assert.equal(started.agents[`codex:${R}`],undefined);assert.equal(started.agents[`codex:${R2}`].state,'idle');
+  const late=(await applyEvent(codex('Stop'),o)).snapshot;
+  assert.equal(late.agents[`codex:${R}`].state,'done');assert.deepEqual(late.agents[`codex:${R2}`],started.agents[`codex:${R2}`]);
+  assert.equal((await applyEvent(worker('SubagentStop',{stop_hook_active:false}),o)).snapshot.agents[`codex:${W1}`].state,'done');
+});
+test('duplicate start and switch back retain the correct workers',async t=>{
+  const p=await tempState(t),o=codexOptions(p);await applyEvent(codex('SessionStart'),o);
+  await applyEvent(worker('SubagentStart'),o);await applyEvent(secondRoot('SessionStart'),o);
+  const started=(await applyEvent(codex('SubagentStop',{session_id:R2,agent_id:W2,stop_hook_active:false}),o)).snapshot;
+  const repeated=(await applyEvent(secondRoot('SessionStart'),o)).snapshot;
+  assert.deepEqual(repeated.agents[`codex:${W2}`],started.agents[`codex:${W2}`]);
+  const back=(await applyEvent(codex('SessionStart'),o)).snapshot;
+  assert.equal(back.agents[`codex:${R2}`],undefined);assert.equal(back.agents[`codex:${W2}`],undefined);
+  assert.deepEqual(back.agents[`codex:${W1}`],started.agents[`codex:${W1}`]);
+});
+test('replacement needs full process proof',async t=>{
+  const cases=[
+    [proof,proof,true],[{...proof,platform:'darwin',bootId:null},{...proof,platform:'darwin',bootId:null},true],
+    [proof,{...proof,platform:'darwin',bootId:null},false],[proof,{...proof,host:'other'},false],
+    [proof,{...proof,bootId:'22345678-1234-1234-8234-123456789abc'},false],
+    [proof,{...proof,pid:101},false],[proof,{...proof,start:'2'},false],
+    [{...proof,bootId:null},{...proof,bootId:null},false],[proof,null,false],[null,proof,false],
+    [{...proof,bootId:null},proof,false],[proof,{...proof,bootId:null},false]
+  ];
+  for(const [oldHandle,newHandle,replaces]of cases){
+    const p=await tempState(t);await applyEvent(codex('SessionStart'),codexOptions(p,oldHandle));
+    const after=(await applyEvent(secondRoot('SessionStart'),codexOptions(p,newHandle))).snapshot;
+    assert.equal(Object.hasOwn(after.agents,`codex:${R}`),!replaces,JSON.stringify([oldHandle,newHandle]));
+  }
+});
+test('replacement uses the latest locked snapshot',async t=>{
+  const p=await tempState(t),o=codexOptions(p);await applyEvent(codex('SessionStart'),o);
+  let enter,release;const entered=new Promise(r=>{enter=r;}),held=new Promise(r=>{release=r;});
+  const holder=withLock(p.lockPath,async()=>{enter();await held;const s=await readSnapshot({paths:p});
+    s.agents[`codex:${W2}`]={...s.agents[`codex:${R}`],id:`codex:${W2}`,sessionId:W2,scope:'worker',root:`codex:${R}`,state:'done'};
+    s.revision=8;await fs.writeFile(p.agentsPath,JSON.stringify(s));});
+  await entered;const pending=applyEvent(secondRoot('SessionStart'),o);release();await holder;
+  const after=(await pending).snapshot;assert.deepEqual(Object.keys(after.agents),[`codex:${R2}`]);assert.equal(after.revision,9);
 });
 
 const S = '0199f000-0000-7000-8000-000000000090';
