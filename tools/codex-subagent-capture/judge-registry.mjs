@@ -1,71 +1,93 @@
 #!/usr/bin/env node
-// Judge a `run --relay` capture. Worker rows exist with scope worker and their root, share
-// the root's handle and never move the root row; the root's SessionEnd publication removes
-// the root and its workers; reap after the process exits leaves nothing. Only events relay
-// handled (wrapped hooks, which leave a .reply file) carry a registry copy; PostToolUse is
-// logged only and is skipped. A switch case (/new, /resume, /fork) has several roots in one
-// process: each is judged against its own previous row, a worker event after its root's
-// SessionEnd must not recreate a row, and the registry copied before /quit, while the
-// process still lives, must hold no replaced root and no worker of one.
-// Exit 0 pass, 1 fail, 2 invalid run (no worker event).
+// Judge captured publications, not inferred terminal activity. Missing process proof and
+// late root upserts may leave accepted duplicates; proven replacement must work immediately.
+// Exit 0 pass, 1 registry/lifecycle failure, 2 incomplete switch evidence.
 // Usage: judge-registry.mjs OUT_DIR
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
-const dir = process.argv[2];
-if (!dir) throw new Error('usage: judge-registry.mjs OUT_DIR');
-const log = join(dir, 'log'), read = path => JSON.parse(readFileSync(path, 'utf8'));
-const records = readdirSync(log).filter(name => /^\d+-[A-Za-z]+\.json$/.test(name)).sort().map(name => {
-  const base = join(log, name.replace(/\.json$/, ''));
-  return { name, ...read(join(log, name)), wrapped: existsSync(`${base}.reply`),
-    after: existsSync(`${base}.agents.json`) ? read(`${base}.agents.json`) : null };
+const dir=process.argv[2];
+if(!dir)throw new Error('usage: judge-registry.mjs OUT_DIR');
+const log=join(dir,'log'),read=path=>JSON.parse(readFileSync(path,'utf8'));
+const handled=readdirSync(log).filter(name=>/^\d+-[A-Za-z]+\.json$/.test(name)).sort().flatMap(name=>{
+  const base=join(log,name.slice(0,-5));
+  return existsSync(`${base}.reply`)?[{name,...read(join(log,name)),after:existsSync(`${base}.agents.json`)?read(`${base}.agents.json`):null}]:[];
 });
-const failures = [], fail = message => failures.push(message);
-const handled = records.filter(record => record.wrapped);
-const workerEvents = handled.filter(record => typeof record.payload.agent_id === 'string');
-if (!workerEvents.length) { console.log('INVALID: no worker event reached relay'); process.exit(2); }
-const rooted = (rows, rootId) => Object.values(rows).filter(row => row.id === rootId || row.root === rootId).map(row => row.id);
-const previousRoot = new Map(), endedRoots = new Set(), roots = [];
-let ended = false;
-for (const record of handled) {
-  if (record.after === null) { fail(`${record.name}: no registry copy after a relay event`); continue; }
-  const rootId = `codex:${record.payload.session_id}`, rows = record.after.agents, root = rows[rootId] ?? null;
-  if (typeof record.payload.agent_id === 'string') {
-    const workerId = `codex:${record.payload.agent_id}`, row = rows[workerId];
-    if (endedRoots.has(rootId)) { if (row) fail(`${record.name}: recreated ${workerId} after its root ${rootId} ended`); }
-    else if (!row) fail(`${record.name}: no worker row`);
-    else {
-      if (row.scope !== 'worker' || row.root !== rootId) fail(`${record.name}: worker row scope ${row.scope}, root ${row.root}`);
-      if (root && !isDeepStrictEqual(row.process, root.process)) fail(`${record.name}: worker and root handles differ`);
+const invalid=message=>{console.log(`INVALID: ${message}`);process.exit(2);};
+const workerEvents=handled.filter(r=>typeof r.payload.agent_id==='string');
+if(!workerEvents.length)invalid('no worker event reached relay');
+const roots=[...new Set(handled.filter(r=>typeof r.payload.agent_id!=='string'&&r.event!=='SessionEnd').map(r=>`codex:${r.payload.session_id}`))];
+const beforeQuitPath=join(dir,'before-quit-agents.json');
+const beforeQuit=existsSync(beforeQuitPath)?read(beforeQuitPath):null;
+const switchCase=existsSync(join(dir,'case'))&&readFileSync(join(dir,'case'),'utf8').trim().startsWith('switch-');
+if(switchCase&&roots.length<2)invalid('switch case has no second root evidence');
+if(switchCase&&!existsSync(beforeQuitPath))invalid('switch case has no before-quit registry copy');
+const sameProcess=(a,b)=>a!=null&&b!=null&&(a.platform!=='linux'||a.bootId!==null)
+  &&a.platform===b.platform&&a.host===b.host&&a.bootId===b.bootId&&a.pid===b.pid&&a.start===b.start;
+const failures=[],fail=message=>failures.push(message);
+const handles=new Map(),starts=new Map(),retired=new Map(),lastRootEvent=new Map();
+let previous={},beforeQuitRecord={},ended=false;
+for(const [index,record]of handled.entries()){
+  if(record.after===null){fail(`${record.name}: no registry copy after a relay event`);continue;}
+  const rootId=`codex:${record.payload.session_id}`,rows=record.after.agents,root=rows[rootId]??null;
+  if(typeof record.payload.agent_id==='string'){
+    const workerId=`codex:${record.payload.agent_id}`,row=rows[workerId];
+    const eventHandle=row?row.process:previous[workerId]?.process??handles.get(rootId);
+    const replaced=!previous[rootId]&&Object.values(previous).some(a=>a.harness==='codex'&&a.scope==='session'&&sameProcess(a.process,eventHandle));
+    if(record.event==='SubagentStop'&&replaced){if(row)fail(`${record.name}: completed replaced worker ${workerId} still published`);}
+    else if(!row)fail(`${record.name}: no worker row`);
+    if(row){
+      if(row.scope!=='worker'||row.root!==rootId)fail(`${record.name}: worker row scope ${row.scope}, root ${row.root}`);
+      if(root?.process&&row.process&&!isDeepStrictEqual(row.process,root.process))fail(`${record.name}: worker and root handles differ`);
     }
-    if (!isDeepStrictEqual(root, previousRoot.get(rootId) ?? null)) fail(`${record.name}: a worker event changed the root row`);
+    if(!isDeepStrictEqual(root,previous[rootId]??null))fail(`${record.name}: a worker event changed the root row`);
+  }else if(record.event==='SessionEnd'){
+    ended=true;
+    const left=Object.values(rows).filter(a=>a.id===rootId||a.root===rootId).map(a=>a.id);
+    if(left.length)fail(`${record.name}: SessionEnd left ${left.join(', ')}`);
+  }else{
+    lastRootEvent.set(rootId,index);
+    if(!root)fail(`${record.name}: no root row`);
+    if(record.event==='SessionStart'){
+      retired.delete(rootId);
+      let matched=false;
+      for(const [id,a]of Object.entries(previous)){
+        if(a.harness!=='codex'||!sameProcess(a.process,root?.process)||id===rootId)continue;
+        if(a.scope==='session'){
+          matched=true;retired.set(id,index);
+          if(rows[id])fail(`${record.name}: replaced root ${id} still published`);
+        }else if(a.scope==='worker'&&a.root!==rootId){
+          if(a.state==='done'){if(rows[id])fail(`${record.name}: completed worker ${id} still published`);}
+          else if(!isDeepStrictEqual(rows[id],a))fail(`${record.name}: unfinished worker ${id} changed at replacement`);
+        }
+      }
+      starts.set(rootId,{matched,index});
+    }
   }
-  else if (!roots.includes(rootId)) {
-    const replaced = roots.at(-1);
-    if (replaced && !endedRoots.has(replaced)) console.log(`INFO: ${replaced} had no SessionEnd before ${rootId} started`);
-    roots.push(rootId);
-  }
-  if (record.event === 'SessionEnd') {
-    ended = true;
-    endedRoots.add(rootId);
-    const left = rooted(rows, rootId);
-    if (left.length) fail(`${record.name}: SessionEnd left ${left.join(', ')}`);
-  }
-  previousRoot.set(rootId, root);
+  for(const a of Object.values(rows))if(a.process)handles.set(a.id,a.process);
+  previous=rows;
+  if(beforeQuit&&record.after.generation===beforeQuit.generation&&record.after.revision===beforeQuit.revision
+    &&isDeepStrictEqual(rows,beforeQuit.agents))beforeQuitRecord={rows,index,starts:new Map(starts),retired:new Map(retired),lastRootEvent:new Map(lastRootEvent)};
 }
-if (!ended) fail('no SessionEnd publication captured');
-const beforeQuit = join(dir, 'before-quit-agents.json');
-if (existsSync(beforeQuit)) {
-  const rows = read(beforeQuit).agents;
-  for (const replaced of roots.slice(0, -1)) {
-    if (rows[replaced]) fail(`before /quit, the replaced root ${replaced} is still published`);
-    for (const id of rooted(rows, replaced).filter(id => id !== replaced)) fail(`before /quit, ${id} outlives its root ${replaced}`);
+if(!ended)fail('no SessionEnd publication captured');
+if(beforeQuit){
+  const rows=beforeQuit.agents;
+  if(!beforeQuitRecord.rows)fail('before /quit, no captured publication matches the checkpoint generation, revision and rows');
+  for(const [i,id]of roots.entries()){
+    if(!rows[id])continue;
+    if((beforeQuitRecord.lastRootEvent?.get(id)??-1)>(beforeQuitRecord.retired?.get(id)??Infinity)){
+      console.log(`ACCEPTED: root-recreated-after-replacement ${id}`);
+    }else if(i>0&&roots.slice(0,i).some(old=>rows[old])){
+      const start=beforeQuitRecord.starts?.get(id);
+      if(!start)console.log(`ACCEPTED: replacement-not-proven-missing-start ${id}`);
+      else if(!start.matched)console.log(`ACCEPTED: replacement-not-proven-process ${id}`);
+    }
   }
 }
-const final = existsSync(join(dir, 'final-agents.json')) ? read(join(dir, 'final-agents.json')) : undefined;
-if (final === undefined) fail('no final-agents.json (reap result)');
-else if (final !== null && Object.keys(final.agents).length) fail(`rows left after reap: ${Object.keys(final.agents).join(', ')}`);
-for (const message of failures) console.log(`FAIL: ${message}`);
-console.log(failures.length ? `FAIL (${failures.length})` : `PASS: ${workerEvents.length} worker events, SessionEnd removed the session's rows, reap left none`);
-process.exit(failures.length ? 1 : 0);
+const final=existsSync(join(dir,'final-agents.json'))?read(join(dir,'final-agents.json')):undefined;
+if(final===undefined)fail('no final-agents.json (reap result)');
+else if(final!==null&&Object.keys(final.agents).length)fail(`rows left after reap: ${Object.keys(final.agents).join(', ')}`);
+for(const message of failures)console.log(`FAIL: ${message}`);
+console.log(failures.length?`FAIL (${failures.length})`:`PASS: ${workerEvents.length} worker events, registry lifecycle checked, reap left none`);
+process.exit(failures.length?1:0);

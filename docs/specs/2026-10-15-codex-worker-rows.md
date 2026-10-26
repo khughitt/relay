@@ -137,13 +137,31 @@ only the row they update changes.
   - the root's SessionEnd arrives: relay deletes the root row and every row whose `root`
     is that root's id, in the same publication; or
   - the process dies: the existing prune removes it with the root, since they share the
-    handle.
-- **No other end.** An interrupted or failed worker turn leaves the row in its last state,
+    handle; or
+  - a root Codex SessionStart proves the same process (equal platform, host, bootId, pid
+    and start; Linux requires bootId, Darwin permits null): it removes other root rows
+    plus `done` workers of other roots. Unfinished workers retain their original root;
+    a worker SubagentStart never causes this replacement; or
+  - its SubagentStop arrives while its own root row is absent and a different root row
+    proves the same process as the event. A duplicate stop does not recreate it. Without
+    that replacement evidence, worker upserts remain ordinary, including absent-root
+    workers. A later tool event can recreate a worker row.
+- **Guard denial precedes mutation.** A refused SubagentStop leaves the registry unchanged
+  because dispatch returns before applying it; the worker continues with its last row.
+- **No inferred end.** An interrupted or failed worker turn leaves the row in its last state,
   usually `working`, until one of the above. Relay keeps its rule of no TTL, replay or
   decay (`docs/api.md`). A consumer reading a worker row's `state` must treat it as the
   last event seen, not as proof of activity. tasks is unaffected (fact 9): its claims
   live by the process, and a stale worker row only lets the same worker acquire again,
   which its thread proof already allows.
+
+Root replacement was added by relay-1ba6de after the recorded switch captures. Ordinary
+root events still upsert: missing start/proof can recover, and a late old-root event may
+restore duplicate rows. No event history is retained; without a competing root's proof
+the original lifecycle applies. Retained `needs-approval` can describe an obsolete
+approval request. Registry retirement does not release the old root's process-live
+claims or let the new thread release them. Daemon-hosted concurrent roots sharing a
+handle remain unverified (relay-511e14). See `docs/api.md` for the current contract.
 
 ## Contract changes (`docs/api.md`)
 

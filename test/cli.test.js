@@ -8,7 +8,7 @@ import { processMarker,noneMarked,reapMarked } from './helpers/survivors.js';
 import { applyEvent } from '../src/bus/transaction.js';
 import { normalizeEvent } from '../src/adapters/index.js';
 const cli = new URL('../bin/relay.js',import.meta.url);
-const run=(p,args)=>spawnSync(process.execPath,[cli.pathname,...args],{encoding:'utf8',env:{...process.env,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome??join(p.stateDir,'config')}});
+const run=(p,args)=>spawnSync(process.execPath,[cli.pathname,...args],{encoding:'utf8',env:{PATH:process.env.PATH??'',HOME:p.stateDir,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome??join(p.stateDir,'config')}});
 test('absent snapshot CLI has exact JSON and creates no directory',async t=>{
   const base=await tempState(t),p={stateDir:join(base.stateDir,'absent')};const r=run(p,['list','--json']);
   assert.equal(r.status,0);assert.equal(r.stdout,'{"snapshot":null,"liveness":{}}\n');assert.equal(r.stderr,'');assert.deepEqual(await fs.readdir(base.stateDir),[]);
@@ -25,7 +25,7 @@ test('list errors are a single JSON envelope on stderr; unknown and null schemas
 test('CLI listing retains dead unknown live, reap removes only dead',async t=>{
   const p=await tempState(t),opts=localObservation(p);
   const e=id=>normalizeEvent('codex','SessionStart',JSON.stringify({session_id:id,cwd:'/repo'}));
-  await applyEvent(e('live'),opts);await applyEvent(e('unknown'),{...opts,resolveSessionPid:()=>null});const result=await applyEvent(e('dead'),opts);
+  await applyEvent(e('live'),opts);await applyEvent(e('unknown'),{...opts,resolveSessionPid:()=>null});const result=await applyEvent(e('dead'),{...opts,resolveSessionPid:()=>process.ppid});
   const h=result.snapshot.agents['codex:dead'].process;h.start=String(BigInt(h.start)+1n);await fs.writeFile(p.agentsPath,JSON.stringify(result.snapshot));
   const before=await fs.readFile(p.agentsPath,'utf8'),listed=run(p,['list','--json']);assert.equal(listed.status,0);
   assert.deepEqual(Object.values(JSON.parse(listed.stdout).liveness).map(v=>v.status),['alive','unknown','dead']);assert.equal(await fs.readFile(p.agentsPath,'utf8'),before);

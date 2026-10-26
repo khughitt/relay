@@ -51,6 +51,9 @@ export async function listAgents(given = {}) {
 /** @param {Record<string, import("../types.js").Liveness>} liveness */
 const diagnosticsFor = (liveness) => Object.entries(liveness).filter(([,v])=>v.status === 'unknown')
   .map(([agentId])=>({code:'PROCESS_UNAVAILABLE',message:'agent liveness unknown',agentId}));
+/** @param {import('../types.js').Handle|null} a @param {import('../types.js').Handle|null} b */
+const sameProcess = (a,b) => a !== null && b !== null && (a.platform !== 'linux' || a.bootId !== null)
+  && a.platform === b.platform && a.host === b.host && a.bootId === b.bootId && a.pid === b.pid && a.start === b.start;
 /** @param {ReturnType<typeof options>} opts @param {import("../types.js").Event|null} event @param {{remote: string|null, repoRoot: string|null}|null} context @param {import("../types.js").Handle|null} handle @param {import("../types.js").Diagnostic[]} diagnostics @returns {Promise<import("../types.js").RegistryResult>} */
 async function mutate(opts, event, context, handle, diagnostics) {
   const locked = await withLock(opts.paths.lockPath,async () => {
@@ -61,12 +64,23 @@ async function mutate(opts, event, context, handle, diagnostics) {
     if (event) {
       const adapter = adapterFor(event.harness), level = adapter.stateForEvent(event.nativeEvent);
       if (level === null) {
-        // A root's SessionEnd ends its workers too: they share its process and have no end event.
+        // SessionEnd also removes workers retained after this root was replaced.
         const ended = Object.keys(agents).filter(id => id === event.agentId || agents[id].root === event.agentId);
         changed ||= ended.length > 0;
         for (const id of ended) delete agents[id];
       }
+      else if (event.harness === 'codex' && event.nativeEvent === 'SubagentStop' && event.root !== undefined
+        && !agents[event.root] && Object.values(agents).some(a => a.harness === 'codex' && a.scope === 'session' && sameProcess(a.process,handle))) {
+        changed ||= Object.hasOwn(agents,event.agentId);
+        delete agents[event.agentId];
+      }
       else {
+        if (event.harness === 'codex' && event.nativeEvent === 'SessionStart' && event.root === undefined) {
+          for (const [id,a] of Object.entries(agents)) {
+            if (a.harness === 'codex' && sameProcess(a.process,handle)
+              && ((a.scope === 'session' && id !== event.agentId) || (a.scope === 'worker' && a.root !== event.agentId && a.state === 'done'))) delete agents[id];
+          }
+        }
         const previous = agents[event.agentId];
         const background = event.background === undefined ? previous?.background : event.background === null ? undefined : event.background;
         const state = adapter.reduceState(level,previous?.state ?? null,{background});

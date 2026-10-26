@@ -68,11 +68,31 @@ OpenCode, `session` for Claude Code, and for Codex `session` without `root` or `
 with it; any other combination is `INVALID_SCHEMA`. A relay from before worker rows
 accepts only `session` for Codex, so it refuses a snapshot holding a worker row and
 writes nothing, rather than publishing the rows without their `root`.
-A worker row ends only with its root: the root's SessionEnd removes the root and every
-row naming it as `root` in one publication, and the prune of a dead process removes them
-together, since they share its handle. A worker has no end event of its own, and an
-interrupted or failed worker turn leaves its row in its last state; a worker row's
-`state` is the last event seen, not proof of activity.
+A root Codex SessionStart retires other Codex session rows on the same proven process
+in one publication. Proof means equal non-null handles (all five fields); Linux needs
+a non-null bootId, while Darwin's documented null is valid. It also removes `done`
+workers on that process whose root differs from the incoming root. Every unfinished
+worker, including `needs-approval`, keeps its original root, even when that root's row
+is gone. Worker SubagentStart never retires a root. Repeated starts keep workers of
+the same root; an explicit SessionStart may switch back to a previous root ID.
+
+A worker SubagentStop removes its row, or leaves it absent, when its root row is absent
+and a different Codex session row proves the same process as that event. Other worker
+events still create/update the worker without changing its root. Without that proof,
+SubagentStop stores `done` as usual. A guard refusal returns before registry mutation:
+the worker's row stays unchanged, as do all other rows. A later worker tool event can
+recreate a removed row. SessionEnd still removes its root and all rows naming that
+root, and confirmed process death prunes them together.
+
+Ordinary root events always upsert, so a missing or handle-less SessionStart can recover
+proof on a later prompt/tool event. Only a proven SessionStart retires competing roots;
+late old-root events can restore duplicates. There is no verified hook-completion order:
+state follows publication order, including `idle` if a start publishes after a prompt.
+No retirement history is kept. Interrupted/failed workers, including obsolete approval
+requests, can remain until an existing end signal. A worker row's `state` is the last
+event seen, not proof of activity. Retiring a row neither releases nor transfers claims:
+the old root's claim remains live by process, and a different thread cannot normally
+release it. Daemon-hosted sessions sharing one process are unverified (relay-511e14).
 `test/fixtures/registry-workers.json` is the shared example: a root, a worker, a nested
 worker and a Claude row; tasks vendors it.
 
