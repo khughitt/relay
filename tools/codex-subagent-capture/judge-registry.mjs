@@ -19,6 +19,7 @@ const workerEvents=handled.filter(r=>typeof r.payload.agent_id==='string');
 if(!workerEvents.length)invalid('no worker event reached relay');
 const roots=[...new Set(handled.filter(r=>typeof r.payload.agent_id!=='string'&&r.event!=='SessionEnd').map(r=>`codex:${r.payload.session_id}`))];
 const beforeQuitPath=join(dir,'before-quit-agents.json');
+const beforeQuit=existsSync(beforeQuitPath)?read(beforeQuitPath):null;
 const switchCase=existsSync(join(dir,'case'))&&readFileSync(join(dir,'case'),'utf8').trim().startsWith('switch-');
 if(switchCase&&roots.length<2)invalid('switch case has no second root evidence');
 if(switchCase&&!existsSync(beforeQuitPath))invalid('switch case has no before-quit registry copy');
@@ -66,12 +67,13 @@ for(const [index,record]of handled.entries()){
   }
   for(const a of Object.values(rows))if(a.process)handles.set(a.id,a.process);
   previous=rows;
-  if(record.event!=='SessionEnd')beforeQuitRecord={rows,index,starts:new Map(starts),retired:new Map(retired),lastRootEvent:new Map(lastRootEvent)};
+  if(beforeQuit&&record.after.generation===beforeQuit.generation&&record.after.revision===beforeQuit.revision
+    &&isDeepStrictEqual(rows,beforeQuit.agents))beforeQuitRecord={rows,index,starts:new Map(starts),retired:new Map(retired),lastRootEvent:new Map(lastRootEvent)};
 }
 if(!ended)fail('no SessionEnd publication captured');
-if(existsSync(beforeQuitPath)){
-  const rows=read(beforeQuitPath).agents;
-  if(!isDeepStrictEqual(rows,beforeQuitRecord.rows))fail('before /quit, registry differs from the last non-end publication');
+if(beforeQuit){
+  const rows=beforeQuit.agents;
+  if(!beforeQuitRecord.rows)fail('before /quit, no captured publication matches the checkpoint generation, revision and rows');
   for(const [i,id]of roots.entries()){
     if(!rows[id])continue;
     if((beforeQuitRecord.lastRootEvent?.get(id)??-1)>(beforeQuitRecord.retired?.get(id)??Infinity)){

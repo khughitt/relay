@@ -194,7 +194,13 @@ no rows. The accepted fallback cases remain visible duplicates, as approved;
 those labels do not excuse an earlier missed proven replacement or unrelated
 worker/cascade/reap violations. Judge tests cover those negative cases.
 
-The task attachments `replay-results.txt` and `replay.mjs` record the verdicts,
+Whole-branch review found and corrected a judge checkpoint assumption: before-quit
+is now matched to a recorded snapshot's generation, revision and rows, including
+SessionEnd publications. Tests cover an old root ending during the hold and a
+worker event after the checkpoint, and still reject an independent later violation.
+All seven replay cases passed again with the corrected judge.
+
+The task attachments `replay-results-final.txt` and `replay.mjs` record the final verdicts,
 source hashes and replay method; original raw captures remain task-retained.
 This is deterministic policy acceptance, not another live capture: it establishes
 neither current Codex event delivery nor daemon-hosted behavior. Capture readiness
