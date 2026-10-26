@@ -15,6 +15,16 @@
 #               the interactive TUI in a detached tmux session, since exec ends the
 #               session, and with it the worker, at the controller's Stop
 #   nested      a worker spawns its own worker (agents.max_depth = 2; Codex defaults to 1)
+#   switch-new, switch-resume, switch-fork
+#               the background case, then, while the worker sleeps, the TUI switches its
+#               root with /new, /resume <id> (a session saved first with codex exec, since
+#               the picker lists no exec session) or /fork, and the new root is asked to run
+#               one command printing CODEX_THREAD_ID and CODEX_SESSION_ID (a new chat sends
+#               its SessionStart with its first prompt). switch-at holds the switch's time
+#               in the log's nanoseconds. CAPTURE_HOLD seconds after the switch (default
+#               90: Codex 0.160.1 ended a replaced session 60 s after the switch, openai/codex
+#               #51360), the registry is copied to before-quit-agents.json while the process
+#               still lives; tui-notes records what did not arrive
 #   CODEX_BIN (default: codex), CAPTURE_MODEL (default: the user's configured model),
 #   CODEX_AUTH (default: ~/.codex/auth.json), CAPTURE_TIMEOUT seconds (default: 600).
 # Prints OUT_DIR; raw payloads land in OUT_DIR/log, one <seq>-<event>.json each.
@@ -31,7 +41,7 @@ case $case in
   followup) prompt="Spawn exactly one subagent named worker. Instruct it to run the shell command \`echo first-turn\` and reply with its output. Wait for it to finish. Then give the same worker a follow-up task with followup_task: run \`echo second-turn\` and reply with its output. Wait for it to finish again, then reply with the single word done. $only" ;;
   badmodel) prompt="Spawn exactly one subagent with its model set to \`no-such-model-relay-capture\`. Instruct it to run the shell command \`echo failed-turn\` and reply with its output. If spawning fails, do not retry: reply with the error. Otherwise wait for it to finish, then reply with done and any error the worker reported. $only" ;;
   interrupted) prompt="Spawn exactly one subagent. Instruct it to run the shell command \`sleep 60; echo late\` and reply with its output. Call wait_agent with a timeout of 10000 ms; it will time out. Then interrupt the subagent with interrupt_agent. Then reply with the single word done. $only" ;;
-  background) prompt="Spawn exactly one subagent. Instruct it to run the shell command \`sleep 15; echo background-ran\` and reply with its output. Do not wait for it: as soon as the spawn returns, reply with the single word done. $only" ;;
+  background|switch-new|switch-resume|switch-fork) prompt="Spawn exactly one subagent. Instruct it to run the shell command \`sleep 15; echo background-ran\` and reply with its output. Do not wait for it: as soon as the spawn returns, reply with the single word done. $only" ;;
   nested) prompt="Spawn exactly one subagent named outer. Instruct outer to spawn exactly one subagent of its own named inner, which runs the shell command \`echo nested-ran\` and replies with its output; outer waits for inner to finish and then replies done. You wait for outer to finish, then reply with the single word done. $only" ;;
   *) echo "unknown case: $case" >&2; exit 2 ;;
 esac
@@ -45,15 +55,23 @@ home=$out/home
 model=${CAPTURE_MODEL:-$(sed -n 's/^model = "\(.*\)"$/\1/p' "$HOME/.codex/config.toml" | head -1)}
 [[ -n $model ]] || { echo "set CAPTURE_MODEL: no model in ~/.codex/config.toml" >&2; exit 2; }
 
-child= tmux_session=
+child= tmux_socket=
 cleanup() {
   [[ -n $child ]] && kill "$child" 2>/dev/null || true
-  [[ -n $tmux_session ]] && tmux kill-session -t "$tmux_session" 2>/dev/null || true
+  [[ -n $tmux_socket ]] && tmux -L "$tmux_socket" kill-server 2>/dev/null || true
   scrub_auth "$out"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 capture_home "$out"
+saved=
+if [[ $case == switch-resume ]]; then
+  # Saved before any hook is configured, so its events stay out of the log.
+  CODEX_HOME=$home timeout 180 "$codex" exec --skip-git-repo-check -m "$model" -C "$out/work" \
+    'Reply with the single word saved.' </dev/null >"$out/saved.stdout" 2>"$out/saved.stderr"
+  saved=$(find "$home/sessions" -name 'rollout-*.jsonl' | sed -n 's/.*\([0-9a-f]\{8\}-[0-9a-f-]\{27\}\)\.jsonl$/\1/p')
+  [[ $saved =~ ^[0-9a-f-]{36}$ ]] || { echo "expected one saved session, found: $saved" >&2; exit 1; }
+fi
 if [[ -n $relay ]]; then
   install_relay "$out" "$relay"
   wrap_relay "$out"
@@ -73,28 +91,70 @@ multi_agent = true
 TOML
 [[ $case == nested ]] && printf '\n[agents]\nmax_depth = 2\n' >>"$home/config.toml"
 
+# The first record of EVENT whose payload matches the jq condition, or failure.
+logged() {
+  local f
+  for f in "$out"/log/*-"$1".json; do [[ -e $f ]] && jq -e ".payload | $2" "$f" >/dev/null && { echo "$f"; return 0; }; done
+  return 1
+}
+# Poll a command once a second for up to SECONDS seconds; its last result is the return.
+wait_for() {
+  local deadline=$((SECONDS + $1)); shift
+  until "$@" >/dev/null || ((SECONDS >= deadline)); do sleep 1; done
+  "$@" >/dev/null
+}
+ends() { local f n=0; for f in "$out"/log/*-SessionEnd.json; do [[ -e $f ]] && n=$((n + 1)); done; echo "$n"; }
+ended_since() { (( $(ends) > $1 )); }
+pane() { tmux -L "$tmux_socket" capture-pane -p -t capture >"$out/$1" || true; }
+# Enter follows a pause: sent in the same burst, the TUI reads it as pasted text, not a submit.
+submit() { tmux -L "$tmux_socket" send-keys -t capture -l "$1"; sleep 1; tmux -L "$tmux_socket" send-keys -t capture Enter; }
+note() { echo "$1" >>"$out/tui-notes"; }
+
 status=0
-if [[ $case == background ]]; then
+if [[ $case == background || $case == switch-* ]]; then
   printf '\n[projects."%s"]\ntrust_level = "trusted"\n' "$out/work" >>"$home/config.toml"
-  tmux_session=relay-capture-$$
-  tmux new-session -d -s "$tmux_session" -x 200 -y 50 \
-    "CODEX_HOME=$(printf %q "$home") ${relay:+RELAY_STATE_DIR=$(printf %q "$RELAY_STATE_DIR") }$(printf %q "$codex") --dangerously-bypass-hook-trust -C $(printf %q "$out/work") $(printf %q "$prompt")"
-  # The worker's SubagentStop, or the timeout, ends the run; the TUI stays up until then.
-  deadline=$((SECONDS + ${CAPTURE_TIMEOUT:-600}))
-  until compgen -G "$out/log/*-SubagentStop.json" >/dev/null || ((SECONDS >= deadline)); do sleep 1; done
-  compgen -G "$out/log/*-SubagentStop.json" >/dev/null || status=124
-  sleep 3
-  tmux capture-pane -p -t "$tmux_session" >"$out/tui.txt" || true
-  # Quit through the TUI so Codex fires SessionEnd; kill only if it has not exited. Enter
-  # follows a pause: sent in the same burst, the TUI reads it as pasted text, not a submit.
-  tmux send-keys -t "$tmux_session" /quit
-  sleep 1
-  tmux send-keys -t "$tmux_session" Enter
-  quit_deadline=$((SECONDS + 20))
-  until compgen -G "$out/log/*-SessionEnd.json" >/dev/null || ((SECONDS >= quit_deadline)); do sleep 1; done
-  compgen -G "$out/log/*-SessionEnd.json" >/dev/null || echo "no SessionEnd within 20 s of /quit" >>"$out/tui-shutdown"
-  tmux kill-session -t "$tmux_session" 2>/dev/null || true
-  tmux_session=
+  # A private tmux server; --no-daemon keeps Codex 0.164's shared app-server daemon, which
+  # would outlive the run, from starting under the private CODEX_HOME.
+  tmux_socket=relay-capture-$$
+  tmux -L "$tmux_socket" new-session -d -s capture -x 200 -y 50 -c "$out/work" \
+    "CODEX_HOME=$(printf %q "$home") ${relay:+RELAY_STATE_DIR=$(printf %q "$RELAY_STATE_DIR") }$(printf %q "$codex") --no-daemon --dangerously-bypass-hook-trust -C $(printf %q "$out/work") $(printf %q "$prompt")"
+  if [[ $case == background ]]; then
+    # The worker's SubagentStop, or the timeout, ends the run; the TUI stays up until then.
+    wait_for "${CAPTURE_TIMEOUT:-600}" logged SubagentStop true || status=124
+    sleep 3
+  elif wait_for "${CAPTURE_TIMEOUT:-600}" logged PreToolUse '.agent_id != null'; then
+    root=$(jq -r .payload.session_id "$(logged SessionStart true)")
+    pane tui-1-worker-running.txt
+    case $case in
+      switch-new) submit /new ;;
+      switch-resume) submit "/resume $saved" ;;
+      switch-fork) submit /fork ;;
+    esac
+    date +%s%N >"$out/switch-at"
+    switched=$SECONDS
+    sleep 5
+    pane tui-2-switched.txt
+    submit 'Run the shell command `echo "THREAD=$CODEX_THREAD_ID SESSION=$CODEX_SESSION_ID"` and reply with its output.'
+    wait_for 30 logged SessionStart ".session_id != \"$root\"" || { note "no SessionStart for a new root within 30 s of its prompt"; status=1; }
+    wait_for 180 logged Stop ".session_id != \"$root\"" || note "no Stop from a new root within 180 s of its prompt"
+    # The worker sleeps 15 s from its PreToolUse; it has until 60 s after the switch.
+    wait_for $((60 - (SECONDS - switched))) logged SubagentStop true || note "no SubagentStop within 60 s of the switch"
+    hold=$((${CAPTURE_HOLD:-90} - (SECONDS - switched)))
+    ((hold > 0)) && sleep "$hold"
+    if [[ -r $out/relay-state/agents.json ]]; then cp "$out/relay-state/agents.json" "$out/before-quit-agents.json"; fi
+  else
+    status=124
+  fi
+  pane tui.txt
+  # Quit through the TUI so Codex fires SessionEnd; kill only if it has not exited.
+  ended=$(ends)
+  submit /quit
+  wait_for 20 ended_since "$ended" || note "no SessionEnd within 20 s of /quit"
+  if tmux -L "$tmux_socket" has-session -t capture 2>/dev/null; then
+    note "the TUI had not exited 20 s after /quit"; pane tui-after-quit.txt
+  fi
+  tmux -L "$tmux_socket" kill-server 2>/dev/null || true
+  tmux_socket=
 else
   CODEX_HOME=$home timeout "${CAPTURE_TIMEOUT:-600}" "$codex" exec --skip-git-repo-check --dangerously-bypass-hook-trust \
     -C "$out/work" "$prompt" >"$out/exec.stdout" 2>"$out/exec.stderr" &
