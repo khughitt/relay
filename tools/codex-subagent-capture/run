@@ -56,9 +56,15 @@ model=${CAPTURE_MODEL:-$(sed -n 's/^model = "\(.*\)"$/\1/p' "$HOME/.codex/config
 [[ -n $model ]] || { echo "set CAPTURE_MODEL: no model in ~/.codex/config.toml" >&2; exit 2; }
 
 child= tmux_socket=
+# kill-server leaves the socket file behind; remove it with the server.
+stop_tmux() {
+  tmux -L "$tmux_socket" kill-server 2>/dev/null || true
+  rm -f "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)/$tmux_socket"
+  tmux_socket=
+}
 cleanup() {
   [[ -n $child ]] && kill "$child" 2>/dev/null || true
-  [[ -n $tmux_socket ]] && tmux -L "$tmux_socket" kill-server 2>/dev/null || true
+  [[ -n $tmux_socket ]] && stop_tmux
   scrub_auth "$out"
 }
 trap cleanup EXIT
@@ -147,14 +153,17 @@ if [[ $case == background || $case == switch-* ]]; then
   fi
   pane tui.txt
   # Quit through the TUI so Codex fires SessionEnd; kill only if it has not exited.
-  ended=$(ends)
-  submit /quit
-  wait_for 20 ended_since "$ended" || note "no SessionEnd within 20 s of /quit"
   if tmux -L "$tmux_socket" has-session -t capture 2>/dev/null; then
-    note "the TUI had not exited 20 s after /quit"; pane tui-after-quit.txt
+    ended=$(ends)
+    submit /quit
+    wait_for 20 ended_since "$ended" || note "no SessionEnd within 20 s of /quit"
+    if tmux -L "$tmux_socket" has-session -t capture 2>/dev/null; then
+      note "the TUI had not exited 20 s after /quit"; pane tui-after-quit.txt
+    fi
+  else
+    note "the TUI had exited before /quit"
   fi
-  tmux -L "$tmux_socket" kill-server 2>/dev/null || true
-  tmux_socket=
+  stop_tmux
 else
   CODEX_HOME=$home timeout "${CAPTURE_TIMEOUT:-600}" "$codex" exec --skip-git-repo-check --dangerously-bypass-hook-trust \
     -C "$out/work" "$prompt" >"$out/exec.stdout" 2>"$out/exec.stderr" &

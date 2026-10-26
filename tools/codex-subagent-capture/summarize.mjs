@@ -3,9 +3,9 @@
 // label: R is the root session (R2, R3, … the roots a /new, /resume or /fork switched to),
 // W1, W2, … the worker agent ids in order of appearance,
 // T1, T2, … turn ids, P1, … the nearest codex process. Transcript paths become the label
-// of the thread whose rollout they name, and a hook's CODEX_*_ID values the label of the
-// thread they name. A switch case's switch-at file becomes a row of its own, between the
-// events before and after the switch. Usage: summarize.mjs OUT_DIR
+// of the thread whose rollout they name, and a hook's CODEX_THREAD_ID and CODEX_SESSION_ID
+// the label of the thread they name. A switch case's switch-at file becomes a row of its
+// own, between the events before and after the switch. Usage: summarize.mjs OUT_DIR
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -26,6 +26,8 @@ const label = (kind, id) => {
 // A root is a session that sends events of its own (no agent_id), in order of appearance.
 const roots = [...new Set(records.filter(({ payload: p }) => !p.agent_id).map(({ payload: p }) => p.session_id))];
 const thread = id => { const n = roots.indexOf(id); return n < 0 ? label('W', id) : n ? `R${n + 1}` : 'R'; };
+// Only these name a thread; the capture hook redacts every other CODEX_* value.
+const threadIds = new Set(['CODEX_THREAD_ID', 'CODEX_SESSION_ID']);
 const uuid = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/;
 const transcript = path => { const match = uuid.exec(path ?? ''); return match ? `${thread(match[1])}'s rollout` : null; };
 
@@ -37,7 +39,7 @@ const rows = records.map(({ ns, event, payload: p, env, ancestry }, index) => {
     'stop_hook_active' in p && `stop_hook_active: ${p.stop_hook_active}`,
     p.transcript_path && `transcript: ${transcript(p.transcript_path)}`,
     p.agent_transcript_path && `agent transcript: ${transcript(p.agent_transcript_path)}`,
-    Object.keys(env).filter(key => key !== 'CODEX_HOME').map(key => `env ${key}${/_ID$/.test(key) && env[key] ? `=${thread(env[key])}` : ''}`).join(', '),
+    Object.keys(env).filter(key => key !== 'CODEX_HOME').map(key => `env ${key}${threadIds.has(key) ? `=${thread(env[key])}` : ''}`).join(', '),
   ].filter(Boolean).join('; ');
   return [index + 1, `${(Number(ns - start) / 1e9).toFixed(1)}`, event, p.turn_id ? label('T', p.turn_id) : '—',
     thread(p.session_id),

@@ -173,11 +173,13 @@ ending its turn without waiting), then, at the worker's first tool call, the swi
 into the TUI (`/new`, `/resume <id>` of a session saved with `codex exec` before any hook
 was configured, or `/fork`), then a prompt asking the new root to run
 `echo "THREAD=$CODEX_THREAD_ID SESSION=$CODEX_SESSION_ID"`. The registry was copied to
-`before-quit-agents.json` 90 s after the switch, while the process still lived, then
+`before-quit-agents.json` 90 s after the switch (89.3–89.7 s: the wait counts whole
+seconds), while the process still lived, then
 `/quit` was sent. The TUI ran with `--no-daemon`: from 0.164.0 a plain launch starts a
-managed app-server daemon under the private `CODEX_HOME` that outlives the TUI. With
-and without the flag, every hook ran as a child of the TUI's own `codex` process (probe
-below), so the flag does not change the handle relay resolves.
+managed app-server daemon under the private `CODEX_HOME` that outlives the TUI. In the
+two one-prompt quit probes below (with and without the flag), every hook's recorded
+ancestry was bash, then the TUI's own `codex` process, then the tmux server, so the flag
+did not change the handle relay resolves.
 
 **Verdict: a row outlives its root on a live handle.** No case fired a SessionEnd for
 the replaced root before `/quit`. The worker kept running across the switch, and its
@@ -203,19 +205,20 @@ call's `CODEX_THREAD_ID` and `CODEX_SESSION_ID` both name the active root after 
 switch, as `relay-2cd4b1` found on 0.163.0. No hook sees these variables (no `env`
 entry in any record).
 
-SessionStart for the new root fires only with its first prompt, never at the switch
-itself (as openai/codex#51360 reports for `/resume` on 0.160.1). Between the switch and
+SessionStart for the new root arrived with its first prompt, sent about 6 s after the
+switch, and not before it (openai/codex#51360 reports the same for `/resume` on 0.160.1;
+these runs do not show what a longer wait would bring). Between the switch and
 that prompt, relay has no row for the conversation shown in the terminal.
 
 ### SessionEnd at `/quit`
 
-A `/quit` sent soon after a session's last activity fired no SessionEnd on 0.163.0 or
-0.164.0, while `codex exec` on 0.164.0 did fire one:
+A `/quit` sent 2–3 s after a session's last activity, and one sent after 75 s idle,
+fired no SessionEnd on 0.163.0 or 0.164.0, while `codex exec` on 0.164.0 did fire one:
 
 | Run | Version | `/quit` after | SessionEnd |
 | --- | --- | --- | --- |
 | `background` (relay judge: FAIL, "no SessionEnd publication captured") | 0.164.0 | ~3 s after SubagentStop | none; the TUI exited |
-| first switch-new, -resume and -fork runs (pre-quit copy 3 s after SubagentStop) | 0.164.0 | ~3 s after SubagentStop | none |
+| first switch-new, -resume and -fork runs (pre-quit copy 3 s after SubagentStop; outputs not kept) | 0.164.0 | ~3 s after SubagentStop | none |
 | one prompt, plain logging hooks, `--no-daemon` | 0.164.0 | ~2 s after Stop | none; the TUI exited |
 | the same without `--no-daemon` | 0.164.0 | ~2 s after Stop | none; the TUI exited |
 | the same, tmux `remain-on-exit` (the pane's pty stays open, so no SIGHUP) | 0.164.0 | ~2 s after Stop | none; Codex exited 0 |
@@ -224,15 +227,16 @@ A `/quit` sent soon after a session's last activity fired no SessionEnd on 0.163
 | `codex exec`, one prompt | 0.164.0 | (exec ends itself) | fired |
 | switch cases with the 90 s hold (above) | 0.164.0 | 90 s after the switch | fired for both roots |
 
-Codex's own log (`logs_2.sqlite` in the private home) ends the no-SessionEnd quit with a
-thread unsubscribe request and no hook dispatch. On 0.162.1 the same `background` case
+Codex's own log (`logs_2.sqlite` in the private home) records no hook dispatch at any
+of these quits; in four of them (without `--no-daemon`, `remain-on-exit`, idle and
+`background`) its last thread request is an unsubscribe. On 0.162.1 the same `background` case
 fired SessionEnd at `/quit` (Judge results above). What makes the hold runs differ is not
 established. Filed as `relay-68ca4e`.
 
 ### Hook sequences (switch cases, 90 s hold; `background` control)
 
-R is the first root, R2 the root after the switch; the *switch* row is when the command
-was typed.
+R is the first root, R2 the root after the switch; the *switch* row is when Enter was
+sent after the switch command.
 
 #### switch-new
 
