@@ -92,7 +92,9 @@ No retirement history is kept. Interrupted/failed workers, including obsolete ap
 requests, can remain until an existing end signal. A worker row's `state` is the last
 event seen, not proof of activity. Retiring a row neither releases nor transfers claims:
 the old root's claim remains live by process, and a different thread cannot normally
-release it. Daemon-hosted sessions sharing one process are unverified (relay-511e14).
+release it. Retirement assumes one live Codex root per process, as in the captured TUI
+launches. Daemon-hosted sessions sharing one process are unverified (relay-511e14); if
+concurrent roots share a handle, each root SessionStart retires the others' rows.
 `test/fixtures/registry-workers.json` is the shared example: a root, a worker, a nested
 worker and a Claude row; tasks vendors it.
 
@@ -462,7 +464,9 @@ A guard error is a refusal with reason `relay refused: <CODE>: <message>`.
 Observers run only after a successful registry publication (changed or not) or a
 reap; after a registry failure they are skipped with a diagnostic and healed by
 reconciliation. `event.background` carries counts or null when reported by Claude
-Code Stop. `type: "reconcile"` carries `event: null`.
+Code Stop. `type: "reconcile"` carries `event: null`. `reaped` lists only rows pruned
+for dead processes; rows an event removes (a SessionEnd's root and workers, a Codex
+root SessionStart's retired rows) appear only as their absence from the snapshot.
 
 ### Hook exit codes
 

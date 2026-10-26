@@ -108,20 +108,24 @@ in task notes are accepted, as in the public tasks and familiar repositories.
 
 Retires replaced Codex roots. A root Codex SessionStart now removes the other Codex
 session rows on the same proven process, and the `done` workers there that belong to
-a different root, in one publication. Proof is equal non-null handles; Linux also
-needs a non-null boot id. Unfinished workers keep their original root. A worker
+a different root, in one publication. Same-process proof is equal non-null handles;
+Linux also needs a non-null boot id. Unfinished workers keep their original root. A worker
 SubagentStop removes its row when its root row is gone and a different Codex session
 row proves the same process. Without that proof, rows behave as in v0.2.0. Retiring a
-row neither releases nor transfers a tasks claim. `docs/api.md` states the contract
-and its limits: late old-root events, unverified hook completion order, and
-daemon-hosted sessions (`relay-511e14`).
+row neither releases nor transfers a tasks claim. Retirement assumes one live Codex
+root per process, as in the captured TUI launches: if concurrent roots share a handle
+(daemon-hosted sessions, unverified, `relay-511e14`), each root SessionStart retires
+the others' rows. `docs/api.md` states the contract and its other limits: late
+old-root events and unverified hook completion order. No persisted shapes change;
+v0.2.0 and v0.2.1 read each other's registry and inbox stores.
 
 Also includes the Codex subagent capture's root-switch cases (`/new`, `/resume`,
 `/fork`) with per-root judging, and corrections to the README's event-mapping prose
-and the API's CLI inventory. Task records moved out of this repository to the records
-root. Platform status and capability evidence remain as recorded for v0.1.0; this
-release does not establish new live harness or Darwin acceptance. Live activation
-belongs to the runtime adoption task, not this release.
+and the API's CLI inventory. Task records and working plans and specs moved out of
+this repository; no shipped file changed or referred to them. Platform status and
+capability evidence remain as recorded for v0.1.0; this release does not establish
+new live harness or Darwin acceptance. Live activation belongs to the runtime
+adoption task, not this release.
 
 ### Publication status
 
