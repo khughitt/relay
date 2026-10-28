@@ -179,9 +179,13 @@ test('guard results survive missing storage, broken enrichment and lock exhausti
   const holder = withLock(p.lockPath, async () => { await held; }, { deadline: performance.now() + 20000 });
   await new Promise((resolve) => setTimeout(resolve, 100));
   let pending;
-  r = await hook(p, { outerMs: 1500, deps: { apply: (...args) => (pending = applyEvent(...args)) } });
+  // Exercise lock exhaustion without spending the guard budget on subprocess startup.
+  r = await hook(p, { outerMs: 1500, deps: {
+    run: async () => ({ status: 'exited', exitCode: 0, signal: null, stdout: '{"decision":"allow"}', stderr: '' }),
+    apply: (...args) => (pending = applyEvent(...args)),
+  } });
   release(); await holder; await Promise.allSettled([pending]);
-  assert.equal(r.exitCode, 1); assert.match(r.stderr, /registry: (LOCK_TIMEOUT|DEADLINE_EXCEEDED)/); assert.equal(r.stdout, '');
+  assert.equal(r.stdout, ''); assert.match(r.stderr, /registry: (LOCK_TIMEOUT|DEADLINE_EXCEEDED)/); assert.equal(r.exitCode, 1);
 });
 
 test('a deadline during lock reclamation leaves the guard for operator repair', async (t) => {
