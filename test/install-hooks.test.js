@@ -12,7 +12,7 @@ import { tempState } from './helpers/fixture.js';
 const relay = '/opt/relay/bin/relay';
 const subscribers = '/home/me/.config/relay/subscribers.json';
 const node = shellQuote(process.execPath).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const base = '{\n  // keep this comment\n  "hooks": {\n    "SessionStart": [{"hooks":[{"type":"command","command":"~/d/familiar/bin/familiar hook --agent codex SessionStart"}]}],\n    "PreToolUse": [{"matcher":"*","hooks":[{"type":"command","command":"\'/old relay/bin/relay\' hook --harness codex --outer-ms 30000 PreToolUse"}]}]\n  },\n  "statusLine": {"type":"command","command":"ops"}\n}';
+const base = '{\n  // keep this comment\n  "hooks": {\n    "SessionStart": [{"hooks":[{"type":"command","command":"/home/me/familiar/bin/familiar hook --agent codex SessionStart"}]}],\n    "PreToolUse": [{"matcher":"*","hooks":[{"type":"command","command":"\'/old relay/bin/relay\' hook --harness codex --outer-ms 30000 PreToolUse"}]}]\n  },\n  "statusLine": {"type":"command","command":"ops"}\n}';
 
 test('planner replaces stale relay hooks, retires both familiar shapes, and preserves JSONC', () => {
   assert.throws(() => planHooks({ text: base, harness: 'codex', relayBin: relay, subscribersPath: subscribers }), /familiar/);
