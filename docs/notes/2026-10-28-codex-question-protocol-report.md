@@ -1,176 +1,160 @@
-# Codex question connector: app discovery prerequisite blocked
+# Codex question connector: native app availability remains unproven
 
-Execution of approved feasibility plan `7d55697` against approved spec `741a546`
-proved the private Unix WebSocket handshake and `initialize` round trip on Codex
-0.165.0. The next prerequisite, account-connected app discovery, stopped at the
-approved 15-second RPC deadline. No model turn or app operation ran. This is an
-inconclusive discovery attempt, not evidence that Linear is unavailable or that
-native question routing is unsupported. The parent relay-a27e7c remains open;
-production implementation and phone acceptance remain owed.
+The single inventory attempt authorized by plan `ccd0a75` completed with
+`unknown: inventory-page-limit`. The longer timeout worked: the first `app/list`
+response arrived after about 44.2 seconds. Discovery then stopped after ten pages
+of 100 entries while the server still advertised another page. No model turn,
+TUI, app operation or native question ran. relay-a27e7c remains open; production
+implementation and phone acceptance remain owed.
 
-## Verified work and its limits
+A captured update contains 5,025 directory entries, including one named `Linear`
+with `isAccessible: false` and `isEnabled: true`. This harness's tool catalog still
+exposes `mcp__codex_apps__linear_search`. Neither observation establishes that the
+directory entry is the same connector as the authorized search, or why the private
+server and harness differ. Do not infer that the user's account is disconnected,
+that installing an app is necessary, or that native question routing is unsupported.
 
-Task 1 (relay-dc1f42) contains the disposable probe driver and its safety checks:
-82/82 focused tests passed on Node 26.5.0 and Node 22.23.2; the fresh repository
-`just test-fast` run passed 773/773. The recorded full-suite baseline also passed
-773/773. The tests cover bounded framing/RPC, explicit child environments,
-access-only authentication, refresh refusal, source-login change detection,
-owned-process cleanup, budgets, lightweight history, synthetic per-thread size
-failure/recovery, and rejection of stale-mode and model-silence evidence.
+## What changed and passed
 
-Native `transport-01` passed before real-wire-derived fake-process fixtures were
-built. It opened an owned private foreground server, validated the Upgrade,
-received `initialize`, confirmed the private Codex home, and closed cleanly.
-The peer advertised 16,777,216 bytes; the driver retains its stricter local caps
-(1 MiB outbound, 8 MiB incoming). This run read no authentication source and
-started no TUI or model. Its raw wire capture is retained. Post-initialize fake
-scenarios are explicitly synthetic, not native capability evidence.
+The approved amendment changed only the research driver's request-local RPC timer,
+the inventory `app/list` call site, and the inventory case deadline. Inventory
+`app/list` gets 95 seconds; ordinary calls, including `app/list` without the
+explicit inventory override, retain 15 seconds. The inventory case gets 120
+seconds and its harness limit includes 60 seconds for cleanup. The cumulative
+30-minute/30-turn budget and all other safeguards remain unchanged.
 
-The first independent execution review found three driver gaps after the original
-76/76 tests passed: capture bytes omitted JSON escaping and the portable copy;
-a removal error could skip later cleanup; and inventory checked property names
-without validating the authorized arguments. Regression tests reproduced each
-problem, including an actual filesystem permission failure. Corrections count
-exact persisted bytes with space reserved inside the cap for a verdict, continue
-independent cleanup stages with a failed result, and conservatively validate the
-exact approved argument object. Unsupported schema constraints fail closed. The
-82-test suite includes these corrections. A scoped review additionally found that
-oversized peer metadata could exceed the reserved verdict space; its regression
-reproduced the missing result, and the corrected driver measures the exact
-serialized result and substitutes a bounded failure envelope preserving cleanup
-outcomes and diagnostic codes. The original native evidence is unchanged.
+Five new tests exercise late matched responses, rejection of partial-update
+substitutes, exact timeout boundaries, the scoped call site, and case/aggregate
+budget precedence. Four missing-behavior assertions failed before implementation;
+the aggregate-reserve control already passed. Verification after the change:
 
-The pilot orchestration exists but has not run against a real model. Later matrix
-cases are not yet implemented: they are deliberately refused until the pilot
-establishes native mappings. History pagination and isolation have only synthetic
-coverage. No production connector, public API or dependency changed.
+- Combined research-driver suite: 87/87 on Node 26.5.0 and 87/87 on Node 22.23.2.
+- Repository `just test-fast`: 773/773.
+- Prior driver corrections remain covered: exact persisted-capture accounting,
+  bounded failure verdicts, independent cleanup after filesystem errors, and
+  conservative validation of the exact approved Linear arguments.
 
-## The blocked inventory
+Task 1 (relay-dc1f42) stays complete. Its native `transport-01` handshake and
+`initialize` proof, captured-wire fixture provenance and scoped review acceptance
+remain valid for that prerequisite. Synthetic pilot/history/cleanup tests still
+do not establish native question capability. The latest source snapshot is `r7`
+for `run.mjs`, `probe.test.mjs` and `cases.json`; unchanged modules retain their
+previous snapshots. No production connector, API, dependency or live setting changed.
 
-`inventory-02`, 2026-10-29 11:03:50–11:04:07 UTC, used the same private Unix
-WebSocket route and access-token-only login. Its result is `unknown`, reason
-`rpc-deadline`:
+## Native inventory-03 evidence
 
-1. `initialize` returned the expected 0.165.0 user agent and private home.
-2. `account/login/completed` reported success. The driver supplied no refresh
-   token and received no refresh request.
-3. `app/list` was sent at 11:03:52.001 UTC. An `app/list/updated` notification
-   arrived at 11:03:56.288, but the matching RPC response did not arrive within
-   15 seconds. The driver stopped and cleaned up.
-4. That notification listed eight accessible apps and did not include Linear.
-   It is a partial update, not a completed catalog or proof of absence. Tool
-   schema, effective app approval policy and model availability checks were
-   not reached. The configured model is `gpt-6-astra`; its availability in this
-   private server remains unconfirmed.
+The run lasted from 2026-10-29 12:08:20.578 to 12:09:16.088 UTC on Codex 0.165.0.
+The initialize user agent again identified 0.165.0 and the owned private home.
+Access-only login completed successfully; no refresh request was observed.
 
-The [tagged app-list implementation](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server/src/request_processors/apps_processor.rs#L186)
-loads accessible apps and the directory separately, can notify before both finish,
-and returns the RPC result only after both finish. Its load timeout is 90 seconds.
-This explains why a partial notification is insufficient and identifies a mismatch
-between the probe's deadline and the server's permitted wait. It does not establish
-which backend was slow, that waiting longer would succeed, or an upstream defect.
+- First `app/list` sent at 12:08:23.614; its matching response arrived at
+  12:09:07.800. Thus the previous 15-second deadline would have stopped this run.
+- Ten responses each contained 100 entries, with successive cursors `100` through
+  `1000`. The tenth still had `nextCursor: "1000"`; the driver returned
+  `inventory-page-limit`, rather than claiming the catalog ended.
+- The earlier update at 12:08:28.775 contained eight entries, all accessible.
+  The later update at 12:09:07.507 contained 5,025 entries, two marked accessible.
+  These are distinct captured updates, not a count of the user's connected apps.
+- In the later update, the exact-name `Linear` entry had id
+  `asdk_app_69a089a326dc8191b32a3f2553f5be2c`, `isAccessible: false`, and
+  `isEnabled: true`. No exact-name Linear entry occurred in the ten returned pages.
+  Neither the notification nor a name match proves identity with the approved tool.
+- The driver never reached `mcpServerStatus/list`, `config/read` or `model/list`.
+  The authorized native tool name/schema, effective prompt policy and selected
+  model's availability therefore remain unverified. The configured model remains
+  `gpt-6-astra`; no substitution was made.
+- Tool discovery in this harness still advertises `linear_search`, `linear_fetch`
+  and `linear_search_documentation` under `mcp__codex_apps__`. These names were read
+  as metadata only; none was invoked and no account content was fetched.
 
-Both owned inventory processes were reaped (2570855, 2570819), with no survivors;
-private credentials/runtime state were removed. Both transport processes were
-also reaped (2183596, 2183556). No live daemon socket, desktop, launcher or service
-was changed. No source-login change was detected. The persisted cumulative budget
-is **73,256 ms and zero model turns**, including the earlier conservative 40-second
-diagnostic charge, out of the existing 30-minute/30-turn allowance. No extension
-is requested by this report.
+The large update was inspected offline after cleanup. It does not turn the stopped
+case into a passed inventory: the required native tool, schema, model and policy
+observations are missing. The ten-page bound is an implementation limit of the
+discovery driver, distinct from the plan's ten-page receipt-history lookup.
+
+Cleanup passed with no errors: owned processes 3942981 and 3942922 were reaped,
+no survivors were recorded, and the private credential/runtime directories were
+removed. Their absence and the evidence hashes were independently rechecked.
+No source-login change was detected. No live daemon socket or desktop was used.
+The persisted budget is **128,769 ms and zero turns**, an additional 55,513 ms,
+including cleanup, since the prior checkpoint. The earlier conservative
+40-second diagnostic charge remains included. No budget extension is requested.
 
 ## Gate disposition
 
 | Spec gate | Verdict and missing native evidence |
 | --- | --- |
 | 1: transport and join | Partial: private handshake/initialize/cleanup passed; ordinary TUI discovery, early/late join, settings preservation, lightweight native history and subscription isolation unobserved. |
-| 2: clarification-only routing and forms | Unknown: built-in provenance, native Plan positive control, Default/async and secret exclusions, app approval, dedicated permission example/path audit, forms and decline unobserved. |
+| 2: clarification-only routing and forms | Unknown: native built-in provenance, Plan positive control, Default/async and secret exclusions, app approval, dedicated permission example/path audit, forms and decline unobserved. |
 | 3: receipt and races | Unknown: exact accepted-answer result mapping, desktop/client orderings, cleanup-only resolution, mismatch, interruption and delayed receipt unobserved. |
 | 4: defer | Unknown: native handback and unchanged pending turn unobserved. |
 | 5: reconnect/restart | Unknown: pending replay, authoritative reconciliation completion, daemon generation, stale-answer rejection and no-client recovery unobserved. |
 | 6–7: production and phone | Not attempted: production fixture/integration suite and user-present phone answer/defer belong to later work. |
 
-There is no established native request/answer mapping, decline encoding, receipt
+There is still no established native answer mapping, decline encoding, receipt
 extractor, late-join source, replay barrier, daemon-generation discriminator or
-same-call retry rule. Synthetic fixture mappings must not become production code.
-The 10-page/20-item receipt lookup is a probe bound only; a production plan must
-use observed result distance and failure behavior. No native history samples yet
-support selecting a production incoming-message cap.
+same-call retry rule. Source-based mode evidence remains a candidate requiring
+native built-in provenance and a Plan positive control. Previous-turn mode and
+model silence still prove nothing. No native history samples justify choosing a
+production receipt-search bound or incoming-message cap.
 
-## Mode evidence prepared for the pilot
+## Recommended next decision
 
-The retained [0.165.0 built-in handler](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/core/src/tools/handlers/request_user_input.rs)
-derives blocking status from the current turn's Plan mode. Depending on feature
-availability, Default may expose a nonblocking variant; an unavailable blocking
-variant does not mean the whole question tool must be absent. A proposed predicate
-therefore still needs native built-in call provenance, exact call correlation,
-`isBlocking: true`, matching source/version/configuration and the Plan positive
-control. No such native question has yet been observed here.
+Prepare a focused read-only metadata diagnostic before another full inventory:
+inspect native MCP tool metadata and effective configuration first, then use
+specific app metadata to determine whether the authorized Linear search is
+available to this private 0.165.0 server and how it is identified. Do not make
+completion of a 5,025-entry general directory scan the first prerequisite to
+learning which tools are exposed.
 
-`collaborationMode/list` omits developer-instruction text. The driver reads its
-Default preset values and clears overrides exactly as the
-[tagged TUI does](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/tui/src/collaboration_modes.rs#L90),
-so the server supplies current instructions. It will record the effective control
-configuration; that check was not reached. A previous turn's mode or a model
-choosing not to invoke a tool still proves nothing. These are prepared source
-candidates, not passed capability gates.
+The saved 0.165.0 protocol provides `mcpServerStatus/list`, `config/read`, and
+`app/read`. `app/read` takes `appIds` (at most 100) and optional `includeTools`;
+its public tool summaries are explicitly display-only, so they cannot replace
+an authoritative native tool schema or prove invocation availability. The observed
+directory id is only a candidate to inspect, not an established connector mapping.
+A revised plan must specify the exact metadata requests, positive identity/schema
+checks, fixed bounds and the point where unavailable/ambiguous evidence stops it.
+It must retain the same access-only auth, capture limits, cleanup and aggregate
+budget, and start no model turn or app operation during that diagnostic.
 
-## Decision for review
+Why this recommendation: captured evidence already exposes a native-versus-harness
+metadata discrepancy, while increasing the page count alone cannot establish
+connector identity or availability. Cost: a diagnostic may show that the current
+private topology cannot expose the approved tool without a separately reviewed
+configuration change. No compatibility conclusion is assumed here.
 
-Recommend a narrow amendment to the next frozen feasibility plan: allow only
-inventory `app/list` a **95-second RPC deadline**, give inventory a **120-second
-case deadline plus 60 seconds cleanup**, and permit one fresh read-only inventory
-attempt after fake-clock tests prove the exception and unchanged default timeout.
-The original 30-minute/30-turn aggregate budget, token-lifetime check, frame and
-capture caps, refresh refusal and cleanup rules remain unchanged. Every other RPC
-keeps its 15-second deadline. Multiple pages remain bounded by the single case
-deadline. Another incomplete inventory stops before any model turn.
+Alternatives are to keep the task blocked, or have the user choose a different
+concrete app probe after its identity and safety are established. Installing or
+connecting an app, copying live login state, changing account settings, accepting
+an approval, substituting tools/arguments, or weakening the native capability gates
+is not authorized. The existing exact Linear search/decline approval persists.
+No second attempt or new diagnostic was run after `inventory-03`; plan `ccd0a75`
+explicitly stops on another incomplete inventory.
 
-Why this alternative: it lets the native 90-second load timeout produce a response
-or error, with a small allowance for config/setup work. Cost: it can spend up to two
-minutes of the existing budget and still fail; it cannot make an unavailable app
-available. Do not adopt it silently: plan `7d55697` explicitly requires the shorter
-deadline and routes unknown prerequisites back to review. No timeout was widened
-and no retry was run in this revision.
+Task 2 (relay-01090a) remains incomplete. Task 3 (relay-4746ed) produces this blocker
+report, with no guessed production plan. The parent stays open and the branch
+stays unmerged until the connector, required native gates and phone acceptance
+are complete. The owner prepares a revised diagnostic plan after the user's
+decision, for its separate frozen review.
 
-Keeping the present limits is safe but leaves discovery inconclusive. Switching
-to `app/read` or `app/installed` would need its own metadata/identity investigation;
-no compatible Linear id or equivalent recipe has been established. Accepting an
-interim notification, substituting a different app, installing one, changing live
-account settings or skipping the app gate is rejected. The exact approved Linear
-search/decline authorization remains valid, but was not exercised.
+## Retained evidence and earlier decisions
 
-Task 2 (relay-01090a) remains incomplete at inventory; Task 3 (relay-4746ed)
-produces this blocker report, with no guessed production plan. After the user's
-decision, the owning Codex session freezes any amended feasibility plan for its
-separate review, then resumes the blocked inventory. The branch stays unmerged
-until the connector, all required gates and human phone acceptance are complete.
+relay-a27e7c owns the raw task scratch, plan workspace and portable attachments.
+`inventory-03-evidence.json` maps every page and update to timestamps, preserves
+selected metadata and the budget, and records the raw result/capture hashes.
+`inventory-03-result.json` is a portable result attachment with the runtime path
+substituted. Exact raw files remain under retained `runs/inventory-03`; the complete
+updates are not replaced by the bounded summary. `protocol-contract-report.md`
+is the task-scratch copy of this report.
 
-## Earlier evidence and retained artifacts
+Attachments `r7-run.mjs`, `r7-probe.test.mjs`, `r7-cases.json` and
+`timeout-r5-{red,green,dev,node22,fast}.log` preserve the timeout change and tests.
+Earlier r4/r6 snapshots, native transport captures, RED/GREEN safety corrections,
+full reviews, source hashes and generated 0.165.0 protocol remain retained.
 
-The previous report at `741a546` remains the exact record of the JSON-line proxy
-failure under plan `3b668d5`. hq-d85ede had already recorded Unix WebSocket and
-Plan-only blocking behavior on 0.162.1; that evidence was overlooked in the first
-transport design. The new run resolves only the transport prerequisite. Retained
-`transport-review-evidence.json` records the 0.165.0 common-listener source chain
-for managed daemon and private `--listen unix://`; no live daemon was contacted,
-and listener equivalence still says nothing about lifecycle/recovery equivalence.
-
-relay-a27e7c owns the raw task scratch and portable attachments. Current evidence:
-
-- Current corrected driver snapshots `r6-run.mjs`, `r6-probe.test.mjs` and
-  `r6-fake-child.mjs`, with `verdict-fix-dev.log`, `verdict-fix-node22.log`,
-  `verdict-fix-fast.log`, `verdict-size-red.log`, `verdict-size-green.log`,
-  and earlier `review-fix-dev.log`, `review-fix-node22.log`,
-  `review-fix-red.log`, `cleanup-fault-red.log` and `review-fix-green.log`.
-  Unchanged modules and prior snapshots: `r4-*.mjs`, `r4-cases.json`,
-  `task1-r4-dev.log`, `task1-r4-node22.log`,
-  `task1-r4-fast.log`, RED/GREEN safety logs and `transport-initialize-fixture.json`.
-- `transport-01-result.json` and `inventory-02-result.json` portable result
-  attachments; raw results/captures under retained `runs/transport-01` and
-  `runs/inventory-02`. Portable result paths replace the private runtime path.
-- `inventory-blocker-evidence.json`: exact raw/portable/result/budget/source hashes
-  and the tagged source URL. `mode-rule.json` retains mode-source references and
-  hashes. `source-0.165.0/sources.json` maps saved full source to tagged URLs.
-- `protocol-contract-report.md` is the portable task-scratch copy of this report.
-  Parent retained-item records locate manifests and owners; no raw evidence was
-  removed or replaced by a derivative. Test logs prove fixture behavior only.
+Report `aac3954` records the previous timeout blocker and corrected driver.
+Report/spec `741a546` preserve the earlier mistaken JSON-line proxy premise and
+its correction. hq-d85ede had already recorded Unix WebSocket and Plan-only
+blocking on 0.162.1; that overlooked evidence remains acknowledged. Tagged
+common-listener evidence proves transport selection, not managed/private
+lifecycle equivalence. No earlier native unknown is promoted to a pass here.
