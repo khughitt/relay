@@ -10,8 +10,8 @@ production implementation and phone acceptance remain owed.
 
 ## Verified work and its limits
 
-Task 1 (relay-dc1f42) completed the disposable probe driver and its safety checks:
-76/76 focused tests passed on Node 26.5.0 and Node 22.23.2; the fresh repository
+Task 1 (relay-dc1f42) contains the disposable probe driver and its safety checks:
+81/81 focused tests passed on Node 26.5.0 and Node 22.23.2; the fresh repository
 `just test-fast` run passed 773/773. The recorded full-suite baseline also passed
 773/773. The tests cover bounded framing/RPC, explicit child environments,
 access-only authentication, refresh refusal, source-login change detection,
@@ -25,6 +25,16 @@ The peer advertised 16,777,216 bytes; the driver retains its stricter local caps
 (1 MiB outbound, 8 MiB incoming). This run read no authentication source and
 started no TUI or model. Its raw wire capture is retained. Post-initialize fake
 scenarios are explicitly synthetic, not native capability evidence.
+
+The first independent execution review found three driver gaps after the original
+76/76 tests passed: capture bytes omitted JSON escaping and the portable copy;
+a removal error could skip later cleanup; and inventory checked property names
+without validating the authorized arguments. Regression tests reproduced each
+problem, including an actual filesystem permission failure. Corrections count
+exact persisted bytes with space reserved inside the cap for a verdict, continue
+independent cleanup stages with a failed result, and conservatively validate the
+exact approved argument object. Unsupported schema constraints fail closed. The
+81-test suite includes these corrections; the original native evidence is unchanged.
 
 The pilot orchestration exists but has not run against a real model. Later matrix
 cases are not yet implemented: they are deliberately refused until the pilot
@@ -143,7 +153,11 @@ and listener equivalence still says nothing about lifecycle/recovery equivalence
 
 relay-a27e7c owns the raw task scratch and portable attachments. Current evidence:
 
-- `r4-*.mjs`, `r4-cases.json`, `task1-r4-dev.log`, `task1-r4-node22.log`,
+- Current corrected driver snapshots `r5-run.mjs`, `r5-probe.test.mjs` and
+  `r5-fake-child.mjs`, with `review-fix-dev.log`, `review-fix-node22.log`,
+  `review-fix-red.log`, `cleanup-fault-red.log` and `review-fix-green.log`.
+  Unchanged modules and prior snapshots: `r4-*.mjs`, `r4-cases.json`,
+  `task1-r4-dev.log`, `task1-r4-node22.log`,
   `task1-r4-fast.log`, RED/GREEN safety logs and `transport-initialize-fixture.json`.
 - `transport-01-result.json` and `inventory-02-result.json` portable result
   attachments; raw results/captures under retained `runs/transport-01` and
