@@ -112,11 +112,20 @@ The revised plan must carry these concrete requirements forward:
    topology/recovery obligations privately.
 4. Re-probe hq's native mode-enforcement rule as a candidate: positively identify
    the built-in blocking tool, observe `isBlocking: true`, and demonstrate native
-   Default-mode refusal on this version with a Plan positive control. Require an
-   actual attempted call and native rejection; a model choosing not to call it is
-   not refusal evidence. Account for mode changes and resumed/late-joined calls.
+   Default-mode enforcement on this version with a Plan positive control. Accept
+   either an actual attempted call and native rejection, or native evidence of
+   tool unavailability from captured tool-availability data or version-pinned
+   source applicable to the tested configuration. A model choosing not to call
+   it is not enforcement evidence. Account for mode changes and resumed/late-joined calls.
    Only established enforcement may supply the existing Plan-mode qualification;
    this does not permit `isBlocking` alone. Otherwise mode remains unknown.
+5. Use `thread/resume` with `excludeTurns: true`, which the saved 0.165.0
+   `ThreadResumeParams` documents as returning metadata and live-resume state
+   without populating `thread.turns`. Fetch needed history through bounded pages
+   of `thread/turns/list` and `thread/items/list`. Size the incoming message limit
+   from real responses, retaining a hard cap; an oversized response must produce
+   a visible failure for the affected thread, never a silent drop. The revised
+   plan must define thread isolation and connection recovery for this case.
 
 These are obligations for the next reviewed plan, not a plan approval or a live
 capability verdict. No probe or production code changed in this documentation

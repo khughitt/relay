@@ -137,8 +137,11 @@ route does not activate.
 The revised feasibility plan must test native mode enforcement as a candidate
 way to establish the Plan-mode requirement. hq-d85ede recorded that 0.162.1
 refused the blocking built-in tool in Default mode. Re-probe on 0.165.0 with a
-Plan positive control and an actual attempted blocking-tool call in Default,
-capturing native refusal rather than model prose or mere absence of a question.
+Plan positive control and either an actual attempted blocking-tool call in Default
+with native refusal, or native evidence that the blocking tool is unavailable in
+Default from captured tool-availability data or version-pinned source applicable
+to the tested configuration; model prose or merely choosing not to call the tool
+does not count.
 If the current-version evidence establishes that enforcement for the supported
 route, positive built-in-call provenance together with `isBlocking: true` may
 establish the question's Plan-mode qualification. This is a candidate proof of
