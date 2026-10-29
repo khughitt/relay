@@ -1,6 +1,8 @@
 # Codex blocking question connector — addendum
 
-Status: proposed; user review required before implementation planning.
+Status: transport revision proposed; user review required before replanning.
+The nontransport contract was approved at relay `77d3aee`; this revision replaces
+the proxy/framing assumption disproved during execution of plan `3b668d5`.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
 
 ## Intent and authority
@@ -18,7 +20,7 @@ blocking route only. It does not change Claude or detached-question semantics.
 The source session's human asked for follow-ups after the Claude acceptance; its
 agent filed this Plan-mode-first slice. The parent goal supplies the phone answer
 and native-desktop defer requirements. The choices below are the current author's
-recommendations, not decisions already approved by the user.
+recommendations where changed below; the remaining contract retains its approval.
 
 ## Evidence and unresolved feasibility
 
@@ -37,8 +39,11 @@ The installed CLI is 0.165.0. Its generated experimental TypeScript protocol say
 - Raw response events can describe calls and outputs with call ids; typed thread
   items include `functionCallOutput`. Availability and exact id correspondence on
   this shared-daemon route remain unprobed.
-- CLI help exposes `codex app-server proxy --sock <path>`, a stdio bridge to an
-  existing daemon. Its reconnect and failure behavior remain unprobed.
+- `codex app-server proxy --sock <path>` forwards raw bytes to the existing daemon.
+  It does not translate newline JSON into WebSocket messages. A private 0.165.0
+  run timed out on newline JSON; a separate HTTP Upgrade through that proxy
+  returned `101 Switching Protocols`. Neither run sent authentication or started
+  a model turn. See the [transport probe report](../notes/2026-10-28-codex-question-protocol-report.md).
 
 The [official app-server documentation](https://learn.chatgpt.com/docs/app-server#toolrequestuserinput)
 says resolution notifications also occur when a pending request is cleared by turn
@@ -54,13 +59,17 @@ No current-version live question probe has run for this addendum.
 
 ## Approaches
 
-1. **Use the installed Codex proxy, recommended.** One owned child of `relay serve`
-   exchanges bounded newline JSON with the existing daemon. Codex owns its Unix
-   WebSocket framing; relay needs no transport dependency. Cost: the proxy and
-   daemon must both pass the installed-version evidence gate.
-2. **Implement Unix WebSocket transport in relay.** Avoids a child, but adds framing,
-   handshake and lifecycle code solely to duplicate the supplied proxy. Rejected
-   unless a probe proves the proxy unusable; that outcome returns to design review.
+1. **Connect directly to the Unix WebSocket, recommended revision.** Use Node
+   built-ins for the Unix socket, HTTP Upgrade and bounded WebSocket framing.
+   No new runtime dependency or proxy child. Validate the upgrade response and
+   acceptance key, mask client frames, handle fragmentation and control frames,
+   bound aggregate message size and time, and reject unsupported compression.
+   Test malformed and truncated frames, close/ping/pong, cancellation and reconnect
+   before live use. Cost: relay owns a small but security-sensitive transport;
+   the next reviewed plan must specify and test that boundary before probing.
+2. **Keep the raw proxy and add WebSocket framing.** Technically possible, but
+   requires the same framing implementation plus a child lifecycle. Rejected
+   because the proxy supplies no framing or local-connection benefit here.
 3. **Use detached questions instead of native integration.** Already supported, but
    requires agents to change how they ask and does not answer the native waiting
    tool call. Does not meet this task.
@@ -78,7 +87,7 @@ root library export. Configuration names and exact internal function boundaries
 are left to the implementation plan. Configuration is opt-in and names an absolute
 Codex executable, its home, the control socket, and a validated evidence file.
 Do not auto-start, restart, update or reconfigure the daemon. Disabled configuration
-does not launch a proxy. Missing or malformed enablement fields fail early.
+does not open a connection. Missing or malformed enablement fields fail early.
 
 Join loaded threads associated with live Codex rows in relay's registry, including
 new arrivals; use paginated loaded-thread discovery and bounded refresh. Joining
@@ -169,9 +178,9 @@ route representation only as needed and update validation, stored schema, JSDoc 
 recovery together; leave existing hook ownership and local socket commands intact.
 Connector operations cannot be invoked as Codex hook-waiter operations.
 
-On proxy disconnection stop sending immediately. Reconnect with bounded backoff
-while the service lives; shutdown cancels timers and reaps its child. Do not infer
-daemon death merely from losing the proxy. Reconcile exact pending requests and
+On transport disconnection stop sending immediately. Reconnect with bounded backoff
+while the service lives; shutdown cancels timers and closes its socket. Do not infer
+daemon death merely from losing the connection. Reconcile exact pending requests and
 correlated outputs before any retry. Replay the same saved answer only if that exact
 native call is proven pending; if resolved, obtain its result rather than resend.
 Absence from a partial page or an unfinished replay is not proof of disappearance.
@@ -192,7 +201,7 @@ id/answer mappings, and a verdict for each gate. Version mismatch disables the
 connector with an actionable diagnostic; the existing inbox continues serving.
 An evidence file must be validated, not just present. No substring version match.
 
-1. Proxy connects to an isolated daemon and exits cleanly; joining loaded threads
+1. Transport connects to an isolated daemon and closes cleanly; joining loaded threads
    does not change their settings or start work. Test late join and new-thread discovery.
 2. Ordinary blocking questions are positively distinguishable from app approvals,
    secret and async requests. Exercise all forms the translator will admit, including
@@ -202,7 +211,7 @@ An evidence file must be validated, not just present. No substring version match
    mismatch, interruption, and delayed confirmation. No false `consumed` is allowed.
 4. Defer leaves the native question usable and advances no turn until the desktop
    answers. Verify history and relay retry responses.
-5. Proxy and relay restarts preserve identity; daemon restart/re-ask rejects stale
+5. Transport reconnects and relay restarts preserve identity; daemon restart/re-ask rejects stale
    answers. Include recovery with no client attached and later attachment, either
    from current hq-25665e evidence or a focused isolated probe owned here. Do not
    wait for that task's unrelated OpenCode or exec probes.
