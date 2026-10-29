@@ -12,12 +12,14 @@
 
 ## Scope and phase boundary
 
-**Proposed socket-alias amendment, awaiting review:** approved84692cd is exhausted.
-The r15 observer passed offline checks and corrective review, but readiness-04
-stopped unknown/observer-ownership before TUI launch, with zero polls/input/turns.
-Cleanup was verified. The next proposal verifies Codex's source-defined protected
-socket alias and runs readiness-05 once. No pilot, metadata, app operation or
-production work is included. The approved production spec remains unchanged.
+**Execution checkpoint: approved0492f74 is exhausted.** The r16 alias correction
+passed201checks on each runtime and independent review. readiness-05 passed
+native composer/thread/start-policy proof with zero input/turns and verified
+cleanup. Budget is373609ms/two charged turns. Native work is stopped. This
+checkpoint authorizes no further attempt or pilot: a separately reviewed
+first-question/direct-join plan must handle the TUI settings/turn lifecycle.
+The original requirements below remain historical obligations of that plan;
+the completed readiness sequence does not unlock them automatically.
 
 The approved spec makes
 provenance, receipt, decline and reconciliation prerequisites of production work.
@@ -58,14 +60,15 @@ authorized by this phase.
 
 ## Resume state and ordering
 
-Continue from **364,929 ms (6 min 4.9 s), two charged turns**, inactive. The
+Current checkpoint: **373,609 ms (6 min 13.6 s), two charged turns**, inactive.
+The approved0492f74 execution began at364929ms and charged8680ms for readiness-05. The
 30-minute/30-turn cap, earlier conservative charge and unused bootstrap reservation
 remain unchanged. All previous readiness sequences are exhausted. Verify retained
 hashes, readiness-03 cleanup, r13 and metadata-02 core admission before execution.
 The r15 combined disposable checks passed171/171 on Node26.5.0 and22.23.2;
 repository fast773/773 and structured hygiene exit codes0. Independent review
-accepted the fragment-count/Close corrections before readiness-04. These are
-prior evidence, not verification of the proposed alias resolver. No repository
+accepted the fragment-count/Close corrections before readiness-04. Those are prior r15 evidence. r16 now passed201/201 on each runtime and the
+one native readiness-05; see the current report for its exact limited verdict. No repository
 executable changes are planned. Readiness-04 charged4255ms, zero turns; no refund.
 
 The Linear identity/schema uncertainty remains separate: the native name is
@@ -234,28 +237,28 @@ The existing outside-client initialize/codexHome and effective-policy checks rem
   Preserve any unexpected remaining candidate as cleanup-failed evidence; do not
   unlink a changed/unknown object, scan the namespace or remove its shared parent.
 
-- [ ] **Write RED regressions before implementation:** source-shaped alias passes;
+- [x] **Write RED regressions before implementation:** source-shaped alias passes;
   direct socket at the alias, wrong target/hash, relative target, broken alias,
   alias/namespace/target symlink substitution, wrong uid/mode/type and changed
   identity before/after connect all fail without TUI input. A matching readable
   server response cannot override a bad alias. Predicate evidence contains no
   credential canary or untrusted path/error prose. Fake native startup publishes
   and cleans the physical socket/lock; leftover candidates invalidate cleanup.
-- [ ] **Run RED** through `just test-one` for observer/probe tests; retain the
+- [x] **Run RED** through `just test-one` for observer/probe tests; retain the
   source-layout failure against r15. Implement only the alias/ownership boundary,
   safe diagnostic projection and owned-candidate cleanup checks. Preserve all r15
   framing, fragment, Close, policy correlation, budgets and CLI restrictions.
-- [ ] **Run GREEN and checkpoint r16:** combined observer/probe/transport/history
+- [x] **Run GREEN and checkpoint r16:** combined observer/probe/transport/history
   checks on Node22 and development runtime, normal validated fast-test policy,
   `just check`, `tasks check`, diff hygiene, source pins and retained manifests.
   Record real exit codes. Fake passing does not establish native readiness.
-- [ ] **Run readiness-05 exactly once after this frozen revision is approved:**
+- [x] **Run readiness-05 exactly once after this frozen revision is approved:**
   normal access-token-only/safe-core preflight, CLI0.165.0, configuredgpt-6-astra,
   fresh owned workspace, saved untrusted,120-second case/180-second outer bound,
   original40-poll/90-second readiness cap and aggregate budget364929ms/two turns.
   No keys, trust fallback, `/plan`, model turn, metadata, app operation or pilot.
   Do not repair failing ownership settings or increase caps during the attempt.
-- [ ] **Interpret and stop regardless of outcome:** preserve original verdict,
+- [x] **Interpret and stop regardless of outcome:** preserve original verdict,
   projected predicate and native start-policy evidence if obtained, frame/message
   maxima if observed, and complete cleanup verification. Unknown grants no retry.
   A readiness pass still needs a separately reviewed first-question/direct-join
@@ -846,7 +849,7 @@ question capability remains Task 2's gate.
   assert.equal(await utf8AcrossFragmentsWithPing(), 'decoded-once-pong-masked');
   ```
   These helper names are local test helpers, not exported driver APIs.
-- [ ] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/unix-websocket.test.mjs"`.
+- [x] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/unix-websocket.test.mjs"`.
   Record missing transport or wrong framing assertions, never a real credential
   or setup failure. Implement the bounded codec contracts below, then rerun GREEN.
 - [ ] **Implement `transport` only and run the real first connection.** Start one
@@ -875,7 +878,7 @@ question capability remains Task 2's gate.
   retries an answer without same-tuple pending proof. Mode tests must reject both
   previous-turn Plan settings and model non-use; source-based evidence must match
   exact version/configuration and cover the blocking variant, not just a tool name.
-- [ ] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/probe.test.mjs" "$WORK_ROOT/relay/relay-a27e7c/probe/history.test.mjs"`.
+- [x] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/probe.test.mjs" "$WORK_ROOT/relay/relay-a27e7c/probe/history.test.mjs"`.
   Confirm the named behavior fails, then replace the old line transport and add
   `history.mjs`, inventory and pilot orchestration. Each server/TUI/fixture child
   uses an explicit-key environment; no unrelated sentinel child may be killed.

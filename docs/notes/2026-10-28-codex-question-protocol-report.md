@@ -1,3 +1,111 @@
+# Codex question feasibility: native readiness established
+
+## Current outcome after approved0492f74
+
+The single authorized readiness-05 ran on Codex0.165.0 from
+2026-10-29T19:47:03.639Z to19:47:12.317Z. Its original verdict is
+**passed / readiness-only**, exit0. Three discovery polls found one native TUI
+thread and a recognized empty composer in the fresh saved-untrusted workspace.
+No keystrokes, trust fallback, model turns, metadata retry, app operation or pilot
+occurred. Native work stopped after this attempt as approved.
+
+The source-defined socket alias passed all captured ownership predicates at
+startup, immediately before connection and immediately after connection. The
+observer received the native TUI thread/start response on that connection and
+correlated its exact typed request id with the discovered thread. It confirmed
+the owned cwd, gpt-6-astra, on-request approvalPolicy, user approvalsReviewer,
+readOnly sandbox with networkAccess:false, and null activePermissionProfile.
+Refreshed config/layer checks independently passed. Unlike readiness-04, these
+ownership predicates and start-policy fields were actually captured.
+
+The peer advertised16777216bytes. Observed maximum frame/message sizes were
+3428bytes client-to-server and11090bytes server-to-client, below the unchanged
+8MiB local limit. This small startup observation does not size production thread
+history or prove a recovery/subscription contract.
+
+Budget is **373609ms (6min13.6s), two charged turns**, inactive. This attempt
+charged8680ms and zero turns; historical charges/reservations are retained.
+All seven owned PIDs were independently absent after the run. Private/runtime
+paths and the two exact derived protected socket/lock candidates were absent.
+Cleanup reported no errors/survivors; no namespace scan, permission repair or
+unrelated deletion occurred. The driver detected no source-login change, refresh
+request or private credential persistence. Host-load found nothing left running.
+
+Raw SHA256: `e8b672864aac2cf674b91e50495e0731e244b765f6a30a69769a647b52571c6f`.
+Portable SHA256: `3040c659da9bb7bb392a440fee4c953c76ad8817c481573911d0fcc505aa8126`.
+`readiness-05-observations.json` keeps interpretation and independent cleanup/hash
+checks separate from the unchanged original run result. Raw evidence, console,
+exit status and portable derivatives remain retained on relay-a27e7c.
+
+## Implemented correction and verification
+
+Disposable r16 implements the exact native alias resolver and identity checks
+specified by0492f74. The observer connects only to the derived protected socket;
+its own listener remains in the private runtime directory. Errors expose fixed
+codes and bounded stat predicates, never arbitrary link targets or error prose.
+The driver computes the native namespace from canonical /tmp and effective uid,
+verifies the owned server process, and records exact socket/lock cleanup candidates.
+Only the internal test dependency object can substitute a fixture namespace.
+
+The fake server now publishes an alias,0600 protected socket and startup lock in
+an owned fixture namespace outside private/runtime removal. Tests require normal
+cleanup and preserve/report leftover candidates. No production connector code,
+host launcher, shared daemon configuration, dependency or active route changed.
+
+RED:21 alias tests and4 driver integrations failed before their implementations.
+An initial updated codec fixture exceeded the Unix path-length limit; its prefix
+was shortened, the failed log retained and only its41empty generated directories
+removed. Final combined checks passed **201/201 on Node26.5.0 and201/201 on
+Node22.23.2**. Repository fast checks passed **773/773**. just check, tasks check
+and diff hygiene exited0. Full logs and11 r16 source/test snapshots are retained.
+Independent pre-native review (codex/gpt-6-astra, impl20) accepted the correction
+with no new findings.192 retained records,15 complete manifests and11 reviewed
+input hashes were independently reverified before readiness-05.
+
+## Boundary and next review
+
+Readiness is now demonstrated in this isolated topology. The paid pilot is still
+unrun: no built-in question provenance, current-question Plan enforcement, exact
+answer receipt, exclusion, late-join, race/defer/reconnect/restart or production
+phone capability is established by this result. Linear identity/schema remains
+unknown. Earlier failed/unknown runs keep their original verdicts.
+
+Ruling: retain exact source-derived alias verification rather than generic link
+following or removing ownership checks (0492f74, r16). Why: the native run now
+confirms the expected owned layout and identities. Cost: a future layout change
+still fails visibly and needs renewed version-specific evidence.
+
+Ruling: stop native work after the readiness pass (0492f74, readiness-05).
+Why: the approved sequence explicitly ends here; the current observer rejects
+turns and settings changes. Cost: the question/receipt pilot requires its own
+reviewed first-question/direct-join plan before further execution.
+
+The next design review must settle that transition, not repeat readiness alone.
+Pinned tui/src/chatwidget/settings.rs:704–706,751–770 shows a mode choice submits
+an override containing collaboration mode; app_server_session.rs:1452–1508 sends
+the effective mode on turn/start. The current zero-input observer deliberately
+rejects this lifecycle. The next plan must account for native settings-update
+policy, first-turn materialization, direct-client join/replay and exact receipt
+without treating the observer as production provenance or a resume-mode snapshot
+as proof of the question turn. It must also check raw-event availability before
+assuming a newly joined client receives earlier tool-call provenance. These are
+planning obligations, not authorization to alter the driver or run another case.
+
+The recommendation is to use this completed readiness proof as the starting
+point for that separately frozen plan. Rejected alternative: rerun the old pilot
+unchanged, which retains the pre-first-turn resume problem and lacks this observer
+lifecycle. No gate is waived by this recommendation. The parent, Task2 and Task3
+remain open; connector implementation, native gates and user phone answer/defer
+acceptance still precede integration.
+
+Existing minor (deferred): the default/medium effort-label allowlist can fail
+closed on another legitimate label. No new minor was introduced in this slice.
+
+## Historical report through0492f74
+
+The following preserves earlier evidence and proposals, not renewed execution
+authorization.
+
 # Codex question feasibility: private socket alias blocker
 
 ## Current outcome after approved84692cd
