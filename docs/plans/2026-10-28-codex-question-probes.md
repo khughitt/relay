@@ -12,8 +12,9 @@
 
 ## Scope and phase boundary
 
-This resumes the feasibility phase after the app-discovery timeout under plan
-`7d55697`. The earlier transport blocker under `3b668d5` is resolved for the
+This resumes the feasibility phase after the incomplete app inventory under plan
+`ccd0a75`, recorded in blocker report `f4c5448`. The earlier transport blocker
+under `3b668d5` is resolved for the
 private handshake/initialize prerequisite only. The approved spec makes
 provenance, receipt, decline and reconciliation prerequisites of production work.
 The generated types establish field shapes, but do not prove those prerequisites.
@@ -23,7 +24,10 @@ Node 22/development-runtime and user-present phone answer/defer acceptance.
 
 Writing an implementation that guesses an acknowledgement or replay barrier is
 rejected. A passed probe produces the exact parser and reconciliation decisions
-for the next plan; a failed or unknown required gate returns to design review.
+for the next plan; a failed or unknown required gate prevents production work.
+The app-approval prerequisite alone may remain unknown while independent native
+probes run in the sequence below; every other unknown stops its dependent cases.
+This changes probe ordering, not the approved spec or its acceptance gates.
 No second transport, transcript-tail fallback or permanently unconfirmed route is
 authorized by this phase.
 
@@ -50,34 +54,41 @@ authorized by this phase.
 
 ## Resume state and ordering
 
-The approved spec remains `741a546`. Read the frozen blocker report at `aac3954`
-and the task's retained evidence before edits. Task 1 is complete: the corrected
-research driver passed 82/82 tests on Node 26.5.0 and 22.23.2, the repository suite
-passed 773/773, and fresh scoped review accepted the corrections. Native
-`transport-01` proved private handshake/initialize without auth or inference;
-its raw frames supplied the later fake transport fixtures. Do not repeat completed
-Task 1 work or treat those fixtures as native question evidence.
+The approved spec remains `741a546`. Read frozen report `f4c5448` and verify
+retained hashes before edits. Task 1 is complete. The narrow Task 2 timeout
+amendment under `ccd0a75` is also complete: driver checks passed 87/87 on Node
+26.5.0 and 22.23.2; the repository suite passed 773/773. Native `transport-01`
+proved private handshake/initialize; its frames supplied later fake fixtures.
+Do not repeat that work or treat fixtures as native question evidence.
 
-`inventory-02` authenticated successfully with an access token only, then stopped
-at the approved 15-second `app/list` RPC deadline. Its interim app update does not
-establish a complete catalog or Linear's absence. The tagged 0.165.0 implementation
-permits a 90-second app-list load. The user approved the narrow timing adjustment
-recommended in `aac3954`; this amended plan still needs its own frozen review.
+`inventory-03` received its first `app/list` response after 44.2 seconds, then
+stopped at ten pages/1,000 entries. A separate update held 5,025 entries, including
+an inaccessible entry named Linear; identity with the approved harness search is
+unproven. No additional general-directory scan is authorized by this revision.
+The persisted budget is **128,769 ms and zero turns**, including the conservative
+40,000 ms diagnostic charge. Never reset it. No native question or app operation
+has run. The existing exact Linear search/decline authorization persists.
 
-Resume at Task 2's timeout-amendment tests, then one fresh read-only inventory
-attempt. Only after a passing complete inventory may the native pilot and remaining
-matrix proceed. Keep all failed runs. The persisted budget is **73,256 ms and zero
-turns**, including the earlier conservative 40,000 ms diagnostic charge; never
-reset it. No native question or app operation has run. Existing exact Linear
-search/decline authorization persists without widening its scope.
+The user endorsed the read-only metadata diagnostic and delegated the sequencing
+choice in the review of `f4c5448` (reviewer `claude/claude-opus-5-5`). The owner's
+choice in this proposed revision is: fake diagnostic/admission checks → one native
+metadata diagnostic → pilot → `join`, `forms`, `race`, `clear`, `defer`,
+`reconnect`, `restart` → available exclusion examples. The pilot and these seven
+cases may proceed with app exclusion unknown, only after their own prerequisites
+pass. Gate 2, production implementation and activation remain blocked until all
+required exclusions, including a real app approval, pass. No complete feasibility
+verdict is possible merely from the app-independent cases.
 
-The earlier order remains evidenced: bounded codec checks → real private
-unauthenticated handshake/initialize → real-wire-derived fake-process checks →
-access-only inventory → native pilot → remaining matrix. hq-d85ede recorded
-WebSocket and Plan-only blocking behavior on 0.162.1; keep that provenance and the
-current-version source candidate, but do not claim the live mode gate passed.
-Tagged-source common-listener evidence in `transport-review-evidence.json` proves
-listener selection, not managed/private lifecycle equivalence.
+Why: receipt, native competition and recovery can disprove viability before app
+metadata is resolved. Rejected alternative: retain a complete app inventory as a
+precondition to every turn. Cost if wrong: if no app approval is producible, the
+spent turns support a redesign but do not deliver an activatable route. This plan
+still requires its own frozen review before driver changes or live execution.
+
+hq-d85ede recorded WebSocket and Plan-only blocking on 0.162.1; retain that
+provenance and the current-version source candidate without claiming the live
+mode gate passed. Tagged common-listener evidence proves listener selection,
+not managed/private lifecycle equivalence.
 
 ## Workspace, artifacts and interfaces
 
@@ -110,10 +121,13 @@ node <probe>/run.mjs --case <name> --out <fresh-dir> --codex <absolute-bin>
 ```
 
 `--case`, `--out` and `--codex` are required once. `--model` and `--auth-file`
-are also required for `inventory`, `pilot` and the matrix, and forbidden for
+are also required for `metadata`, historical `inventory`, `pilot` and the matrix,
+and forbidden for
 `transport`, which must not read a login file. Unknown, repeated, missing or empty
 arguments fail before output creation or launch. `--case` is `transport`,
-`inventory`, `pilot` or one of the matrix rows. Never accept shell command strings. Spawn argv arrays.
+`metadata`, historical `inventory`, `pilot` or one of the matrix rows. `inventory`
+remains a historical fixture path; this revision authorizes no live invocation of it.
+Never accept shell command strings. Spawn argv arrays.
 
 `runCase({name, out, codex, model, authFile, signal}) -> Promise<RunResult>` owns all
 children, bounded IPC buffers and timers. The probe module exports this function
@@ -153,9 +167,9 @@ lower live override is the explicit isolation control below. Use `node:net`,
 | Frames | Mask every client frame with fresh randomness; reject masked server frames, RSV bits, reserved opcodes and noncanonical/unsafe lengths before allocation. Accept text fragmentation with aggregate cap, interleaved ping/pong and close. Validate UTF-8 across message fragments and close reasons; reject binary application messages, orphan continuation, nested data messages, fragmented/oversized controls, invalid close codes, truncated header/payload and EOF mid-message. Test 125/126 and 65535/65536 length boundaries. |
 | Limits | Outbound message cap `min(1 MiB, peerLimitBytes)`; never fragment to evade it. Incoming hard cap 8 MiB per frame or reassembled message, including advertised lengths checked before allocation. Maintain a 15-second incomplete-message deadline and 2-second close grace. Test smaller peer limits, chunk splits and aggregate fragmentation limits. |
 | Buffering | At most 32 in-flight RPCs and 256 queued notifications, with total queued decoded payload at most 8 MiB. Await socket drain; bound pending outbound bytes to 1 MiB. Overflow is explicit failure, not dropped events. Total persisted capture is 16 MiB per case, including wire/header/decoded artifacts; stop before exceeding it. No payload enters diagnostics on parse/limit failure. |
-| RPC | One JSON object per text message; validate object/id/method boundary. 15-second RPC deadline, except inventory `app/list` alone gets 95 seconds as specified in Task 2. Connection-local ids never become durable identity. Refresh requests abort before normal routing. Auth frames and errors are excluded/redacted as in the retained safety tests. All pending calls fail explicitly on connection loss. |
+| RPC | One JSON object per text message; validate object/id/method boundary. 15-second RPC deadline, except historical inventory `app/list` alone retains its completed 95-second override. Connection-local ids never become durable identity. Refresh requests abort before normal routing. Auth frames and errors are excluded/redacted as in the retained safety tests. All pending calls fail explicitly on connection loss. |
 
-Native `transport` starts with the 8 MiB incoming hard cap. Inventory, pilot and
+Native `transport` starts with the 8 MiB incoming hard cap. Metadata, pilot and
 history pages record byte lengths and method names without credential content.
 Keep this fixed probe ceiling throughout the run; do not silently raise it to make
 an observation pass. The report proposes a production cap from the largest real
@@ -221,9 +235,14 @@ paths leave the rule unknown.
 
 The pilot uses a normal TUI Plan positive control and a separate private Default
 control. For the latter the probe may explicitly set `collaborationMode` on its
-own `turn/start` as `{mode:"default", settings:{model, reasoning_effort:null,
-developer_instructions:null}}` (generated `CollaborationMode`/`Settings` fields) to establish
-the requested mode for that controlled turn. This is producer setup, never an
+own `turn/start` using the Default preset returned by `collaborationMode/list`.
+Use the preset's model/reasoning values with only the tagged TUI's documented
+fallback for null fields; verify the selected configured model matches. The
+preset mask has no developer-instruction field: clear that override only as the
+pinned TUI does, rather than inventing Default instructions or assuming null
+means native defaults. Retain preset, constructed settings and effective settings
+from the completed controlled turn; prove the source rule applies to them.
+This is producer setup, never an
 observer override on the Plan thread. Record effective model/features/permissions
 and show that the audited rule applies to this exact configuration. Accept either
 an actual attempted blocking call with native rejection, or captured native
@@ -290,33 +309,137 @@ for investigation. Any unexpected private credential persistence fails cleanup:
 stop, remove owned copies, and report a possible live-login impact without rewriting
 the source. No real login, private auth copy or auth payload becomes an attachment.
 
-Before any paid pilot, complete an exclusion-fixture inventory. Each row below
-needs a producer and expected native provenance, or a recorded blocker. In
-particular, an app approval using the question method is not assumed to exist in
-an empty private home. Use the already approved exact Linear recipe below. A changed app, operation,
-arguments or external effect requires a new concrete user approval; plan approval
-alone does not grant those changes. If no suitable connected app or safe recipe is available, park Task 2
-before inference, identify the missing class, and return that blocker for design
-review; do not run an inevitably incomplete matrix or mark the class passed.
+Record producers for each exclusion class, but do not gate the pilot on the app
+example. Missing app identity/schema/policy blocks only the app branch and keeps
+gate 2 unknown. The approved exact Linear recipe remains the sole account-connected
+operation allowed. Changing its app, operation, arguments or external effects
+requires new concrete user approval. Native provenance/mode, auth, model,
+isolation and safety prerequisites still apply before any non-app turn.
+
+### Focused metadata diagnostic and admission
+
+Use one fresh `metadata` run, no TUI, `thread/start`, `turn/start`, tool invocation,
+app operation or account configuration change. Keep the same empty private home,
+access-only auth, private prompt-policy configuration, caps and cleanup. Do not
+copy live config, MCP credentials, plugin state or refresh tokens. The reviewer's
+live-config observation (only `ohai` explicitly configured, no app sections) is
+attributed evidence, not independently verified by this plan or a complete view of
+effective runtime settings.
+
+Before that run, audit the pinned `rust-v0.165.0` source: follow the saved
+`apps_processor.rs` calls to `apps_enabled_for_auth`, `CodexAuth::uses_codex_backend`,
+the managed/external auth variants, and construction/discovery of `codex_apps` in
+the MCP manager. Read relevant feature defaults, per-app policy, and initialization
+or cache conditions. Save exact source URLs, bytes/hashes and line references under
+`source-0.165.0`; record a bounded `app-auth-audit.json` with supporting conditions,
+contradictions and unresolved paths. Do not infer managed/external equivalence
+from the enum names or from the absence of a live config section. If source cannot
+establish a cause, preserve the hypothesis as unresolved; do not switch login mode.
+This audit is prerequisite to interpreting app availability, not a native pass.
+
+After initialize and successful access-only login, send metadata requests in this
+order. Every request keeps the ordinary 15-second RPC deadline. One 120-second
+case deadline bounds them together; missing a result is never permission to extend
+it or retry. Use no `app/list` requests or general-directory notifications as proof.
+
+1. `mcpServerStatus/list` with
+   `{cursor:null,limit:100,detail:"toolsAndAuthOnly",serverName:"codex_apps"}`;
+   omit `threadId`. At most one response page. Require a terminal `nextCursor:null`
+   before declaring that filtered server absent; otherwise record
+   `mcp-discovery-incomplete`. Examine only the exact server name and exact
+   `linear_search` or `mcp__codex_apps__linear_search` tool names, with one unique
+   match. Require `toolsError:null`, a valid tool map and the existing conservative
+   `admitsApprovedArguments` schema check for the unchanged approved arguments.
+   Preserve native server/tool names, input schema, auth/runtime status and available
+   cache/error metadata. Cached or ambiguous discovery is not proven live availability;
+   use the pinned handler's semantics to interpret it and leave it unknown if unclear.
+   Never choose by a display label or substitute a similarly named operation.
+2. `config/read` with `{includeLayers:false,cwd:<owned-private-workspace>}`.
+   Record effective model, relevant feature/auth/app-policy settings and configuration
+   provenance without credentials. Require `sandbox_mode:"read-only"`,
+   `approval_policy:"on-request"` and `approvals_reviewer:"user"`, as the existing
+   private config writes, independently of app availability. App admission additionally
+   requires the exact private default prompt/user policy and no per-app/tool overrides.
+   Unproven app-specific policy blocks the app example. Observed automatic app
+   approval or permissive/unknown general sandbox/approval/credential boundaries
+   stop the entire batch, including non-app probes. Config reads never write settings.
+   A non-app prompt requests only the built-in question operation; the controller
+   never approves unrelated native tool or permission requests.
+3. `model/list` with `{cursor:null,limit:100,includeHidden:true}`, following returned
+   opaque cursors for at most three pages, stopping once the exact configured model
+   is found. Detect repeated cursors. Absent or unobserved model is a core blocker,
+   not permission to substitute. Then `collaborationMode/list` with `{}`; require
+   valid Plan/Default presets and record the inputs for the existing mode proof.
+4. Only if the exact app tool/schema and prompt policy above qualify, one optional
+   `app/read` with
+   `{appIds:["asdk_app_69a089a326dc8191b32a3f2553f5be2c"],includeTools:true}`;
+   omit `threadId`. This is secondary investigation of the already observed candidate,
+   not a required general-directory lookup. Its display-only summaries cannot prove
+   schema or invocation availability, and an unrelated candidate does not invalidate
+   positive authoritative MCP evidence. Retain any identity association only when
+   native metadata/source actually establishes it. No ID guessing or alternate lookup.
+
+When `codex_apps` or the exact search/schema is missing, stop the app-discovery
+branch immediately: no `app/read` or further app listing. Finish only independent
+core config/model/preset checks if transport, auth, capture, ownership and budget
+remain safe. Give the app branch a stable observation code (`codex-apps-absent`,
+`linear-tool-unmatched`, `linear-schema-unproven`, `mcp-discovery-incomplete`,
+`mcp-discovery-error`, or `app-prompt-policy-unproven`). Record a separate cause
+`auth-mode`, `feature`, `configuration`, or `unresolved`, with exact evidence for
+any established cause. An RPC timeout is an observed timeout with unresolved cause
+unless stronger evidence exists. Never invent a cause merely to name the stop.
+No retry, managed-login comparison, feature enablement or configuration repair is
+authorized by this diagnostic.
+
+Add `result.metadata = {core, app}`. Each member is
+`{status:"passed"|"unknown"|"failed",reason,evidenceRefs}`; app also has `cause`
+and `causeEvidenceRefs`. Core covers exact version/private identity, successful
+access-only auth, safe effective config, model and preset observations. It does
+not claim native mode/provenance/receipt. App records the exact tool/schema/policy
+prerequisite only, never gate-2 passage; add bounded `tool` evidence fields
+`{serverName,toolName,inputSchema,evidenceRefs}` only for an exact match, within
+the existing verdict-size cap. No tool metadata is allowed to displace cleanup
+from the bounded failure verdict. A non-app case does not consume an app ID.
+If core passes and only app evidence is incomplete, the run's overall status stays
+`unknown`, reason `app-prerequisite-unproven`, exit 1; never relabel it a passed
+inventory. The controller may proceed to the pilot solely when core passed,
+cleanup passed and no transport/auth/capture/budget/ownership failure occurred.
+Every paid case repeats its own core safety/model checks in its fresh private
+server; a previous result never overrides a fresh failure. Any other unknown or
+failure stops dependent runs. An optional `app/read` timeout leaves its association
+unknown; any unsafe channel failure still stops the whole run.
+
+After the diagnostic, run the pilot once. Only its native provenance, mode and exact
+receipt success admits the seven app-independent cases. Run them in the stated
+order within the existing budget; stop dependent cases at any required unknown or
+failure. Do not use the diagnostic to authorize a question response. At the end,
+run available secret, Default/async and dedicated-permission exclusion controls;
+only run the app control if its exact metadata/policy prerequisites pass again in
+that control's fresh server. Missing app evidence leaves that portion of `exclude`
+unknown and returns to design after the independent evidence is recorded. It never
+becomes a pass, and no production plan or route activation is allowed until all
+five protocol gates pass.
 
 ### Case limits and subscription budget
 
 Store numeric case-name → deadline-seconds entries in `cases.json` (matching the
-existing driver format): transport 60, inventory 120, pilot 360, join 300,
+existing driver format): transport 60, metadata 120, pilot 360, join 300,
 forms 600, exclude 600, race 480, clear 360, defer 240, reconnect 480, restart 600.
+Keep the historical `inventory:120` fixture entry, but do not run it live.
 These are ceilings per case, not a promise that all cases fit their sum. Keep the
 15-second default RPC timeout separate from model-turn and delayed-receipt waits;
-only inventory `app/list` uses 95 seconds. In
+only the historical inventory `app/list` path uses 95 seconds; metadata requests
+keep 15 seconds. In
 `clear`, delay observation for 75 seconds within its case deadline.
 
 The original authorization remains at most 30 minutes of cumulative live probe wall time
 and 30 model turns on the existing subscription, including pilot and retries;
 it does not authorize buying credits or API use. The earlier 15–30 minute estimate
-is provisional, not evidence that the full matrix fits this allowance. Per-case
+is provisional, not evidence that the full matrix fits this allowance. Active per-case
 ceilings total 70 minutes before cleanup, so an extension may be needed. Keep the
 30-minute/30-turn cap unchanged; no token-cost estimate is claimed. Persist cumulative time/turn counts
-across runs and resumes, continuing from 73,256 ms and zero turns. Charge native
-transport and inventory time as well as inference; no case gets a new budget.
+across runs and resumes, continuing from 128,769 ms and zero turns. Charge native
+transport, metadata and historical inventory time as well as inference; no case gets a new budget.
 Reserve 60 seconds of remaining aggregate allowance for cleanup; refuse a launch
 with no execution time left after that reservation. End work at the earlier of
 the case deadline or aggregate allowance minus that reserve, and charge cleanup
@@ -331,7 +454,8 @@ the driver's deadline or the aggregate budget.
 **Completed under `7d55697`, including reviewed corrections retained with report
 `aac3954`.** The steps below preserve the original requirements and evidence
 contract; do not reimplement or rerun them merely because this plan was revised.
-Task 2 owns the newly approved timeout amendment.
+Task 2 owns the metadata/admission amendment. Its earlier timeout amendment is
+complete under `ccd0a75`; preserve that evidence.
 
 **Files:** Modify retained `probe/run.mjs`, `probe/probe.test.mjs`,
 `probe/fake-child.mjs`, `probe/cases.json`; create `probe/unix-websocket.mjs`,
@@ -352,7 +476,7 @@ question capability remains Task 2's gate.
   baseline. Re-run full baseline only if the checkout, dependencies or runtime
   changed since that run. Preserve the old 19-check results as historical safety
   evidence. Read the approved Linear recipe; no repeated approval is needed for
-  the unchanged operation. Native availability still needs the inventory case.
+  the unchanged operation. Native app availability now uses Task 2's metadata procedure, independently of pilot admission.
 - [ ] **Write failing codec tests before modifying the driver.** In
   `unix-websocket.test.mjs`, assert the boundary table below using byte vectors
   and an owned Unix socket with no Codex process. These are protocol-unit inputs,
@@ -400,10 +524,9 @@ question capability remains Task 2's gate.
   Use one private tmux TUI with `--remote unix://<private-socket>` and direct
   WebSocket clients; never `daemon start`, systemd or the live control socket.
   No inference runs while building/testing these fake paths.
-- [ ] **Implement `inventory`.** After all fake checks pass, use access-only auth
-  to inspect native app/model/config metadata without inference. Confirm the exact
-  approved Linear operation is available and prompt policy effective; never invoke
-  it here. Missing metadata or unsuitable prompt policy stops before the pilot.
+- [x] **Historical `inventory` implementation retained.** Task 2 replaces its live
+  admission role with focused metadata and separate core/app verdicts. Preserve
+  the completed timeout tests and historical failed runs; do not run it live.
 - [ ] **Implement `pilot` using the mode-evidence procedure below.** Capture one
   native Circle/Square blocking question from the Plan positive control, attach an
   observer without overrides, prove provenance and mode, answer Square through its
@@ -430,61 +553,77 @@ question capability remains Task 2's gate.
 
 ### Task 2: Run the current-version protocol matrix
 
-**Files:** Extend task-local `probe/run.mjs` and `probe/cases.json`; create fresh
-`runs/<run-id>/` evidence and `protocol-contract-report.md` in task scratch.
+**Files:** Extend task-local `probe/run.mjs`, `probe/probe.test.mjs`,
+`probe/fake-child.mjs` and `probe/cases.json`; retain pinned source/audit additions
+in `source-0.165.0/` and `app-auth-audit.json`; create fresh `runs/<run-id>/`
+evidence and `protocol-contract-report.md` in task scratch.
 
 **Interfaces:** Consumes Task 1's CLI and result schema. Produces one `RunResult`
 per case and a report mapping each approved spec gate to exact native fields,
 captured ordering, supported versions and verdicts. No synthetic fixture may be
 reported as native capability evidence.
 
-- [ ] **Write timeout regressions first.** In `probe/probe.test.mjs`, use Node's
-  fake timers and a fake wire, never real model turns or 95-second sleeps. Assert:
-  an explicitly extended inventory `app/list` call remains pending at 15,000 ms,
-  accepts its matching response at 20,000 ms, and without a response rejects with
-  `rpc-deadline` at 95,000 ms (still pending at 94,999 ms). An ordinary call,
-  including `app/list` without the inventory override, still rejects at 15,000 ms.
-  Add a fake-process inventory assertion that only its `app/list` calls receive
-  the explicit extension; app/model/config/tool-policy checks remain mandatory.
-  A partial `app/list/updated` must not settle the RPC or pass inventory.
-  Extend the existing fake-clock budget test: inventory's case fails at 120,000 ms,
-  aggregate exhaustion can stop it sooner, and the 60-second cleanup reserve and
-  persisted counters are unchanged. One case deadline bounds all inventory pages;
-  a new page never starts a new case or aggregate budget.
+- [ ] **Audit auth-mode and app discovery before interpreting absence.** Follow
+  the pinned source procedure above and retain `app-auth-audit.json`; record what
+  is established versus unresolved. This step uses source/metadata only, not a
+  managed-login run or the live daemon. No hypothesis changes credentials/config.
+- [ ] **Write metadata/admission regressions first.** In `probe/probe.test.mjs`
+  and fake-child fixtures, assert the exact request order/parameters above; no
+  `app/list`, TUI, `thread/start`, `turn/start` or invocation occurs in `metadata`.
+  A missing exact server/tool/schema stops app discovery without calling `app/read`,
+  yet permits core checks. Label lookalikes, duplicate tools, `toolsError`, unsupported
+  schema constraints, cached/ambiguous availability, partial pages and schema mismatch
+  remain app unknown, never a substitute search. Assert the optional candidate read
+  cannot qualify a tool or override authoritative MCP evidence. Schema admission
+  must retain all existing exact-argument regressions.
+  Test `core:passed/app:unknown` with clean cleanup yields overall unknown/exit 1
+  while the controller admission predicate allows only the non-app pilot. Failed
+  core, unsafe policy, refresh request, auth/capture/budget/cleanup error, missing
+  result and any other reason reject admission. Unproven app-specific policy permits
+  core probes only when general safety is established; observed automatic app
+  approval rejects all inference. Test known auth/feature/config causes
+  require supporting evidence; absent support is `unresolved`, not a guessed cause.
+  Verify pilot/non-app paths repeat core checks and never require app availability;
+  exclusion cannot invoke the approved tool without fresh exact metadata/policy.
+  A pilot failure still blocks all seven later cases; app unknown cannot produce
+  a green gate 2 or overall feasibility result. Use fake clocks to prove metadata
+  stops at 120,000 ms, each RPC at 15,000 ms, an earlier aggregate limit still wins,
+  and neither caught app-discovery errors nor later requests reset any deadline.
+  Pin one MCP page, three model pages, one candidate read and zero retries; include
+  absent/malformed/contradictory result fields in admission rejection tests.
 - [ ] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/probe.test.mjs"`.
-  Expected: failures identify the missing scoped timeout/case behavior. Preserve
-  the existing 82 checks and all four review regressions; no credential-bearing
-  fixtures or upstream daemon are involved.
-- [ ] **Implement the narrow exception.** In `probe/run.mjs`, extend the private
-  method to `Rpc.call(method, params, secret = false, timeoutMs = this.timeout)`;
-  use that request-local value when creating its response timer. Existing calls
-  retain the constructor's 15,000 ms default. Only the inventory pagination helper
-  passes `95_000`, and only when `method === "app/list"`; do not change the RPC
-  instance default, `Rpc.next`, handshake/frame deadlines, auth waits, pilot RPCs,
-  or any other method. No CLI, config or environment timeout override is added.
-  In `probe/cases.json`, change only `inventory` from 60 to 120 seconds.
-- [ ] **Run GREEN and checkpoint:** run the Task 1 combined focused command on
-  development Node and Node 22, recording each runtime and test count, then
-  `just test-fast`. Expected: all existing and new checks pass. Attach revised
-  source/test/case snapshots, keep RED/GREEN logs, and refresh retained manifests.
-  Disposable scripts remain off-tree; no production code or dependency changes.
-- [ ] **Preflight:** Re-read current hq-25665e notes for relevant results without
-  taking its claim. Resolve the installed executable and versions afresh. Confirm
-  the selected model exists in this installation and record it; use the installed
-  configured model, with no silent substitution. An unavailable subscription/auth
-  path is a blocker, not permission to buy API access. Identify existing daemon processes and socket paths read-only so ownership
-  cannot be confused with the private one; do not connect to its socket. Complete the
-  authentication lifetime checks and exclusion-fixture inventory above, including
-  any required account-connected approval, before the first paid pilot. Record
-  the approved recipe and cumulative subscription budget in task notes.
-- [ ] **Inventory before inference:** Run exactly one fresh `--case inventory` attempt after the timeout
-  regression checks pass, using a new output directory such as `runs/inventory-03`,
-  under a 180-second harness timeout (120-second case plus 60-second cleanup).
-  Read its verdict; another incomplete catalog, unavailable Linear, incompatible
-  auth/schema or prompt policy stops before a model turn and returns a blocker
-  report, with no automatic retry. An interim notification is not a completed RPC.
-  Retain the exact effective private configuration. Reuse only the existing exact
-  app approval; no app invocation occurs in inventory.
+  Failures must identify the missing diagnostic/admission behavior. Preserve all
+  87 current checks, including request-local timeout, capture limits, failure verdict,
+  cleanup and schema safety. Fixture child environments stay explicit-key and fake.
+- [ ] **Implement the bounded metadata case and explicit admission.** Extend
+  `runCase` in `probe/run.mjs`, CLI allowed cases and `probe/cases.json` with
+  `metadata:120`; use the result and request contracts above. Keep app and core
+  checks independent, and retain ordinary RPC deadlines. Add a pure exported
+  `canRunPilot(result) -> boolean` used by fixture tests and the controller's
+  recorded pre-pilot check: true only for a metadata run with core passed, clean
+  cleanup, and either overall passed with app passed or overall unknown with app
+  unknown and the exact `app-prerequisite-unproven` reason. Reject absent or
+  inconsistent fields, failed assertions and cleanup errors/survivors. Missing app
+  evidence is represented by its unknown sub-verdict, not a failed safety assertion. It does not launch a process or waive
+  fresh checks. Keep completed inventory code/tests as historical evidence; no
+  new retry/timeout CLI switches or generalized RPC framework.
+- [ ] **Run GREEN and checkpoint:** use Task 1's combined focused command on
+  development Node and Node 22, record versions/counts, then `just test-fast`.
+  Attach updated source/test/case snapshots and RED/GREEN logs; refresh manifests.
+  No native run until these checks pass. No production code or dependency changes.
+- [ ] **Preflight:** Re-read hq-25665e for relevant results without taking its
+  claim. Resolve the executable and exact versions afresh; retain the configured
+  model, with no substitution. Identify existing daemon processes/socket paths
+  read-only, never connect to them. Complete auth lifetime and safety checks,
+  record available exclusion producers and the unchanged exact Linear approval.
+  Missing app metadata is not a pre-pilot blocker under this revised ordering.
+- [ ] **One metadata attempt before inference:** Run `--case metadata` with a
+  fresh directory such as `runs/metadata-01` under a 180-second harness timeout.
+  Read core/app verdicts, exact source evidence, capture and cleanup. No automatic
+  retry or general-directory scan. Record `canRunPilot(result)` and the evidence
+  hash; if false, freeze a blocker report without inference. If true with app
+  unknown, explicitly record that exception and keep gate 2 unknown. Private
+  account-connected metadata still uses the approved access-only boundary.
 - [ ] **Pilot first:** Run the CLI with `--case pilot` in the foreground under a
   harness-tracked timeout of seven minutes (360-second case plus cleanup). Read request, native result, terminal
   capture, verdict and cleanup before adding or running other cases. Correct probe
@@ -496,7 +635,11 @@ reported as native capability evidence.
   subscription budget above. No idle-desktop window is required.
   A retry names the observed cause and changes
   only the probe defect or prerequisite. A required failed/unknown contract stops
-  dependent cases and production work.
+  dependent cases and production work; only the app prerequisite has the explicitly
+  bounded ordering exception above. Run available exclusions after those seven cases.
+  Before each newly implemented case runs live, add and pass its fake-process
+  assertions through `just test-one`, preserving the case-specific requirements
+  below; fake success alone never qualifies its native verdict.
 
 | Case | Required observation and assertion |
 | --- | --- |
@@ -517,7 +660,7 @@ claims that this installation supports them):
 | Secret question | In a private Plan thread ask the native question tool for a secret-marked field using only the dummy value `probe-not-a-secret`. Require observed `isSecret: true` and built-in provenance. If the native tool cannot emit it, record unknown; hand-crafted JSON does not replace it. |
 | Default/async question | Use a separate owned Default control turn whose `turn/start` explicitly sets Default as above; prompt its asynchronous question tool for Circle/Square. Require an actual nonblocking request and originating call; a prose question is not evidence. A prior-turn resume-mode value cannot qualify this control. Native absence of the blocking variant can prove mode enforcement, but does not replace the separately required async exclusion example. |
 | Permission request | Ask the private agent to use built-in `request_permissions` for read access to a controller-created sentinel outside its allowed workspace, never a real user file; deny the request before the read. Require observed `item/permissions/requestApproval` with native tool provenance, plus the version-scoped path audit below. A command-execution approval alone does not prove this permission-tool case. A question-method permission example is required only if the protocol, documentation or native evidence establishes that path. |
-| App approval using the question method | Requires a connected app plus user-approved account-connected recipe. Before the pilot name one actual tool, exact synthetic arguments, private approval policy forcing a prompt, and the point where the driver denies/cancels before invocation. Choose an operation whose approval can be observed without an external write; never enable automatic approval or a permissive sandbox. Do not connect/install an app or change live account settings merely to obtain this case. If no existing app can safely produce it, park before the pilot. At runtime require a real question-method approval with app-tool provenance; another approval method or cached consent is unknown. |
+| App approval using the question method | Requires a connected app plus user-approved account-connected recipe. Before this app control name one actual tool, exact synthetic arguments, private approval policy forcing a prompt, and the point where the driver denies/cancels before invocation. Choose an operation whose approval can be observed without an external write; never enable automatic approval or a permissive sandbox. Do not connect/install an app or change live account settings merely to obtain this case. If no existing app can safely produce it, leave this exclusion and gate 2 unknown; it does not block the pilot or seven independent cases. At runtime require a real question-method approval with app-tool provenance; another approval method or cached consent is unknown. |
 
 Permission path audit: retain the installed-version `ServerRequest` union,
 `PermissionsRequestApprovalParams`, and the relevant official documentation
@@ -540,7 +683,7 @@ session and retained as `app-probe-recipe.md`. Use only the existing Linear sear
 In the isolated config set `apps._default.default_tools_approval_mode = "prompt"`
 and `apps._default.approvals_reviewer = "user"`, with no per-app/tool overrides.
 Confirm the actual native tool name and advertised argument schema by metadata;
-if the approved operation cannot be identified exactly, stop, never substitute.
+if the approved operation cannot be identified exactly, stop the app control, never substitute.
 Request one attempt, then decline the offered native approval. Never accept it or
 write externally. If the prompt is bypassed, only this read-only search is allowed
 to execute, and the case fails. Do not retain returned account content in portable
@@ -625,9 +768,10 @@ checked report and the next frozen artifact; never an enabled connector.
 
 ## Plan review and records
 
-This revised plan is reviewed before Task 2 implements the timeout amendment.
-The user approved its recommendation after report `aac3954`; that does not replace
-review of this frozen revision. Task 1 stays complete, Task 2 resumes after review,
+This revised plan is reviewed before Task 2 implements metadata/admission changes.
+The user endorsed the diagnostic after `f4c5448` and delegated the ordering choice;
+that does not replace review of this frozen revision. Task 1 stays complete,
+Task 2 resumes after review,
 and Task 3 retains the report/next-artifact obligation. Inline execution is the recommendation;
 there is no independent parallel implementation in this evidence-dependent phase.
 Reuse children relay-dc1f42 (Task 1), relay-01090a (Task 2) and relay-4746ed
