@@ -15,6 +15,7 @@
 # Design: ops docs/specs/2026-09-04-test-ci-audit-design.md.
 
 set quiet
+set positional-arguments
 
 tt := "python3 tools/tt"
 
@@ -24,6 +25,7 @@ tt := "python3 tools/tt"
 # so here; the target must always exist and the report shows the gap as equal durations.
 fast_cmd := "npm test"
 test_cmd := "npm test"
+one_cmd := "node --test"
 check_cmd := "python3 tools/ops-check && tasks check && npx --no-install tsc --noEmit"
 
 # What a fresh checkout or worktree needs before the suite can run: dependency installs
@@ -46,8 +48,8 @@ test-fast:
     {{tt}} test-fast -- sh -c '{{fast_cmd}}'
 
 # One test file or pattern: the inner loop while writing it. Recorded like the others.
-test-one *args:
-    {{tt}} test-one -- node --test {{args}}
+test-one +args:
+    {{tt}} test-one -- sh -c '{{one_cmd}} "$@" 2>&1' test-one "$@"
 
 # The full suite.
 test:

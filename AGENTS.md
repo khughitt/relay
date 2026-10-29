@@ -14,7 +14,9 @@
   `jsonc-parser` (a regular dependency npm installs with relay; only `relay install`
   needs it), plus development-only
   TypeScript and Node 22 types.
-- Verify through `just test-fast` while working and `just gate` before integration.
+- Use `just test-one <file>` or `just test-one --test-name-pattern "<regex>" <file>`
+  while working; arguments pass intact to `node --test`. Run `just test-fast` before
+  committing and `just gate` before integration.
   Fast and full commands intentionally run the same suite. Hooks use the vendored
   ops front door; install core.hooksPath .githooks in a new clone.
 - `just check` runs strict `tsc --checkJs --noEmit` on every `src/` and `bin/` file.
