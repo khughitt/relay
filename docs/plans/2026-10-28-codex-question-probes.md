@@ -15,7 +15,9 @@
 This resumes the feasibility phase after the private-TUI trust blocker under plan
 `91c1c14`, recorded in frozen report `6d0751d`. The user endorsed the next direction
 and the additions from reviewer `claude/claude-opus-5-5`; this new plan still requires
-its own frozen review before any driver change, trust setting or native retry. The earlier transport blocker
+its own frozen review before any driver change, trust setting or native retry.
+This revision corrects the startup-screen finding against proposed plan `da4a8a8`;
+that proposal was not approved for execution. The earlier transport blocker
 under `3b668d5` is resolved for the
 private handshake/initialize prerequisite only. The approved spec makes
 provenance, receipt, decline and reconciliation prerequisites of production work.
@@ -49,7 +51,7 @@ authorized by this phase.
 ## Review Focus
 
 1. Trust can change defaults or enable workspace configuration: Task 2 pins one owned canonical path, rejects unexpected project layers, and rechecks effective read-only/on-request/user policy before input.
-2. A trust/modal/loading screen can receive queued model text: Task 2 accepts only the exact trust action or recognized empty composer, bounds blank first paint, and sends no keys to unfamiliar nonblank screens.
+2. Startup status or a modal can receive queued model text: Task 2 waits without input on pinned starting states, tolerates noninteractive notices above the required composer, and rejects unknown prompts/modals before any ready or starting match.
 3. A previous thread or a missing TUI thread can masquerade as readiness: Task 2 requires unique new native thread/cwd/model evidence, no inference bootstrap, serial backoff, 40 polls/90 s and aggregate precedence.
 4. Missing capture or similar tool names can create false app conclusions: Task 2 retains the corrected projection, tests naming/absence/omission separately, and keeps app unknown independent of safe core admission.
 5. A successful startup can be mistaken for native capability: the pilot still needs exact built-in provenance, current-version Plan enforcement and exact correlated receipt; all other native gates and cleanup remain mandatory.
@@ -287,18 +289,49 @@ Never repair a failing safety setting. Trust may change defaults; observed
 permissive or unknown effective settings stop the whole batch.
 
 Implement a small pure `classifyTuiScreen(text, workspace)` returning
-`trust`, `ready` or `unknown`, with a reason and matched evidence. Capture only the
-owned pane at fixed 160×40; normalize ANSI escapes, line endings and wrapping,
-not semantic text or arbitrary prompts. Derive ready-composer fixtures from the
-pinned empty/default/Plan composer snapshots: exact empty `› Ask Codex to do
-anything` line plus the matching `? for shortcuts` footer variant, with no modal,
-permission/approval request, input text or busy state. A glyph or footer alone is
-insufficient. Require the full recognized composer and protocol proof together;
-terminal text never establishes Plan mode, provenance or receipt. Trust matching
-uses the pinned Folder access copy/choices plus exact owned path, not a substring.
-Until the first nonblank painted frame, observe silently for at most 5 seconds;
-any nonblank unrecognized screen stops with `tui-screen-unrecognized`, without
-keystrokes. Do not dismiss announcements, login, permissions or model pickers.
+`trust`, `starting`, `ready` or `unknown`, with a reason and matched evidence.
+Capture only the owned pane at fixed 160×40; normalize ANSI escapes, line endings
+and wrapping, not semantic text or arbitrary prompts. Match the active input/status
+area, not the entire screen. A trust screen uses the pinned Folder access
+copy/choices plus exact owned path, not a substring. Unknown modal, login, approval,
+permission request, picker or other input prompt takes precedence over every
+starting/ready match and stops with `tui-screen-unrecognized`, without keys.
+Never treat a composer visible behind a modal as permission to send input.
+
+Recognize these pinned startup states as `starting`; they permit observation only:
+
+- The placeholder session header while configuration is pending: the native
+  `OpenAI Codex (v0.165.0)` title and owned directory, without the required ready
+  composer. Use the rendered header from `tui/src/history_cell/session.rs:358–381`,
+  not its different `raw_lines` transcript representation. `chatwidget.rs:1265–1272,
+  1534–1546` and `chatwidget/constructor.rs:66–68` explain its lifetime.
+- An active status row with `Booting MCP server: <name>` or
+  `Starting MCP servers (<completed>/<total>): <names>`, matching
+  `chatwidget/mcp_startup.rs:17–18,159–190`. Variable names/counts and spinner/time
+  decoration are data, not prompts. This active status takes precedence over a
+  visible composer; quoted text in the history area does not count as active status.
+
+On `starting`, keep polling without `/plan`, keys, turn reservation or inference,
+within the same 40-request/90-second readiness bound. State changes never reset
+that bound. The initial blank first paint retains its 5-second allowance. Other
+unclassified noninteractive paint is not readiness: retain it and observe without
+input within the existing readiness bound, ending unknown if no ready state appears.
+This does not broaden the trust fallback, which still requires its exact prompt.
+
+Recognize `ready` from the required empty `› Ask Codex to do anything` composer
+line and matching `? for shortcuts` footer variant, with no active startup/busy
+status, prefilled input or modal. The placeholder is fixed in
+`chatwidget.rs:2101`; use the pinned empty/default/Plan composer fixtures for the
+input area. A glyph or footer alone is insufficient. Notices above the composer
+are not whole-screen match requirements: welcome banners, empty-state animation,
+and a completed `MCP startup incomplete` warning may coexist with readiness.
+Retain warnings in bounded evidence, separate from an active MCP startup status;
+`chatwidget/mcp_startup.rs:202–241` records failures and clears startup state.
+A warning does not establish tool availability or waive any core/app policy gate;
+the app control still needs its independent authoritative metadata and approval.
+Require recognized composer plus native thread/policy proof together before input.
+Terminal text never establishes Plan mode, provenance or receipt. Retain exact
+source hashes and these distinctions in `tui-readiness-source.json`.
 
 Before TUI launch retain the loaded-thread set. With no other producer creating
 threads, require exactly one new loaded id, corroborated by `thread/read` with
@@ -322,8 +355,9 @@ No overlapping polls or notification-driven bursts. Ordinary RPCs retain 15
 seconds; rate limits never restart the case/aggregate deadline. Capture at most
 once per poll, with bounded output inside the existing total capture cap. Use the
 same readiness gate afresh in each paid TUI case; a prior readiness pass does not
-waive current policy or identity checks. A changed/unknown screen before an input
-stops without delivering that input.
+waive current policy or identity checks. Reclassify before each input:
+starting/unclassified noninteractive paint waits without input inside the same bound; an unknown prompt/modal stops. A changed
+screen never inherits a previous ready classification.
 
 Add `result.readiness={status,reason,trustLevel,threadId,evidenceRefs,pollCount}`;
 threadId is null unless native proof succeeded. `passed` requires effective policy,
@@ -334,8 +368,9 @@ Neither readiness nor metadata proves the question/receipt gates. Terminal and
 protocol observations must be retained before cleanup on every failure too.
 
 Why: test the least-permissive candidate before paying for inference, and prevent
-input from reaching a different prompt. Cost: unfamiliar legitimate screens or
-unproven thread identity stop this bounded attempt. Rejected alternatives are
+input from reaching a different prompt. Cost: an unrecognized prompt, readiness
+timeout or unproven thread identity still stops this bounded attempt; the classifier maintains a slightly larger
+source-derived startup list. Rejected alternatives are
 trusting all projects, assuming terminal text means readiness, or starting a model
 turn to discover the TUI thread.
 
@@ -715,13 +750,23 @@ core/app separation, request-local 95 s deadline and capture projection. Keep th
   targets reject; both trust levels retain explicit policies; trusted post-action
   drift or unknown config stops before a turn. Untrusted success never escalates;
   only clean exact `untrusted-trust-prompt` admits one trusted attempt. An unknown
-  screen, login/modal/approval, prefilled composer or footer-only fake receives
-  no keys. Missing/ambiguous/disappeared native thread receives no `/plan` or
+  prompt, login/modal/approval, prefilled composer or footer-only fake receives
+  no keys. Unknown prompts/modals stop even with ready composer/startup text behind
+  them. Test placeholder header → single/multiple MCP startup → ready progression
+  without keys or charged turns before readiness; startup plus a visible composer
+  stays starting. Ready composer with varying welcome/animation/warning history
+  stays ready; retain MCP warning evidence without passing the app gate. Match
+  active input/status regions, not quoted startup/composer text in history.
+  Missing/ambiguous/disappeared native thread receives no `/plan` or
   model input and consumes no turn. A previous control thread cannot qualify.
 - [ ] **Pin timing and failure assertions.** Fake clocks prove poll starts are
   at least 500 ms apart, intervals 500/1000/2000 ms capped, no overlap, at most 40 calls,
   readiness ends by 90 s even inside case 120 s, and earlier aggregate exhaustion
-  wins. Empty first paint is bounded 5 s; a nonblank unknown screen stops at once.
+  wins. Empty first paint is bounded 5 s; starting and unclassified noninteractive
+  paint never reset the 40-request/90-second bound or trigger trust escalation.
+  A startup stall ends unknown with zero turns; an unknown prompt/modal stops
+  immediately without keys. A startup warning followed by the ready composer
+  does not itself stop or authorize the app control.
   Refreshed config/resume mismatch, refresh request, capture overflow, private
   auth persistence and cleanup errors invalidate readiness and prevent the pilot.
   Assert failure terminal/protocol evidence is saved without credentials.
@@ -910,7 +955,8 @@ checked report and the next frozen artifact; never an enabled connector.
 
 ## Plan review and records
 
-This revised plan is reviewed before Task 2 implements trust/readiness changes or
+This revised plan supersedes unapproved `da4a8a8` after its startup-classifier
+review finding. It is reviewed before Task 2 implements trust/readiness changes or
 runs either retry. The user endorsed the direction and reviewer additions after
 `6d0751d`; that does not replace review of this frozen revision. Task 1 stays complete,
 Task 2 resumes after review,
