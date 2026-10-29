@@ -147,9 +147,9 @@ the source. No real login, private auth copy or auth payload becomes an attachme
 
 Before any paid pilot, complete an exclusion-fixture inventory. Each row below
 needs a producer and expected native provenance, or a recorded blocker. In
-particular, app/permission examples using the question method are not assumed to
-exist in an empty private home. Prepare the exact account/app/tool/arguments and
-approval policy needed to produce those examples, then seek the user's approval
+particular, an app approval using the question method is not assumed to exist in
+an empty private home. Prepare the exact account/app/tool/arguments and
+approval policy needed to produce that example, then seek the user's approval
 for that account-connected probe. Plan approval does not grant this external
 action. If no suitable connected app or safe recipe is available, park Task 2
 before inference, identify the missing class, and return that blocker for design
@@ -165,8 +165,10 @@ These are ceilings per case, not a promise that all cases fit their sum. Keep th
 
 Approval of this revision authorizes at most 30 minutes of live probe wall time
 and 30 model turns on the existing subscription, including pilot and retries;
-it does not authorize buying credits or API use. Expected use remains 15–30
-minutes; no token-cost estimate is claimed. Persist cumulative time/turn counts
+it does not authorize buying credits or API use. The earlier 15–30 minute estimate
+is provisional, not evidence that the full matrix fits this allowance. Per-case
+ceilings total 64 minutes before cleanup, so an extension may be needed. Keep the
+30-minute/30-turn cap unchanged; no token-cost estimate is claimed. Persist cumulative time/turn counts
 across runs and resumes. Stop at the first exhausted budget, keep partial evidence,
 and seek an explicit extension before more inference. The harness timeout covers
 the case deadline plus a bounded 60-second cleanup allowance; it never replaces
@@ -185,6 +187,15 @@ cases are added in Task 2 using the same bounded capture/cleanup path.
 - [ ] **Setup:** Re-enter the worktree skill, confirm dependency hydration, run
   `just test`, and note command, runtime and nonzero test count on this task.
   A pre-existing failure is investigated and recorded before changing probe code.
+- [ ] **Early app-fixture discovery:** Before building the driver, inspect available
+  app/tool metadata read-only and prepare the exact deny-before-invocation recipe
+  required by Task 2. Record whether this installation exposes a suitable existing
+  app and whether its private approval policy can force the prompt. Metadata alone
+  is not native protocol evidence. If proving availability needs the private server,
+  defer only that bounded, non-inference check to the tested driver; do not touch the
+  live daemon. Present a concrete account-connected probe for approval as soon as
+  its recipe is reviewable. A missing recipe remains a Task 2 prerequisite, not
+  permission to install an app or a prohibition on Task 1's fake-process work.
 - [ ] **Write `probe.test.mjs` before the driver.** Use fake Codex/tmux processes
   and fake auth bytes in a private home. Assert these named behaviors:
   `invalid argv launches nothing`, `existing output is never overwritten`,
@@ -195,7 +206,8 @@ cases are added in Task 2 using the same bounded capture/cleanup path.
   reaches child, disk, RPC or capture`, `refresh request aborts without retry`,
   `auth frames and credential-bearing errors are never captured`, `changed source
   or private auth persistence stops the batch`, `missing protocol Plan mode sends
-  no question prompt`, and `case and cumulative budgets survive resume and stop
+  no question prompt`, `previous-turn Plan mode cannot qualify a Default question
+  turn`, and `case and cumulative budgets survive resume and stop
   inference at their limit`. Give fixtures no real
   credentials or inherited Git variables. Preserve an unrelated sentinel child.
 - [ ] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/probe.test.mjs"`.
@@ -219,11 +231,22 @@ cases are added in Task 2 using the same bounded capture/cleanup path.
   observer without overrides and require `thread/resume`'s
   `collaborationMode.mode == "plan"` before submitting the question prompt. Null,
   missing or conflicting mode evidence is unknown; terminal text is insufficient.
-  If a thread cannot be created without a turn, use a harmless bootstrap turn
-  that requests no question, count it against the budget, then verify mode before
-  the question turn. Request exactly one Circle/Square question. Using the observer
-  without settings overrides, capture the native tuple and reply Square through
-  the proxy. Locate the correlated native result, then perform checked cleanup.
+  If creating the thread or applying the TUI's mode selection requires a turn,
+  use a harmless bootstrap turn that requests no question, count it against the
+  budget, then verify mode before the question turn. Request exactly one
+  Circle/Square question. Before accepting or answering it as an eligible question,
+  re-read effective mode through `thread/resume` while that question is pending.
+  Correlate the request's `(threadId, turnId)` with `turn/started` and the resumed
+  thread's active turn; require the same active turn throughout the mode read and
+  no intervening mode change or newer turn. The earlier precheck alone never
+  qualifies the question. `turn/started` has no mode field in the saved 0.165.0
+  types; do not invent one. Verify that the effective-mode read applies to this
+  active turn, not saved settings for a prior or future turn. If that association
+  cannot be established, record unknown and leave the question native. Apply this
+  same current-turn check to Plan cases and the Default/async negative case.
+  Using the observer without settings overrides, capture the native tuple and
+  reply Square through the proxy only after these checks. Locate the correlated
+  native result, then perform checked cleanup.
   Model text `CHOSEN=Square` is corroboration only. A missing identity/provenance or
   matching receipt makes the pilot unknown and stops the matrix.
 - [ ] **Run GREEN** through the same `just test-one` command on development Node
@@ -258,8 +281,8 @@ captured ordering, supported versions and verdicts. No fabricated protocol fixtu
   capability into a pass by changing the target thread's settings.
 - [ ] **Add and run each case below, once each initially.** Each is a separate
   bounded run with fresh isolation and a result. Use two named clients for races.
-  Expected total including pilot is about 15–30 minutes, dependent on inference;
-  enforce the subscription budget above. No idle-desktop window is required.
+  Runtime is unmeasured and may exceed the initial allowance; enforce the
+  subscription budget above. No idle-desktop window is required.
   A retry names the observed cause and changes
   only the probe defect or prerequisite. A required failed/unknown contract stops
   dependent cases and production work.
@@ -282,15 +305,27 @@ claims that this installation supports them):
 | --- | --- |
 | Secret question | In a private Plan thread ask the native question tool for a secret-marked field using only the dummy value `probe-not-a-secret`. Require observed `isSecret: true` and built-in provenance. If the native tool cannot emit it, record unknown; hand-crafted JSON does not replace it. |
 | Default/async question | Switch a separate private TUI thread to Default, confirm `collaborationMode.mode == "default"` through the protocol, and prompt its asynchronous question tool for Circle/Square. Require actual nonblocking request and originating call; a prose question is not evidence. |
-| Permission request | Ask the private agent to request permission for a read of a controller-created sentinel outside its allowed workspace, never a real user file; deny the request before the read. Record the actual approval method and tool. A dedicated `item/permissions/requestApproval` or command-approval method proves only that class, not a permission request routed through `item/tool/requestUserInput`. The latter requires its own installed-version producer recipe in preflight; if none is known, it is an explicit blocker before the pilot, not an inferred pass. |
+| Permission request | Ask the private agent to use built-in `request_permissions` for read access to a controller-created sentinel outside its allowed workspace, never a real user file; deny the request before the read. Require observed `item/permissions/requestApproval` with native tool provenance, plus the version-scoped path audit below. A command-execution approval alone does not prove this permission-tool case. A question-method permission example is required only if the protocol, documentation or native evidence establishes that path. |
 | App approval using the question method | Requires a connected app plus user-approved account-connected recipe. Before the pilot name one actual tool, exact synthetic arguments, private approval policy forcing a prompt, and the point where the driver denies/cancels before invocation. Choose an operation whose approval can be observed without an external write; never enable automatic approval or a permissive sandbox. Do not connect/install an app or change live account settings merely to obtain this case. If no existing app can safely produce it, park before the pilot. At runtime require a real question-method approval with app-tool provenance; another approval method or cached consent is unknown. |
 
-The permission-through-question and app-through-question prerequisites may be
-the same installed app path only when observed provenance proves both facts.
-Until an exact safe recipe is recorded and its external action approved, those
-prerequisites are **unmet**, so Task 1 can build with fake fixtures but Task 2
-cannot start live inference. This is an explicit feasibility blocker, not a
-request to narrow the approved exclusion requirement.
+Permission path audit: retain the installed-version `ServerRequest` union,
+`PermissionsRequestApprovalParams`, and the relevant official documentation
+references and inspection result. The saved 0.165.0 protocol exposes the dedicated
+permission method; the [official permission documentation](https://learn.chatgpt.com/docs/app-server#permission-requests)
+assigns it to `request_permissions`. No question-based permission path has been
+identified in these sources. Record that bounded finding, not a universal proof
+from a type union's silence. Observing the dedicated method plus this audit is
+sufficient permission-exclusion evidence unless a source or actual request reveals
+another path; then add the corresponding case before declaring exclusion passed.
+Absence of a recipe for an unestablished path does not block the pilot. This matches
+the approved spec's gate 2, which names app approvals, secret and async requests.
+Positive built-in-question provenance remains mandatory for every forwarded call;
+all other methods and unidentified requests remain native.
+
+The app-through-question recipe and account-connected approval remain **unmet**
+prerequisites: Task 1 can build with fake fixtures, but Task 2 cannot start live
+inference until they are recorded. This preserves the approved app-exclusion
+requirement without inventing an additional permission transport requirement.
 
 - [ ] **Report the contract.** For each gate, give raw evidence references/hashes,
   the exact request and answer mapping, positive built-in provenance predicate,
