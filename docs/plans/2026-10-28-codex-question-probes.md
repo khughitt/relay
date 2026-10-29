@@ -167,7 +167,7 @@ lower live override is the explicit isolation control below. Use `node:net`,
 | Frames | Mask every client frame with fresh randomness; reject masked server frames, RSV bits, reserved opcodes and noncanonical/unsafe lengths before allocation. Accept text fragmentation with aggregate cap, interleaved ping/pong and close. Validate UTF-8 across message fragments and close reasons; reject binary application messages, orphan continuation, nested data messages, fragmented/oversized controls, invalid close codes, truncated header/payload and EOF mid-message. Test 125/126 and 65535/65536 length boundaries. |
 | Limits | Outbound message cap `min(1 MiB, peerLimitBytes)`; never fragment to evade it. Incoming hard cap 8 MiB per frame or reassembled message, including advertised lengths checked before allocation. Maintain a 15-second incomplete-message deadline and 2-second close grace. Test smaller peer limits, chunk splits and aggregate fragmentation limits. |
 | Buffering | At most 32 in-flight RPCs and 256 queued notifications, with total queued decoded payload at most 8 MiB. Await socket drain; bound pending outbound bytes to 1 MiB. Overflow is explicit failure, not dropped events. Total persisted capture is 16 MiB per case, including wire/header/decoded artifacts; stop before exceeding it. No payload enters diagnostics on parse/limit failure. |
-| RPC | One JSON object per text message; validate object/id/method boundary. 15-second RPC deadline, except historical inventory `app/list` alone retains its completed 95-second override. Connection-local ids never become durable identity. Refresh requests abort before normal routing. Auth frames and errors are excluded/redacted as in the retained safety tests. All pending calls fail explicitly on connection loss. |
+| RPC | One JSON object per text message; validate object/id/method boundary. 15-second RPC deadline, except the single metadata `mcpServerStatus/list` request and historical inventory `app/list` retain request-local 95-second deadlines. Connection-local ids never become durable identity. Refresh requests abort before normal routing. Auth frames and errors are excluded/redacted as in the retained safety tests. All pending calls fail explicitly on connection loss. |
 
 Native `transport` starts with the 8 MiB incoming hard cap. Metadata, pilot and
 history pages record byte lengths and method names without credential content.
@@ -330,7 +330,8 @@ Before that run, audit the pinned `rust-v0.165.0` source: follow the saved
 `apps_processor.rs` calls to `apps_enabled_for_auth`, `CodexAuth::uses_codex_backend`,
 the managed/external auth variants, and construction/discovery of `codex_apps` in
 the MCP manager. Read relevant feature defaults, per-app policy, and initialization
-or cache conditions. Save exact source URLs, bytes/hashes and line references under
+or cache conditions, including the bounds on startup, initialization and tool
+discovery. Save exact source URLs, bytes/hashes and line references under
 `source-0.165.0`; record a bounded `app-auth-audit.json` with supporting conditions,
 contradictions and unresolved paths. Do not infer managed/external equivalence
 from the enum names or from the absence of a live config section. If source cannot
@@ -338,9 +339,27 @@ establish a cause, preserve the hypothesis as unresolved; do not switch login mo
 This audit is prerequisite to interpreting app availability, not a native pass.
 
 After initialize and successful access-only login, send metadata requests in this
-order. Every request keeps the ordinary 15-second RPC deadline. One 120-second
-case deadline bounds them together; missing a result is never permission to extend
-it or retry. Use no `app/list` requests or general-directory notifications as proof.
+order. Only the single filtered `mcpServerStatus/list` request below gets a
+request-local **95-second** deadline; every other metadata request keeps 15 seconds.
+One 120-second case deadline bounds them together; missing a result is never
+permission to extend it or retry. Use no `app/list` requests or general-directory
+notifications as proof.
+
+Deadline basis: the pinned `codex-mcp/src/mcp/mod.rs` constructs host-owned
+`codex_apps` with `startup_timeout_sec:30`. `rmcp_client.rs` applies that timeout
+to client creation and separately passes it to initialization and initial tool
+listing; `pagination.rs` bounds the paginated listing as a whole. These sequential
+phases can consume up to 90 seconds before surrounding discovery work. No single
+end-to-end bound for the whole app-server request has been established, so use the
+95-second precedent as a bounded probe allowance, not a native timing guarantee.
+The pre-run audit must record these paths and any contrary bound; it cannot widen
+the case or aggregate limit. If a contrary bound cannot fit this allowance, retain
+that limitation without an automatic increase. The source links and exact hashes
+live in the task's `source-0.165.0/sources.json`.
+
+Why: avoid preempting native startup/discovery at 15 seconds. Cost if wrong: up to
+80 additional seconds charged against the existing budget. This is the sole change
+to request deadlines from `e91248b`; no constructor-wide default is changed.
 
 1. `mcpServerStatus/list` with
    `{cursor:null,limit:100,detail:"toolsAndAuthOnly",serverName:"codex_apps"}`;
@@ -428,8 +447,8 @@ forms 600, exclude 600, race 480, clear 360, defer 240, reconnect 480, restart 6
 Keep the historical `inventory:120` fixture entry, but do not run it live.
 These are ceilings per case, not a promise that all cases fit their sum. Keep the
 15-second default RPC timeout separate from model-turn and delayed-receipt waits;
-only the historical inventory `app/list` path uses 95 seconds; metadata requests
-keep 15 seconds. In
+only the single metadata `mcpServerStatus/list` request and historical inventory
+`app/list` path use 95 seconds; every other metadata request keeps 15 seconds. In
 `clear`, delay observation for 75 seconds within its case deadline.
 
 The original authorization remains at most 30 minutes of cumulative live probe wall time
@@ -587,7 +606,11 @@ reported as native capability evidence.
   exclusion cannot invoke the approved tool without fresh exact metadata/policy.
   A pilot failure still blocks all seven later cases; app unknown cannot produce
   a green gate 2 or overall feasibility result. Use fake clocks to prove metadata
-  stops at 120,000 ms, each RPC at 15,000 ms, an earlier aggregate limit still wins,
+  stops at 120,000 ms; the filtered metadata MCP request remains pending at
+  15,000 ms, accepts its matching reply at 44,200 ms, and with no reply rejects at
+  95,000 ms (still pending at 94,999 ms). An unextended MCP call and every other
+  metadata request retain 15,000 ms. An interim notification cannot settle the RPC.
+  Assert only that one call site supplies 95,000; an earlier aggregate limit still wins,
   and neither caught app-discovery errors nor later requests reset any deadline.
   Pin one MCP page, three model pages, one candidate read and zero retries; include
   absent/malformed/contradictory result fields in admission rejection tests.
@@ -598,7 +621,9 @@ reported as native capability evidence.
 - [ ] **Implement the bounded metadata case and explicit admission.** Extend
   `runCase` in `probe/run.mjs`, CLI allowed cases and `probe/cases.json` with
   `metadata:120`; use the result and request contracts above. Keep app and core
-  checks independent, and retain ordinary RPC deadlines. Add a pure exported
+  checks independent. Pass `95_000` only at that single metadata MCP call site
+  through the existing `Rpc.call` request-local timeout argument; retain ordinary
+  deadlines everywhere else and no `Rpc.next`/handshake/frame timeout changes. Add a pure exported
   `canRunPilot(result) -> boolean` used by fixture tests and the controller's
   recorded pre-pilot check: true only for a metadata run with core passed, clean
   cleanup, and either overall passed with app passed or overall unknown with app
@@ -782,3 +807,7 @@ waiver of task tracking or plan review. Once ordinary links resolve, restore the
 At the end, keep relay-a27e7c open for the actual connector implementation and
 phone acceptance. Do not integrate unreviewed artifacts, activate a service or
 leave an unattended probe running across a review gate.
+
+Deadline amendment after review of `e91248b`: Keith approved execution after this
+request-local deadline correction is frozen. Record the new revision before any
+driver change or native run; no second approval of the unchanged scope is needed.
