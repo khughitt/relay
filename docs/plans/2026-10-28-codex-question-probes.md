@@ -12,21 +12,14 @@
 
 ## Scope and phase boundary
 
-**Execution checkpoint:** the user approved1206516 and its single readiness-03
-attempt is complete: failed/rpc-error with native code-32600/class no-rollout,
-zero turns, clean cleanup. The diagnostic projection/tests are complete in r13.
-Budget360674ms/two charged turns. The sequence below is exhausted; it grants no
-further run. See the updated protocol report for evidence and the next design
-question. Broader pilot/matrix requirements remain deferred.
+**Proposed readiness-04 amendment, awaiting review:** approved1206516 is
+exhausted. readiness-03 observed native code -32600/class no-rollout at pre-input
+resume, with zero turns and verified cleanup. The user approved replanning at
+9ae6138, not another native attempt. This revision proposes a task-local observer
+of the TUI's own `thread/start` response, followed by one zero-inference readiness
+attempt. It does not authorize pilot-02, metadata, app operations or the matrix.
+The approved production spec and its direct Unix WebSocket transport are unchanged.
 
-
-This resumes after approved `995a04e` ran readiness-02 and stopped at a redacted
-thread/resume RPC error. Only the diagnostic prerequisite and single zero-inference
-attempt in Resume state and ordering are executable under this revision. All
-pilot/matrix instructions are retained future requirements, not authorization to
-run them now. Separate user approval of this revision precedes further native work.
-The earlier transport prerequisite remains proved; no production connector is
-authorized by this amendment.
 The approved spec makes
 provenance, receipt, decline and reconciliation prerequisites of production work.
 The generated types establish field shapes, but do not prove those prerequisites.
@@ -58,93 +51,161 @@ authorized by this phase.
 
 ## Review Focus
 
-1. Trust can change defaults or enable workspace configuration: Task 2 pins one owned canonical path, rejects unexpected project layers, and rechecks effective read-only/on-request/user policy before input.
-2. Startup status or a modal can receive queued model text: Task 2 waits without input on pinned starting states, tolerates noninteractive notices above the required composer, and rejects unknown prompts/modals before any ready or starting match.
+1. Captured start policy can belong to another thread or become stale: the observer tests exact response/discovery identity and rejects duplicate starts or subsequent mutations. Trust can change defaults or enable workspace configuration: Task 2 pins one owned canonical path, rejects unexpected project layers, and rechecks effective read-only/on-request/user policy before input.
+2. Split/oversized frames or backpressure can corrupt observation: observer tests preserve bytes and fail on malformed input, limits and stalled writes. Startup status or a modal can receive queued model text: Task 2 waits without input on pinned starting states, tolerates noninteractive notices above the required composer, and rejects unknown prompts/modals before any ready or starting match.
 3. A previous thread or a missing TUI thread can masquerade as readiness: Task 2 requires unique new native thread/cwd/model evidence, no inference bootstrap, serial backoff, 40 polls/90 s and aggregate precedence.
 4. Missing capture or similar tool names can create false app conclusions: Task 2 retains the corrected projection, tests naming/absence/omission separately, and keeps app unknown independent of safe core admission.
 5. A successful startup can be mistaken for native capability: the pilot still needs exact built-in provenance, current-version Plan enforcement and exact correlated receipt; all other native gates and cleanup remain mandatory.
 
 ## Resume state and ordering
 
-The approved spec remains `741a546`. The user approved `995a04e`; its one
-untrusted `readiness-02` attempt ran and stopped at `thread/resume` with original
-status `failed`, reason `rpc-error`. Composer recognition, unique loaded thread,
-`thread/read` identity/model/cwd and effective workspace config passed. The error
-body and numeric code were redacted, so the readiness capability remains unknown.
-No trust input or model turn ran. Cleanup verified seven owned PIDs gone and
-private/runtime directories removed. The trusted fallback was ineligible and
-pilot-02 did not run. That sequence is exhausted; do not retry it under 995a04e.
+Continue from **360,674 ms (6 min 0.7 s), two charged turns**, inactive. The
+30-minute/30-turn cap, earlier conservative charge and unused bootstrap reservation
+remain unchanged. All previous readiness sequences are exhausted. Verify retained
+hashes, readiness-03 cleanup, r13 and metadata-02 core admission before execution.
+The last combined disposable checks passed123/123 on Node26.5.0 and22.23.2;
+repository baseline/last fast check passed773/773. These are prior evidence, not
+verification of the proposed observer. No repository executable changes are planned.
 
-The current revision proposes **one diagnostic readiness-03**, untrusted, with
-no model input, no `/plan`, no trusted fallback and no pilot even if it passes.
-Its only driver change is safe, method-scoped error classification, tested offline
-before execution. The retained r12 classifier and safety gates stay unchanged.
-After that single run, report the exact observed class or unresolved cause and
-stop for design/plan review. Never bootstrap inference merely to persist a thread.
+The Linear identity/schema uncertainty remains separate: the native name is
+`linear.search`, but the retained response lacks its schema and connector/callable
+identity. Source-derived name normalization is conditional, not permission to
+invoke it. No metadata retry, alias acceptance or app operation is included.
 
-Continue **353,341 ms and two charged turns** (5 min 53.3 s). This includes the
-7,272 ms readiness-02 charge, the earlier 40,000 ms conservative diagnostic charge,
-and the unused earlier bootstrap reservation. Do not reset/refund the budget.
-No new metadata run, app alias, schema acceptance or operation is authorized.
+### Decision: observe the native start response
 
-Before execution, verify the retained readiness-02 and metadata-02 hashes/cleanup,
-the current source audit and the offline correction logs. Metadata core admission
-remains usable; app admission remains unknown. r12's combined 119/119 checks on
-Node 26.5.0 and 22.23.2 and repository 773/773 baseline are retained evidence;
-run the new focused tests and combined disposable-driver checks after changing
-error capture, plus mandatory hygiene. No repository executable code changes.
+The source audit `fresh-thread-policy-source.json` pins the following to0.165.0:
 
-The Linear source audit is stronger than name resemblance but conditional:
-Codex Apps uses connector-aware namespace/name normalization and collision handling,
-not merely one flat join. With connector name Linear, prefix enabled and no collision,
-`linear.search` produces namespace `mcp__codex_apps__linear`, callable `_search`,
-and the ToolName display string `mcp__codex_apps__linear_search`. The retained
-projection lacks connector/callable identity, and a display string alone does not
-prove external-harness alias mapping. The raw schema is also absent. Keep the
-operation unqualified pending actual schema/identity evidence and the user's
-confirmation that it is the same approved read-only search and arguments.
-`toolsAndAuthOnly` omits resources, not tool definitions; the status path preserves
-schemas when supplied, but missing backend schemas can become null. No discovery
-retry is included merely to resolve those remaining app questions.
+- `ThreadReadResponse`/`Thread` lack actual approval and sandbox fields; there is
+  no `thread/settings/read`. Effective config alone is insufficient.
+- `request_processors/turn_processor.rs:941–992` returns an empty response for
+  `thread/settings/update`; empty overrides do not submit an update. An empty
+  request is not a getter. `bespoke_event_handling.rs:1288–1307` emits settings
+  notifications only for changes, after a baseline is installed in
+  `thread_lifecycle.rs:240–275`. No initial notification can be assumed.
+- `thread_processor.rs:1679–1710` sends the actual config-snapshot policy in
+  `ThreadStartResponse` to its originating client. The native TUI receives it in
+  `tui/src/app_server_session.rs:895–950`. Capturing that response can establish
+  policy without stored history, a mutation or inference.
+- TUI session logging records event variants/outgoing commands, not that complete
+  native response. It is not a substitute for this observation.
 
-### Diagnostic prerequisite and single attempt
+Add a disposable Unix socket observer between **only the private TUI and the
+private server**. The existing outside probe client stays directly connected to
+that server. This is research instrumentation, not a second production transport
+or a way for the eventual connector to discover policy. It forwards native bytes
+unchanged; it does not implement an endpoint, regenerate a handshake, synthesize
+RPCs, answer ping/close, or send any policy/model request.
 
-1. Extend only the `thread/resume` RPC error projection in `probe/run.mjs`. Keep
-   arbitrary error messages/data redacted. Retain request id, method, safe integer
-   error code (otherwise null), and a bounded `errorClass` computed against the
-   pending request's thread id and pinned source literals:
-   - `no-rollout`: exact `no rollout found for thread id <id>`;
-   - `thread-closing`: exact `thread <id> is closing; retry thread/resume after the thread is closed`;
-   - `listener-not-running`: exact `failed to enqueue running thread resume for thread <id>: thread listener is not running`;
-   - `unclassified`: every other shape/text, with no original message/data saved.
-   Capture these safe fields before the existing `rpc-error` rejection. This does
-   not change verdicts, automatically retry, or expose login errors/token material.
-   All other RPC error bodies retain their current redaction.
-2. Add fake-process/RPC regressions first: each exact class for the matching
-   pending thread; wrong-thread/lookalike text becomes unclassified; noninteger
-   code becomes null; credential-bearing arbitrary message/data never appears;
-   login errors remain redacted; an RPC failure still blocks readiness/pilot and
-   reaps owned children with zero readiness turns. Retain focused RED→GREEN and
-   combined checks on Node 22 and the development runtime. Snapshot the corrected
-   disposable driver as r13. These are next-execution tasks, not completed claims.
-3. Reuse verified worktree/baseline and retained metadata admission. Preflight CLI
-   0.165.0, gpt-6-astra, access-token lifetime, safe private configuration and
-   remaining aggregate budget. Never connect to the live daemon or copy a refresh
-   token. Preserve the 40-poll/90-second readiness bound and existing core checks.
-4. Run fresh `runs/readiness-03 --case readiness --trust-level untrusted`, one
-   120-second case with a 180-second outer harness bound. Require normal cleanup.
-   Save the original result and safe error projection. Do not run metadata,
-   trusted fallback, `/plan`, bootstrap, pilot or another case after this run.
-5. Update the blocker report. A known error class is evidence about this run,
-   not permission to repair persistence, relax policy proof or add inference.
-   Unclassified remains unknown. A readiness pass does not prove Plan mode,
-   provenance, receipt, app exclusion or any other native gate. Freeze the next
-   proposed design/plan only after interpreting this evidence.
+Rejected: unchanged resume retries, paid bootstrap, config-only policy proof,
+forcing a settings change, and session-log inference. Why: they either repeat the
+observed failure, change the subject being measured, or lack actual thread policy.
+Cost of the selected observer: another bounded parser to verify, and one additional
+zero-turn readiness checkpoint before the paid pilot is replanned. A successful
+observer does not qualify the production join/replay contract.
 
-The pinned source shows loaded resume reads stored-thread state before obtaining
-its configuration snapshot, and fresh threads may lack materialized history.
-That supports a missing-rollout hypothesis; the redacted readiness-02 error does
-not establish it. Do not describe it as a confirmed Codex defect.
+### Observer contract and bounds
+
+Create `probe/tui-policy-observer.mjs`, exporting
+`startTuiPolicyObserver({listenPath,upstreamPath,expectedCwd,expectedModel,signal,onEvidence,onFailure})`.
+It resolves once listening with `{close()}`; `close()` is idempotent and awaits
+both sockets/listener closure. `onFailure(code)` is terminal for readiness.
+`onEvidence(record)` receives only the projection below, never raw wire data.
+Create `probe/tui-policy-observer.test.mjs`; integrate it in `probe/run.mjs`
+and fake scenarios in `probe/fake-child.mjs` and `probe/probe.test.mjs`.
+Keep the existing direct client/codec unchanged. No library, general proxy CLI,
+new child process, host launcher or persistent service is added.
+
+- Bind one socket under the owned0700 runtime directory, mode0600, upstream fixed
+  to the verified owned server socket. Refuse existing/symlink paths, a second
+  client or a reconnect; close the run on any such ambiguity. Never accept TCP
+  or a caller-selected/live upstream. Unlink only this observer's recorded socket.
+- Decode copies of each direction while forwarding the original buffers in order.
+  Verify the client's Upgrade/key and matching server101/accept, no extensions or
+  subprotocol, with a16KiB header limit per direction and15-second handshake bound.
+  Check `x-codex-websocket-max-unfragmented-message-bytes` as the existing client
+  does. Client-to-server data frames must respect that limit as well as the local
+  cap. Never refragment to fit. Invalid/absent limit ends unknown.
+- Observe masked client and unmasked server frames, fragmented UTF-8 text and
+  interleaved control frames. Validate reserved bits/opcodes, lengths, masking,
+  fragmentation and close payloads; reject binary/invalidUTF-8/invalidJSON rather
+  than omit them silently. Forward ping/pong/close unchanged; generate none.
+- Hard cap each assembled message and frame at8MiB; each direction's retained
+  wire-byte decoding state at8MiB+16KiB. Enforce incremental parsing before copying
+  a claimed size, including split headers and many coalesced frames. Keep no raw
+  wire archive. Pause the source on downstream backpressure, no application write
+  queue, at most1MiB pending forwarding bytes per direction; exceedance fails
+  visibly.15-second partial-message/no-progress bounds and the original case and
+  aggregate deadlines all apply; no timer resets extend readiness's90seconds.
+- Track at most one outstanding native `thread/start` request and its exact typed
+  RPC id. Retain only method/id, not its params. Match the server response on that
+  connection. A second start, mismatched id, error, missing fields or duplicate
+  response cannot supply proof and fails visibly. Ignore other valid JSON RPC
+  bodies after bounded parsing; never persist their text. Notifications cannot be
+  mistaken for replies. Do not retain login/token/tool/config bodies or error text.
+- Project only response id, native thread.id, cwd, model, approvalPolicy,
+  approvalsReviewer, sandbox, activePermissionProfile, and direction/source label
+  `tui-thread-start-response`. Validate each permitted value against expected
+  owned cwd, configured model and the policy below before recording; thread.id
+  must be a nonempty string of at most128 characters and later match discovery; unknown
+  nested sandbox/profile fields produce a bounded rejection code rather than raw
+  data. Pass the projection through the existing credential filter; if it removes
+  a required field, readiness is unknown. Record only message/frame byte counts,
+  maxima, handshake outcome and peer limit for transport diagnostics.
+- A `thread/settings/updated` for this thread, any `turn/*` request, or any
+  `thread/*` request other than the first `thread/start`, `thread/read`,
+  `thread/list` and `thread/loaded/list`, invalidates this zero-input snapshot
+  and ends readiness unknown. Do not silently use stale start policy. No `/plan`
+  occurs in this revision; its later settings lifecycle must be planned separately.
+- Parse/capture/write failure, disconnect before verdict, abort, timeout or overflow
+  closes both connections and listener, clears buffers, and prevents input/pilot.
+  Cleanup awaits closure within2seconds, then destroys remaining owned sockets.
+  Existing owned-process cleanup and original failure precedence still apply.
+
+### Task2 amendment: implement, verify, then one readiness attempt
+
+- [ ] **Write failing observer tests.** Assert byte-for-byte forwarding of real
+  retained unauthenticated handshake/initialize fixtures plus clearly labelled
+  synthetic start frames; split every header boundary and cover coalescing,
+  masking, fragmentation, interleaved control, wrong accept/limits, smaller peer
+  limit, malformed/oversized frames, invalidUTF-8/JSON, slow fragments/backpressure,
+  second client, abort, peer close, error propagation and idempotent cleanup.
+  Use fake clocks for deadlines. Credential canaries in irrelevant bodies,
+  arbitrary errors and unknown nested fields must never reach retained evidence.
+- [ ] **Write failing readiness tests.** Fake native start policy passes only when
+  its exact thread id equals the unique new loaded id and `thread/read` identity,
+  cwd/model, refreshed safe config and ready composer all match. Wrong id/type,
+  forged notification, duplicate start, missing/redacted fields, permissive policy,
+  unexpected settings update, early disconnect or unexpected model turn fails
+  with zero keys/turn reservations. Assert **no pre-input `thread/resume` call**,
+  no trusted fallback and no pilot even on success. Preserve all existing safety
+  and r13 error-projection checks for later resume users.
+- [ ] **Run RED**, using `just test-one` with the new observer test and affected
+  probe test file; retain named missing-behavior failures. Then implement the
+  observer and replace only standalone readiness's pre-input resume proof with
+  its correlated native response. TUI `--remote` points to the owned observation
+  socket; controller RPCs continue to use the server socket directly. Disable
+  paid cases explicitly in this diagnostic revision rather than silently applying
+  the new proof to them. Retain old run evidence unchanged.
+- [ ] **Run GREEN and checkpoint r14.** Run observer/probe/transport/history checks
+  together through `just test-one` on development Node and Node22; record counts
+  and versions. Follow validated code-checkout test policy for the fast check and
+  always run `just check`, `tasks check` and diff hygiene. Retain source/fixtures,
+  RED/GREEN logs and manifests before any native use. A fake pass is no native proof.
+- [ ] **Preflight and run readiness-04 once**, after this frozen plan is approved.
+  Recheck CLI0.165.0, gpt-6-astra, access-token lifetime, private safe configuration,
+  unchanged real login hash, retained core admission and remaining budget. Run fresh
+  `runs/readiness-04 --case readiness --trust-level untrusted`,120-second case,
+  180-second outer harness bound. The original40-poll/90-second readiness limit
+  includes observer startup. Saved untrusted only; no trust input, fallback,
+  `/plan`, bootstrap, metadata, app operation or pilot, even if readiness passes.
+- [ ] **Interpret and stop.** Preserve original result and projected native policy,
+  correlate response/discovery/read ids, record real frame/message maxima and
+  advertised limit, and verify all owned cleanup. A pass proves only this private
+  TUI's pre-input readiness. Unknown/failure grants no retry or cap increase.
+  Update the report and return the paid pilot's ordering for separate review:
+  first question, later direct resume/replay, provenance and exact receipt must
+  still work without relying on TUI observation as production evidence.
 
 All broader matrix requirements below remain obligations of the parent task;
 they are **deferred and not authorized by this diagnostic revision**.
@@ -405,10 +466,14 @@ control thread. Tagged `tui/src/app/startup.rs:19–51,560–586` starts a fresh
 before any initial message, so a bootstrap turn is not needed to discover it.
 A missing signal is `tui-thread-unobserved`, never permission to send input.
 Only after ready composer + native thread proof may the paid pilot send `/plan`
-or reserve/submit its question. Remove the old READY bootstrap entirely. Verify
-lightweight resume (`excludeTurns:true`, no overrides) for this exact loaded thread:
-`cwd`, `model`, `approvalPolicy`, `approvalsReviewer` and read-only `sandbox` must
-match the requested boundary; contradictory active-permission provenance stops.
+or reserve/submit its question. Remove the old READY bootstrap entirely. For standalone readiness-04 use the correlated native `thread/start` response
+specified above, not `thread/resume`: exact thread id/cwd/model, on-request
+approvalPolicy, user approvalsReviewer, readOnly sandbox with networkAccess:false,
+and activePermissionProfile null or exactly `{id:":read-only",extends:null}`
+must match.
+Contradictory/unknown permission provenance stops. Refreshed effective config with
+layers is still independently mandatory. Future paid cases are disabled pending
+review of their fresh-thread/join ordering; this proof does not qualify them.
 
 All discovery/capture iterations are serial, with one shared counter/deadline:
 minimum 500 ms between starts of `thread/loaded/list`, exponential intervals
@@ -676,7 +741,7 @@ it does not authorize buying credits or API use. The earlier 15–30 minute esti
 is provisional, not evidence that the full matrix fits this allowance. Listed per-case
 ceilings total 74 minutes before cleanup when both readiness variants are needed, so an extension may be needed. Keep the
 30-minute/30-turn cap unchanged; no token-cost estimate is claimed. Persist cumulative time/turn counts
-across runs and resumes, continuing from 353,341 ms and two charged turns. Charge native
+across runs and resumes, continuing from360,674 ms and two charged turns. Charge native
 transport, metadata, readiness and historical inventory time as well as inference; no case gets a new budget.
 Reserve 60 seconds of remaining aggregate allowance for cleanup; refuse a launch
 with no execution time left after that reservation. End work at the earlier of
@@ -806,7 +871,8 @@ Completed through `59e468e` execution: source audit, metadata/core-app separatio
 attempts. Captured-frame fixes passed 114/114; the subsequent trust-overlap review
 correction passed 115/115 on both runtimes. Keep all prior evidence. Completed
 steps below are retained requirements, not work to redo. Execution first verifies
-the retained r12 corrections, then implements the current diagnostic prerequisite and runs only readiness-03.
+the retained r13 corrections, then follows only the current Task2 observer amendment
+and readiness-04 above. The completed steps below are historical evidence.
 
 - [x] **Correct trust-overlap admission offline before retry.** The review of
   `564bf02` found a substring trust match that bypassed modal rejection. Match
@@ -833,7 +899,7 @@ the retained r12 corrections, then implements the current diagnostic prerequisit
 - [ ] **Verify source and retained state.** Read `tui-readiness-source.json`, exact
   pinned files/snapshots and `6d0751d`. Confirm the remote-untrusted skip and
   pre-prompt thread-start paths apply to the selected CLI/socket. Preserve the
-  live-config count as reviewer observation. Check budget 353341 ms/two turns and
+  live-config count as reviewer observation. Check budget360674 ms/two turns and
   all retained hashes before launch. Never rewrite old results or reset counters.
 - [x] **Write failing trust/readiness tests** in `probe/probe.test.mjs`, with
   synthetic screens in `probe/fake-child.mjs` and pinned composer/trust snapshots
@@ -889,8 +955,8 @@ the retained r12 corrections, then implements the current diagnostic prerequisit
   fast check. Run `just check` and `tasks check`. Attach source/tests/fixtures/logs
   and refresh manifests before native work. No production code changes.
 - [x] **Implement and verify the safe resume-error projection** exactly as the
-  current Resume state and ordering section specifies; retain r13 and RED→GREEN.
-- [x] **Run only diagnostic readiness-03** after this frozen revision is approved,
+  approved1206516 specified; retain r13 and RED→GREEN.
+- [x] **Completed diagnostic readiness-03** under approved1206516,
   with all current prerequisites, unchanged budgets and cleanup. No fallback,
   bootstrap, pilot, metadata or matrix case follows this diagnostic run.
 - [x] **Interpret and freeze the report.** Preserve original outcomes and source
@@ -1025,11 +1091,11 @@ checked report and the next frozen artifact; never an enabled connector.
 
 ## Plan review and records
 
-This amendment is reviewed before any further native run. The user approved
-`995a04e`; readiness-02 then failed at resume without inference. That exhausted
-its readiness sequence. It does not authorize the diagnostic proposed here.
-Task 1 remains done; Task 2 resumes only the current error-capture prerequisite and diagnostic readiness-03 after
-this frozen revision is approved. Task 3 retains the report/next-artifact obligation.
+This amendment is reviewed before implementation or further native work. The
+user approved replanning after9ae6138; that is not approval of this new observer
+or readiness-04. Task1 remains done. Task2 resumes only the observer amendment
+and one standalone readiness-04 after this frozen revision is approved. Task3
+retains the report/next-artifact obligation. All paid cases remain disabled.
 Continue inline execution; no independent parallel implementation is needed.
 Reuse children relay-dc1f42 (Task 1), relay-01090a (Task 2) and relay-4746ed
 (Task 3), updating their parent-plan references to this frozen revision. Preserve

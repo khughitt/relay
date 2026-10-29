@@ -70,26 +70,40 @@ checks passed **123/123 on Node26.5.0 and123/123 on Node22.23.2**. Fresh
 passed. r13 source/fixtures and portable logs are attached to the task; raw logs
 and evidence remain in its persistent directory.
 
-## Next design review
+## Proposed fresh-thread policy observation (offline only)
 
-Recommend revising the readiness proof before another live attempt. The next
-plan must identify a source-supported way to establish the actual fresh thread's
-sandbox/approval/model/workspace settings without requiring stored history, then
-show how the first real question and later resume still prove provenance, mode,
-subscription isolation and exact receipt. Keep first-turn policy proof explicit;
-configuration alone must not silently replace it. An offline source audit can
-prepare that proposal, but no alternative proof is accepted by this report.
+After9ae6138 the user approved replanning. No additional native run or model turn
+has occurred. The pinned audit `fresh-thread-policy-source.json` confirms that
+an empty `thread/settings/update` is not a getter: the response is empty and no
+update is submitted for empty overrides. Settings notifications require an actual
+change from the initialized baseline. The TUI session log also lacks the complete
+native start response. None supplies a read-only policy snapshot to an observer.
 
-Rejected now: repeat the same resume unchanged, inject a paid bootstrap solely
-to materialize history, or waive thread-policy verification. Why: the error is
-now observed and none of those actions establishes the required safe joining
-contract. Cost: the pilot stays unrun while that contract is redesigned.
-No additional native execution, app alias or paid turn is authorized here.
+The native TUI does receive actual policy in `ThreadStartResponse`, generated from
+Codex's config snapshot (`thread_processor.rs:1679–1710`, received at
+`tui/src/app_server_session.rs:895–950`). The revised plan therefore proposes a
+bounded task-local Unix socket observer on that private connection. It forwards
+bytes unchanged and retains only correlated native identity/policy fields; the
+outside client continues speaking directly to the private server. This changes
+measurement, not the approved production transport or capability predicates.
+
+Ruling: prefer this zero-inference observation over another stored-history resume,
+a paid bootstrap, config-only proof or a forced settings mutation. Why: it reads
+the native response that already exists without changing the thread under test.
+Cost: a new bounded parser needs offline verification and one readiness-only run.
+It may fail safely on unexpected framing, startup settings changes or size limits.
+
+Ruling: the proposed execution stops after one untrusted readiness-04, even if it
+passes. Why: observing start policy cannot establish when the outside production
+client can join/replay the first real question. Cost: pilot-02 needs a separate
+reviewed ordering after this evidence; no paid capability progress is claimed.
+No fallback, input, metadata retry, app alias or paid turn is proposed here.
 
 Task2 and Task3 remain incomplete. Native readiness, Plan provenance/mode/receipt,
 forms/exclusions, join/isolation, races/defer and recovery remain unproved;
-production connector and user-present phone acceptance remain owed. The Linear
-identity/schema limitations below are unchanged. The branch remains unmerged.
+production connector and user-present phone acceptance remain owed. Budget stays
+360674ms/two charged turns. Existing default/medium effort allowlist is a deferred
+minor: another legitimate label fails closed. The branch remains unmerged.
 
 ## Historical checkpoint through 1206516
 
