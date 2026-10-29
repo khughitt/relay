@@ -1,4 +1,102 @@
-# Codex question feasibility: readiness-02 stopped at resume
+# Codex question feasibility: native no-rollout diagnostic
+
+## Current outcome after approved 1206516
+
+The single authorized `readiness-03` ran on Codex 0.165.0 from
+2026-10-29T17:43:52.376Z to 17:43:59.707Z. Its original outcome is
+**failed / rpc-error**, with readiness capability **unknown**. The bounded
+projection captured request 13's native error: **code -32600, class no-rollout**.
+It matches the pinned exact message for the thread id in that pending
+`thread/resume` request; arbitrary error text and data were not retained.
+
+The request used `excludeTurns:true`. Before it, the owned untrusted workspace
+passed refreshed effective configuration checks, the native empty composer was
+recognized, three discovery polls found one new TUI thread, and `thread/read`
+confirmed its identity, model and workspace. The failure is at stored-thread
+resume, not composer recognition. No keys or native model turns occurred.
+No fallback, `/plan`, pilot, metadata retry or app operation followed.
+The approved diagnostic sequence is exhausted, even though its capture objective
+was achieved. It does not authorize another native run.
+
+Raw SHA-256: `44e09208dc53994364dece3c5e33704ad23893e3543addfdc4faf909326026a2`.
+Portable SHA-256: `73f8180aa7677c7d8af65eef467d8cb0496c2db2a0184688e109eef2cb6b3cfa`.
+`readiness-03-observations.json` records request/response lines31/32 and the
+controller interpretation separately from the original result. All evidence
+hashes matched, all seven owned PIDs were independently absent, and both private
+and runtime directories were removed. Cleanup had no errors or survivors;
+no login-file change or refresh request was detected.
+
+Budget is **360,674 ms (6 min 0.7 s), two charged turns**, inactive. This attempt
+added7,333 ms and zero turns. Only one native turn was observed historically;
+the unused reservation and earlier conservative charge remain counted.
+
+## What this establishes and what it does not
+
+The pinned `thread_processor.rs:4624–4662` reads stored state even when resuming
+an already loaded thread. Lines6443–6455 map a missing stored thread to the
+exact no-rollout message. This run now supplies the native response missing from
+readiness-02: the same request shape cannot complete the required pre-input
+policy proof for this fresh thread in this setup.
+
+The source's first-message materialization comments are consistent with the
+observation. They do not prove which internal storage condition occurred, that
+all fresh threads behave identically, or that the managed live daemon has this
+failure. Readiness-02 retains its redacted, unresolved cause. No upstream defect
+is asserted, patched or reported; this is an incompatibility between the current
+probe's pre-input resume requirement and the observed fresh-thread behavior.
+
+The current generated protocol exposes no `thread/settings/read` method.
+`thread/read` returns Thread metadata, which lacks sandbox and approval policy;
+`thread/settings/updated` carries those fields, but none was observed here.
+The mutating `thread/settings/update` is not an authorized substitute for a read.
+These facts do not yet supply another complete native policy-proof path.
+
+## Diagnostic implementation and verification
+
+Disposable driver r13 changes only the pending `thread/resume` error projection.
+It preserves request id/method, a safe integer code or null, and an exact class:
+no-rollout, thread-closing, listener-not-running or unclassified. Classification
+uses the pending request's thread id. It exposes no arbitrary message/data;
+other RPC errors retain redaction and secret calls remain uncaptured. RPC
+rejection, readiness gates, budgets and cleanup remain unchanged.
+
+Four focused regressions cover exact classes, wrong-thread/lookalike text,
+invalid codes/missing identity, credential-bearing errors and a fake readiness
+failure with no input or turns and verified cleanup. RED passed1/4; GREEN passed4/4.
+During GREEN the integration assertion was corrected to decode the existing
+JSONL data wrapper; capture format was unchanged. Combined driver/transport/history
+checks passed **123/123 on Node26.5.0 and123/123 on Node22.23.2**. Fresh
+`just test-fast` passed **773/773**; `just check`, `tasks check` and diff hygiene
+passed. r13 source/fixtures and portable logs are attached to the task; raw logs
+and evidence remain in its persistent directory.
+
+## Next design review
+
+Recommend revising the readiness proof before another live attempt. The next
+plan must identify a source-supported way to establish the actual fresh thread's
+sandbox/approval/model/workspace settings without requiring stored history, then
+show how the first real question and later resume still prove provenance, mode,
+subscription isolation and exact receipt. Keep first-turn policy proof explicit;
+configuration alone must not silently replace it. An offline source audit can
+prepare that proposal, but no alternative proof is accepted by this report.
+
+Rejected now: repeat the same resume unchanged, inject a paid bootstrap solely
+to materialize history, or waive thread-policy verification. Why: the error is
+now observed and none of those actions establishes the required safe joining
+contract. Cost: the pilot stays unrun while that contract is redesigned.
+No additional native execution, app alias or paid turn is authorized here.
+
+Task2 and Task3 remain incomplete. Native readiness, Plan provenance/mode/receipt,
+forms/exclusions, join/isolation, races/defer and recovery remain unproved;
+production connector and user-present phone acceptance remain owed. The Linear
+identity/schema limitations below are unchanged. The branch remains unmerged.
+
+## Historical checkpoint through 1206516
+
+The following report is retained unchanged apart from its historical heading.
+Its readiness-03 proposal was executed above and grants no further attempt.
+
+# Earlier readiness-02 checkpoint
 
 ## Current outcome after approved 995a04e
 

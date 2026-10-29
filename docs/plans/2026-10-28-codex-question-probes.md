@@ -12,6 +12,14 @@
 
 ## Scope and phase boundary
 
+**Execution checkpoint:** the user approved1206516 and its single readiness-03
+attempt is complete: failed/rpc-error with native code-32600/class no-rollout,
+zero turns, clean cleanup. The diagnostic projection/tests are complete in r13.
+Budget360674ms/two charged turns. The sequence below is exhausted; it grants no
+further run. See the updated protocol report for evidence and the next design
+question. Broader pilot/matrix requirements remain deferred.
+
+
 This resumes after approved `995a04e` ran readiness-02 and stopped at a redacted
 thread/resume RPC error. Only the diagnostic prerequisite and single zero-inference
 attempt in Resume state and ordering are executable under this revision. All
@@ -880,12 +888,12 @@ the retained r12 corrections, then implements the current diagnostic prerequisit
   focused tests plus hygiene, no broad rerun; absent/enabled means the documented
   fast check. Run `just check` and `tasks check`. Attach source/tests/fixtures/logs
   and refresh manifests before native work. No production code changes.
-- [ ] **Implement and verify the safe resume-error projection** exactly as the
+- [x] **Implement and verify the safe resume-error projection** exactly as the
   current Resume state and ordering section specifies; retain r13 and RED→GREEN.
-- [ ] **Run only diagnostic readiness-03** after this frozen revision is approved,
+- [x] **Run only diagnostic readiness-03** after this frozen revision is approved,
   with all current prerequisites, unchanged budgets and cleanup. No fallback,
   bootstrap, pilot, metadata or matrix case follows this diagnostic run.
-- [ ] **Interpret and freeze the report.** Preserve original outcomes and source
+- [x] **Interpret and freeze the report.** Preserve original outcomes and source
   hypotheses separately; unknown causes do not justify an automatic retry.
 
 The remaining matrix below is deferred scope, not this revision's execution list.
