@@ -4,15 +4,15 @@
 
 **Goal:** Establish the exact current-version protocol contracts needed to implement relay-a27e7c without falsely confirming answers or answering an approval as a clarification.
 
-**Architecture:** A private Codex server and native TUI reproduce the shared-daemon topology, with an outside client using the supplied stdio proxy. A bounded task-local probe captures native requests, responses, receipts and restart behavior. No production connector is written in this phase.
+**Architecture:** A private Codex server and native TUI reproduce the shared-daemon topology, with bounded outside clients speaking WebSocket directly over the private Unix socket. A bounded task-local probe captures native requests, responses, receipts and restart behavior. No production connector is written in this phase.
 
 **Tech Stack:** Installed Codex, Node >=22 built-ins, a private tmux server, the existing `just` test front door. No added dependencies.
 
-**Spec:** [Codex blocking question connector addendum](../specs/2026-10-28-codex-question-connector.md), approved by the user at relay `77d3aee2f84d5945514a7fcf089a899b4153deb9` (task spec review round 2). Read the accepted parent spec's §5, §8 and §9.3 too.
+**Spec:** [Codex blocking question connector addendum](../specs/2026-10-28-codex-question-connector.md), approved by the user at relay `741a546dde23a4271ab640b7bfde8aabadfbc87c` (task spec review round 9). Read the accepted parent spec's §5, §8 and §9.3 too.
 
 ## Scope and phase boundary
 
-This is the first executable phase of the connector task. The approved spec makes
+This resumes the feasibility phase after the transport blocker in plan `3b668d5`. The approved spec makes
 provenance, receipt, decline and reconciliation prerequisites of production work.
 The generated types establish field shapes, but do not prove those prerequisites.
 This plan therefore ends with a verdict and either a concrete production-code plan
@@ -36,15 +36,36 @@ authorized by this phase.
 - Production code does not manage the daemon. This probe may start and stop only its own foreground server and private TUI, never a host service or the real daemon.
 - No real credentials in automated fixtures. Never copy a refreshable login into the probe. Live runs use only the access-token boundary below; no refresh token reaches a child, private home or RPC. Do not change live login state or create paid API credentials.
 - All spawned process environments are built from explicit keys, including private `HOME`, `CODEX_HOME`, XDG config/state/cache/runtime locations, `PATH`, `USER`, `TERM` when needed, and isolated Git configuration. Never copy the inherited environment.
-- Tests use `just test-one`; no direct test-runner invocation. New worktree baseline remains deferred until execution Setup, when `just test` runs before any probe code is written.
+- Tests use `just test-one`; no direct test-runner invocation. The execution baseline already passed: `just test`, Node 26.5.0, 773/773 tests. Reuse that recorded baseline unless code, dependencies or runtime changed; do not repeat it for this documentation-only revision.
 
 ## Review Focus
 
-1. A normally created TUI thread may lack raw events that a specially configured test thread exposes. Task 2 must prove both early and late attachment without changing thread settings.
-2. A resolution can be cleanup or a competing answer. Task 2 compares actual call-correlated outputs, never a notification or model's final text alone.
-3. A disconnect can occur after native acceptance but before the client observes it. Task 2 must recover the output or positively identify the exact still-pending request before any resend.
-4. An approval can use the question method. Task 2 requires a positive built-in-call discriminator, plus exclusion evidence; a label heuristic or a synthetic fixture alone is insufficient.
-5. A cleanup fault can leave a server or credential behind. Task 1 tests interruption cleanup, and every Task 2 case carries a checked cleanup verdict that can invalidate the run.
+1. Real transport differs from a fake: Task 1 must prove native handshake plus `initialize` before building fake-process wire fixtures, then test framing boundaries and a lower peer cap.
+2. Long histories can exceed a cap or hide the receipt on a later page: Task 1 tests lightweight resume, pagination, visible per-thread failure and an unaffected second thread; Task 2 validates native subscription isolation and exact receipt recovery.
+3. Previous-turn mode or model silence can falsely qualify a Default question: Task 1 tests both invalid proofs; Task 2 qualifies a Plan positive control using current-version native enforcement evidence, including late join and mode changes.
+4. Resolution may be cleanup, an approval or a competing answer: Task 2 requires positive built-in provenance, negative-class evidence and exact correlated outputs, including disconnect after acceptance and before receipt.
+5. A cleanup fault can leave credentials or processes behind: Task 1 retains interruption, auth-boundary, budget and sentinel-process tests; every native run carries a cleanup verdict that can invalidate it.
+
+## Resume state and ordering
+
+The approved transport spec replaces the disproved newline-JSON proxy assumption.
+Read the blocker report at `741a546` and the task's retained evidence before edits.
+The baseline is complete; the 19 fake-process checks passed on Node 26.5.0 and
+22.23.2 but did not establish the native wire contract. The driver is incomplete:
+it lacks a valid transport and working answer/receipt path. Preserve failed runs.
+The native attempt and diagnostics used no authentication or model turns; the
+persisted budget charges 55,541 ms (including a conservative 40,000 ms diagnostic
+allowance), zero turns. Continue this ledger; do not reset it.
+
+Order: bounded codec checks → real private unauthenticated handshake/initialize →
+real-wire-derived fake-process checks → access-only inventory → native pilot →
+remaining matrix. The first native connection precedes fake-process transport
+fixtures, not the small unit checks needed to make that connection bounded.
+No app operation or inference occurs in the first connection test. Historical
+hq-d85ede already recorded WebSocket and Plan-only blocking behavior on 0.162.1;
+retain that provenance, but test the rule on 0.165.0. Tagged-source common-listener
+evidence is retained in `transport-review-evidence.json`; it proves listener
+selection, not managed/private lifecycle equivalence.
 
 ## Workspace, artifacts and interfaces
 
@@ -52,8 +73,7 @@ Continue in `.worktrees/codex-question` on `feat/codex-question`. Do not recreat
 Verify retained manifests before using prior inputs. Keep the approved spec unchanged.
 
 Task scratch is the already recorded `$WORK_ROOT/relay/relay-a27e7c/`. Within it,
-create `probe/` for `run.mjs`, `probe.test.mjs`, fixture children and an initial
-`cases.json`; use fresh `runs/<run-id>/` directories for evidence. Record creation
+reuse `probe/` for the files listed in Task 1; use fresh `runs/<run-id>/` directories for evidence. Record creation
 and mutable ownership immediately. A short per-run runtime directory may live under
 the host runtime directory when a Unix socket path would exceed its limit; record
 its path and copy needed results into persistent scratch before cleanup. No
@@ -66,9 +86,9 @@ than a new public tool. Existing code to borrow selectively:
   auth-file copy is explicitly forbidden here, as are inherited environments.
 - `tools/codex-model-acceptance/run`: private tmux naming and capture pattern,
   not its `--no-daemon` topology or permissive sandbox flags.
-- `test/helpers/spawn-lines.js`: owned-child cleanup and line-based assertions.
-- `src/serve/lines.js`: bounded UTF-8 framing; do not modify production code just
-  to share a probe helper.
+- `test/helpers/spawn-lines.js`: owned-child cleanup only. Neither this helper nor
+  `src/serve/lines.js` defines the WebSocket wire contract; do not reuse line framing
+  or modify production code to share a probe helper.
 
 The probe CLI is:
 
@@ -77,9 +97,11 @@ node <probe>/run.mjs --case <name> --out <fresh-dir> --codex <absolute-bin>
                     --model <confirmed-model> --auth-file <read-only-auth-source>
 ```
 
-All five options are required once; unknown, repeated, missing or empty arguments
-fail before creating output or launching anything. `--case` is one of the rows in
-Task 2, including `pilot`. Never accept shell command strings. Spawn argv arrays.
+`--case`, `--out` and `--codex` are required once. `--model` and `--auth-file`
+are also required for `inventory`, `pilot` and the matrix, and forbidden for
+`transport`, which must not read a login file. Unknown, repeated, missing or empty
+arguments fail before output creation or launch. `--case` is `transport`,
+`inventory`, `pilot` or one of the matrix rows. Never accept shell command strings. Spawn argv arrays.
 
 `runCase({name, out, codex, model, authFile, signal}) -> Promise<RunResult>` owns all
 children, bounded IPC buffers and timers. The probe module exports this function
@@ -100,6 +122,116 @@ no environment dump or auth frames. A portable derivative replaces host paths an
 synthetic thread ids consistently while preserving identity relationships and
 ordering. Keep hashes of raw and derivative bytes; neither is a substitute for the other.
 
+### Bounded Unix WebSocket and RPC contract
+
+`connectUnixWebSocket({socketPath, signal, onText, onFailure, maxIncomingBytes = 8388608}) -> Promise<Wire>` in
+`probe/unix-websocket.mjs` resolves only after a validated Upgrade. `Wire` exposes
+`sendText(text): Promise<void>`, `close(): Promise<void>`, and read-only
+`peerLimitBytes`. `onText(text)` receives complete validated UTF-8 text messages;
+`onFailure(code)` fires once with a bounded diagnostic, never payload bytes.
+`close` is idempotent; abort rejects outstanding writes and closes the socket.
+`maxIncomingBytes` must be a positive integer no larger than 8 MiB; the only
+lower live override is the explicit isolation control below. Use `node:net`,
+`node:crypto` and Buffer/TextDecoder only; no runtime dependency.
+`sendText` promises local write completion, never native answer receipt.
+
+| Boundary | Required behavior and tests |
+| --- | --- |
+| Upgrade | 15-second total handshake deadline, 16 KiB header cap. Generate a fresh random key; require status 101, Upgrade/Connection tokens and exact SHA-1 acceptance key. Reject duplicate critical headers, missing/invalid/nonpositive peer limit, extensions or unsolicited subprotocols. Preserve any frame bytes arriving after headers in the same chunk. No compression requested. |
+| Frames | Mask every client frame with fresh randomness; reject masked server frames, RSV bits, reserved opcodes and noncanonical/unsafe lengths before allocation. Accept text fragmentation with aggregate cap, interleaved ping/pong and close. Validate UTF-8 across message fragments and close reasons; reject binary application messages, orphan continuation, nested data messages, fragmented/oversized controls, invalid close codes, truncated header/payload and EOF mid-message. Test 125/126 and 65535/65536 length boundaries. |
+| Limits | Outbound message cap `min(1 MiB, peerLimitBytes)`; never fragment to evade it. Incoming hard cap 8 MiB per frame or reassembled message, including advertised lengths checked before allocation. Maintain a 15-second incomplete-message deadline and 2-second close grace. Test smaller peer limits, chunk splits and aggregate fragmentation limits. |
+| Buffering | At most 32 in-flight RPCs and 256 queued notifications, with total queued decoded payload at most 8 MiB. Await socket drain; bound pending outbound bytes to 1 MiB. Overflow is explicit failure, not dropped events. Total persisted capture is 16 MiB per case, including wire/header/decoded artifacts; stop before exceeding it. No payload enters diagnostics on parse/limit failure. |
+| RPC | One JSON object per text message; validate object/id/method boundary. 15-second RPC deadline. Connection-local ids never become durable identity. Refresh requests abort before normal routing. Auth frames and errors are excluded/redacted as in the retained safety tests. All pending calls fail explicitly on connection loss. |
+
+Native `transport` starts with the 8 MiB incoming hard cap. Inventory, pilot and
+history pages record byte lengths and method names without credential content.
+Keep this fixed probe ceiling throughout the run; do not silently raise it to make
+an observation pass. The report proposes a production cap from the largest real
+nonsecret message observed plus explicit headroom (at least 2x observed size,
+rounded up to MiB, floor 1 MiB, ceiling 8 MiB). If required headroom exceeds the
+ceiling, report a limit blocker for design review. Real small samples do not prove
+support for arbitrary histories; the pagination and oversize tests remain required.
+
+### Lightweight history and thread isolation
+
+`openThread({threadId, wireFactory, signal}) -> Promise<ThreadProbe>` in
+`probe/history.mjs` owns a dedicated initialized connection for that one loaded
+thread; `wireFactory(): Promise<Rpc>` creates the bounded transport/RPC adapter, never a
+server. Adapt the existing `Rpc` to expose `call(method, params): Promise<object>`,
+`send(message): Promise<void>`, `next(predicate): Promise<object>`, and `close()`;
+its onText input feeds only validated complete messages. Register that callback
+before reading frames; do not lose frames coalesced with the Upgrade response.
+`ThreadProbe` exposes `resume(): Promise<ThreadResumeResponse>`,
+`findResult({turnId,itemId,matchNativeResult,pageSize = 20})` and `close()`.
+`matchNativeResult(item, tuple)` returns a matched native result or null; the pilot
+must establish this exact call/output mapping before it can be used live. Fixture
+mappings are explicitly synthetic, never a substitute for that evidence.
+`resume()` sends only `{threadId, excludeTurns:true}`; omit `initialTurnsPage`,
+`history`, `path` and all settings overrides. Its metadata is not proof of an
+active turn's mode. The owner checks loaded-thread membership before rejoining;
+never resume an unloaded thread merely for discovery.
+
+Fetch only needed history: `thread/turns/list` with `limit:20`,
+`sortDirection:"desc"`, `itemsView:"notLoaded"`; then `thread/items/list` for the
+relevant `turnId`, `limit:20`, `sortDirection:"asc"`, preserving returned string
+cursors. The saved SortDirection values are `"asc"` and `"desc"`. `pageSize` may
+reduce these limits to 1–20, never increase them. Use at most 10 pages across the
+lookup and detect repeated cursors.
+Return `{status:"found", result}` only for an exact correlated result;
+`{status:"unknown",reason}` for exhausted bounds, absent mapping, loss or incomplete
+reconciliation. A final page alone is not a temporal replay barrier. Receipt can
+be found early; declaring a call gone needs Task 2's independent barrier evidence.
+
+Keep the authentication/control client separate; at most four thread clients plus
+one control client, enough for two competing clients and isolation controls.
+For a size violation on a dedicated thread channel, close only that channel,
+record `{threadId,reason:"inbound-limit"}`, quarantine that thread for this run,
+and send no answer/retry there. Keep another assigned thread's connection usable;
+never log the offending payload. Reconnect the failed thread at most once to
+obtain lightweight metadata, with no automatic history fetch or answer resend;
+a repeat failure leaves it quarantined. An oversized control message cannot be
+attributed safely: stop the case visibly rather than guessing a thread. If native
+subscriptions broadcast unrelated large payloads to all clients, connection-per-thread
+is insufficient; mark isolation unknown and return to design, not silently claim
+containment. Task 2 tests subscriptions with two owned threads. Synthetic overflow
+proves driver mechanics only, not server subscription behavior. Cleanup/capture
+failure can still invalidate the whole case even when a thread failure is contained.
+
+### Current-version Plan-mode proof
+
+Before the paid pilot, inspect the pinned 0.165.0 tool registration and handler
+sources for the blocking question variant: record file URLs, hashes, exact mode
+and feature/configuration conditions and any alternate call path. The hq 0.162.1
+fact is motivation, not this proof. If available native tool-availability data
+establishes the same rule, retain it too. Do not mistake hiding a descriptive name
+for enforcing unavailability of the blocking variant. Incomplete or contradictory
+paths leave the rule unknown.
+
+The pilot uses a normal TUI Plan positive control and a separate private Default
+control. For the latter the probe may explicitly set `collaborationMode` on its
+own `turn/start` as `{mode:"default", settings:{model, reasoning_effort:null,
+developer_instructions:null}}` (generated `CollaborationMode`/`Settings` fields) to establish
+the requested mode for that controlled turn. This is producer setup, never an
+observer override on the Plan thread. Record effective model/features/permissions
+and show that the audited rule applies to this exact configuration. Accept either
+an actual attempted blocking call with native rejection, or captured native
+availability/version-pinned source proving the blocking tool unavailable in Default.
+A model choosing not to call, a prose refusal, or resumed prior-turn settings is
+insufficient. Source-proven unavailability does not require eliciting an impossible
+call; record the selected proof path and the Default control's actual configuration.
+
+For the positive question require positive built-in provenance plus `isBlocking:true`
+and the established rule. Retain the exact `(threadId,turnId,itemId)`, native tool
+call and matching result; `turn/started` has no mode field. A resume-mode read may
+corroborate, never replace, this proof unless native evidence binds it to the exact
+active turn. Do not retain the old unconditional pre-question resume-mode gate.
+Use at most one harmless TUI bootstrap turn if needed; count every started turn.
+Task 2's `join` repeats qualification for late attachment and a TUI Plan→Default
+mode change, and `exclude` checks actual Default/async requests. If a queued old
+Plan request remains blocking after mode selection changes, qualify its original
+call only when the version-proven rule covers its creation semantics; do not infer
+its mode from the new selection. Missing provenance or enforcement fails closed.
+
 ### Authentication boundary and prerequisite gate
 
 The source login is read only by the controller, never by a child. Extract only
@@ -111,19 +243,19 @@ check, not cryptographic validation; server authentication must still succeed.
 Never request a refresh or wait for this probe to renew a stale token.
 
 Start with an empty private Codex home and isolated credential-store configuration.
-Initialize a dedicated authentication proxy with `experimentalApi: true`, then
+Initialize a dedicated authentication WebSocket client with `experimentalApi: true`, then
 send `account/login/start` with `type: "chatgptAuthTokens"`, the access token and
 account id only. Omit this entire frame from capture and discard credential-bearing
 errors without printing their contents. Require the matching successful login
 response and `account/updated.authMode == "chatgptAuthTokens"` before starting
-the TUI. Keep that proxy available for server requests. On any
+the TUI. Keep that client available for server requests. On any
 `account/chatgptAuthTokens/refresh` request or authorization error, abort and clean
 up; never supply refreshed credentials, call logout, or fall back to managed login.
 On the deliberate server restart, repeat this same access-only login before
 reconnecting the TUI, recording it as a probe action, not recovery evidence.
-For the no-client variant, leave **all** proxies, including the authentication
-proxy, disconnected during the no-client interval; authenticate only when the
-later observer joins. A server with an authentication proxy attached is not
+For the no-client variant, leave **all** WebSocket clients, including the authentication
+client, disconnected during the no-client interval; authenticate only when the
+later observer joins. A server with an authentication client attached is not
 evidence of no-client recovery. If access-only login changes the recovery path,
 report that equivalence unknown rather than crediting the gate.
 
@@ -137,8 +269,9 @@ refresh for managed logins. Whether 0.165.0 would invalidate this particular liv
 login through a copied refresh token remains unverified; this plan avoids sharing
 that token rather than depending on its age or detecting rotation after the fact.
 
-Before and after every case, compare source-login bytes privately and check for
-unexpected private auth-file creation or credential-store writes. Retain only
+For authenticated cases, compare source-login bytes privately before and after
+the case. Every case checks for unexpected private auth-file creation or
+credential-store writes; `transport` never reads the live login file. Retain only
 booleans, never credentials or credential hashes. A source change is not proof the
 probe caused it (the live session can refresh concurrently), but it stops the batch
 for investigation. Any unexpected private credential persistence fails cleanup:
@@ -148,113 +281,134 @@ the source. No real login, private auth copy or auth payload becomes an attachme
 Before any paid pilot, complete an exclusion-fixture inventory. Each row below
 needs a producer and expected native provenance, or a recorded blocker. In
 particular, an app approval using the question method is not assumed to exist in
-an empty private home. Prepare the exact account/app/tool/arguments and
-approval policy needed to produce that example, then seek the user's approval
-for that account-connected probe. Plan approval does not grant this external
-action. If no suitable connected app or safe recipe is available, park Task 2
+an empty private home. Use the already approved exact Linear recipe below. A changed app, operation,
+arguments or external effect requires a new concrete user approval; plan approval
+alone does not grant those changes. If no suitable connected app or safe recipe is available, park Task 2
 before inference, identify the missing class, and return that blocker for design
 review; do not run an inevitably incomplete matrix or mark the class passed.
 
 ### Case limits and subscription budget
 
-Store these `deadlineSeconds` values in `cases.json`: pilot 180, join 300,
+Store numeric case-name → deadline-seconds entries in `cases.json` (matching the
+existing driver format): transport 60, inventory 60, pilot 360, join 300,
 forms 600, exclude 600, race 480, clear 360, defer 240, reconnect 480, restart 600.
 These are ceilings per case, not a promise that all cases fit their sum. Keep the
 15-second RPC timeout separate from model-turn and delayed-receipt waits. In
 `clear`, delay observation for 75 seconds within its case deadline.
 
-Approval of this revision authorizes at most 30 minutes of live probe wall time
+The original authorization remains at most 30 minutes of cumulative live probe wall time
 and 30 model turns on the existing subscription, including pilot and retries;
 it does not authorize buying credits or API use. The earlier 15–30 minute estimate
 is provisional, not evidence that the full matrix fits this allowance. Per-case
-ceilings total 64 minutes before cleanup, so an extension may be needed. Keep the
+ceilings total 69 minutes before cleanup, so an extension may be needed. Keep the
 30-minute/30-turn cap unchanged; no token-cost estimate is claimed. Persist cumulative time/turn counts
-across runs and resumes. Stop at the first exhausted budget, keep partial evidence,
+across runs and resumes, starting from 55,541 ms and zero turns. Charge native
+transport and inventory time as well as inference; no case gets a new budget.
+Reserve 60 seconds of remaining aggregate allowance for cleanup; refuse a launch
+with no execution time left after that reservation. End work at the earlier of
+the case deadline or aggregate allowance minus that reserve, and charge cleanup
+time too. An overrun is a failed budget assertion, never an implicit extension.
+Stop at the first exhausted budget, keep partial evidence,
 and seek an explicit extension before more inference. The harness timeout covers
 the case deadline plus a bounded 60-second cleanup allowance; it never replaces
 the driver's deadline or the aggregate budget.
 
-### Task 1: Build and verify the isolated probe driver
+### Task 1: Repair and verify the isolated probe driver
 
-**Files:** Create task-local `probe/run.mjs`, `probe/probe.test.mjs`, fixture child
-scripts and `probe/cases.json`. Do not edit `src/`, schemas, package dependencies,
-real settings or shared launchers.
+**Files:** Modify retained `probe/run.mjs`, `probe/probe.test.mjs`,
+`probe/fake-child.mjs`, `probe/cases.json`; create `probe/unix-websocket.mjs`,
+`probe/unix-websocket.test.mjs`, `probe/history.mjs`, `probe/history.test.mjs` and
+`probe/fixtures/` for captured unauthenticated wire bytes plus hash/provenance maps.
+`unix-websocket.mjs` owns only HTTP Upgrade/framing; `history.mjs` owns lightweight
+resume/pagination and thread-scoped failure. `run.mjs` owns RPC correlation,
+processes, auth, budget, mode evidence and case orchestration. Do not edit `src/`,
+schemas, dependencies, live settings or shared launchers. No proxy compatibility path.
 
-**Interfaces:** Consumes the retained generated protocol and CLI help. Produces
-`runCase` and `RunResult` above, with only `pilot` implemented initially; later
-cases are added in Task 2 using the same bounded capture/cleanup path.
+**Interfaces:** Consume the CLI/result contracts above and the bounded transport
+and history contracts below. `runCase` implements `transport`, `inventory` and
+`pilot`; Task 2 adds matrix cases through the same path. The driver is not done
+until fake checks pass and its initial native transport case succeeds; live
+question capability remains Task 2's gate.
 
-- [ ] **Setup:** Re-enter the worktree skill, confirm dependency hydration, run
-  `just test`, and note command, runtime and nonzero test count on this task.
-  A pre-existing failure is investigated and recorded before changing probe code.
-- [ ] **Early app-fixture discovery:** Before building the driver, inspect available
-  app/tool metadata read-only and prepare the exact deny-before-invocation recipe
-  required by Task 2. Record whether this installation exposes a suitable existing
-  app and whether its private approval policy can force the prompt. Metadata alone
-  is not native protocol evidence. If proving availability needs the private server,
-  defer only that bounded, non-inference check to the tested driver; do not touch the
-  live daemon. Present a concrete account-connected probe for approval as soon as
-  its recipe is reviewable. A missing recipe remains a Task 2 prerequisite, not
-  permission to install an app or a prohibition on Task 1's fake-process work.
-- [ ] **Write `probe.test.mjs` before the driver.** Use fake Codex/tmux processes
-  and fake auth bytes in a private home. Assert these named behaviors:
-  `invalid argv launches nothing`, `existing output is never overwritten`,
-  `wrong server home refuses before thread RPC`, `unmatched response cannot settle
-  another RPC`, `oversized input aborts without logging its payload`, and
-  `SIGTERM reaps owned children and removes private credentials`. Also assert
-  `expired or insufficient-lifetime token launches nothing`, `refresh token never
-  reaches child, disk, RPC or capture`, `refresh request aborts without retry`,
-  `auth frames and credential-bearing errors are never captured`, `changed source
-  or private auth persistence stops the batch`, `missing protocol Plan mode sends
-  no question prompt`, `previous-turn Plan mode cannot qualify a Default question
-  turn`, and `case and cumulative budgets survive resume and stop
-  inference at their limit`. Give fixtures no real
-  credentials or inherited Git variables. Preserve an unrelated sentinel child.
-- [ ] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/probe.test.mjs"`.
-  Record the expected missing-driver/behavior failure, not a setup or credential failure.
-- [ ] **Implement the minimal driver.** One fresh foreground
-  `codex app-server --listen unix://<private-socket>` under private environment,
-  one private tmux TUI using `--remote unix://<private-socket>`, and named proxy
-  clients using `codex app-server proxy --sock <private-socket>`. Confirm this
-  reproduces the shared-server ownership/recovery path; if only a materially
-  different topology can run, mark equivalence unknown and do not claim the gate.
-  Do not use `daemon start`, `restart`, bootstrap, systemd or the live control socket.
-- [ ] **Bound the run.** Use a 1 MiB per-line cap and bounded total capture
-  (16 MiB per case), RPC deadlines of 15 seconds, and the per-case and aggregate
-  budgets above. Test deadlines with an injected clock, not minute-long sleeps.
-  Capture overflow fails the case. On EXIT/TERM/INT close clients, stop the private
-  tmux server, terminate/reap the owned server and children, remove any private credentials,
-  then verify cleanup. Refuse mismatching ownership before killing any pid.
-- [ ] **Implement `pilot`.** Initialize the proxy, verify its returned `codexHome`
-  equals the private home, and record exact CLI/server versions. Establish access-only
-  authentication as above. In the private TUI, select Plan mode, then attach an
-  observer without overrides and require `thread/resume`'s
-  `collaborationMode.mode == "plan"` before submitting the question prompt. Null,
-  missing or conflicting mode evidence is unknown; terminal text is insufficient.
-  If creating the thread or applying the TUI's mode selection requires a turn,
-  use a harmless bootstrap turn that requests no question, count it against the
-  budget, then verify mode before the question turn. Request exactly one
-  Circle/Square question. Before accepting or answering it as an eligible question,
-  re-read effective mode through `thread/resume` while that question is pending.
-  Correlate the request's `(threadId, turnId)` with `turn/started` and the resumed
-  thread's active turn; require the same active turn throughout the mode read and
-  no intervening mode change or newer turn. The earlier precheck alone never
-  qualifies the question. `turn/started` has no mode field in the saved 0.165.0
-  types; do not invent one. Verify that the effective-mode read applies to this
-  active turn, not saved settings for a prior or future turn. If that association
-  cannot be established, record unknown and leave the question native. Apply this
-  same current-turn check to Plan cases and the Default/async negative case.
-  Using the observer without settings overrides, capture the native tuple and
-  reply Square through the proxy only after these checks. Locate the correlated
-  native result, then perform checked cleanup.
-  Model text `CHOSEN=Square` is corroboration only. A missing identity/provenance or
-  matching receipt makes the pilot unknown and stops the matrix.
-- [ ] **Run GREEN** through the same `just test-one` command on development Node
-  and installed Node 22 (adjust only this command's PATH; print `node --version`).
-  Record counts and verify tests did not contact a real daemon or inference service.
-- [ ] **Checkpoint:** attach source/test snapshots and the test result summaries;
-  hash retained scratch. No repository-code commit is needed for these research
-  scripts. Mark this child done only after its checks and attachments are verified.
+- [ ] **Setup:** Verify retained manifests, hydration and the recorded 773-test
+  baseline. Re-run full baseline only if the checkout, dependencies or runtime
+  changed since that run. Preserve the old 19-check results as historical safety
+  evidence. Read the approved Linear recipe; no repeated approval is needed for
+  the unchanged operation. Native availability still needs the inventory case.
+- [ ] **Write failing codec tests before modifying the driver.** In
+  `unix-websocket.test.mjs`, assert the boundary table below using byte vectors
+  and an owned Unix socket with no Codex process. These are protocol-unit inputs,
+  not claimed native fixtures. At minimum pin:
+  ```js
+  assert.equal(await rejectsUpgrade({ peerLimit: '0' }), 'peer-limit-invalid');
+  assert.equal(await sendAtPeerLimit({ peerLimit: 16, bytes: 17 }), 'outbound-limit');
+  assert.equal(await fragmentedTextBytesOver(8 * 1024 * 1024), 'inbound-limit');
+  assert.equal(await utf8AcrossFragmentsWithPing(), 'decoded-once-pong-masked');
+  ```
+  These helper names are local test helpers, not exported driver APIs.
+- [ ] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/unix-websocket.test.mjs"`.
+  Record missing transport or wrong framing assertions, never a real credential
+  or setup failure. Implement the bounded codec contracts below, then rerun GREEN.
+- [ ] **Implement `transport` only and run the real first connection.** Start one
+  owned foreground `codex app-server --listen unix://<private-socket>` in an empty
+  private home. Do not read auth, start a TUI, or create a turn. Connect directly,
+  validate Upgrade, send masked JSON `initialize` with `experimentalApi: true`,
+  require its matching response and private `codexHome`, then send `initialized`.
+  Record exact CLI/server versions, advertised cap, wire bytes and decoded message
+  sizes. Close/reap and verify cleanup. Run in a tracked foreground call bounded
+  by the 60-second case deadline plus at most 60 seconds cleanup; retain even
+  failed attempts. HTTP 101 alone is insufficient. Failure/unknown stops here.
+- [ ] **Build fake-process fixtures from the successful wire capture.** Replace
+  newline-JSON fake behavior with the real HTTP/WebSocket sequence. Annotate each
+  fixture's source hash, byte offsets and substitutions (random Upgrade keys,
+  paths, ids); preserve original raw bytes. Add synthetic malformed/control/limit
+  cases separately labelled as such. Never reuse the old fake as protocol proof.
+- [ ] **Write failing driver/history tests.** Keep the existing ownership, auth,
+  redaction, split-stderr secret, source-file deletion and interruption regressions.
+  Add: mismatched RPC id cannot settle another call; whole/fragmented oversized
+  input fails without payload logging; no newline fallback; unknown RPC/queued
+  notification floods fail boundedly; `transport` never reads auth or starts a TUI;
+  auth refresh aborts; budgets survive resume; lightweight resume emits exactly
+  `{threadId, excludeTurns:true}` with no settings overrides; later-page receipt is
+  found; cursor repetition/page exhaustion is unknown; oversize quarantines only
+  its assigned thread and another thread's RPC still completes; reconnect never
+  retries an answer without same-tuple pending proof. Mode tests must reject both
+  previous-turn Plan settings and model non-use; source-based evidence must match
+  exact version/configuration and cover the blocking variant, not just a tool name.
+- [ ] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/probe.test.mjs" "$WORK_ROOT/relay/relay-a27e7c/probe/history.test.mjs"`.
+  Confirm the named behavior fails, then replace the old line transport and add
+  `history.mjs`, inventory and pilot orchestration. Each server/TUI/fixture child
+  uses an explicit-key environment; no unrelated sentinel child may be killed.
+  Use one private tmux TUI with `--remote unix://<private-socket>` and direct
+  WebSocket clients; never `daemon start`, systemd or the live control socket.
+  No inference runs while building/testing these fake paths.
+- [ ] **Implement `inventory`.** After all fake checks pass, use access-only auth
+  to inspect native app/model/config metadata without inference. Confirm the exact
+  approved Linear operation is available and prompt policy effective; never invoke
+  it here. Missing metadata or unsuitable prompt policy stops before the pilot.
+- [ ] **Implement `pilot` using the mode-evidence procedure below.** Capture one
+  native Circle/Square blocking question from the Plan positive control, attach an
+  observer without overrides, prove provenance and mode, answer Square through its
+  native request id, and require a correlated native result with that exact answer.
+  `CHOSEN=Square` prose is corroboration only. If mode cannot be proven, do not
+  answer through the outside client; mark unknown, clean up and stop the matrix.
+  Use normal TUI settings with no raw-event opt-in. Native TUI compatibility with
+  external auth and shared-server semantics is itself a gate, not an assumption.
+- [ ] **Run GREEN:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/unix-websocket.test.mjs" "$WORK_ROOT/relay/relay-a27e7c/probe/probe.test.mjs" "$WORK_ROOT/relay/relay-a27e7c/probe/history.test.mjs"`.
+  Run on development Node and installed Node 22, changing only that command's PATH and printing the
+  runtime version. Run `just test-fast` before checkpointing. Record counts and
+  prove fake tests contacted no real daemon or inference service.
+- [ ] **Verify cleanup on all paths.** A `finally` cleanup path handles normal
+  completion and signal-triggered abort (SIGTERM/SIGINT). Close all WebSockets,
+  stop the owned private tmux server, terminate/reap only recorded server/child
+  pids whose start identity still matches, and remove owned private credential
+  state/runtime directories. Refuse mismatched ownership before any kill. Capture
+  overflow or cleanup failure invalidates the run. Tests preserve an unrelated
+  sentinel child and exercise interruption during Upgrade, auth and pending RPC.
+- [ ] **Checkpoint:** attach source/test/wire snapshots and test results; hash
+  retained scratch. No repository-code commit is needed for disposable scripts.
+  Mark relay-dc1f42 done only after the native `transport` result, fixture checks
+  and attachments are verified. Task 2 owns the inventory/pilot live verdicts.
 
 ### Task 2: Run the current-version protocol matrix
 
@@ -263,19 +417,24 @@ cases are added in Task 2 using the same bounded capture/cleanup path.
 
 **Interfaces:** Consumes Task 1's CLI and result schema. Produces one `RunResult`
 per case and a report mapping each approved spec gate to exact native fields,
-captured ordering, supported versions and verdicts. No fabricated protocol fixture.
+captured ordering, supported versions and verdicts. No synthetic fixture may be
+reported as native capability evidence.
 
 - [ ] **Preflight:** Re-read current hq-25665e notes for relevant results without
   taking its claim. Resolve the installed executable and versions afresh. Confirm
   the selected model exists in this installation and record it; use the installed
   configured model, with no silent substitution. An unavailable subscription/auth
-  path is a blocker, not permission to buy API access. Inventory the real daemon
-  read-only so ownership cannot be confused with the private one. Complete the
+  path is a blocker, not permission to buy API access. Identify existing daemon processes and socket paths read-only so ownership
+  cannot be confused with the private one; do not connect to its socket. Complete the
   authentication lifetime checks and exclusion-fixture inventory above, including
   any required account-connected approval, before the first paid pilot. Record
   the approved recipe and cumulative subscription budget in task notes.
+- [ ] **Inventory before inference:** Run `--case inventory` after Task 1 passes,
+  under a 120-second harness timeout (60-second case plus 60-second cleanup).
+  Read its verdict; unavailable Linear, incompatible auth or prompt policy stops
+  before a model turn. Retain the exact effective private configuration.
 - [ ] **Pilot first:** Run the CLI with `--case pilot` in the foreground under a
-  harness-tracked timeout of five minutes. Read request, native result, terminal
+  harness-tracked timeout of seven minutes (360-second case plus cleanup). Read request, native result, terminal
   capture, verdict and cleanup before adding or running other cases. Correct probe
   mistakes against their output, retaining failed runs. Do not convert an unsupported
   capability into a pass by changing the target thread's settings.
@@ -289,13 +448,13 @@ captured ordering, supported versions and verdicts. No fabricated protocol fixtu
 
 | Case | Required observation and assertion |
 | --- | --- |
-| `join` | A TUI-created thread, with ordinary settings and no special raw-event opt-in, is discoverable through paginated `thread/loaded/list`. Early and late `thread/resume` observers receive the pending request and enough evidence to identify the built-in call. Compare model, mode, instructions, approvals and workspace before/after joining; none changes, no turn starts. A completed/unloaded thread is not resumed merely for discovery. |
-| `forms` | Native single choice, Other, nullable-options text, multiple questions and native decline are captured and answered through the proxy. Record exact native question-id mappings, labels/text and declined result. Obtain decline from actual native interaction; do not guess `{}` or a magic string. If a required form cannot be produced or represented, report it unknown/unsupported. |
-| `exclude` | Establish a positive discriminator for an ordinary built-in blocking call. Execute the prerequisite recipes below and record the actual method and originating tool for every negative class. No real app operation is approved. An unobserved negative class or discriminator based only on labels/prose is not a pass. Controlled synthetic inputs test the proposed predicate but are labelled synthetic, not capability evidence. |
-| `race` | On separate questions, order desktop before proxy and proxy before desktop, including a delayed proxy write after the other client wins. Identify the actual accepted answer by call-correlated output, show that resolution alone does not establish it, and record how duplicate responses behave. A different native answer must never be called receipt of the proxy candidate. |
+| `join` | A TUI-created thread, with ordinary settings and no special raw-event opt-in, is discoverable through paginated `thread/loaded/list`. Early and late `thread/resume` observers receive the pending request and enough evidence to identify the built-in call. Compare model, mode, instructions, approvals and workspace before/after joining; none changes, no turn starts. A completed/unloaded thread is not resumed merely for discovery. Repeat after Plan→Default selection changes; prove eligibility from creation-time evidence, never current selection. Use the history/isolation controls below. |
+| `forms` | Native single choice, Other, nullable-options text, multiple questions and native decline are captured and answered through the WebSocket client. Record exact native question-id mappings, labels/text and declined result. Obtain decline from actual native interaction; do not guess `{}` or a magic string. If a required form cannot be produced or represented, report it unknown/unsupported. |
+| `exclude` | Establish a positive discriminator for an ordinary built-in blocking call. Execute the prerequisite recipes below and record the actual method and originating tool for every negative class. Never accept a native app approval; only the exact authorized read-only fallback search may execute if prompting is bypassed, which fails the case. An unobserved negative class or discriminator based only on labels/prose is not a pass. Controlled synthetic inputs test the proposed predicate but are labelled synthetic, not capability evidence. |
+| `race` | On separate questions, order desktop before client and client before desktop, including a delayed client write after the other client wins. Identify the actual accepted answer by call-correlated output, show that resolution alone does not establish it, and record how duplicate responses behave. A different native answer must never be called receipt of the outside client candidate. |
 | `clear` | Interrupt an unanswered turn through the private controller, capture cleanup resolution and prove no matching answer exists. Separately delay receipt observation beyond 60 seconds and recover the exact output. Record ordering when resolution precedes the output; distinguish temporarily missing receipt from cleared-without-answer. |
-| `defer` | Keep the proxy silent, leave the native question pending, then answer using only native TUI input. No turn advances before that input. Capture the matching native result and prove the proxy has not answered or interrupted. This establishes native handback; relay's `released` state itself is tested in the later production phase. |
-| `reconnect` | Kill/recreate only the proxy while a question waits, then separately disconnect after sending its answer but before reading receipt. Rejoin without overrides. Find a positive pending replay or exact recorded result, and an authoritative completion condition for reconciliation. Silence, an arbitrary grace period, and a partial page are not barriers. Repeat with a fresh controller process, representing relay restart. |
+| `defer` | Keep the outside client silent, leave the native question pending, then answer using only native TUI input. No turn advances before that input. Capture the matching native result and prove the outside client has not answered or interrupted. This establishes native handback; relay's `released` state itself is tested in the later production phase. |
+| `reconnect` | Disconnect/recreate only the outside client while a question waits, then separately disconnect after sending its answer but before reading receipt. Rejoin without overrides. Find a positive pending replay or exact recorded result, and an authoritative completion condition for reconciliation. Silence, an arbitrary grace period, and a partial page are not barriers. Repeat with a fresh controller process, representing relay restart. |
 | `restart` | Stop/reap only the private server while a question waits, restart against the same private home, once with the private TUI reconnecting and once with no client attached until later. Record daemon identity and old/new turn/item/RPC ids. An old response must never answer a new call even if its RPC id is reused. Record interrupted vs recovered behavior exactly; no-client recovery is not inferred from the attached run. |
 
 Exclusion producers (these are attempts to elicit real protocol examples, not
@@ -304,7 +463,7 @@ claims that this installation supports them):
 | Class | Producer and required evidence |
 | --- | --- |
 | Secret question | In a private Plan thread ask the native question tool for a secret-marked field using only the dummy value `probe-not-a-secret`. Require observed `isSecret: true` and built-in provenance. If the native tool cannot emit it, record unknown; hand-crafted JSON does not replace it. |
-| Default/async question | Switch a separate private TUI thread to Default, confirm `collaborationMode.mode == "default"` through the protocol, and prompt its asynchronous question tool for Circle/Square. Require actual nonblocking request and originating call; a prose question is not evidence. |
+| Default/async question | Use a separate owned Default control turn whose `turn/start` explicitly sets Default as above; prompt its asynchronous question tool for Circle/Square. Require an actual nonblocking request and originating call; a prose question is not evidence. A prior-turn resume-mode value cannot qualify this control. Native absence of the blocking variant can prove mode enforcement, but does not replace the separately required async exclusion example. |
 | Permission request | Ask the private agent to use built-in `request_permissions` for read access to a controller-created sentinel outside its allowed workspace, never a real user file; deny the request before the read. Require observed `item/permissions/requestApproval` with native tool provenance, plus the version-scoped path audit below. A command-execution approval alone does not prove this permission-tool case. A question-method permission example is required only if the protocol, documentation or native evidence establishes that path. |
 | App approval using the question method | Requires a connected app plus user-approved account-connected recipe. Before the pilot name one actual tool, exact synthetic arguments, private approval policy forcing a prompt, and the point where the driver denies/cancels before invocation. Choose an operation whose approval can be observed without an external write; never enable automatic approval or a permissive sandbox. Do not connect/install an app or change live account settings merely to obtain this case. If no existing app can safely produce it, park before the pilot. At runtime require a real question-method approval with app-tool provenance; another approval method or cached consent is unknown. |
 
@@ -322,10 +481,37 @@ the approved spec's gate 2, which names app approvals, secret and async requests
 Positive built-in-question provenance remains mandatory for every forwarded call;
 all other methods and unidentified requests remain native.
 
-The app-through-question recipe and account-connected approval remain **unmet**
-prerequisites: Task 1 can build with fake fixtures, but Task 2 cannot start live
-inference until they are recorded. This preserves the approved app-exclusion
-requirement without inventing an additional permission transport requirement.
+The account-connected recipe is **already approved by the user** in this task's
+session and retained as `app-probe-recipe.md`. Use only the existing Linear search
+(current harness catalog name `mcp__codex_apps__linear_search`) with exact arguments
+`{"query":"relay-question-probe-no-match-20261029","limit":1,"type":"all"}`.
+In the isolated config set `apps._default.default_tools_approval_mode = "prompt"`
+and `apps._default.approvals_reviewer = "user"`, with no per-app/tool overrides.
+Confirm the actual native tool name and advertised argument schema by metadata;
+if the approved operation cannot be identified exactly, stop, never substitute.
+Request one attempt, then decline the offered native approval. Never accept it or
+write externally. If the prompt is bypassed, only this read-only search is allowed
+to execute, and the case fails. Do not retain returned account content in portable
+evidence. Native availability and producing the right prompt remain unproven;
+those are prerequisite/result checks, not grounds to ask for the same approval again.
+No app installation, new account setting or different operation is authorized.
+
+History/isolation controls in `join`: reuse the owned pilot/control-style threads
+and normal generated history; do not manufacture a huge account transcript. Fetch
+turns/items with `pageSize:1` so an exact result on a later page is exercised, and
+record `excludeTurns:true` resume sizes. Use two independently resumed owned
+threads and observe notification subscription scope. Then on a disposable thread
+channel set `maxIncomingBytes` below a previously measured history-response size,
+repeat that bounded history request, and require a visible thread-id/limit failure,
+channel closure and no answer send. The other thread must complete an ordinary
+RPC and remain able to answer natively. The failing channel's one metadata-only
+reconnect uses the normal cap; no auto-refetch or response resend. Record any
+cross-thread broadcast and whether it defeats containment; if so, fail isolation.
+The deliberately induced, correctly isolated failure is a passing test assertion;
+an unexpected limit failure in a required native observation leaves that gate
+unknown. These lower-cap controls prove the same failure path without generating
+an actual 8 MiB payload. Synthetic tests separately cover the real cap's length boundaries.
+When early stop prevents a control, report it unobserved, never passed.
 
 - [ ] **Report the contract.** For each gate, give raw evidence references/hashes,
   the exact request and answer mapping, positive built-in provenance predicate,
@@ -341,7 +527,7 @@ requirement without inventing an additional permission transport requirement.
 
 ### Task 3: Freeze the implementation decisions or the blocker
 
-**Files:** Create `docs/notes/2026-10-28-codex-question-protocol-report.md` in the
+**Files:** Update `docs/notes/2026-10-28-codex-question-protocol-report.md` in the
 code worktree, derived from the portable Task 2 report. On passing all prerequisite
 gates, create `docs/plans/2026-10-28-codex-question-connector.md`; otherwise produce
 only the report and any required spec revision for user review.
@@ -349,8 +535,9 @@ only the report and any required spec revision for user review.
 **Interfaces:** Consumes every `RunResult` plus exact source hashes. Produces a
 checked report and the next frozen artifact; never an enabled connector.
 
-- [ ] **Adjudicate completeness.** Require all five prerequisite gates in the
-  approved spec, including no-client recovery and native forms. List any missing
+- [ ] **Adjudicate completeness.** Require all five protocol prerequisite gates (spec gates 1–5) in the
+  approved spec, including no-client recovery and native forms, plus Task 1 transport/history safety
+  checks. Spec gates 6–7 remain production/phone obligations, not completed here. List any missing
   evidence explicitly. Preserve the parent task's implemented-vs-intended scope;
   a failed route probe does not authorize narrowing its acceptance.
 - [ ] **On failure/unknown:** record the smallest blocking contract, its evidence,
@@ -386,11 +573,11 @@ checked report and the next frozen artifact; never an enabled connector.
 
 ## Plan review and records
 
-The plan is reviewed before Task 1 runs. Inline execution is the recommendation;
+This revised plan is reviewed before Task 1 resumes. Inline execution is the recommendation;
 there is no independent parallel implementation in this evidence-dependent phase.
-Record one child per task heading, each with this plan attachment and its heading
-in its body while the tracker cannot link a branch-only plan. Add dependencies
-Task 1 → Task 2 → Task 3. This is a documented workaround for tasks-85e8cd, not a
+Reuse children relay-dc1f42 (Task 1), relay-01090a (Task 2) and relay-4746ed
+(Task 3), updating their parent-plan references to this frozen revision. Preserve
+the Task 1 → Task 2 → Task 3 dependency chain; do not create replacement tasks. This is a documented workaround for tasks-85e8cd, not a
 waiver of task tracking or plan review. Once ordinary links resolve, restore them.
 
 At the end, keep relay-a27e7c open for the actual connector implementation and
