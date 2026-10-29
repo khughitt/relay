@@ -60,18 +60,24 @@ authorized by this phase.
 
 The approved spec remains `741a546`. Read the companion frozen protocol report
 and verify retained hashes before any execution. Task 1 stays complete. Task 2's
-trust/readiness implementation, captured-frame fixes and review-required trust-overlap
-correction are complete offline in snapshot `r11`: combined driver checks passed
-115/115 on Node 26.5.0 and 22.23.2. Repository checks passed 773/773. Before retained
-admission or any native retry, verify the r11 hashes and focused RED→GREEN evidence
-for both trust levels. The whole pinned trust surface, including its footer, must
-match; extra text cannot qualify fallback or receive keys. Do not repeat completed
-implementation or call fixtures native proof.
+trust/readiness implementation, captured-frame and trust-overlap fixes, and the
+review-required Plan-screen correction are complete offline in snapshot `r12`.
+Combined driver checks passed 119/119 on Node 26.5.0 and 22.23.2. Repository checks
+remain 773/773 from the unchanged code checkout. Before retained admission or any
+native retry, verify r12 hashes and the focused RED→GREEN evidence for trust and
+post-`/plan` admission. The entire pinned trust surface must match; the Plan
+composer accepts only source-derived decoration and still requires native
+identity/policy/provenance/mode evidence. Do not repeat completed implementation
+or call fixtures native proof.
 
 `metadata-02` passed core config/model/preset checks and clean cleanup in 11.378
 seconds, with an auditable projection. `codex_apps` has 194 tools, including
 `linear.search`; neither exact approved tool name matched. App remains unknown,
-not an authorized alias or schema proof. `canRunPilot(metadata-02)` passed with
+not an authorized alias or schema proof. Offline inspection of the exact raw
+response confirmed the `linear.search` object contains only `name`, not its
+schema. Snapshot r12 retains that one schema in any future separately authorized
+metadata run as evidence only; exact-name admission remains unchanged.
+`canRunPilot(metadata-02)` passed with
 verified evidence. No metadata retry is authorized by this revision.
 
 `readiness-01` used saved untrusted, displayed no trust prompt and created one
@@ -89,7 +95,7 @@ pilot-01; its unused bootstrap reservation stays charged. Never reset/refund the
 budget. The exact approved Linear search/decline operation persists; the observed
 `linear.search` name is not permission to substitute another operation.
 
-After approval: verify the final r11 driver/checks and metadata-02 evidence → one
+After approval: verify the final r12 driver/checks and metadata-02 evidence → one
 fresh no-inference `readiness-02` with untrusted → only its exact eligible trust
 prompt permits one trusted `readiness-03` → one `pilot-02` → the seven independent
 cases → available exclusions. Retained metadata admission and clean cleanup are
@@ -328,8 +334,24 @@ Recognize `ready` from the required empty `› Ask Codex to do anything` compose
 line and matching `? for shortcuts` footer variant, with no active startup/busy
 status, prefilled input or modal. The placeholder is fixed in
 `chatwidget.rs:2101`; use the pinned empty/default/Plan composer fixtures for the
-input area. Permit the captured model/workspace status line between composer and
-footer only for the exact owned path; it is UI decoration, not mode/model proof.
+input area. Derive the status row from pinned source rather than copying only
+Default's captured row: model display name, effort label, separator and exact
+owned workspace. `chatwidget/status_controls.rs:460–467` renders absent/None
+as `default` and other efforts by their string label; `status_surfaces.rs:988–1006`
+combines model and effort. The private setup needs `default` and `medium` because
+`models-manager/src/collaboration_mode_presets.rs:6–24` sets Plan to Medium.
+Do not use `plan` as an effort label. Allow the source Plan indicator
+`Plan mode (⇧tab to cycle)` (or its compact `Plan mode` form) right-aligned on
+the status row, and the source shortcut-footer variant. See
+`bottom_pane/footer.rs:150–174`, `chat_composer/status_surface.rs:20–80` and the
+retained fullscreen Plan snapshot. Require the exact owned path, empty composer
+and recognized shortcut footer; extra prompts, typed text or busy/startup state
+still prevent readiness. The native Default capture and source-derived Plan
+fixture are distinguished in `plan-screen-source.json`; no native Plan frame has
+been captured. Exercise `/plan` through the fake-process driver to the ready
+Plan composer and onward to native-protocol receipt checks; an overlapping modal
+must stop without question input or its turn charge. All status/footer labels
+are decoration, never mode/model/provenance proof.
 A glyph or footer alone is insufficient. Notices above the composer
 are not whole-screen match requirements: welcome banners, empty-state animation,
 and a completed `MCP startup incomplete` warning may coexist with readiness.
@@ -750,7 +772,7 @@ Completed through `59e468e` execution: source audit, metadata/core-app separatio
 attempts. Captured-frame fixes passed 114/114; the subsequent trust-overlap review
 correction passed 115/115 on both runtimes. Keep all prior evidence. Completed
 steps below are retained requirements, not work to redo. Execution first verifies
-the r11 correction and focused RED→GREEN logs, then retained admission and readiness-02.
+the r12 corrections and focused RED→GREEN logs, then retained admission and readiness-02.
 
 - [x] **Correct trust-overlap admission offline before retry.** The review of
   `564bf02` found a substring trust match that bypassed modal rejection. Match
@@ -760,6 +782,19 @@ the r11 correction and focused RED→GREEN logs, then retained admission and rea
   the exact valid prompt passing. Focused regression failed before the correction
   and passed afterward; combined checks passed 115/115 on both runtimes. Verify
   snapshot r11 and this evidence before the next unchecked step.
+
+- [x] **Correct post-Plan screen admission before retry.** Review of `408dd93`
+  identified the missing medium effort/Plan indicator. Retain pinned formatter
+  source and a synthetic Plan fixture, reproduce rejection in the classifier and
+  the fake `/plan` sequence, then admit only the known decoration with the exact
+  workspace. Check that post-Plan modals still stop before question input/charge
+  and protocol mode/provenance gates still apply. The four new focused checks
+  went from 1/4 to 4/4; combined r12 checks passed 119/119 on both runtimes.
+- [x] **Inspect the retained dotted Linear entry offline.** The exact raw
+  metadata-02 response contains only `name` for `linear.search`, so no argument
+  compatibility decision is possible. Retain its schema in the next separately
+  authorized metadata capture; test that this remains evidence-only and cannot
+  admit an alias or invoke any app. This plan still authorizes no metadata rerun.
 
 - [ ] **Verify source and retained state.** Read `tui-readiness-source.json`, exact
   pinned files/snapshots and `6d0751d`. Confirm the remote-untrusted skip and

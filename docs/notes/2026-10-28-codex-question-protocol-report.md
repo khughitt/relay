@@ -122,6 +122,39 @@ is an observed native model turn; its unobserved bootstrap reservation remains
 charged. The earlier 40-second diagnostic charge remains included. No refund,
 budget extension or extra live attempt was taken.
 
+## Offline Plan-screen correction after review of 408dd93
+
+The incoming review correctly predicted that the post-`/plan` composer would be
+rejected. Pinned `status_controls.rs:460–467` and `status_surfaces.rs:988–1006`
+confirm effort formatting: absent/None is `default`, while the Plan preset's
+Medium becomes `medium`. The Plan indicator is right-aligned beside the status
+row in the fullscreen source snapshot, with `⇧tab` as the rendered key label;
+its shortcut footer remains below. The fetched footer SHA-256 is
+`cba851759c13f631ed95bbb243f36d4c70e7f7f28c991f8bf14a5b5fc19a0a1d`, matching
+the reviewer's prefix. Source hashes and the audit are in `plan-screen-source.json`.
+
+Snapshot `r12` accepts this source-derived decoration for the exact owned
+workspace. It preserves whole-screen trust matching, modal/startup precedence,
+empty-composer admission, native thread/policy checks, and independent question
+provenance/mode/receipt checks. A synthetic post-`/plan` frame now drives the fake
+pilot; it is not presented as a native Plan capture. Four focused checks went
+from **1/4 to 4/4**, including a post-Plan modal refusing question input/charge.
+Combined driver/codec/history checks passed **119/119 on Node 26.5.0 and 22.23.2**.
+The repository code is unchanged; its prior 773/773 result remains the baseline.
+
+An offline recursive inspection of the hashed `metadata-02/raw.jsonl` found the
+`linear.search` entry at line 8, decoded message/result/data/0/tools/linear.search.
+It contains only `name`; no schema survived that projection. We cannot decide
+whether it admits the approved arguments from these bytes. The r12 projection
+will retain this one additional exact schema in a future separately authorized
+metadata run, but app admission still accepts only the previously approved exact
+names. A fake regression verifies the schema is retained while the verdict stays
+`linear-tool-unmatched`, with no app/read or model turn. This amendment authorizes
+neither another metadata run nor invocation/substitution of `linear.search`.
+
+No native operations ran during these corrections. Budget remains 346,069 ms and
+two charged turns; all earlier native results and their hashes are unchanged.
+
 ## Gate disposition
 
 | Spec gate | Current evidence and remaining obligation |
@@ -161,7 +194,7 @@ user-present phone answer/defer acceptance are complete.
 ## Retained history
 
 The task retains native metadata-02/readiness-01 bytes, observations, captured
-fixture, r9/r10/r11 driver snapshots, RED/GREEN logs and full reviews. Prior report
+fixture, r9/r10/r11/r12 driver snapshots, RED/GREEN logs and full reviews. Prior report
 `6d0751d` records metadata-01's omitted response and pilot-01's trust interruption;
 `f4c5448` records the inventory page-limit stop; `aac3954` records the earlier
 transport/inventory correction. Approved spec `741a546` still governs all gates.
