@@ -52,7 +52,13 @@ question method. Thus a method name alone establishes neither receipt nor an
 ordinary clarification. Those are material gaps in the earlier short §9.3.
 
 hq's `answer-server-terminal` and `answer-server-managed` facts were probed on
-0.162.1. They establish the earlier route's viability, not current-version support.
+0.162.1 on 2026-10-11 under hq-d85ede. The terminal fact explicitly records
+WebSocket over the Unix control socket and native refusal of the blocking tool in
+Default mode. The prior approved spec cited those facts but overlooked the
+transport statement; the 0.165.0 check confirms earlier evidence rather than
+discovering a new transport. The mode observation is also relevant evidence for
+the next probe, not proof of current-version behavior. These facts establish the
+earlier route's viability, not current-version support.
 hq-25665e remains open, including no-client recovery; this design claims no result
 from it. Task notes locate the source transcript and retained generated protocol.
 No current-version live question probe has run for this addendum.
@@ -64,15 +70,38 @@ No current-version live question probe has run for this addendum.
    No new runtime dependency or proxy child. Validate the upgrade response and
    acceptance key, mask client frames, handle fragmentation and control frames,
    bound aggregate message size and time, and reject unsupported compression.
+   Respect the server's `x-codex-websocket-max-unfragmented-message-bytes` header:
+   for the evidenced 0.165.0 route require a valid positive integer, cap outbound
+   messages at the smaller of that value and the local message limit, and never
+   use fragmentation to evade that ceiling. Keep inbound frame/reassembly limits
+   separately bounded. Reject missing/malformed limits for this version; any
+   different version's policy needs its own evidence. Test a peer limit smaller
+   than the local cap, not just the observed 16 MiB advertisement.
    Test malformed and truncated frames, close/ping/pong, cancellation and reconnect
    before live use. Cost: relay owns a small but security-sensitive transport;
    the next reviewed plan must specify and test that boundary before probing.
-2. **Keep the raw proxy and add WebSocket framing.** Technically possible, but
+2. **Use the existing `ws` library.** Its [IPC API](https://github.com/websockets/ws/blob/master/doc/ws.md#ipc-connections)
+   supports Unix sockets directly. The inspected 8.22.0 package has no mandatory
+   runtime dependencies; its native peers are optional. It would avoid owning
+   the framing implementation but add a second runtime dependency beside
+   `jsonc-parser`. Rejected under this repository's Node-builtins runtime rule.
+   The intended peer is a trusted local daemon and no extensions are needed;
+   that bounds the implementation but does not excuse malformed-frame tests.
+   Cost if wrong: relay maintains framing and protocol edge cases the library
+   already covers. Reconsider through design review if the bounded client cannot
+   be kept small and fully tested; do not add the dependency silently.
+3. **Keep the raw proxy and add WebSocket framing.** Technically possible, but
    requires the same framing implementation plus a child lifecycle. Rejected
    because the proxy supplies no framing or local-connection benefit here.
-3. **Use detached questions instead of native integration.** Already supported, but
+4. **Use detached questions instead of native integration.** Already supported, but
    requires agents to change how they ask and does not answer the native waiting
    tool call. Does not meet this task.
+
+Node's browser-compatible built-in `WebSocket` is not a direct Unix-socket
+alternative on the supported Node 22 floor: the installed 22.23.2 rejects the
+`ws+unix:` scheme and exposes no public `node:undici` module. Undici's custom
+dispatcher extension is not a built-in Unix-socket connector; using an external
+Undici agent or a private Node API would change the dependency/API boundary.
 
 The implementation plan starts with a bounded probe phase. Passing the evidence
 gates below is required before production connector implementation, not merely
@@ -104,6 +133,19 @@ not provenance. Secret questions, app approvals, permission requests, async/defa
 questions, and unidentified calls stay native; emit a bounded diagnostic code
 without question text or answers. If the protocol cannot distinguish these, the
 route does not activate.
+
+The revised feasibility plan must test native mode enforcement as a candidate
+way to establish the Plan-mode requirement. hq-d85ede recorded that 0.162.1
+refused the blocking built-in tool in Default mode. Re-probe on 0.165.0 with a
+Plan positive control and an actual attempted blocking-tool call in Default,
+capturing native refusal rather than model prose or mere absence of a question.
+If the current-version evidence establishes that enforcement for the supported
+route, positive built-in-call provenance together with `isBlocking: true` may
+establish the question's Plan-mode qualification. This is a candidate proof of
+the same requirement, not permission to use `isBlocking` alone or to assume the
+historical rule persists. Contradictory, unavailable or incomplete enforcement
+evidence leaves the mode gate unknown and returns to design review. The plan
+must address mode changes and resumed/late-joined calls before relying on it.
 
 Presence `here` admits no new inbox question. Existing questions retain their
 identity when presence changes. When `away`, supported questions enter the inbox;
@@ -200,6 +242,16 @@ The plan must record exact CLI and daemon versions, protocol fixture hashes, nat
 id/answer mappings, and a verdict for each gate. Version mismatch disables the
 connector with an actionable diagnostic; the existing inbox continues serving.
 An evidence file must be validated, not just present. No substring version match.
+
+Start the revised native probes with a real WebSocket handshake and `initialize`
+round trip against the private foreground server, without authentication or
+inference. The earlier 101 response alone is insufficient. Derive subsequent
+fake-process transport fixtures from captured real frames, then add malformed
+and boundary cases; fake JSON-line success cannot establish the native wire
+contract. Confirm from version-pinned source that the managed daemon and private
+`--listen unix://` endpoint select the same listener, without connecting to the
+live daemon. Listener equivalence does not prove recovery or other lifecycle
+equivalence; those gates remain separate.
 
 1. Transport connects to an isolated daemon and closes cleanly; joining loaded threads
    does not change their settings or start work. Test late join and new-thread discovery.
