@@ -1,3 +1,98 @@
+# Codex question feasibility: private socket alias blocker
+
+## Current outcome after approved84692cd
+
+The single authorized readiness-04 ran from2026-10-29T19:00:29.334Z to
+19:00:33.589Z. Original result: **unknown / observer-ownership**, exit1.
+Core metadata/configuration checks passed, but observer construction failed before
+TUI launch: zero discovery polls, no native TUI thread, no keys or model turns.
+No observer handshake or start-policy response was captured. The attempt is spent;
+no fallback, retry, metadata, app operation or pilot followed.
+
+Budget is **364929ms (6min4.9s), two charged turns**, inactive; this run added4255ms
+and zero turns. Historical reservations remain charged. All three owned PIDs2640,
+1893 and1855 were independently absent. Private/runtime paths were removed and
+cleanup reported no errors/survivors. The exact protected socket and lock derived
+from the recorded canonical alias were also absent; the shared namespace was not
+scanned or changed. Native evidence hashes verified.
+
+Raw SHA256: `f3a67a1af68e5f05c74fd0f4bbc908937181fc078caf0de59c7389c9a95e0d8e`.
+Portable SHA256: `3561340540f79390c10ccb4ee56e4d8cc60244fc64aec61852405cc9648b24c1`.
+`readiness-04-observations.json` retains interpretation separately from original
+result, including the bounds of the cleanup observation.
+
+## Source finding and limitation
+
+The pinned0.165.0 Unix listener deliberately publishes the requested path as a
+symlink to a0600 protected socket. The protected filename is SHA256 of the canonical
+advertised path; its namespace is canonical `/tmp` plus `codex-daemon-<effective-uid>`,
+owned by that uid with mode0700, independent of HOME/TMPDIR/CODEX_HOME.
+See `socket-alias-source.json`, `app-server-transport/src/transport/unix_socket.rs`
+69–145 and354–369, and `uds/src/daemon_directory.rs`13–39.
+
+Our observer instead requires lstat of the advertised path to report a socket.
+Its fake server used that direct-socket layout. I missed the source's normal
+rendezvous alias when drafting the observer boundary. This is a source-supported
+mismatch in the probe, not a Codex defect. The run captured only the combined
+observer-ownership error; its individual runtime predicates/readlink were not
+retained. Do not claim those values were observed after cleanup or reinterpret
+this run as a passed native contract.
+
+## Implementation and review evidence
+
+Disposable r14 added the byte-preserving observer and standalone start-policy
+correlation. Initial29 observer tests failed before implementation; readiness
+integration6/6 failed before its change. Two first-GREEN assertions were corrected
+to await downstream bytes, not merely the earlier capture callback. A scalar RPC
+reply regression was reproduced and fixed. Combined r14 passed164/164 both runtimes.
+
+Independent review found two Important defects: fragment object counts escaped
+the byte cap, and Close did not invalidate policy. Seven reproductions failed;
+r15 bounds both parsers to1024fragments and makes Close terminal while forwarding
+original bytes with a shared2-second shutdown bound. Intermediate81/83 exposed a
+missing direct-client diagnostic allowlist entry; final **171/171** passed on
+Node26.5.0 and22.23.2, **773/773** repository fast checks passed, and structured
+hygiene records exit0. Fresh scoped review accepted both corrections before the
+native attempt. Full reviews and r14/r15 snapshots remain retained.
+
+Ruling: retain historical exported fake pilot paths but reject pilot/trusted
+readiness at the native CLI. Why: preserve synthetic contract coverage while
+restricting this diagnostic. Cost: runCase remains callable and controller
+discipline must prevent bypassing the approved sequence. This does not authorize
+any native pilot or change the paid-case gates.
+
+Ruling: fix the direct client's shared fragment defect despite the unchanged-codec
+plan instruction. Why: both parsers run in this diagnostic; fixing only one leaves
+the resource-exhaustion path. Cost: a valid message above1024fragments fails visibly.
+Both rulings were accepted in corrective review against84692cd.
+
+## Proposed next revision
+
+The revised plan specifies source-pinned verification of the exact alias target,
+namespace and socket ownership/modes, identity checks around connection, bounded
+predicate capture, and fake processes with the real alias layout. It proposes
+one untrusted zero-input readiness-05 after offline verification and separate
+frozen-plan approval. No resolver correction or further native run has occurred.
+
+Ruling: verify the specific protected alias instead of following arbitrary links
+or removing the ownership check. Why: exact target derivation keeps the private
+instance boundary while matching Codex's actual source contract. Cost: the probe
+must maintain a version-pinned check and a changed layout fails unknown.
+
+Ruling: preserve readiness-04 unknown and stop native work. Why: the only approved
+attempt is exhausted and supplied no start-policy proof. Cost: the paid pilot
+remains unrun pending the reviewed correction and readiness evidence.
+
+Existing minor (deferred): the default/medium effort-label allowlist fails closed
+on another legitimate label. All native question/provenance/Plan/receipt, exclusion,
+join/lifecycle/recovery gates and account-specific Linear identity/schema remain
+unproved. Production connector and phone answer/defer acceptance still precede
+integration. Task2/Task3 and relay-a27e7c remain open; the branch is unmerged.
+
+## Historical report through9ae6138 and the84692cd proposal
+
+The following is historical evidence, not renewed execution authorization.
+
 # Codex question feasibility: native no-rollout diagnostic
 
 ## Current outcome after approved 1206516
