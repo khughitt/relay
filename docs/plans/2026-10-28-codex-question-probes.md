@@ -60,9 +60,13 @@ authorized by this phase.
 
 The approved spec remains `741a546`. Read the companion frozen protocol report
 and verify retained hashes before any execution. Task 1 stays complete. Task 2's
-trust/readiness implementation and its captured-frame corrections are complete:
-combined driver checks passed 114/114 on Node 26.5.0 and 22.23.2. Repository checks
-passed 773/773. Do not repeat completed implementation or call fixtures native proof.
+trust/readiness implementation, captured-frame fixes and review-required trust-overlap
+correction are complete offline in snapshot `r11`: combined driver checks passed
+115/115 on Node 26.5.0 and 22.23.2. Repository checks passed 773/773. Before retained
+admission or any native retry, verify the r11 hashes and focused RED→GREEN evidence
+for both trust levels. The whole pinned trust surface, including its footer, must
+match; extra text cannot qualify fallback or receive keys. Do not repeat completed
+implementation or call fixtures native proof.
 
 `metadata-02` passed core config/model/preset checks and clean cleanup in 11.378
 seconds, with an auditable projection. `codex_apps` has 194 tools, including
@@ -85,7 +89,7 @@ pilot-01; its unused bootstrap reservation stays charged. Never reset/refund the
 budget. The exact approved Linear search/decline operation persists; the observed
 `linear.search` name is not permission to substitute another operation.
 
-After approval: verify the final r10 driver/checks and metadata-02 evidence → one
+After approval: verify the final r11 driver/checks and metadata-02 evidence → one
 fresh no-inference `readiness-02` with untrusted → only its exact eligible trust
 prompt permits one trusted `readiness-03` → one `pilot-02` → the seven independent
 cases → available exclusions. Retained metadata admission and clean cleanup are
@@ -743,9 +747,19 @@ reported as native capability evidence.
 
 Completed through `59e468e` execution: source audit, metadata/core-app separation,
 95 s scoped deadline, trust/readiness driver, 112 pre-run checks and both native
-attempts. Offline captured-frame corrections bring the combined checks to114/114.
-Keep all prior evidence. Completed steps below are retained requirements, not work
-to redo; execution resumes at verified retained admission and readiness-02.
+attempts. Captured-frame fixes passed 114/114; the subsequent trust-overlap review
+correction passed 115/115 on both runtimes. Keep all prior evidence. Completed
+steps below are retained requirements, not work to redo. Execution first verifies
+the r11 correction and focused RED→GREEN logs, then retained admission and readiness-02.
+
+- [x] **Correct trust-overlap admission offline before retry.** The review of
+  `564bf02` found a substring trust match that bypassed modal rejection. Match
+  the entire pinned trust surface, including its native footer, before allowing
+  fallback or input. Test additional login, approval and arbitrary modal content
+  above and below it at both trust levels: unknown, no fallback and no keys. Keep
+  the exact valid prompt passing. Focused regression failed before the correction
+  and passed afterward; combined checks passed 115/115 on both runtimes. Verify
+  snapshot r11 and this evidence before the next unchecked step.
 
 - [ ] **Verify source and retained state.** Read `tui-readiness-source.json`, exact
   pinned files/snapshots and `6d0751d`. Confirm the remote-untrusted skip and

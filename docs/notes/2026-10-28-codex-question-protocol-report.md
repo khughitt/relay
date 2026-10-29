@@ -80,7 +80,10 @@ Raw evidence: `runs/readiness-01/raw.jsonl`, SHA-256
 diagnosis. `probe/fixtures/readiness-01-screen.json` preserves the captured frame
 with the owned workspace replaced by a named placeholder and its raw-source hash.
 The remaining code accepts only the captured status-line shape for the exact
-owned path; unknown prompts/modals retain precedence. Model/mode text never
+owned path. Independent review then found that the trust substring branch could
+bypass extra prompt/modal content. Snapshot r11 fixes this by matching the whole
+pinned trust surface, including its native footer; extra content fails closed.
+No overlap was observed natively. Model/mode text never
 replaces native identity, policy, provenance or Plan-mode proof.
 
 The 44 recorded owned child/command processes were verified gone. Private/runtime
@@ -99,9 +102,17 @@ checks passed 112/112 on Node 26.5.0 and 22.23.2; repository `just test-fast` pa
 773/773 and `just check`/`tasks check` passed. That pre-run driver is snapshot `r9`.
 
 After readiness-01, two regressions reproduced the captured status-line rejection
-and stale missing-thread reason. Both went RED→GREEN. The final combined checks
+and stale missing-thread reason. Both went RED→GREEN. The r10 combined checks
 passed **114/114 on both Node versions**. The fake screen now includes the observed
 status line; snapshot `r10` includes that fixture and the captured-frame regression.
+Review of `564bf02` found one Important trust-overlap defect and its plan
+consequence. A focused regression reproduced the unsafe classification, then
+passed after the whole-screen trust match. It covers extra login, approval and
+arbitrary modal content above/below trust at both trust levels, with no fallback
+or keys; valid trust still passes. Snapshot `r11` passes **115/115 on both Node
+versions**. The retry plan requires verifying this correction and RED→GREEN
+evidence before retained admission or another native attempt.
+
 These are offline corrections, not a retroactive native readiness pass. No
 executable repository code, dependency, production connector or host setting changed.
 
@@ -150,7 +161,7 @@ user-present phone answer/defer acceptance are complete.
 ## Retained history
 
 The task retains native metadata-02/readiness-01 bytes, observations, captured
-fixture, r9/r10 driver snapshots, RED/GREEN logs and full reviews. Prior report
+fixture, r9/r10/r11 driver snapshots, RED/GREEN logs and full reviews. Prior report
 `6d0751d` records metadata-01's omitted response and pilot-01's trust interruption;
 `f4c5448` records the inventory page-limit stop; `aac3954` records the earlier
 transport/inventory correction. Approved spec `741a546` still governs all gates.
