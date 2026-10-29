@@ -1,4 +1,93 @@
-# Codex question connector: readiness stopped on a driver classifier defect
+# Codex question feasibility: readiness-02 stopped at resume
+
+## Current outcome after approved 995a04e
+
+`readiness-02` ran on Codex 0.165.0 with saved untrusted in the owned private
+workspace. Its original result is **failed / rpc-error**; the required readiness
+capability remains **unknown**, not disproved. It ran from
+2026-10-29T17:09:09.800Z to 17:09:17.070Z and charged 7,272 ms. No keys, trust
+acceptance or model turns occurred. No fallback, pilot or matrix case followed.
+
+The corrected classifier passed the native empty composer. Three discovery polls
+found exactly one new thread. `thread/read` returned the expected id, workspace
+and gpt-6-astra model; refreshed config/read with layers passed policy checks.
+The next request, id 13, was `thread/resume` with that id and `excludeTurns:true`.
+Its reply was an error. The driver retained only `error:"redacted"`, so neither
+numeric code nor cause can be recovered from this capture. The original error
+and failed result are preserved without reinterpretation as a native contract pass.
+
+Raw SHA-256: `4c9397bec1a068d629dfee5af91559b59176c5aae3655345368b3ba10aafceee`.
+`readiness-02-observations.json` records the controller interpretation separately.
+All evidence hashes matched; all seven recorded owned PIDs were gone, both
+private and runtime paths were removed, and cleanup had no survivors/errors.
+The controller detected no auth-file change or refresh request. No process remains.
+
+Budget is **353,341 ms (5 min 53.3 s), two charged turns**, active false. Only one
+native turn was observed historically, in pilot-01; its unused reservation and
+the earlier diagnostic charge stay counted. No budget extension or refund occurred.
+
+## Source audit and limits
+
+`linear-resume-source-audit.json` retains hashes and the paths inspected.
+`thread_processor.rs:4624–4662` shows even loaded-thread resume reads the stored
+thread before its configuration snapshot. Missing stored threads map to a
+no-rollout error at lines 6443–6455; other errors can also propagate. Source notes
+that fresh-thread history may be unmaterialized before a first user message.
+This supports a hypothesis, not the observed cause: the actual message was redacted.
+No Codex defect, persistence repair or inference bootstrap is established/authorized.
+
+The requested Linear name trace reaches a connector-aware path:
+
+- `rmcp_client.rs:866–918` routes Codex Apps tools through connector-name/id
+  normalization while preserving the raw MCP tool definition.
+- `codex_apps.rs:31–70` sanitizes the raw name, strips a matching connector prefix,
+  and constructs the namespace from server and connector when provided.
+- `tools.rs:113–218` applies prefixing, sanitization and collision/length handling;
+  its canonical name is a namespace/name pair. `protocol/tool_name.rs` formats
+  that pair by concatenation.
+
+With connector name Linear, prefix enabled and no collision, the raw name
+`linear.search` yields namespace `mcp__codex_apps__linear` and callable `_search`;
+the display string equals the approved `mcp__codex_apps__linear_search`. This is
+strong conditional evidence, not proof of the private account's actual mapping:
+connector/callable identity was not retained, and display formatting does not by
+itself establish the external harness's flattened-name mapping. The exact schema
+and approved argument compatibility remain absent. No alias or new app call is admitted.
+
+The schema path is also traced: `tools/list` supplies tool definitions through
+`rmcp_client.rs:717–773`; catalog listing retains them; `mcp/mod.rs:713–727,817–870`
+serializes the raw tool into protocol Tool. `ToolsAndAuthOnly` drops resources only.
+`protocol/mcp.rs:390–427` retains inputSchema but permits a missing schema as null.
+Thus this status path does not deliberately remove schemas for deferred model
+loading. Our projection definitely removed this name's schema field; actual backend
+omission/null is still possible. A future approved capture must verify the bytes.
+
+## Proposed next step, separately reviewed
+
+The companion revision proposes offline tests and a narrowly scoped safe error
+projection, then one zero-inference untrusted `readiness-03`. Retain only numeric
+code and exact source-literal error classes for thread/resume; all arbitrary text
+and data stay redacted. Stop after that run, even on success. There is no trusted
+fallback, pilot, metadata retry or app operation in that diagnostic authorization.
+
+Why: it measures the currently hidden failure before changing native behavior.
+Cost: up to another 120 seconds, with no model turns, and an unclassified error
+may still leave the cause unknown. Rejected alternatives are guessing a missing
+rollout, adding inference to materialize history, or repeating the unchanged capture.
+The frozen diagnostic plan requires user review before its execution.
+
+No driver code changed after r12. Its 119/119 checks on Node 26.5.0 and22.23.2
+remain applicable; repository baseline773/773 was reused because executable code
+and dependencies are unchanged. This documentation/source audit adds no test claim.
+Required native readiness is still incomplete; Plan provenance/mode/receipt,
+forms/exclusions, join, races/defer, recovery, connector and phone acceptance remain
+unproved or unimplemented. The parent remains open and the branch stays unmerged.
+
+## Historical report through 995a04e
+
+The following sections preserve the earlier checkpoint. Their proposed retry was
+executed only as described above and is now exhausted; they grant no current retry.
+
 
 Approved feasibility plan `59e468e` ran through one corrected metadata diagnostic
 and one untrusted no-inference readiness attempt. The private TUI skipped trust,
