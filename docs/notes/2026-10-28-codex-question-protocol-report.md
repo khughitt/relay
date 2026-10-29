@@ -11,7 +11,7 @@ production implementation and phone acceptance remain owed.
 ## Verified work and its limits
 
 Task 1 (relay-dc1f42) contains the disposable probe driver and its safety checks:
-81/81 focused tests passed on Node 26.5.0 and Node 22.23.2; the fresh repository
+82/82 focused tests passed on Node 26.5.0 and Node 22.23.2; the fresh repository
 `just test-fast` run passed 773/773. The recorded full-suite baseline also passed
 773/773. The tests cover bounded framing/RPC, explicit child environments,
 access-only authentication, refresh refusal, source-login change detection,
@@ -34,7 +34,11 @@ problem, including an actual filesystem permission failure. Corrections count
 exact persisted bytes with space reserved inside the cap for a verdict, continue
 independent cleanup stages with a failed result, and conservatively validate the
 exact approved argument object. Unsupported schema constraints fail closed. The
-81-test suite includes these corrections; the original native evidence is unchanged.
+82-test suite includes these corrections. A scoped review additionally found that
+oversized peer metadata could exceed the reserved verdict space; its regression
+reproduced the missing result, and the corrected driver measures the exact
+serialized result and substitutes a bounded failure envelope preserving cleanup
+outcomes and diagnostic codes. The original native evidence is unchanged.
 
 The pilot orchestration exists but has not run against a real model. Later matrix
 cases are not yet implemented: they are deliberately refused until the pilot
@@ -153,8 +157,10 @@ and listener equivalence still says nothing about lifecycle/recovery equivalence
 
 relay-a27e7c owns the raw task scratch and portable attachments. Current evidence:
 
-- Current corrected driver snapshots `r5-run.mjs`, `r5-probe.test.mjs` and
-  `r5-fake-child.mjs`, with `review-fix-dev.log`, `review-fix-node22.log`,
+- Current corrected driver snapshots `r6-run.mjs`, `r6-probe.test.mjs` and
+  `r6-fake-child.mjs`, with `verdict-fix-dev.log`, `verdict-fix-node22.log`,
+  `verdict-fix-fast.log`, `verdict-size-red.log`, `verdict-size-green.log`,
+  and earlier `review-fix-dev.log`, `review-fix-node22.log`,
   `review-fix-red.log`, `cleanup-fault-red.log` and `review-fix-green.log`.
   Unchanged modules and prior snapshots: `r4-*.mjs`, `r4-cases.json`,
   `task1-r4-dev.log`, `task1-r4-node22.log`,
