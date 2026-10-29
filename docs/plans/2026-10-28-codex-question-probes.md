@@ -12,14 +12,14 @@
 
 ## Scope and phase boundary
 
-This resumes the feasibility phase after the private-TUI trust blocker under plan
-`91c1c14`, recorded in frozen report `6d0751d`. The user endorsed the next direction
-and the additions from reviewer `claude/claude-opus-5-5`; this new plan still requires
-its own frozen review before any driver change, trust setting or native retry.
-This revision corrects the startup-screen finding against proposed plan `da4a8a8`;
-that proposal was not approved for execution. The earlier transport blocker
-under `3b668d5` is resolved for the
-private handshake/initialize prerequisite only. The approved spec makes
+This resumes after approved plan `59e468e` ran metadata-02 and readiness-01.
+The companion protocol report records a disposable-driver classifier defect:
+normal composer status text was rejected, then a stale flag mislabelled the stop.
+The defects are corrected offline against the capture. This new frozen revision
+requires separate user approval before any further native run. It is not a retry
+under the earlier approval. The earlier private transport prerequisite remains
+proved; no production connector is authorized by this amendment.
+The approved spec makes
 provenance, receipt, decline and reconciliation prerequisites of production work.
 The generated types establish field shapes, but do not prove those prerequisites.
 This plan therefore ends with a verdict and either a concrete production-code plan
@@ -58,46 +58,48 @@ authorized by this phase.
 
 ## Resume state and ordering
 
-The approved spec remains `741a546`. Read frozen report `6d0751d` and verify
-retained hashes before edits. Task 1 stays complete. Task 2's metadata/core-app
-split and scoped MCP deadline are implemented; final disposable-driver checks
-passed 98/98 on Node 26.5.0 and 22.23.2, and repository checks passed 773/773.
-Do not repeat completed implementation or treat fixtures as native capability.
+The approved spec remains `741a546`. Read the companion frozen protocol report
+and verify retained hashes before any execution. Task 1 stays complete. Task 2's
+trust/readiness implementation and its captured-frame corrections are complete:
+combined driver checks passed 114/114 on Node 26.5.0 and 22.23.2. Repository checks
+passed 773/773. Do not repeat completed implementation or call fixtures native proof.
 
-`metadata-01` passed core config/model/preset checks in 9.7 seconds, but reported
-app unknown. Its full MCP response was omitted by the credential-vocabulary
-filter: `linear-tool-unmatched` suggests the in-memory path found a server, but
-neither that server nor its tools can now be independently checked. A naming
-mismatch is a hypothesis, not an established cause. The corrected capture is
-fixture-verified only. `pilot-01` completed one Default control turn and effective
-Default resume; its TUI remained at Folder access. The controller stopped it
-without accepting trust. No question/receipt or dependent matrix case ran.
+`metadata-02` passed core config/model/preset checks and clean cleanup in 11.378
+seconds, with an auditable projection. `codex_apps` has 194 tools, including
+`linear.search`; neither exact approved tool name matched. App remains unknown,
+not an authorized alias or schema proof. `canRunPilot(metadata-02)` passed with
+verified evidence. No metadata retry is authorized by this revision.
 
-Continue **253,783 ms and two charged turns**, including the earlier 40,000 ms
-conservative diagnostic charge. Only one native turn was observed; the unused TUI
-bootstrap reservation stays charged. Never reset or refund the budget. The exact
-approved Linear search/decline operation persists; this revision adds no tool
-invocation or alternative tool/argument approval.
+`readiness-01` used saved untrusted, displayed no trust prompt and created one
+native thread with the expected cwd/model. Its original unknown result is
+`tui-thread-unobserved` after 40 polls. The capture instead establishes that a
+normal model/workspace status line prevented composer recognition, while an early
+missing-id flag was not cleared. Required thread/read and resume policy checks
+were never reached. Both driver defects are fixed offline; the original result
+stays unchanged. No model turn or keystroke ran. A complete readiness pass is
+still unproved, and the paid `pilot-02` has not been attempted.
 
-After approval, run: fake trust/readiness/capture checks → one corrected metadata
-retry (`metadata-02`) → no-inference readiness with `untrusted` → only its narrow
-eligible fallback, readiness with `trusted` → one paid pilot retry (`pilot-02`) →
-`join`, `forms`, `race`, `clear`, `defer`, `reconnect`, `restart` → available
-exclusions. Metadata's safe core plus clean cleanup remains required, while app
-unknown alone does not block readiness/pilot. Readiness must pass independently.
-Only the pilot's native provenance/mode/exact-receipt success admits later cases.
-Any other unsafe or unknown prerequisite stops dependent execution.
+Continue **346,069 ms and two charged turns**, including the earlier 40,000 ms
+conservative diagnostic charge. Only one native turn was observed in the earlier
+pilot-01; its unused bootstrap reservation stays charged. Never reset/refund the
+budget. The exact approved Linear search/decline operation persists; the observed
+`linear.search` name is not permission to substitute another operation.
 
-Gate 2 and every production/activation gate remain required. A metadata match is
-not an app-approval example. Missing app approval still prevents an overall pass,
-even if every independent case succeeds. No new general directory scan, managed
-login, feature enablement, live-config copying or unlisted retry is authorized.
+After approval: verify the final r10 driver/checks and metadata-02 evidence → one
+fresh no-inference `readiness-02` with untrusted → only its exact eligible trust
+prompt permits one trusted `readiness-03` → one `pilot-02` → the seven independent
+cases → available exclusions. Retained metadata admission and clean cleanup are
+necessary but never replace each fresh server's own core/auth/model/policy checks.
+A readiness failure/unknown stops; no additional readiness attempt, configuration
+repair or metadata scan is included. Only pilot provenance/mode/exact-receipt
+success admits later cases. App unknown alone still does not block safe independent
+learning, but gate 2 and all production/activation gates remain required.
 
-Why include metadata now: its corrected projection can make the naming question
-auditable without another review round. Cost: the previous attempt took about
-10 seconds, but this one may consume its full 120-second case allowance. Rejected
-alternative: defer that read-only diagnostic behind a separate plan. Private
-trust/readiness is the only newly allowed configuration work, scoped below.
+Why prepare this retry: the localized driver defect is reproduced from the actual
+frame and corrected offline. Cost: another bounded readiness attempt may remain
+unknown and use up to 120 seconds, with no inference; the unchanged aggregate cap
+still wins. Rejected alternatives are taking an unlisted immediate retry, relaxing
+native thread/policy proof, or repeating the completed metadata diagnostic.
 
 hq-d85ede recorded WebSocket and Plan-only blocking on 0.162.1; retain that
 provenance and current-version source candidate. Shared-listener source proves
@@ -322,7 +324,9 @@ Recognize `ready` from the required empty `› Ask Codex to do anything` compose
 line and matching `? for shortcuts` footer variant, with no active startup/busy
 status, prefilled input or modal. The placeholder is fixed in
 `chatwidget.rs:2101`; use the pinned empty/default/Plan composer fixtures for the
-input area. A glyph or footer alone is insufficient. Notices above the composer
+input area. Permit the captured model/workspace status line between composer and
+footer only for the exact owned path; it is UI decoration, not mode/model proof.
+A glyph or footer alone is insufficient. Notices above the composer
 are not whole-screen match requirements: welcome banners, empty-state animation,
 and a completed `MCP startup incomplete` warning may coexist with readiness.
 Retain warnings in bounded evidence, separate from an active MCP startup status;
@@ -470,7 +474,9 @@ isolation and safety prerequisites still apply before any non-app turn.
 
 ### Focused metadata diagnostic and admission
 
-Use one fresh corrected-capture `metadata-02` retry, no TUI, `thread/start`, `turn/start`, tool invocation,
+Historical metadata-02 used the diagnostic below and is complete; this revision
+authorizes no further metadata case. Verify its retained verdict and hashes for
+admission, while each fresh case repeats its own core checks. The diagnostic uses no TUI, `thread/start`, `turn/start`, tool invocation,
 app operation or account configuration change. Keep the same empty private home,
 access-only auth, private prompt-policy configuration, caps and cleanup. Do not
 copy live config, MCP credentials, plugin state or refresh tokens. The reviewer's
@@ -581,7 +587,7 @@ server; a previous result never overrides a fresh failure. Any other unknown or
 failure stops dependent runs. An optional `app/read` timeout leaves its association
 unknown; any unsafe channel failure still stops the whole run.
 
-After the diagnostic and passed no-inference readiness, retry the pilot once. Only its native provenance, mode and exact
+After verified metadata-02 admission and a fresh complete no-inference readiness pass, run pilot-02 once. Only its native provenance, mode and exact
 receipt success admits the seven app-independent cases. Run them in the stated
 order within the existing budget; stop dependent cases at any required unknown or
 failure. Do not use the diagnostic to authorize a question response. At the end,
@@ -607,10 +613,10 @@ only the single metadata `mcpServerStatus/list` request and historical inventory
 The original authorization remains at most 30 minutes of cumulative live probe wall time
 and 30 model turns on the existing subscription, including pilot and retries;
 it does not authorize buying credits or API use. The earlier 15–30 minute estimate
-is provisional, not evidence that the full matrix fits this allowance. Active per-case
+is provisional, not evidence that the full matrix fits this allowance. Listed per-case
 ceilings total 74 minutes before cleanup when both readiness variants are needed, so an extension may be needed. Keep the
 30-minute/30-turn cap unchanged; no token-cost estimate is claimed. Persist cumulative time/turn counts
-across runs and resumes, continuing from 253,783 ms and two charged turns. Charge native
+across runs and resumes, continuing from 346,069 ms and two charged turns. Charge native
 transport, metadata, readiness and historical inventory time as well as inference; no case gets a new budget.
 Reserve 60 seconds of remaining aggregate allowance for cleanup; refuse a launch
 with no execution time left after that reservation. End work at the earlier of
@@ -735,18 +741,22 @@ per case and a report mapping each approved spec gate to exact native fields,
 captured ordering, supported versions and verdicts. No synthetic fixture may be
 reported as native capability evidence.
 
-Completed prerequisites under `91c1c14`: source auth/discovery audit, metadata
-core/app separation, request-local 95 s deadline and capture projection. Keep their
-98 checks and prior failed/native evidence. The changes below are the new work.
+Completed through `59e468e` execution: source audit, metadata/core-app separation,
+95 s scoped deadline, trust/readiness driver, 112 pre-run checks and both native
+attempts. Offline captured-frame corrections bring the combined checks to114/114.
+Keep all prior evidence. Completed steps below are retained requirements, not work
+to redo; execution resumes at verified retained admission and readiness-02.
 
 - [ ] **Verify source and retained state.** Read `tui-readiness-source.json`, exact
   pinned files/snapshots and `6d0751d`. Confirm the remote-untrusted skip and
   pre-prompt thread-start paths apply to the selected CLI/socket. Preserve the
-  live-config count as reviewer observation. Check budget 253783 ms/two turns and
+  live-config count as reviewer observation. Check budget 346069 ms/two turns and
   all retained hashes before launch. Never rewrite old results or reset counters.
-- [ ] **Write failing trust/readiness tests** in `probe/probe.test.mjs`, with
+- [x] **Write failing trust/readiness tests** in `probe/probe.test.mjs`, with
   synthetic screens in `probe/fake-child.mjs` and pinned composer/trust snapshots
-  under `probe/fixtures/`. Test exact owned-path trust only; parent/root/symlink
+  under `probe/fixtures/`. Preserve captured `readiness-01-screen.json` and its
+  raw-source hash: the owned model/workspace status line is not typed input.
+  Test exact owned-path trust only; parent/root/symlink
   targets reject; both trust levels retain explicit policies; trusted post-action
   drift or unknown config stops before a turn. Untrusted success never escalates;
   only clean exact `untrusted-trust-prompt` admits one trusted attempt. An unknown
@@ -755,22 +765,25 @@ core/app separation, request-local 95 s deadline and capture projection. Keep th
   them. Test placeholder header → single/multiple MCP startup → ready progression
   without keys or charged turns before readiness; startup plus a visible composer
   stays starting. Ready composer with varying welcome/animation/warning history
-  stays ready; retain MCP warning evidence without passing the app gate. Match
+  stays ready; the captured model/workspace status line for the exact owned path
+  is accepted without treating it as native mode/model proof. Retain MCP warning
+  evidence without passing the app gate. Match
   active input/status regions, not quoted startup/composer text in history.
   Missing/ambiguous/disappeared native thread receives no `/plan` or
   model input and consumes no turn. A previous control thread cannot qualify.
-- [ ] **Pin timing and failure assertions.** Fake clocks prove poll starts are
+- [x] **Pin timing and failure assertions.** Fake clocks prove poll starts are
   at least 500 ms apart, intervals 500/1000/2000 ms capped, no overlap, at most 40 calls,
   readiness ends by 90 s even inside case 120 s, and earlier aggregate exhaustion
   wins. Empty first paint is bounded 5 s; starting and unclassified noninteractive
   paint never reset the 40-request/90-second bound or trigger trust escalation.
   A startup stall ends unknown with zero turns; an unknown prompt/modal stops
   immediately without keys. A startup warning followed by the ready composer
-  does not itself stop or authorize the app control.
+  does not itself stop or authorize the app control. A later native id clears an
+  earlier missing-id flag, without qualifying an unready screen or resetting limits.
   Refreshed config/resume mismatch, refresh request, capture overflow, private
   auth persistence and cleanup errors invalidate readiness and prevent the pilot.
   Assert failure terminal/protocol evidence is saved without credentials.
-- [ ] **Test corrected metadata evidence before retry.** Retain the existing
+- [x] **Test corrected metadata evidence before retry.** Retain the existing
   projection regression; add an exact-name miss whose server is present, absent
   server, case/prefix naming variants and multiple matches. Capture identifiers
   and available status/schema evidence without credential-bearing prose. If the
@@ -778,15 +791,15 @@ core/app separation, request-local 95 s deadline and capture projection. Keep th
   explicit evidence limitation, never a passed app prerequisite. No alias becomes
   authorized by resemblance; schema and identity still must match the approved
   search. Test projected/cached/partial evidence cannot replace authoritative data.
-- [ ] **Run RED** through `just test-one` on the changed probe test file and retain
+- [x] **Run RED** through `just test-one` on the changed probe test file and retain
   the named missing-behavior failures. Do not edit runtime code before those tests.
-- [ ] **Implement the bounded gate** in `probe/run.mjs`: the explicit trust-level
+- [x] **Implement the bounded gate** in `probe/run.mjs`: the explicit trust-level
   option, isolated workspace, pure screen classifier, serial readiness loop,
   effective config/thread checks, `RunResult.readiness`, and failed-pane capture.
   Add `readiness:120` in `probe/cases.json`. Use the established RPC/cleanup/capture
   code; no new framework/dependency. Remove the blind `/plan` and bootstrap path;
   the paid pilot uses the same positive gate before input. Keep old evidence intact.
-- [ ] **Run GREEN and checkpoint.** Run the combined probe/codec/history files
+- [x] **Run GREEN and checkpoint.** Run the combined probe/codec/history files
   through `just test-one` on development Node and Node 22, recording versions and
   counts. Obey the invoking checkout's validated `.tt.toml`: policy-off means
   focused tests plus hygiene, no broad rerun; absent/enabled means the documented
@@ -796,19 +809,18 @@ core/app separation, request-local 95 s deadline and capture projection. Keep th
   configured gpt-6-astra, auth lifetime, private ownership and remaining budget.
   The private workspace starts empty with no project layers that could run code
   upon trust. Do not connect to the live daemon or use the desktop.
-- [ ] **Retry metadata once:** `--case metadata`, fresh `runs/metadata-02`, harness
-  timeout 180 s; existing case 120 s/MCP 95 s/other RPC 15 s remain. Inspect the projection,
-  exact identifiers, policy and core/app verdicts. Preserve naming differences as
-  evidence, never choose another operation. Record `canRunPilot`, hashes and clean
-  cleanup. Unsafe core/channel/capture/budget stops all; app unknown alone permits
-  readiness. No second metadata attempt is authorized.
-- [ ] **Prove readiness without inference:** `--case readiness --trust-level
-  untrusted`, fresh `runs/readiness-01`, harness 180 s. No `/plan`, prompt or charged
-  turn. Read verdict, captures, native thread, effective policy and cleanup.
-  Only the exact eligible untrusted prompt outcome allows one fresh
-  `runs/readiness-02 --trust-level trusted` under the same bounds. Record the chosen
-  level; any other failure/unknown stops without a paid pilot. These cases share
-  the original budget and each has its own fresh private server/home/workspace.
+- [ ] **Verify retained admission, without another diagnostic.** Hash-check
+  `runs/metadata-02` and its original result; require `canRunPilot` true and complete
+  cleanup. Preserve the exact-name mismatch and the schema evidence limit. Any
+  missing/corrupt evidence or failed core admission stops; do not repeat metadata
+  or qualify `linear.search` by resemblance.
+- [ ] **Retry readiness once without inference:** `--case readiness --trust-level
+  untrusted`, fresh `runs/readiness-02`, harness 180 s. Use the corrected matcher
+  and captured-frame regression, with no `/plan`, prompt or charged turn. Require
+  composer plus native thread/read/resume policy and cleanup. Only a clean exact
+  `untrusted-trust-prompt` permits fresh `runs/readiness-03 --trust-level trusted`
+  under the same bounds. Any other failure/unknown stops, with no additional live
+  readiness attempt. All cases retain fresh server/home/workspace and original budget.
 - [ ] **Retry the pilot once:** fresh `runs/pilot-02 --case pilot --trust-level
   <passed-level>`, harness 420 s, case 360 s. Repeat core and readiness checks in that
   private server; then Default control and Plan question proof. Count turns only
@@ -955,13 +967,12 @@ checked report and the next frozen artifact; never an enabled connector.
 
 ## Plan review and records
 
-This revised plan supersedes unapproved `da4a8a8` after its startup-classifier
-review finding. It is reviewed before Task 2 implements trust/readiness changes or
-runs either retry. The user endorsed the direction and reviewer additions after
-`6d0751d`; that does not replace review of this frozen revision. Task 1 stays complete,
-Task 2 resumes after review,
-and Task 3 retains the report/next-artifact obligation. Inline execution is the recommendation;
-there is no independent parallel implementation in this evidence-dependent phase.
+This amendment is reviewed before any further native run. Keith approved `59e468e`,
+whose metadata-02/readiness-01 attempts and offline driver corrections are complete.
+That approval does not authorize the additional readiness attempt proposed here.
+Task 1 remains done; Task 2 resumes with retained admission/readiness-02 only after
+this frozen revision is approved. Task 3 retains the report/next-artifact obligation.
+Continue inline execution; no independent parallel implementation is needed.
 Reuse children relay-dc1f42 (Task 1), relay-01090a (Task 2) and relay-4746ed
 (Task 3), updating their parent-plan references to this frozen revision. Preserve
 the Task 1 → Task 2 → Task 3 dependency chain; do not create replacement tasks. This is a documented workaround for tasks-85e8cd, not a
@@ -972,5 +983,5 @@ phone acceptance. Do not integrate unreviewed artifacts, activate a service or
 leave an unattended probe running across a review gate.
 
 The earlier conditional approval after `e91248b` was discharged by `91c1c14` and
-its completed runs. It does not approve this new trust/readiness amendment. Keep
+its completed runs. It does not approve this additional readiness retry. Keep
 the approved spec unchanged and preserve inline execution after separate review.

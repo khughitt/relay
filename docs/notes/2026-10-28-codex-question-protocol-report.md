@@ -1,183 +1,158 @@
-# Codex question connector: pilot stopped at private-folder trust
+# Codex question connector: readiness stopped on a driver classifier defect
 
-Plan `91c1c14` satisfied Keith's conditional approval of the deadline correction
-and was frozen before execution. Its one metadata attempt completed in 9.7 seconds;
-core safety/model/preset checks passed, while app evidence remained unknown. The
-approved independent pilot then ran one native Default control turn successfully,
-but the private TUI stayed at its folder-trust prompt. The controller stopped the
-owned driver without accepting that prompt. No question or answer receipt was
-observed. relay-a27e7c remains open; the seven dependent cases, exclusions,
-production connector and user phone acceptance remain owed.
+Approved feasibility plan `59e468e` ran through one corrected metadata diagnostic
+and one untrusted no-inference readiness attempt. The private TUI skipped trust,
+created a native thread and displayed its composer. The driver did not qualify it:
+its screen matcher rejected the normal model/workspace status line, then a stale
+missing-thread flag mislabelled the stop. The original run remains unknown. Both
+defects are fixed against captured evidence offline; no further live attempt ran.
+relay-a27e7c remains open, with Task 2 incomplete and the pilot/matrix, production
+connector and phone acceptance still owed.
 
-## Deadline and source audit
+## Native metadata-02
 
-Only the filtered metadata `mcpServerStatus/list` receives 95 seconds. Every other
-metadata request retains 15 seconds, the case retains 120 seconds, and the
-aggregate allowance remains 30 minutes/30 turns including cleanup and metadata.
-The tagged `rust-v0.165.0` source gives client creation, initialization and initial
-tool listing separate 30-second bounds. No end-to-end request bound was established;
-95 seconds is the approved precedent, not a native guarantee. Ordinary MCP calls
-retain their default deadline. The historical inventory path is not run again.
+The run lasted 2026-10-29 16:05:22.805–16:05:34.182 UTC (11.378 seconds charged).
+It used a fresh private server and access-only authentication, with no TUI, model
+turn or app invocation. One filtered `mcpServerStatus/list` request used the
+approved 95-second request allowance within the 120-second case limit; the other
+metadata calls retained 15 seconds. No directory scan or `app/read` ran.
 
-The source audit records exact URLs, hashes and line references in
-`app-auth-audit.json` and `source-0.165.0/sources.json` on the task. Host-owned
-`codex_apps` requires the Apps feature and `uses_codex_backend`; both managed
-ChatGPT and access-only ChatGPT tokens satisfy that backend predicate. Apps is
-stable/default enabled. Thus external-token login alone is not an established
-cause of missing tools. Backend entitlement, cache and account-specific exposure
-remain unresolved; no managed-login comparison or feature/config repair ran.
+Core safety/model/preset checks passed: read-only sandbox, on-request approvals,
+user reviewer, configured `gpt-6-astra`, and Plan/Default presets. The corrected
+projection retained native identifiers, so this time the account-tool observation
+is independently auditable:
 
-Threadless status collection creates an eager filtered connection, captures its
-snapshot and cancels its manager. Tool listing can use cached catalog data in some
-paths, so successful discovery alone must not be generalized into live invocation
-proof. The reviewer's live-config observation remains attributed to
-claude/claude-opus-5-5, not independently verified effective state.
+- The terminal response contains `codex_apps`, with 194 tools, 90 named `linear.*`.
+- It advertises `linear.search`, rather than either exact accepted name
+  `linear_search` or `mcp__codex_apps__linear_search`.
+- The overall result is `unknown: app-prerequisite-unproven`; the app reason is
+  `linear-tool-unmatched`, cause `unresolved`. The new name is not an authorized
+  alias. Its schema was not retained by the exact-match projection, so neither
+  argument compatibility nor operation identity is established. No tool was called.
+- This resolves the earlier missing-server ambiguity, not the app-approval gate.
+  Source still permits cache paths; metadata is not invocation or approval proof.
 
-## Native metadata-01
+Raw evidence: `runs/metadata-02/raw.jsonl`, SHA-256
+`dbbef4df94550ab8e12e7f5bff7564291d187736a4180dca83003bac1fd02fba`.
+The portable `metadata-02-observations.json` records selected identifiers and
+verdicts without copying unrelated catalog metadata into the report. Exact raw
+bytes remain private retained evidence. All recorded owned processes were reaped;
+private credentials/runtime directories were removed, no source-login change or
+refresh request was detected, and cleanup reported no errors. Independent hash,
+PID and path checks passed. `canRunPilot(metadata-02)` was true under the approved
+core/app separation. Cumulative budget then stood at 265,161 ms/two charged turns.
 
-The run lasted 2026-10-29 14:10:09.009–14:10:18.709 UTC. Private `initialize` and
-access-only login succeeded on Codex 0.165.0. Exactly one filtered MCP request was
-sent at 14:10:11.568; its processing completed at about 14:10:16.344, within both
-the old and new bounds on this attempt. Then `config/read`, one `model/list` and
-`collaborationMode/list` completed. There was no directory scan, `app/read`, TUI,
-thread creation, model turn or app invocation in this case.
+## Native readiness-01
 
-- Retained config proves read-only sandbox, on-request approvals and user reviewer.
-  The selected `gpt-6-astra` model was returned. Plan/Default presets were returned
-  with null model fields, so the configured model supplies the value. Default's
-  effective settings were subsequently checked in the pilot.
-- The driver's in-memory classification reported `linear-tool-unmatched`, cause
-  `unresolved`. Its overall result is `unknown: app-prerequisite-unproven`; this is
-  not a passed app inventory or gate-2 result.
-- **Evidence limit:** the existing credential-vocabulary filter omitted the entire
-  MCP response from capture. Its original tool names, schemas and count are not
-  available for independent inspection. Therefore the reported unmatched result
-  is a driver observation, not independently auditable native absence. Do not
-  conclude that Linear is disconnected, absent from the account, or incompatible.
-  The exact triggering content was not retained and cannot be reconstructed.
-- The remaining core responses were retained. The explicit `canRunPilot` check
-  returned true after evidence hashes and cleanup were independently verified.
-  Missing app evidence was the sole allowed exception; core safety did not rely on
-  the omitted MCP response. This follows the approved sequencing change.
+The run lasted 2026-10-29 16:06:21.563–16:07:42.470 UTC (80.908 seconds charged).
+It used `trust_level="untrusted"` for only its canonical private workspace, a fresh
+private home/server/TUI and the unchanged access-only authentication boundary.
+Core checks and workspace `config/read` with `includeLayers:true` passed before
+TUI launch. No trust prompt was seen or answered, and no keystroke or model turn
+was submitted.
 
-No refresh request or change to source login was detected. Owned processes
-2463447 and 2463379 were reaped and private/runtime directories removed, without
-cleanup errors. The budget after this case was 138,471 ms and zero turns.
+The retained protocol shows one `thread/started` notification with the expected
+cwd and model. After the initial empty loaded-thread list, the same new thread
+remained listed. Terminal captures show the native empty composer and footer,
+with a model/workspace status line between them. These are observations, not a
+complete readiness pass: the driver never reached its required `thread/read` or
+lightweight `thread/resume` policy check.
 
-## Native pilot-01
+The driver stopped at 40 readiness polls (plus one pre-launch baseline list).
+Recorded poll intervals ranged from 500 to 2,002 ms, consistent with the capped
+backoff and scheduling overhead. The readiness deadline never reset. The saved
+result is `unknown: tui-thread-unobserved`, with zero native turns and clean
+cleanup. The original result and capture are unchanged.
 
-The run lasted 2026-10-29 14:11:00.336–14:12:55.647 UTC. Its fresh core checks
-passed before inference; it did not query MCP or depend on app availability.
+Two disposable-driver defects explain that misleading stop:
 
-- One native `turn/start` was sent for the Default `READY` control. Native
-  `turn/started` arrived at 14:11:06.267 and `turn/completed` at 14:11:16.337 with
-  status `completed` and no error. Lightweight `thread/resume` confirmed effective
-  Default mode, `gpt-6-astra`, and server-supplied Default instructions.
-- Private tmux/TUI startup did not yield a second loaded thread. The driver sent
-  its planned startup keystrokes and reserved a second turn for the bootstrap
-  prompt, but no second native turn was observed. The polling loop made 1,940
-  `thread/loaded/list` calls; none established the TUI thread. This polling is
-  bounded by the case deadline but is unnecessarily frequent and does not prove
-  terminal readiness.
-- A read-only capture of this run's owned private tmux pane showed **Folder access:
-  Trust this folder?**, offering trust-and-continue or return to the command center.
-  The controller sent no answer to that prompt. No Plan question, built-in
-  provenance, native answer, correlated receipt, defer or recovery was observed.
-- The controller sent SIGTERM to the exact owned driver, PID 2487177, rather than
-  consume the remaining case allowance at a known trust prompt. The saved verdict
-  remains `unknown: interrupted`, exit 130. The separate controller observation is
-  a private-TUI onboarding blocker; it is not a finding that the native question
-  protocol is unsupported, nor a rewritten driver reason.
+1. The ready matcher accepted only shortcut/context lines below the empty
+   composer. The native `GPT-6-Astra default · <owned-workspace>` status line made
+   it reject the composer and fall through to `starting` because the header was
+   still visible. This was a classifier/fixture gap, not a Codex protocol finding.
+2. An early empty discovery set latched `missingThread` without clearing it when
+   the native id appeared. At the poll limit, that stale flag reported missing
+   thread rather than unqualified readiness.
 
-Cleanup succeeded: owned processes 2491932, 2491931, 2491930, 2491925, 2491889,
-2491888, 2487229 and 2487187 were reaped. No survivors, private credential directory,
-runtime socket directory or tmux server remained. Raw/portable evidence and the
-terminal-capture hashes were independently verified. No live daemon or desktop
-was used, and no source-login change was detected.
+Raw evidence: `runs/readiness-01/raw.jsonl`, SHA-256
+`e0f43ba0847021e313fc86f2e8265fe947d31d4b6138fa5684858ff32263a2dd`.
+`readiness-01-observations.json` separates the original result from this controller
+diagnosis. `probe/fixtures/readiness-01-screen.json` preserves the captured frame
+with the owned workspace replaced by a named placeholder and its raw-source hash.
+The remaining code accepts only the captured status-line shape for the exact
+owned path; unknown prompts/modals retain precedence. Model/mode text never
+replaces native identity, policy, provenance or Plan-mode proof.
 
-The cumulative persisted budget is **253,783 ms (4 min 13.8 s), two charged turns**,
-active false. Only **one native model turn** was observed; the unobserved TUI
-bootstrap reservation stays charged conservatively. The earlier 40-second
-conservative diagnostic charge remains included. No extension or retry is taken.
+The 44 recorded owned child/command processes were verified gone. Private/runtime
+paths were gone, no source-login change or refresh request was detected, and
+cleanup had no errors. No process was left running. The trusted fallback did not
+qualify, because this was not the exact untrusted trust-prompt outcome. The pilot
+and all dependent cases therefore did not run.
 
-## Driver verification and capture correction
+## Verification and current driver
 
-The metadata/admission regressions failed 8 of 50 before implementation and passed
-50/50 afterward. Further policy tests reproduced acceptance of automatic `auto`
-app approval, then made `auto`, `writes` and `approve` fail the core safety check.
-Combined driver/codec/history checks passed 97/97 on Node 26.5.0 and Node 22.23.2
-before native execution; repository `just test-fast` passed 773/773.
+Before native execution, ten new missing-behavior tests failed (52/62 passing),
+then passed. Two further safety regressions reproduced post-trust app-policy drift
+and incorrectly passing an omitted exact schema. The fixes made unsafe app policy
+fail readiness and omitted schema leave app unknown. Combined driver/codec/history
+checks passed 112/112 on Node 26.5.0 and 22.23.2; repository `just test-fast` passed
+773/773 and `just check`/`tasks check` passed. That pre-run driver is snapshot `r9`.
 
-After inspecting the omitted MCP capture, a synthetic tool description mentioning
-credential vocabulary reproduced the evidence loss. A small logging correction
-now retains a labelled projection of native server/tool identifiers, auth/runtime
-status, error/cache metadata and matching input schemas, omitting unrelated tool
-prose. It keeps the original response in memory for validation and keeps the
-credential filter in place. This test does not establish which field triggered the
-native omission. The original evidence remains unchanged; no native retry followed.
-Final combined checks passed 98/98 on both Node versions. The source snapshot
-and verification logs are attached as `r8` evidence.
+After readiness-01, two regressions reproduced the captured status-line rejection
+and stale missing-thread reason. Both went RED→GREEN. The final combined checks
+passed **114/114 on both Node versions**. The fake screen now includes the observed
+status line; snapshot `r10` includes that fixture and the captured-frame regression.
+These are offline corrections, not a retroactive native readiness pass. No
+executable repository code, dependency, production connector or host setting changed.
 
-Task 1 (relay-dc1f42) remains done with its earlier private transport/initialize
-proof. Task 2 (relay-01090a) remains incomplete at this native pilot blocker.
-Task 3 (relay-4746ed) records this disposition; no production plan is fabricated.
-No executable repository code, runtime dependency, production connector or host
-setting changed. All driver edits remain disposable retained probe code.
+The persisted budget is **346,069 ms (5 min 46.1 s), two charged turns**, active
+false. This turn added zero model turns. Only the earlier pilot-01 Default control
+is an observed native model turn; its unobserved bootstrap reservation remains
+charged. The earlier 40-second diagnostic charge remains included. No refund,
+budget extension or extra live attempt was taken.
 
 ## Gate disposition
 
-| Spec gate | Verdict and missing native evidence |
+| Spec gate | Current evidence and remaining obligation |
 | --- | --- |
-| 1: transport and join | Partial: private transport/initialize, access-only auth, core metadata and Default control/resume observed; TUI discovery, join and subscription isolation unproven. |
-| 2: clarification-only routing and forms | Unknown: no Plan question/provenance, forms, secret/Default-async exclusions, app approval or dedicated permission control. MCP response omission also limits independent app diagnosis. |
-| 3: receipt and races | Unknown: no exact native answer/result correlation, competing orderings, cleanup-only resolution or delayed receipt. |
-| 4: defer | Unknown: no native handback or unchanged pending turn observation. |
-| 5: reconnect/restart | Unknown: no pending replay, reconciliation barrier, daemon-generation proof, stale-answer rejection or no-client recovery. |
-| 6–7: production and phone | Not attempted: implementation/integration and user-present phone answer/defer remain later obligations. |
+| 1: transport and join | Private transport/auth/core checks remain proved; native untrusted TUI startup and one thread observed. Required thread/read/resume readiness, join and subscription isolation remain unproven. |
+| 2: clarification-only routing and forms | Unknown. Native `linear.search` name observed, but exact authorized operation/schema and real app approval unproved; no Plan question/provenance/forms or other exclusion controls. |
+| 3: receipt and races | Unknown; no exact native answer/result correlation, race, cleanup-only resolution or delayed receipt. |
+| 4: defer | Unknown; no native handback observation. |
+| 5: reconnect/restart | Unknown; no replay barrier, generation proof, stale-answer rejection or no-client recovery. |
+| 6–7: production and phone | Later obligations; not attempted or waived. |
 
-The pilot did not pass, so `join`, `forms`, `race`, `clear`, `defer`, `reconnect`,
-`restart` and exclusions did not run. All five native gates remain required before
-production planning/activation; app unknown never becomes a pass. The source mode
-rule still needs the Plan positive control and matching built-in provenance.
-Receipt search bounds and incoming-message sizing remain probe values, with no
-new native history evidence to justify production values.
+## Proposed next attempt, separately reviewed
 
-## Next decision
+The companion feasibility-plan revision prepares one fresh **readiness-02** with
+untrusted and the corrected matcher. It reuses the verified metadata-02 core/app
+verdict instead of repeating metadata. Each fresh case still repeats its own
+safety/model/auth checks. Only the original exact untrusted trust-prompt outcome
+could admit one trusted **readiness-03**; every other required failure/unknown stops.
+Only a complete readiness pass admits the still-unrun **pilot-02**, once. Its
+native provenance/mode/exact receipt pass remains required for later cases.
 
-Recommend a narrowly revised feasibility plan that handles trust for **only the
-fresh owned private workspace**, verifies TUI readiness before submitting `/plan`
-or counting a bootstrap turn, and bounds discovery polling explicitly. It should
-first test trust/readiness behavior without inference, then reattempt the pilot
-once within the remaining original budget. Any trust configuration belongs only
-to the disposable private home and needs that new frozen plan's review; this run
-neither accepted trust nor repaired settings. Keep app evidence separate and
-unknown until it is actually observed. Verify the revised capture with fake
-processes before any separately approved native metadata retry.
+Why: the defect is localized and reproduced using the actual frame, while native
+untrusted startup already avoided the prior trust blocker. Cost if wrong: another
+bounded readiness run can remain unknown and consume up to its 120-second case
+allowance, with no model turns; the unchanged remaining 30-minute/30-turn budget
+still applies. Rejected alternatives are an unlisted immediate retry, relaxing
+native readiness proof, and repeating the successful metadata diagnostic. No new
+app name, operation or arguments are authorized by this proposal.
 
-Why: the observed blocker occurs before the TUI question path, while the native
-Default control and core safety checks already work. Cost if wrong: another
-bounded pilot may expose a different onboarding or protocol blocker and consume
-more of the existing allowance. Rejected alternative: continue polling or resend
-keystrokes through an unclassified trust prompt; neither proves readiness and
-could accept an unintended native prompt. Changing the protocol gates or making
-`isBlocking` alone sufficient is not proposed.
+The new frozen plan needs user review before any further native run. Preparing it
+alongside this report makes that review concrete; it does not treat the earlier
+approval as retry permission. The parent and Task 2 stay open, Task 1 stays done,
+and Task 3 retains the evidence/next-artifact obligation. `feat/codex-question`
+stays unmerged in `.worktrees/codex-question` until the connector, native gates and
+user-present phone answer/defer acceptance are complete.
 
-The parent stays open and `feat/codex-question` stays unmerged in
-`.worktrees/codex-question`. The next owner revises the feasibility plan after
-review of this blocker; a separate frozen plan review precedes any retry. Local
-integration waits for the actual connector, native gates and phone acceptance.
+## Retained history
 
-## Retained evidence and historical context
-
-The task owns exact raw runs `metadata-01` and `pilot-01`, their portable results,
-source audit and hashes, driver/test snapshot `r8`, RED/GREEN verification logs and
-full reviews. Portable terminal evidence substitutes the owned run path; the raw
-capture remains hashed under `runs/pilot-01`. `protocol-contract-report.md` in
-scratch mirrors this report. No original omitted response is claimed to exist.
-
-Prior report `f4c5448` records inventory-03's 44.2-second first response and
-incomplete ten-page directory scan. `aac3954` records the earlier timeout blocker;
-`741a546` preserves the transport correction and mode-evidence candidate. The
-previously overlooked hq-d85ede Unix-WebSocket/Plan-only evidence remains
-acknowledged. Shared listener source does not establish live/private recovery
-equivalence. No earlier unknown is promoted to a pass by this report.
+The task retains native metadata-02/readiness-01 bytes, observations, captured
+fixture, r9/r10 driver snapshots, RED/GREEN logs and full reviews. Prior report
+`6d0751d` records metadata-01's omitted response and pilot-01's trust interruption;
+`f4c5448` records the inventory page-limit stop; `aac3954` records the earlier
+transport/inventory correction. Approved spec `741a546` still governs all gates.
+The previously overlooked hq-d85ede transport/mode evidence stays acknowledged;
+shared listener source does not establish live/private lifecycle equivalence.
