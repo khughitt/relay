@@ -1,145 +1,156 @@
-# Codex question connector: transport prerequisite blocked
+# Codex question connector: app discovery prerequisite blocked
 
-Execution of the approved plan at relay `3b668d5` stopped before authentication
-or model inference. The installed Codex 0.165.0 proxy carries raw WebSocket bytes,
-not newline-delimited JSON. This disproves the transport assumption in the
-approved addendum at `77d3aee`; it does not disprove native question routing itself.
+Execution of approved feasibility plan `7d55697` against approved spec `741a546`
+proved the private Unix WebSocket handshake and `initialize` round trip on Codex
+0.165.0. The next prerequisite, account-connected app discovery, stopped at the
+approved 15-second RPC deadline. No model turn or app operation ran. This is an
+inconclusive discovery attempt, not evidence that Linear is unavailable or that
+native question routing is unsupported. The parent relay-a27e7c remains open;
+production implementation and phone acceptance remain owed.
 
-This transport was already recorded by hq-d85ede on 2026-10-11 for Codex 0.162.1.
-The `answer-server-terminal.harness.codex` fact in hq's `facts/capabilities.toml`
-explicitly describes WebSocket over the Unix control socket. The approved spec
-cited those facts, but I overlooked that statement when designing the JSON-line
-proxy route. The current run confirms earlier evidence; it is not a newly
-discovered transport. The same fact records native refusal of the blocking tool
-in Default mode, which the revised plan must investigate as current-version mode
-evidence. The historical record has not been re-probed on 0.165.0.
+## Verified work and its limits
 
-## Observations
+Task 1 (relay-dc1f42) completed the disposable probe driver and its safety checks:
+76/76 focused tests passed on Node 26.5.0 and Node 22.23.2; the fresh repository
+`just test-fast` run passed 773/773. The recorded full-suite baseline also passed
+773/773. The tests cover bounded framing/RPC, explicit child environments,
+access-only authentication, refresh refusal, source-login change detection,
+owned-process cleanup, budgets, lightweight history, synthetic per-thread size
+failure/recovery, and rejection of stale-mode and model-silence evidence.
 
-- The worktree full-suite baseline (`just test`, Node 26.5.0) passed 773/773 tests.
-- The partial disposable driver has 19 passing focused checks on Node 26.5.0 and
-  Node 22.23.2. They exercise isolation, lifetime checks, credential suppression,
-  changed/deleted source login, time budgets, RPC matching, bounded input and
-  owned-process cleanup, including a real private tmux server with a fake TUI.
-- The initial RED run lacked the driver. Additional RED checks exposed a cleanup
-  exception when the auth source disappeared and split-chunk stderr disclosure;
-  both were fixed and rerun GREEN. These fake-process checks do not validate the
-  assumed native framing. The fake proxy spoke JSON lines and therefore missed it.
-- `inventory-01` launched the installed foreground server on a private Unix socket
-  and its supplied proxy. Sending JSON-line `initialize` yielded no response within
-  the 15-second RPC limit. It sent no authentication message, opened no TUI and
-  started zero model turns. All three owned processes were reaped; private state
-  was removed. That run charged 15,541 ms and zero turns. The persisted budget now
-  conservatively adds 40,000 ms for the two bounded transport diagnostics whose
-  exact durations were not recorded: 55,541 ms charged in total, still zero turns.
-- A separate, unauthenticated check sent an HTTP WebSocket Upgrade through the same
-  proxy and received `HTTP/1.1 101 Switching Protocols`, the expected RFC sample
-  acceptance key, and the server's frame-size header. Both processes were reaped.
-  Its first attempt failed before the socket appeared because the fresh Codex home
-  had not been created; that failed result is retained too.
+Native `transport-01` passed before real-wire-derived fake-process fixtures were
+built. It opened an owned private foreground server, validated the Upgrade,
+received `initialize`, confirmed the private Codex home, and closed cleanly.
+The peer advertised 16,777,216 bytes; the driver retains its stricter local caps
+(1 MiB outbound, 8 MiB incoming). This run read no authentication source and
+started no TUI or model. Its raw wire capture is retained. Post-initialize fake
+scenarios are explicitly synthetic, not native capability evidence.
 
-The exact tagged [0.165.0 CLI source](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/cli/src/main.rs#L1478)
-passes the proxy socket to `codex_stdio_to_uds::run`. The tagged
-[Unix listener](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server-transport/src/transport/unix_socket.rs#L193)
-accepts a WebSocket handshake. Together with the native 101 response, this supports
-the transport diagnosis; it is our design error, not an identified Codex defect.
+The pilot orchestration exists but has not run against a real model. Later matrix
+cases are not yet implemented: they are deliberately refused until the pilot
+establishes native mappings. History pagination and isolation have only synthetic
+coverage. No production connector, public API or dependency changed.
 
-The 0.165.0 source also confirms the managed daemon's transport selection, without
-opening the live daemon's socket:
+## The blocked inventory
 
-- The [PID backend's command arguments](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server-daemon/src/backend/pid.rs#L392)
-  launch `app-server --listen unix://` (with a separate remote-control flag when
-  enabled). Its startup path may add the managed-daemon flag.
-- The [transport parser](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server-transport/src/transport/mod.rs#L130)
-  maps both the default Unix address and an explicit Unix path to `UnixSocket`.
-- The [app-server dispatch](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server/src/lib.rs#L832)
-  uses `start_control_socket_acceptor` for that variant. Managed operation changes
-  options such as shutdown access, not the listener's WebSocket framing.
+`inventory-02`, 2026-10-29 11:03:50–11:04:07 UTC, used the same private Unix
+WebSocket route and access-token-only login. Its result is `unknown`, reason
+`rpc-deadline`:
 
-This establishes the common listener in the tagged source. It is not a live
-daemon test or proof that recovery, authentication and lifecycle behavior are
-equivalent. Those remain native-probe obligations.
+1. `initialize` returned the expected 0.165.0 user agent and private home.
+2. `account/login/completed` reported success. The driver supplied no refresh
+   token and received no refresh request.
+3. `app/list` was sent at 11:03:52.001 UTC. An `app/list/updated` notification
+   arrived at 11:03:56.288, but the matching RPC response did not arrive within
+   15 seconds. The driver stopped and cleaned up.
+4. That notification listed eight accessible apps and did not include Linear.
+   It is a partial update, not a completed catalog or proof of absence. Tool
+   schema, effective app approval policy and model availability checks were
+   not reached. The configured model is `gpt-6-astra`; its availability in this
+   private server remains unconfirmed.
 
-## Limits and task state
+The [tagged app-list implementation](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/app-server/src/request_processors/apps_processor.rs#L186)
+loads accessible apps and the directory separately, can notify before both finish,
+and returns the RPC result only after both finish. Its load timeout is 90 seconds.
+This explains why a partial notification is insufficient and identifies a mismatch
+between the probe's deadline and the server's permitted wait. It does not establish
+which backend was slow, that waiting longer would succeed, or an upstream defect.
 
-The live attempt did not reach app inventory. Linear's read-only search exists in
-this harness's metadata; its availability and forced approval in the private native
-server remain unknown. Keith approved the exact synthetic search/decline recipe,
-retained on relay-a27e7c; that approval does not authorize another tool or a write.
-No subscription inference was used, no refresh token was copied, and no login,
-live daemon, shared launcher or host service was changed.
+Both owned inventory processes were reaped (2570855, 2570819), with no survivors;
+private credentials/runtime state were removed. Both transport processes were
+also reaped (2183596, 2183556). No live daemon socket, desktop, launcher or service
+was changed. No source-login change was detected. The persisted cumulative budget
+is **73,256 ms and zero model turns**, including the earlier conservative 40-second
+diagnostic charge, out of the existing 30-minute/30-turn allowance. No extension
+is requested by this report.
 
-Task 1 (relay-dc1f42) is **incomplete**: it contains tested safety scaffolding and
-partial pilot observation, not a verified end-to-end pilot. The current driver
-explicitly stops on unproven current-turn mode semantics and has no completed
-answer/receipt path. Its JSON-line RPC transport must be replaced after design and
-plan review. Task 2 (relay-01090a) has not started its matrix; Task 3
-(relay-4746ed) remains open for the eventual complete contract report and next plan.
-This early blocker report does not complete those children or the parent.
+## Gate disposition
 
-Only the transport premise has been investigated live. Built-in provenance,
-question-turn mode, app exclusions, forms/decline, exact receipt, races and recovery
-remain unverified. Preserve every acceptance condition; do not qualify questions
-using `isBlocking` alone or enable a permanently unconfirmed route.
+| Spec gate | Verdict and missing native evidence |
+| --- | --- |
+| 1: transport and join | Partial: private handshake/initialize/cleanup passed; ordinary TUI discovery, early/late join, settings preservation, lightweight native history and subscription isolation unobserved. |
+| 2: clarification-only routing and forms | Unknown: built-in provenance, native Plan positive control, Default/async and secret exclusions, app approval, dedicated permission example/path audit, forms and decline unobserved. |
+| 3: receipt and races | Unknown: exact accepted-answer result mapping, desktop/client orderings, cleanup-only resolution, mismatch, interruption and delayed receipt unobserved. |
+| 4: defer | Unknown: native handback and unchanged pending turn unobserved. |
+| 5: reconnect/restart | Unknown: pending replay, authoritative reconciliation completion, daemon generation, stale-answer rejection and no-client recovery unobserved. |
+| 6–7: production and phone | Not attempted: production fixture/integration suite and user-present phone answer/defer belong to later work. |
 
-## Proposed next decision
+There is no established native request/answer mapping, decline encoding, receipt
+extractor, late-join source, replay barrier, daemon-generation discriminator or
+same-call retry rule. Synthetic fixture mappings must not become production code.
+The 10-page/20-item receipt lookup is a probe bound only; a production plan must
+use observed result distance and failure behavior. No native history samples yet
+support selecting a production incoming-message cap.
 
-The [revised addendum](../specs/2026-10-28-codex-question-connector.md) recommends a
-bounded Unix WebSocket client using Node built-ins. Keeping the raw proxy would
-still require framing plus child cleanup. An embedded stdio server would change
-the shared-thread topology and is not a substitute for this task. No replacement
-transport has been implemented. User review of the revised spec comes next, then
-a revised feasibility plan and framing tests before further native probes.
+## Mode evidence prepared for the pilot
 
-The `ws` alternative is now recorded explicitly in the spec. Its direct Unix
-support and lack of mandatory runtime dependencies make it a real alternative,
-but it would be a second runtime dependency; the Node-builtins rule remains in
-force. The cost of rejecting it is maintaining framing code ourselves. The local
-Node 22.23.2 API check rejects `ws+unix:` and exposes no public `node:undici`
-module; no connection was attempted by that check.
+The retained [0.165.0 built-in handler](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/core/src/tools/handlers/request_user_input.rs)
+derives blocking status from the current turn's Plan mode. Depending on feature
+availability, Default may expose a nonblocking variant; an unavailable blocking
+variant does not mean the whole question tool must be absent. A proposed predicate
+therefore still needs native built-in call provenance, exact call correlation,
+`isBlocking: true`, matching source/version/configuration and the Plan positive
+control. No such native question has yet been observed here.
 
-The revised plan must carry these concrete requirements forward:
+`collaborationMode/list` omits developer-instruction text. The driver reads its
+Default preset values and clears overrides exactly as the
+[tagged TUI does](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/tui/src/collaboration_modes.rs#L90),
+so the server supplies current instructions. It will record the effective control
+configuration; that check was not reached. A previous turn's mode or a model
+choosing not to invoke a tool still proves nothing. These are prepared source
+candidates, not passed capability gates.
 
-1. First complete a real private-server handshake **and `initialize` round trip**
-   without authentication or inference. Build later fake transport fixtures from
-   captured real frames, with additional malformed/limit cases. The earlier 19
-   fake checks remain useful safety checks, not native transport proof.
-2. Honor the advertised frame-size ceiling in addition to local limits, including
-   a test where the peer's limit is smaller. The captured 0.165.0 header advertises
-   16,777,216 bytes; it must never increase the client's own cap.
-3. Use the source-verified common listener above as scoped transport evidence;
-   keep the prohibition on contacting the live daemon and test the remaining
-   topology/recovery obligations privately.
-4. Re-probe hq's native mode-enforcement rule as a candidate: positively identify
-   the built-in blocking tool, observe `isBlocking: true`, and demonstrate native
-   Default-mode enforcement on this version with a Plan positive control. Accept
-   either an actual attempted call and native rejection, or native evidence of
-   tool unavailability from captured tool-availability data or version-pinned
-   source applicable to the tested configuration. A model choosing not to call
-   it is not enforcement evidence. Account for mode changes and resumed/late-joined calls.
-   Only established enforcement may supply the existing Plan-mode qualification;
-   this does not permit `isBlocking` alone. Otherwise mode remains unknown.
-5. Use `thread/resume` with `excludeTurns: true`, which the saved 0.165.0
-   `ThreadResumeParams` documents as returning metadata and live-resume state
-   without populating `thread.turns`. Fetch needed history through bounded pages
-   of `thread/turns/list` and `thread/items/list`. Size the incoming message limit
-   from real responses, retaining a hard cap; an oversized response must produce
-   a visible failure for the affected thread, never a silent drop. The revised
-   plan must define thread isolation and connection recovery for this case.
+## Decision for review
 
-These are obligations for the next reviewed plan, not a plan approval or a live
-capability verdict. No probe or production code changed in this documentation
-revision, and no new daemon connection or model turn ran.
+Recommend a narrow amendment to the next frozen feasibility plan: allow only
+inventory `app/list` a **95-second RPC deadline**, give inventory a **120-second
+case deadline plus 60 seconds cleanup**, and permit one fresh read-only inventory
+attempt after fake-clock tests prove the exception and unchanged default timeout.
+The original 30-minute/30-turn aggregate budget, token-lifetime check, frame and
+capture caps, refresh refusal and cleanup rules remain unchanged. Every other RPC
+keeps its 15-second deadline. Multiple pages remain bounded by the single case
+deadline. Another incomplete inventory stops before any model turn.
 
-## Evidence retained on relay-a27e7c
+Why this alternative: it lets the native 90-second load timeout produce a response
+or error, with a small allowance for config/setup work. Cost: it can spend up to two
+minutes of the existing budget and still fail; it cannot make an unavailable app
+available. Do not adopt it silently: plan `7d55697` explicitly requires the shorter
+deadline and routes unknown prerequisites back to review. No timeout was widened
+and no retry was run in this revision.
 
-Task attachments and retained-item records locate the exact bytes, manifests and
-source URLs: `transport-check-02.json` (successful upgrade), `transport-check.json`
-(failed first setup), `transport-source-evidence.json` (tagged source excerpts and
-full-source hashes), `inventory-01-result.json`, its raw/portable capture, the
-partial driver/test snapshots, and the development/Node22/baseline test logs.
-The plan workspace ledger records the inventory-only preflight ruling. Raw task
-scratch remains owned by the open parent; no evidence or worktree was removed.
-The review revision additionally retains `hq-answer-route-evidence.json` (frozen
-hq fact snapshot and task provenance) and `transport-review-evidence.json`
-(tagged listener-selection chain, library metadata and local Node API check).
+Keeping the present limits is safe but leaves discovery inconclusive. Switching
+to `app/read` or `app/installed` would need its own metadata/identity investigation;
+no compatible Linear id or equivalent recipe has been established. Accepting an
+interim notification, substituting a different app, installing one, changing live
+account settings or skipping the app gate is rejected. The exact approved Linear
+search/decline authorization remains valid, but was not exercised.
+
+Task 2 (relay-01090a) remains incomplete at inventory; Task 3 (relay-4746ed)
+produces this blocker report, with no guessed production plan. After the user's
+decision, the owning Codex session freezes any amended feasibility plan for its
+separate review, then resumes the blocked inventory. The branch stays unmerged
+until the connector, all required gates and human phone acceptance are complete.
+
+## Earlier evidence and retained artifacts
+
+The previous report at `741a546` remains the exact record of the JSON-line proxy
+failure under plan `3b668d5`. hq-d85ede had already recorded Unix WebSocket and
+Plan-only blocking behavior on 0.162.1; that evidence was overlooked in the first
+transport design. The new run resolves only the transport prerequisite. Retained
+`transport-review-evidence.json` records the 0.165.0 common-listener source chain
+for managed daemon and private `--listen unix://`; no live daemon was contacted,
+and listener equivalence still says nothing about lifecycle/recovery equivalence.
+
+relay-a27e7c owns the raw task scratch and portable attachments. Current evidence:
+
+- `r4-*.mjs`, `r4-cases.json`, `task1-r4-dev.log`, `task1-r4-node22.log`,
+  `task1-r4-fast.log`, RED/GREEN safety logs and `transport-initialize-fixture.json`.
+- `transport-01-result.json` and `inventory-02-result.json` portable result
+  attachments; raw results/captures under retained `runs/transport-01` and
+  `runs/inventory-02`. Portable result paths replace the private runtime path.
+- `inventory-blocker-evidence.json`: exact raw/portable/result/budget/source hashes
+  and the tagged source URL. `mode-rule.json` retains mode-source references and
+  hashes. `source-0.165.0/sources.json` maps saved full source to tagged URLs.
+- `protocol-contract-report.md` is the portable task-scratch copy of this report.
+  Parent retained-item records locate manifests and owners; no raw evidence was
+  removed or replaced by a derivative. Test logs prove fixture behavior only.
