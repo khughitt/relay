@@ -12,7 +12,9 @@
 
 ## Scope and phase boundary
 
-This resumes the feasibility phase after the transport blocker in plan `3b668d5`. The approved spec makes
+This resumes the feasibility phase after the app-discovery timeout under plan
+`7d55697`. The earlier transport blocker under `3b668d5` is resolved for the
+private handshake/initialize prerequisite only. The approved spec makes
 provenance, receipt, decline and reconciliation prerequisites of production work.
 The generated types establish field shapes, but do not prove those prerequisites.
 This plan therefore ends with a verdict and either a concrete production-code plan
@@ -48,24 +50,34 @@ authorized by this phase.
 
 ## Resume state and ordering
 
-The approved transport spec replaces the disproved newline-JSON proxy assumption.
-Read the blocker report at `741a546` and the task's retained evidence before edits.
-The baseline is complete; the 19 fake-process checks passed on Node 26.5.0 and
-22.23.2 but did not establish the native wire contract. The driver is incomplete:
-it lacks a valid transport and working answer/receipt path. Preserve failed runs.
-The native attempt and diagnostics used no authentication or model turns; the
-persisted budget charges 55,541 ms (including a conservative 40,000 ms diagnostic
-allowance), zero turns. Continue this ledger; do not reset it.
+The approved spec remains `741a546`. Read the frozen blocker report at `aac3954`
+and the task's retained evidence before edits. Task 1 is complete: the corrected
+research driver passed 82/82 tests on Node 26.5.0 and 22.23.2, the repository suite
+passed 773/773, and fresh scoped review accepted the corrections. Native
+`transport-01` proved private handshake/initialize without auth or inference;
+its raw frames supplied the later fake transport fixtures. Do not repeat completed
+Task 1 work or treat those fixtures as native question evidence.
 
-Order: bounded codec checks → real private unauthenticated handshake/initialize →
-real-wire-derived fake-process checks → access-only inventory → native pilot →
-remaining matrix. The first native connection precedes fake-process transport
-fixtures, not the small unit checks needed to make that connection bounded.
-No app operation or inference occurs in the first connection test. Historical
-hq-d85ede already recorded WebSocket and Plan-only blocking behavior on 0.162.1;
-retain that provenance, but test the rule on 0.165.0. Tagged-source common-listener
-evidence is retained in `transport-review-evidence.json`; it proves listener
-selection, not managed/private lifecycle equivalence.
+`inventory-02` authenticated successfully with an access token only, then stopped
+at the approved 15-second `app/list` RPC deadline. Its interim app update does not
+establish a complete catalog or Linear's absence. The tagged 0.165.0 implementation
+permits a 90-second app-list load. The user approved the narrow timing adjustment
+recommended in `aac3954`; this amended plan still needs its own frozen review.
+
+Resume at Task 2's timeout-amendment tests, then one fresh read-only inventory
+attempt. Only after a passing complete inventory may the native pilot and remaining
+matrix proceed. Keep all failed runs. The persisted budget is **73,256 ms and zero
+turns**, including the earlier conservative 40,000 ms diagnostic charge; never
+reset it. No native question or app operation has run. Existing exact Linear
+search/decline authorization persists without widening its scope.
+
+The earlier order remains evidenced: bounded codec checks → real private
+unauthenticated handshake/initialize → real-wire-derived fake-process checks →
+access-only inventory → native pilot → remaining matrix. hq-d85ede recorded
+WebSocket and Plan-only blocking behavior on 0.162.1; keep that provenance and the
+current-version source candidate, but do not claim the live mode gate passed.
+Tagged-source common-listener evidence in `transport-review-evidence.json` proves
+listener selection, not managed/private lifecycle equivalence.
 
 ## Workspace, artifacts and interfaces
 
@@ -141,7 +153,7 @@ lower live override is the explicit isolation control below. Use `node:net`,
 | Frames | Mask every client frame with fresh randomness; reject masked server frames, RSV bits, reserved opcodes and noncanonical/unsafe lengths before allocation. Accept text fragmentation with aggregate cap, interleaved ping/pong and close. Validate UTF-8 across message fragments and close reasons; reject binary application messages, orphan continuation, nested data messages, fragmented/oversized controls, invalid close codes, truncated header/payload and EOF mid-message. Test 125/126 and 65535/65536 length boundaries. |
 | Limits | Outbound message cap `min(1 MiB, peerLimitBytes)`; never fragment to evade it. Incoming hard cap 8 MiB per frame or reassembled message, including advertised lengths checked before allocation. Maintain a 15-second incomplete-message deadline and 2-second close grace. Test smaller peer limits, chunk splits and aggregate fragmentation limits. |
 | Buffering | At most 32 in-flight RPCs and 256 queued notifications, with total queued decoded payload at most 8 MiB. Await socket drain; bound pending outbound bytes to 1 MiB. Overflow is explicit failure, not dropped events. Total persisted capture is 16 MiB per case, including wire/header/decoded artifacts; stop before exceeding it. No payload enters diagnostics on parse/limit failure. |
-| RPC | One JSON object per text message; validate object/id/method boundary. 15-second RPC deadline. Connection-local ids never become durable identity. Refresh requests abort before normal routing. Auth frames and errors are excluded/redacted as in the retained safety tests. All pending calls fail explicitly on connection loss. |
+| RPC | One JSON object per text message; validate object/id/method boundary. 15-second RPC deadline, except inventory `app/list` alone gets 95 seconds as specified in Task 2. Connection-local ids never become durable identity. Refresh requests abort before normal routing. Auth frames and errors are excluded/redacted as in the retained safety tests. All pending calls fail explicitly on connection loss. |
 
 Native `transport` starts with the 8 MiB incoming hard cap. Inventory, pilot and
 history pages record byte lengths and method names without credential content.
@@ -290,19 +302,20 @@ review; do not run an inevitably incomplete matrix or mark the class passed.
 ### Case limits and subscription budget
 
 Store numeric case-name → deadline-seconds entries in `cases.json` (matching the
-existing driver format): transport 60, inventory 60, pilot 360, join 300,
+existing driver format): transport 60, inventory 120, pilot 360, join 300,
 forms 600, exclude 600, race 480, clear 360, defer 240, reconnect 480, restart 600.
 These are ceilings per case, not a promise that all cases fit their sum. Keep the
-15-second RPC timeout separate from model-turn and delayed-receipt waits. In
+15-second default RPC timeout separate from model-turn and delayed-receipt waits;
+only inventory `app/list` uses 95 seconds. In
 `clear`, delay observation for 75 seconds within its case deadline.
 
 The original authorization remains at most 30 minutes of cumulative live probe wall time
 and 30 model turns on the existing subscription, including pilot and retries;
 it does not authorize buying credits or API use. The earlier 15–30 minute estimate
 is provisional, not evidence that the full matrix fits this allowance. Per-case
-ceilings total 69 minutes before cleanup, so an extension may be needed. Keep the
+ceilings total 70 minutes before cleanup, so an extension may be needed. Keep the
 30-minute/30-turn cap unchanged; no token-cost estimate is claimed. Persist cumulative time/turn counts
-across runs and resumes, starting from 55,541 ms and zero turns. Charge native
+across runs and resumes, continuing from 73,256 ms and zero turns. Charge native
 transport and inventory time as well as inference; no case gets a new budget.
 Reserve 60 seconds of remaining aggregate allowance for cleanup; refuse a launch
 with no execution time left after that reservation. End work at the earlier of
@@ -314,6 +327,11 @@ the case deadline plus a bounded 60-second cleanup allowance; it never replaces
 the driver's deadline or the aggregate budget.
 
 ### Task 1: Repair and verify the isolated probe driver
+
+**Completed under `7d55697`, including reviewed corrections retained with report
+`aac3954`.** The steps below preserve the original requirements and evidence
+contract; do not reimplement or rerun them merely because this plan was revised.
+Task 2 owns the newly approved timeout amendment.
 
 **Files:** Modify retained `probe/run.mjs`, `probe/probe.test.mjs`,
 `probe/fake-child.mjs`, `probe/cases.json`; create `probe/unix-websocket.mjs`,
@@ -420,6 +438,36 @@ per case and a report mapping each approved spec gate to exact native fields,
 captured ordering, supported versions and verdicts. No synthetic fixture may be
 reported as native capability evidence.
 
+- [ ] **Write timeout regressions first.** In `probe/probe.test.mjs`, use Node's
+  fake timers and a fake wire, never real model turns or 95-second sleeps. Assert:
+  an explicitly extended inventory `app/list` call remains pending at 15,000 ms,
+  accepts its matching response at 20,000 ms, and without a response rejects with
+  `rpc-deadline` at 95,000 ms (still pending at 94,999 ms). An ordinary call,
+  including `app/list` without the inventory override, still rejects at 15,000 ms.
+  Add a fake-process inventory assertion that only its `app/list` calls receive
+  the explicit extension; app/model/config/tool-policy checks remain mandatory.
+  A partial `app/list/updated` must not settle the RPC or pass inventory.
+  Extend the existing fake-clock budget test: inventory's case fails at 120,000 ms,
+  aggregate exhaustion can stop it sooner, and the 60-second cleanup reserve and
+  persisted counters are unchanged. One case deadline bounds all inventory pages;
+  a new page never starts a new case or aggregate budget.
+- [ ] **Run RED:** `just test-one "$WORK_ROOT/relay/relay-a27e7c/probe/probe.test.mjs"`.
+  Expected: failures identify the missing scoped timeout/case behavior. Preserve
+  the existing 82 checks and all four review regressions; no credential-bearing
+  fixtures or upstream daemon are involved.
+- [ ] **Implement the narrow exception.** In `probe/run.mjs`, extend the private
+  method to `Rpc.call(method, params, secret = false, timeoutMs = this.timeout)`;
+  use that request-local value when creating its response timer. Existing calls
+  retain the constructor's 15,000 ms default. Only the inventory pagination helper
+  passes `95_000`, and only when `method === "app/list"`; do not change the RPC
+  instance default, `Rpc.next`, handshake/frame deadlines, auth waits, pilot RPCs,
+  or any other method. No CLI, config or environment timeout override is added.
+  In `probe/cases.json`, change only `inventory` from 60 to 120 seconds.
+- [ ] **Run GREEN and checkpoint:** run the Task 1 combined focused command on
+  development Node and Node 22, recording each runtime and test count, then
+  `just test-fast`. Expected: all existing and new checks pass. Attach revised
+  source/test/case snapshots, keep RED/GREEN logs, and refresh retained manifests.
+  Disposable scripts remain off-tree; no production code or dependency changes.
 - [ ] **Preflight:** Re-read current hq-25665e notes for relevant results without
   taking its claim. Resolve the installed executable and versions afresh. Confirm
   the selected model exists in this installation and record it; use the installed
@@ -429,10 +477,14 @@ reported as native capability evidence.
   authentication lifetime checks and exclusion-fixture inventory above, including
   any required account-connected approval, before the first paid pilot. Record
   the approved recipe and cumulative subscription budget in task notes.
-- [ ] **Inventory before inference:** Run `--case inventory` after Task 1 passes,
-  under a 120-second harness timeout (60-second case plus 60-second cleanup).
-  Read its verdict; unavailable Linear, incompatible auth or prompt policy stops
-  before a model turn. Retain the exact effective private configuration.
+- [ ] **Inventory before inference:** Run exactly one fresh `--case inventory` attempt after the timeout
+  regression checks pass, using a new output directory such as `runs/inventory-03`,
+  under a 180-second harness timeout (120-second case plus 60-second cleanup).
+  Read its verdict; another incomplete catalog, unavailable Linear, incompatible
+  auth/schema or prompt policy stops before a model turn and returns a blocker
+  report, with no automatic retry. An interim notification is not a completed RPC.
+  Retain the exact effective private configuration. Reuse only the existing exact
+  app approval; no app invocation occurs in inventory.
 - [ ] **Pilot first:** Run the CLI with `--case pilot` in the foreground under a
   harness-tracked timeout of seven minutes (360-second case plus cleanup). Read request, native result, terminal
   capture, verdict and cleanup before adding or running other cases. Correct probe
@@ -573,7 +625,10 @@ checked report and the next frozen artifact; never an enabled connector.
 
 ## Plan review and records
 
-This revised plan is reviewed before Task 1 resumes. Inline execution is the recommendation;
+This revised plan is reviewed before Task 2 implements the timeout amendment.
+The user approved its recommendation after report `aac3954`; that does not replace
+review of this frozen revision. Task 1 stays complete, Task 2 resumes after review,
+and Task 3 retains the report/next-artifact obligation. Inline execution is the recommendation;
 there is no independent parallel implementation in this evidence-dependent phase.
 Reuse children relay-dc1f42 (Task 1), relay-01090a (Task 2) and relay-4746ed
 (Task 3), updating their parent-plan references to this frozen revision. Preserve
