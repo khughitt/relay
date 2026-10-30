@@ -26,7 +26,7 @@ export class Rpc {
         const p=this.pending.get(m.id);if(!p){if(++this.unmatched>256)fail('unmatched-limit');return;}
         this.pending.delete(m.id);clearTimeout(p.timer);if(m.error)p.reject(Error('rpc-error'));else p.resolve(m.result);return;
       }
-      if(['item/tool/requestUserInput','serverRequest/resolved','turn/completed','thread/started'].includes(m.method)) {
+      if(['item/tool/requestUserInput','serverRequest/resolved','turn/completed','thread/started','thread/status/changed'].includes(m.method)) {
         Promise.resolve(this.onMessage(m)).catch(()=>this.stop('message-handler-failed'));
       }
     } catch { this.stop('invalid-message'); }
@@ -42,14 +42,14 @@ export class Rpc {
     if(this.error)throw this.error;if(!this.wire)throw Error('not-connected');
     await this.wire.sendText(JSON.stringify(message),()=>{if(this.error)throw this.error;beforeWrite?.();});
   }
-  /** @param {string} method @param {unknown} params */
-  call(method,params) {
+  /** @param {string} method @param {unknown} params @param {(()=>void)|undefined} [beforeWrite] */
+  call(method,params,beforeWrite) {
     if(this.error)return Promise.reject(this.error);if(this.pending.size>=32)return Promise.reject(Error('rpc-limit'));
     const id=++this.serial;
     return new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>{this.pending.delete(id);reject(Error('rpc-deadline'));},this.timeout);
       this.pending.set(id,{resolve,reject,timer});
-      this.send({id,method,params}).catch(e=>{clearTimeout(timer);this.pending.delete(id);reject(e);});
+      this.send({id,method,params},beforeWrite).catch(e=>{clearTimeout(timer);this.pending.delete(id);reject(e);});
     });
   }
   async close(){this.signal.removeEventListener('abort',this.onAbort);this.stop('closed');await this.wire?.close();}

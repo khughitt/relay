@@ -42,21 +42,43 @@ Outbound messages must fit both that peer ceiling and the local 1 MiB cap; never
 fragment to evade either. Keep inbound frame/reassembly bounds separate, capped
 at 8 MiB. Shutdown aborts waits, closes sockets and cancels reconnect timers.
 
-Discover only loaded threads associated with live Codex registry rows, using
-complete paginated loaded discovery and bounded refresh, including late joins
-and new arrivals. A row is live only when its qualified process probe is alive;
-stale, replaced, missing or unknown processes do not authorize joins or retain
-subscriptions without an unsettled entry. Recheck before queued resume. Joining must preserve model, instructions, approval policy,
-workspace and collaboration mode, start no work and never resurrect an unloaded
-thread. A registry row disappearing stops new discovery; it does not establish
-an already tracked question's death. Partial pages cannot establish absence.
-Hold a thread subscription only while its registry row is live or relay holds an
-unsettled entry for it (`pending`, `answered` or `handed`). Unsubscribe otherwise,
-including after a handed entry becomes `unconfirmed`; never prolong loading only
-to await a receipt. Released, closed and terminal entries do not retain subscriptions.
-Read-only rollout receipt observation may continue after unsubscribe, within the
-existing retention/bounds. Without an observed exact protocol turn transition,
-a handed answer stays unconfirmed even if matching output later appears.
+Select only loaded threads observed `Active` with `WaitingOnUserInput`, through
+native status broadcasts or a fresh metadata read. The registry is only an
+admission/presence filter: require a matching Codex row with a qualified alive
+process, but infer neither current TUI selection nor runtime retention from it.
+Recheck waiting status, registry liveness, presence and connection ownership at
+the actual resume write. Complete bounded pagination discovers initial/late
+waiting threads; partial pages authorize no new joins or absence decisions.
+Joining preserves model, instructions, approval policy, workspace and mode and
+starts no work. Never resurrect except in this stated residual: a thread whose
+effective unload delay is shorter than relay's resume latency, whose turn ends
+and whose other subscribers all leave inside that window. Make no timing claim.
+Merged `config/read` does not bound a loaded thread's per-thread retention.
+Pinned open-source 0.165.0 first-party client callsites do not set a per-thread
+unload override; the TUI occurrences are tests. Custom clients/configuration can
+set one, so the residual is accepted rather than inferred impossible.
+
+A first join must receive a pending replay during that resume and qualify it by
+full provenance, supported form and Plan admission. Status alone carries no
+turn/item tuple. Reconnect/restart additionally requires the immutable stored
+thread/turn/item tuple; changed replay never inherits an old answer. If resume
+replays no qualifying pending request, the waiting observation is revoked, or a
+known tuple differs, unsubscribe immediately, emit only `CODEX_JOIN_RACED` and
+never retry that observed waiting episode. A genuinely new waiting episode is
+new discovery, not retry authority for the old tuple. Do not send or consume
+from a raced join. Bound the replay observation; this deadline detects failure,
+not a native unload timing guarantee. Atomic loaded-only join replaces this
+residual when supported and re-proved for an explicitly approved version.
+
+Retain a selected subscription only for its live pending question and turn.
+Unsubscribe after settlement and the observed exact turn end; never hold an
+idle thread for registry presence or receipt. Unknown/nonwaiting status cannot
+authorize new joins. Release unselected auto-attached threads on arrival,
+retaining no content. Registry disappearance stops new discovery, but does not
+prove an admitted question's death. Read-only rollout receipt observation can
+continue after release within existing retention/bounds. Without the exact
+protocol turn transition a handed answer stays unconfirmed, even if matching
+output later appears. Do not rejoin solely for receipt.
 
 Exclude the TUI's helper set before joining or publishing: ephemeral feature sources
 `"system"` and `"thread_title"` (serialized as those strings). Do not generalize this exception to arbitrary second
@@ -301,8 +323,9 @@ The evidence index pins every required source file. Required source proofs inclu
 
 1. **Transport/discovery:** private real handshake/initialize and listener source
    equivalence; complete loaded discovery, late/new arrivals, unchanged settings,
-   no work or unloaded resurrection; exact helper-set exclusion and subscription
-   release on registry/entry settlement, with post-unsubscribe receipt tests.
+   no work; accepted residual with short-override raced-join detection and no retry;
+   exact helper-set exclusion, active-waiting retention, unselected auto-attach
+   release and post-unsubscribe receipt tests.
 2. **Admission/forms:** positive built-in provenance and Plan enforcement; app,
    secret, skill, async/default and unidentified exclusions; every admitted form,
    Other/multiple items/decline; unit/source supersession and version serial proof.
