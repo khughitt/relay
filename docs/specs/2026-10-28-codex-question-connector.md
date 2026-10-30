@@ -1,11 +1,12 @@
 # Codex blocking question connector — addendum
 
-Status: receipt-evidence revision proposed; user review required before replanning.
-The user approved the transport revision at relay `741a546`, and the nontransport
-contract at `77d3aee`. This revision changes only where provenance and receipt
-evidence come from. An offline audit of the installed version's source, recorded
-at `4162b6e`, showed that the app-server protocol carries neither for the threads
-this route serves. See "Provenance and receipt from the rollout record" below.
+Status: r6 proposed; user review required before replanning or changing the reader.
+The user approved r5 at relay `cc94eaf` (spec review round 10). That remains the
+last approved contract. This revision proposes two bounded corrections established
+by scripted native 0.165.0 probes: null/empty options stay native, and a structured
+output belonging to a positively identified non-built-in call is discarded without
+invalidating unrelated built-in evidence. No correction is implemented by this doc.
+The r5 transport/nontransport architecture and remaining acceptance gates stand.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
 
 ## Intent and authority
@@ -181,8 +182,10 @@ order. Preserve the native question-id mapping in validated private route metada
 not public presentation fields. Duplicate native ids or ambiguous option labels
 make the entire call unsupported. Copy prompt, header, labels and descriptions
 within existing limits; `recommended` stays null. Native options become single
-choice with `allowOther = isOther`; null options become bounded text. No multiselect
-is invented. The route's maximum waiting period is 23 hours, as for Claude.
+choice with `allowOther = isOther`. On 0.165.0 the built-in rejects null or empty
+options before sending a request, and forces Other on admitted choices. Free text
+therefore uses Other; a null/empty-options request is unsupported and stays native.
+No multiselect is invented. The route's maximum waiting period is 23 hours, as for Claude.
 
 An answer maps back to native ids and exact labels or text. The probe establishes
 the native declined representation and receipt; never substitute a guessed empty
@@ -217,6 +220,18 @@ are plain JSONL; compression applies only to rollouts at least seven days old.
   named below. Never retain, log or forward any other content. An oversized or
   malformed line makes that read's evidence unknown; it is not skipped
   silently.
+- **Structured non-built-in outputs (r6 proposal).** Native MCP results can encode
+  `function_call_output.output` as an array of content objects. Before examining an
+  output, correlate its `call_id` to an earlier persisted call. If that exact call
+  is positively `other` under the provenance predicate, discard an array output's
+  content; retain no text, schema or answer observation for it. It cannot settle a
+  built-in call or produce `consumed`. Continue scanning subsequent lines.
+  A structured output for a built-in or an unidentified call still makes the
+  reader `unknown`. Missing/invalid call IDs, malformed JSON, file identity changes,
+  limits and all other current unknown conditions remain fail-closed. This is an
+  explicit scoped discard of known unrelated output, not permission to skip
+  malformed or unclassified evidence. String output handling and exact built-in
+  receipt equality are unchanged.
 - **Provenance.** A request qualifies only when the file holds a `function_call`
   whose `call_id` equals the request's `itemId` and whose `name` is exactly
   `request_user_input` with no namespace. App tool approvals carry the MCP
@@ -395,3 +410,56 @@ Default-mode async/new-turn delivery, `codex exec`, OpenCode, new phone UI, auto
 presence, public exposure, permission/authorization routing, persistent installation
 and daemon lifecycle management remain outside this task. None is implicitly
 delivered by this addendum or by the existing detached-question route.
+
+
+## R6 evidence, alternatives and next gate
+
+The recorded task and r5 specify native Plan-mode phone answers and defer, with
+positive provenance and exact receipt. Their intent is unchanged. The following
+calls are this revision author's proposals, not additional user approval.
+
+Native `scripted-app-02` identified `noop` in namespace `mcp__relay_fixture` as
+`other`, observed `mcp_tool_call_approval_<id>`, sent Cancel only through the
+controller, and recorded no `tools/call`. Codex then persisted a valid array
+`function_call_output.output` for that call, followed by `task_complete` for the
+same turn. The string-only probe reader became sticky `unknown`, as designed.
+Reopening it cannot help: the valid array remains in history. This blocks truthful
+capability claims for ordinary threads containing MCP history. The minimized
+observation and its raw-line hashes are attached to relay-a27e7c as
+`scripted-structured-output-observation.json`; the protocol report records runs,
+versions, limits and hashes.
+
+Approaches considered:
+
+1. **Discard only arrays belonging to a previously identified non-built-in call**
+   (recommended). The connector needs no receipt for an excluded approval; it must
+   keep answering later ordinary questions in the same thread. This keeps string
+   built-in receipt and privacy boundaries intact. Cost if wrong: a misclassified
+   call could hide evidence; the unchanged exact name/namespace predicate and
+   unknown-on-unidentified rule are therefore mandatory.
+2. **Interpret all content arrays as text.** Rejected for this slice: unrelated
+   tools have arbitrary content, and concatenating their text invents a receipt
+   mapping this version has not proved. Cost of rejection: future built-in array
+   output requires renewed evidence and review.
+3. **Keep the current reader and disable threads with MCP history.** Rejected as
+   the proposed direction: one ordinary tool permanently poisons evidence for all
+   later calls, including after a fresh read. Keeping the connector disabled until
+   review remains correct; this is not an activation waiver.
+
+After user approval of r6, a separately reviewed probe-plan revision must specify:
+
+- RED→GREEN checks for an `other` array followed by a valid built-in call/output;
+  no unrelated content retained; a built-in or unidentified array remains unknown;
+  malformed JSON/IDs and existing file/byte-limit checks retain their refusals.
+- The app control proves exclusion and no tool execution. It does not require an
+  answer receipt for an approval this route must never answer. Keep the original
+  failed attempts and reconcile their observations explicitly.
+- Apply the declared aggregate case deadline before running delayed cases.
+- Resume the remaining competition, defer, recovery and private-TUI evidence gates.
+  Sequential two-call success proves no concurrent pending-call safety; the
+  production plan must still enforce the turn-level single-question rule.
+
+No new production plan, connector, activation or phone acceptance is authorized by
+this proposed revision. The first real-model rollout check remains gate 7, and
+version evidence must match the eventual activation binary; current scripted
+0.165.0 evidence does not establish the shared launcher's 0.166.0 behavior.

@@ -1,3 +1,146 @@
+# Codex question scripted probes: structured-output blocker
+
+## Current outcome
+
+Approved scripted plan r3 (records `82be32595`, SHA-256
+`bfea9cdee60ec7eeddddf08e3da836b9483be9276541737e00e3389694ac9c14`) executed
+inline through Tasks 1–3 and Task 4's native controls. Native work stopped at a
+valid MCP rollout shape that the approved string-only reader rejects. No production
+connector or production plan was written. Tasks 5–7 remain unrun, and relay-a27e7c
+remains open. Proposed spec r6 in
+[the connector addendum](../specs/2026-10-28-codex-question-connector.md)
+requires user review before a revised probe plan or reader implementation.
+
+The failure is conservative: no unsupported answer was reported consumed. Native
+app exclusion itself was observed before cancellation; the complete gate remains
+unsettled because a legitimate MCP output makes later reader evidence unknown.
+
+## Runs and evidence
+
+| Run | Outcome | Wall time | Scope |
+| --- | --- | ---: | --- |
+| `scripted-pilot-01` | passed | 649 ms | late join, policy preservation, loaded-thread discovery, idle join, exact Blue answer in protocol/rollout/provider |
+| `scripted-forms-01` | eight subcases passed | 3318 ms | choice, Other text, three questions, decline, RPC error, null/empty options refusal, two sequential calls |
+| `scripted-exclude-01` | partial; app failed | 16593 ms | secret, Default refusal and Default async passed; old provider projection omitted nested MCP tool names |
+| `scripted-app-02` | failed reader barrier | 672 ms | corrected namespace projection reached native approval and Cancel; valid array output made reader unknown |
+
+The installed binary was explicitly pinned to `codex-cli 0.165.0`, SHA-256
+`c06a67fd8ac76508dc78bd99ce20c9f317b8d568beda59485f3f4134df9962d5`.
+The shared launcher now resolves to 0.166.0 and was never changed. These results
+establish no 0.166.0 capability. Pinned source tarball SHA-256 is
+`4e066a7dbd1234efa7458c2b137161bb7ddde1dde6be4ed4c8f38e6c45f862ab`.
+
+Each run used private homes, an app-server, two clients and a loopback scripted
+Responses provider. Every child environment was built from explicit safe keys;
+no auth file or credential was supplied. Scripted turns spent no subscription and
+left the earlier subscription budget unchanged at 373609 ms/two charged turns,
+inactive. No live daemon, host launcher, desktop, installation or upstream post
+was touched. The private MCP fixture implements only initialize, initialized,
+tools/list and tools/call; the Cancel control recorded no tools/call.
+
+Raw runs live in the task-owned persistent scratch; their portable result/evidence
+attachments and retained-item notes are the durable lookup. Each result lists
+relative evidence paths and hashes. Raw native files are preserved, not rewritten
+when a later observation corrects the interpretation.
+
+## Native findings and limits
+
+- Pilot tuple uses native thread/turn ids and `itemId = call_id`. The request was
+  blocking; resume preserved Plan, model, approvals, sandbox and cwd. The outside
+  client joined after turn start, discovered a second loaded thread with limit1
+  paging, and an idle join emitted no new turn/provider request in its bounded
+  observation. No explicit unloaded-thread or daemon-restart control ran.
+- Exact native choice receipt is `{"answers":{"q_color":{"answers":["Blue"]}}}`.
+  The rollout call had no namespace, its output was a JSON string, and matching
+  `task_complete.turn_id` followed that output. A captured minimized fixture now
+  checks this file order and identity.
+- Other accepted arbitrary text, and three question ids mapped independently.
+  Empty-map decline and JSON-RPC error both reached the model as `{"answers":{}}`.
+  Null and empty options produced native error outputs without a request.
+- Two calls in one scripted model response were accepted sequentially, each with
+  distinct native request and call ids and matching output. This does not prove
+  simultaneous pending-call safety or retire the production single-question rule.
+- Secret questions remained marked and the outside client sent no answer. Default
+  without its feature refused the scripted built-in; enabling the feature produced
+  a nonblocking request answered only by the controller. Permission/elicitation
+  method exclusion has a synthetic test; no permission recipe ran.
+- Codex advertises MCP tools inside namespace groups. The initial provider kept
+  only the group name. A source-backed correction projects child name plus group
+  namespace, retaining neither schema nor description. RED→GREEN and a fresh
+  review preceded the app-only retry; the original failed result remains failed.
+- The app retry found `noop`/`mcp__relay_fixture`, positively classified it `other`,
+  observed `mcp_tool_call_approval_<id>`, and sent Cancel only through the controller.
+  Its native output was an array of `input_text` objects, followed by the matching
+  turn's `task_complete`. The reader rejected that array as `malformed-line` and
+  stayed unknown. The provider also intentionally retains only string outputs.
+  A string receipt or a successful full three-witness app result was not observed.
+
+The minimized `scripted-structured-output-observation.json` retains field types,
+call identity, raw-line hashes and assertions, without array text. Source mapping
+is `scripted-namespace-source.json`: core MCP handler SHA-256
+`3c67d9908c1763fafa6711ee9d402c86c502cb35297e39462bcd908145c58fe4`, namespace
+collector `8c8bca4bcc32bdcbca5a89034f7b22461f65c85246e8ad994b2b68aafca1d1bd`,
+request-input protocol `616c81d35b96785aa30766bedb50d4597aae219879b237b4a2ebbe8315242591`.
+
+## Gates
+
+| Gate | State at this checkpoint |
+| --- | --- |
+| 1 transport/discovery/join | pilot properties passed; explicit unload and later lifecycle controls remain unrun |
+| 2 forms/provenance/exclusions | supported forms and three exclusions passed; app exclusion observed, structured-output reader policy unresolved |
+| 3 exact receipt/competition/clear/delay | pilot/forms exact receipts passed; representative MCP history fails reader; races, clear and delayed receipt unrun |
+| 4 defer | unrun |
+| 5 reconnect/restart/re-ask | unrun |
+| 6 production unit/IPC | no production implementation |
+| 7 real model/phone/native desktop | unrun; remains a distinct user-present activation gate |
+
+A completed protocol turn alone does not settle receipt or disappearance. No gate
+is marked passed because an elapsed wait, model prose or a successful synthetic
+fixture suggested it. A failed or unknown gate yields this blocker report, not a
+production plan.
+
+## Verification and review
+
+Hydration used `just setup`. A fresh `just test` baseline passed 773/773 on Node
+26.5.0; `.tt.toml` is absent. Task-local tests went through `just test-one` only:
+provider 8, reader 12 (including captured pilot), driver 21, combined 41/41 on
+Node26.5.0 and Node22.23.2. Missing-module RED covered new modules; namespace
+privacy and nested-group regressions each failed before their correction.
+`just check` passed; fresh final hygiene and the whole-slice review are recorded
+on the task before freezing this checkpoint.
+
+Fresh reviewers accepted the namespace privacy correction and group projection.
+Their full reports are retained on the task. Deferred minors: overlapping provider
+requests may share an index; aggregate forms/exclude deadlines are not applied
+(the observed runs were short and every subcase retained its 120-second bound).
+The latter must be fixed in the next reviewed plan before delayed cases.
+
+All 50 recorded pilot/forms/exclude evidence hashes were verified before the app
+retry. Server PIDs and exact socket/lock candidates were absent; host-load reported
+nothing left running. The app retry's hashes and cleanup are independently checked
+at this freeze. Private raw homes remain evidence, not active daemons.
+
+## Decisions
+
+- Keep this run blocked on the valid structured-output shape; do not weaken unknown
+  or normalize arrays into guessed answer strings. Why: the approved reader has no
+  such mapping. Cost: remaining native cases and production wait for review.
+- Recommend r6's narrow discard for arrays belonging to positively identified other
+  calls, keeping built-in and unidentified arrays unknown. Why: unrelated MCP history
+  must not permanently poison later built-in evidence. Cost: correlation/provenance
+  validation becomes a prerequisite for that discard; its tests and plan need review.
+- The r3 null-options ruling stands: unsupported/native; text uses Other. Why: native
+  refusal was observed. Cost: future null-option support requires new evidence.
+- The explicit older binary and app-only retry rulings are retained in the ledger.
+  No live pointer changed; the extra credential-free attempt corrected a probe
+  projection defect and preserved both failed results.
+
+The next human action is review of proposed spec r6 and this blocker checkpoint.
+After approval, the agent writes a separately reviewed correction plan, then
+resumes gate evidence. No executable reader change implements r6 yet.
+
+## Historical report through cc94eaf
+
 # Codex question feasibility: receipt gate blocked by protocol source
 
 ## Current outcome after checkpoint be590be
