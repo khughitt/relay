@@ -29,6 +29,9 @@ route, so the first-question/direct-join plan was not drafted. Task 3 follows
 its failure path: the [protocol report](../notes/2026-10-28-codex-question-protocol-report.md)
 records the blocking contract and its alternatives for a design decision. No
 pilot or matrix case is authorized until that decision is made.
+The user delegated the choice. The proposed rollout-record revision of the spec
+is now under review, and it supersedes this plan's prohibition on reading the
+transcript only once approved. A new plan follows its approval.
 
 The approved spec makes
 provenance, receipt, decline and reconciliation prerequisites of production work.

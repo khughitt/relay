@@ -1,8 +1,11 @@
 # Codex blocking question connector — addendum
 
-Status: transport revision proposed; user review required before replanning.
-The nontransport contract was approved at relay `77d3aee`; this revision replaces
-the proxy/framing assumption disproved during execution of plan `3b668d5`.
+Status: receipt-evidence revision proposed; user review required before replanning.
+The user approved the transport revision at relay `741a546`, and the nontransport
+contract at `77d3aee`. This revision changes only where provenance and receipt
+evidence come from. An offline audit of the installed version's source, recorded
+at `4162b6e`, showed that the app-server protocol carries neither for the threads
+this route serves. See "Provenance and receipt from the rollout record" below.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
 
 ## Intent and authority
@@ -36,9 +39,19 @@ The installed CLI is 0.165.0. Its generated experimental TypeScript protocol say
 - Each question has a native `id`, `isOther`, `isSecret`, and nullable options.
   Native answers are a map from question ids to `{answers: string[]}`.
 - `ServerRequestResolvedNotification` carries only `threadId` and `requestId`.
-- Raw response events can describe calls and outputs with call ids; typed thread
-  items include `functionCallOutput`. Availability and exact id correspondence on
-  this shared-daemon route remain unprobed.
+  Every subscribed connection receives the same request id. The first response
+  wins; a later one is logged and gets no reply, so a client cannot learn whose
+  answer was accepted.
+- Besides the built-in tool, the same request is emitted, with `isBlocking: true`
+  in any mode, by the app tool-approval fallback and by the skill
+  MCP-dependency prompt. Only naming conventions separate them; no typed field
+  names the emitter.
+- Raw response events describe calls and outputs with call ids, but only the
+  thread's starter can enable them (`thread/start.experimentalRawEvents`). The
+  TUI does not, and a joining client cannot. Typed `functionCallOutput` items are
+  produced only for injected pending input, never for ordinary tool results.
+  History reads drop those outputs too. The 0.165.0 source audit at `4162b6e`
+  establishes this; it is not a live observation.
 - `codex app-server proxy --sock <path>` forwards raw bytes to the existing daemon.
   It does not translate newline JSON into WebSocket messages. A private 0.165.0
   run timed out on newline JSON; a separate HTTP Upgrade through that proxy
@@ -178,6 +191,75 @@ decline. Request bodies, unrelated transcript content, secrets and credentials a
 not persisted or logged. Persist only the question, minimal routing metadata and
 the actual matching answer observation required by the lifecycle.
 
+## Provenance and receipt from the rollout record
+
+The protocol supplies the request and its resolution. It supplies neither the
+call's provenance nor the result the model received. Both come from the thread's
+own rollout record, the JSONL file Codex appends for every persistent thread.
+This is the route's only evidence channel outside the protocol. It adds no
+transport, and the connector never writes to the file.
+
+In 0.165.0 the source shows three properties this channel depends on. The
+model's `function_call` item is persisted before the tool is dispatched. Its
+`function_call_output` is persisted when the result is recorded. Both kinds
+persist in every history mode, including the TUI's paginated mode. After the
+first user prompt, each append is written and flushed in turn. Live rollouts
+are plain JSONL; compression applies only to rollouts at least seven days old.
+
+- **Locating the file.** Take the path from the thread object that
+  `thread/resume` returns. Accept it only as a regular, non-symlink `.jsonl`
+  file owned by the user, under the configured Codex home's sessions directory.
+  Revalidate its identity on every read. A missing, compressed, replaced,
+  shrunk or unreadable file leaves the evidence unknown.
+- **Reading.** Read appended bytes incrementally from a remembered offset,
+  scanning line by line. Lines and total read volume are bounded. Parse only a
+  line whose top-level `type` is `response_item`, and keep only the fields
+  named below. Never retain, log or forward any other content. An oversized or
+  malformed line makes that read's evidence unknown; it is not skipped
+  silently.
+- **Provenance.** A request qualifies only when the file holds a `function_call`
+  whose `call_id` equals the request's `itemId` and whose `name` is exactly
+  `request_user_input` with no namespace. App tool approvals carry the MCP
+  call's id, and that call's record names a different tool. The skill
+  MCP-dependency prompt has no function-call record at all. Both therefore stay
+  native. Because the call is enqueued before dispatch, a bounded wait for its
+  line covers writer lag. When the wait expires, the request is unidentified and
+  stays native.
+- **Mode.** For the built-in tool the source sets `isBlocking` exactly when the
+  turn is in Plan mode. Positive provenance plus `isBlocking: true` therefore
+  establishes the Plan-mode requirement for that version. The probe must confirm
+  this against a Default-mode control, as the mode paragraph above requires.
+- **Receipt.** `consumed` requires a `function_call_output` with the same
+  `call_id`. Its output must parse as the native answer map, and its values must
+  equal the saved answer after the version-probed mapping. A different value is
+  the observed native answer and is handled as described below. The native
+  encodings for decline and for error responses must be captured by the probe
+  before activation, never guessed. The source suggests an empty answer map,
+  and that remains unconfirmed.
+- **Recovery.** A matching record found after reconnect or relay restart can
+  settle reconciliation for that exact call. The proposed authoritative sign
+  that a call is gone without an answer has three parts: protocol completion or
+  abort of the request's `turnId`, a rollout read caught up past that point, and
+  no matching output. The probe must confirm this, including what an aborted
+  call records. An unfinished read or an unknown file state is never a sign of
+  disappearance.
+
+The rollout format is undocumented and version-specific. The evidence file must
+pin it alongside the protocol, and a version mismatch disables the connector.
+Probe fixtures come from captured real lines and are then extended with
+malformed, oversized, truncated and rotated cases. Rejected alternatives:
+
+- Leaving handed answers permanently unconfirmed. Why: it contradicts the
+  parent's done criterion and this spec's acceptance. Cost if wrong: an
+  extra file reader to maintain.
+- Starting relay-owned threads with raw events enabled. Why: such threads do not
+  serve the user's TUI questions, and the flag is documented for internal use.
+  Cost if wrong: none for this route.
+- Waiting for an upstream typed result. Why: no such request was found and no
+  release date exists. Cost if wrong: if upstream ships one, the file reader
+  becomes the second-best channel and should be replaced. A prepared upstream
+  request is posted only with the user's approval.
+
 ## Delivery, native competition and defer
 
 All inbox transitions use its existing serial queue and durable commit discipline.
@@ -259,10 +341,13 @@ equivalence; those gates remain separate.
 1. Transport connects to an isolated daemon and closes cleanly; joining loaded threads
    does not change their settings or start work. Test late join and new-thread discovery.
 2. Ordinary blocking questions are positively distinguishable from app approvals,
-   secret and async requests. Exercise all forms the translator will admit, including
-   free text, Other, multiple items, and decline.
-3. A phone-equivalent answer gets a correlated native result carrying its exact
-   values. Test desktop-first and phone-first races, cleanup-only resolution,
+   secret and async requests by the rollout provenance rule. The rule must also
+   leave the skill-dependency prompt and unidentified calls native. Exercise all
+   forms the translator will admit, including free text, Other, multiple items,
+   and decline.
+3. A phone-equivalent answer gets a correlated rollout `function_call_output`
+   carrying its exact values. The rollout reader's limits, rotation and
+   compression refusals and writer-lag wait are tested against captured lines. Test desktop-first and phone-first races, cleanup-only resolution,
    mismatch, interruption, and delayed confirmation. No false `consumed` is allowed.
 4. Defer leaves the native question usable and advances no turn until the desktop
    answers. Verify history and relay retry responses.
@@ -280,7 +365,14 @@ equivalence; those gates remain separate.
    endpoint and rollback first; obtain host-use/host-change approval at execution.
 
 The first probe is the smallest end-to-end pilot before an extended run. Do not
-touch this session's daemon or use the live desktop to probe. Implementation begins
+touch this session's daemon or use the live desktop to probe. Gates 1–5 concern
+the protocol and the rollout record, not model behaviour. They run against the
+installed Codex binary with a local scripted Responses provider in place of the
+model. That spends no subscription turns, needs no credential, and makes each
+tool call deterministic. The source's own tests use the same technique. The
+model's real behaviour is exercised in gate 7. Mode enforcement stays a source
+proof plus a scripted Default-mode control call. A scripted call cannot show
+what a real model chooses, and gate 7 covers that. Implementation begins
 only after the reviewed plan and passing protocol gates; activation and the human
 acceptance remain distinct gates. If native identity, receipt or clarification-only
 routing cannot be proved, record the blocker and return for a design decision.
@@ -290,8 +382,9 @@ routing cannot be proved, record the blocker and return for a design decision.
 Expected code: `src/routes`, `src/serve/{serve,config,inbox,socket}.js`, lifecycle
 and stored-entry validation, `src/types.js`, and their test fixtures/type checks.
 Reuse the existing inbox, persistence, HTTP guard and event stream. Add only the
-internal connector and necessary route operations; no new HTTP endpoints, root
-exports, question-policy engine or second transport implementation.
+internal connector, its read-only rollout-record reader and necessary route
+operations; no new HTTP endpoints, root exports, question-policy engine or
+second transport implementation.
 
 Update `docs/api.md`, the inbox-service runbook, route-probe instructions and
 portable version evidence when implemented. The plan chooses the smallest private
