@@ -1,0 +1,57 @@
+name: Test suite
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '26']
+    env:
+      TT_FORCE: '1'
+      GIT_CONFIG_NOSYSTEM: '1'
+    steps:
+      - name: Isolate Git configuration
+        run: |
+          touch "$RUNNER_TEMP/relay-gitconfig"
+          echo "GIT_CONFIG_GLOBAL=$RUNNER_TEMP/relay-gitconfig" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: '1.59.0'
+      - name: Install test capabilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y attr lsof util-linux
+          # Fixtures deliberately use a system-only PATH.
+          sudo install -m 755 "$(command -v just)" /usr/bin/just
+      - name: Enable and prove unprivileged PID namespaces in this disposable VM
+        run: |
+          # Retain the real namespace test; this relaxation lasts only for this VM.
+          sysctl -n kernel.apparmor_restrict_unprivileged_userns
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          test "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns)" = 0
+          unshare --user --map-root-user --pid --fork --mount-proc true
+      - name: Hydrate checkout
+        run: just setup
+      - name: Portable hygiene (detached task checks remain local)
+        run: just ci-check-hygiene
+      - name: Strict type checks
+        run: just check-code
+      - name: Full suite
+        run: just test

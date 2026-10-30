@@ -1,5 +1,5 @@
 # Front door for tests. Copy to the project root and fill in the three commands below.
-# Inner loop: `just test-fast` (affected-only). Full suite: `just test`.
+# Inner loop: `just test-one <file>`. Broad checks honor .tt.toml; `just test-full` forces the suite.
 # Gates: `just check` at pre-commit, `just gate` at pre-push and in CI.
 # The git hooks call `hook-pre-commit` and `hook-pre-push` instead, which run the very
 # same commands under their own target names. Hook cost is the number this design exists
@@ -26,7 +26,13 @@ tt := "python3 tools/tt"
 fast_cmd := "npm test"
 test_cmd := "npm test"
 one_cmd := "node --test"
-check_cmd := "python3 tools/ops-check && tasks check && npx --no-install tsc --noEmit"
+check_hygiene_cmd := "python3 tools/ops-check && tasks check"
+check_code_cmd := "npx --no-install tsc --noEmit"
+ci_hygiene_cmd := "python3 tools/ops-check"
+
+# The prepared workflow covers every branch, including names containing slashes.
+ci_remote := "origin"
+ci_suite_refs := "refs/heads/*"
 
 # What a fresh checkout or worktree needs before the suite can run: dependency installs
 # (npm ci, uv sync) and any gitignored inputs the tests read, hydrated from the main
@@ -55,9 +61,23 @@ test-one +args:
 test:
     {{tt}} test -- sh -c '{{test_cmd}}'
 
-# Seconds, not minutes: format, lint, typecheck, tasks check.
+# Explicit full verification; only the inner suite is timed.
+test-full:
+    TT_FORCE=1 just test
+
+check-hygiene:
+    {{tt}} check-hygiene -- sh -c '{{check_hygiene_cmd}}'
+
+# Hosted checkouts have no detached task records; keep this omission explicit.
+ci-check-hygiene:
+    {{tt}} ci-check-hygiene -- sh -c '{{ci_hygiene_cmd}}'
+
+check-code:
+    {{tt}} check-code -- sh -c '{{check_code_cmd}}'
+
 check:
-    {{tt}} check -- sh -c '{{check_cmd}}'
+    just check-hygiene
+    just check-code
 
 gate: check test
 
@@ -73,13 +93,20 @@ work-link *names:
 setup:
     {{tt}} setup -- sh -c '{{setup_cmd}}'
 
-# What the pre-commit hook runs: `check`'s command under its own hook target.
+# Hook timers cover mandatory hygiene only; broad children decide separately.
 hook-pre-commit:
-    {{tt}} hook-pre-commit -- sh -c '{{check_cmd}}'
+    {{tt}} hook-pre-commit -- sh -c '{{check_hygiene_cmd}}'
+    just check-code
 
-# What the pre-push hook runs: the same commands as `gate`, under one hook target.
 hook-pre-push:
-    {{tt}} hook-pre-push -- sh -c '{{check_cmd}} && {{test_cmd}}'
+    {{tt}} hook-pre-push -- sh -c '{{check_hygiene_cmd}}'
+    just check-code
+    just test
+
+hook-pre-push-fast:
+    {{tt}} hook-pre-push-fast -- sh -c '{{check_hygiene_cmd}}'
+    just check-code
+    just test-fast
 
 # Build the Darwin probe bundle from clean relay and ops checkouts (docs/specs/2026-09-25-darwin-probe.md).
 darwin-bundle ops:

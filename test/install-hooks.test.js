@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, realpathSync } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { bindingsFor, planHooks, shellQuote, timeoutSeconds, versionManagerOf, versionWarnings } from '../src/install/hooks.js';
@@ -12,7 +12,7 @@ import { tempState } from './helpers/fixture.js';
 const relay = '/opt/relay/bin/relay';
 const subscribers = '/home/me/.config/relay/subscribers.json';
 const node = shellQuote(process.execPath).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const base = '{\n  // keep this comment\n  "hooks": {\n    "SessionStart": [{"hooks":[{"type":"command","command":"~/d/familiar/bin/familiar hook --agent codex SessionStart"}]}],\n    "PreToolUse": [{"matcher":"*","hooks":[{"type":"command","command":"\'/old relay/bin/relay\' hook --harness codex --outer-ms 30000 PreToolUse"}]}]\n  },\n  "statusLine": {"type":"command","command":"ops"}\n}';
+const base = '{\n  // keep this comment\n  "hooks": {\n    "SessionStart": [{"hooks":[{"type":"command","command":"/home/me/familiar/bin/familiar hook --agent codex SessionStart"}]}],\n    "PreToolUse": [{"matcher":"*","hooks":[{"type":"command","command":"\'/old relay/bin/relay\' hook --harness codex --outer-ms 30000 PreToolUse"}]}]\n  },\n  "statusLine": {"type":"command","command":"ops"}\n}';
 
 test('planner replaces stale relay hooks, retires both familiar shapes, and preserves JSONC', () => {
   assert.throws(() => planHooks({ text: base, harness: 'codex', relayBin: relay, subscribersPath: subscribers }), /familiar/);
@@ -116,8 +116,8 @@ test('a rendered hook command runs under launchd\'s minimal PATH', async (t) => 
   const guard = { name: 'g', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], argv: [process.execPath, new URL('./fixtures/subscriber.js', import.meta.url).pathname, 'deny'], timeoutMs: 2000 };
   await writeFile(file, JSON.stringify({ schema: 1, subscribers: [guard] }), { mode: 0o600 });
   const relayBin = realpathSync(new URL('../bin/relay.js', import.meta.url).pathname), minimal = '/usr/bin:/bin:/usr/sbin:/sbin';
-  const run = (command) => spawnSync('/bin/sh', ['-c', command], { encoding: 'utf8', timeout: 20000,
-    env: { PATH: minimal, HOME: p.stateDir, RELAY_STATE_DIR: join(p.stateDir, 'state') },
+  const run = (command, searchPath = minimal) => spawnSync('/bin/sh', ['-c', command], { encoding: 'utf8', timeout: 20000,
+    env: { PATH: searchPath, HOME: p.stateDir, RELAY_STATE_DIR: join(p.stateDir, 'state') },
     input: JSON.stringify({ session_id: 'minimal-path', cwd: p.stateDir, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'true' } }) });
   for (const harness of ['claude-code', 'codex']) {
     const [entry] = JSON.parse(planHooks({ text: '{}', harness, relayBin, subscribersPath: file })).hooks.PreToolUse;
@@ -125,11 +125,9 @@ test('a rendered hook command runs under launchd\'s minimal PATH', async (t) => 
     assert.equal(r.status, 2, `${harness}: ${r.stderr}`); assert.match(r.stdout, /"permissionDecision":"deny"/);
   }
   // The command without the node path is what failed: `env: node: No such file or directory`.
-  if (!minimal.split(':').some((d) => existsSync(join(d, 'node')))) {
-    const [entry] = JSON.parse(planHooks({ text: '{}', harness: 'claude-code', relayBin, subscribersPath: file })).hooks.PreToolUse;
-    const r = run(entry.hooks[0].command.slice(shellQuote(process.execPath).length + 1));
-    assert.equal(r.status, 127, r.stderr); assert.match(r.stderr, /node: No such file or directory/);
-  }
+  const [entry] = JSON.parse(planHooks({ text: '{}', harness: 'claude-code', relayBin, subscribersPath: file })).hooks.PreToolUse;
+  const r = run(entry.hooks[0].command.slice(shellQuote(process.execPath).length + 1), '');
+  assert.equal(r.status, 127, r.stderr); assert.match(r.stderr, /node.*No such file or directory/);
 });
 
 // A path inside one version's directory dies with that version; Node reports the resolved

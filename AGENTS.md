@@ -4,7 +4,10 @@
   `tasks check` before commits, and completion on the task's branch before it merges.
 - Planned work requires reviewed specs and plans before implementation. Reuse the
   approved extraction spec in ops; tasks identity has a separate design gate.
-- Committed designs live in `docs/specs/`; implementation plans in `docs/plans/`.
+- New design specs, implementation plans, briefs and handoffs go under the
+  project's records directory (`docs/specs/`, `docs/plans/`, `docs/notes/` there),
+  committed in the records repository, never in this tree. Documents this tree
+  already tracks stay here and are revised in place.
 - Use task worktrees under the main checkout’s .worktrees directory, native `git worktree add`, and `just setup`
   immediately when defined. Follow the host's WORK_ROOT lock/removal convention.
 - Use conventional commits without AI attribution.
@@ -15,11 +18,16 @@
   needs it), plus development-only
   TypeScript and Node 22 types.
 - Use `just test-one <file>` or `just test-one --test-name-pattern "<regex>" <file>`
-  while working; arguments pass intact to `node --test`. Run `just test-fast` before
-  committing and `just gate` before integration.
+  while working; arguments pass intact to `node --test`. Run fresh focused checks
+  for changed behavior and `just check-hygiene` before committing or integration.
+  The invoking code root’s .tt.toml disables routine broad local checks; a missing
+  policy file means enabled. Do not rerun broad targets solely for a commit or gate.
+  Policy skips are not passing tests. Use `just test-full` to force the suite, and TT_FORCE=1
+  with `just check` to force type checks too. Read docs/test-execution-policy.md for
+  current activation state and coverage gaps.
   Fast and full commands intentionally run the same suite. Hooks use the vendored
   ops front door; install core.hooksPath .githooks in a new clone.
-- `just check` runs strict `tsc --checkJs --noEmit` on every `src/` and `bin/` file.
+- When forced or policy-enabled, `just check` runs strict `tsc --checkJs --noEmit` on every `src/` and `bin/` file.
   Shared JSDoc contracts live in `src/types.js`; preserve runtime validation at JSON
   boundaries. `test/types/` holds compile-time contract checks, never runtime tests.
 - Test the Node 22 floor as well as the development runtime. The suite includes an
