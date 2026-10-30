@@ -125,7 +125,9 @@ result and passes without widening the decoder.
 Pre-native impl23 found Important3; expiry/cleanup regressions were reproduced RED
 and fixed GREEN, and receive-hook coverage was corrected. Fresh impl24 accepted
 prerequisites with no Critical/Important finding. Full reports and exact reviewer
-identity `codex/gpt-6-astra` are attached to the parent. Final hygiene and whole-
+identity `codex/gpt-6-astra` are attached to the parent. Whole-correction impl25
+accepted the blocker checkpoint with no Critical/Important findings and one new
+Minor finding; it grants neither continuation nor integration approval. Final hygiene and whole-
 correction review are recorded on the task before freezing this checkpoint.
 `just test-fast` passed **773/773** after the correction controls.
 `just check`, `tasks check` and whitespace checks pass with no errors. Four
@@ -135,6 +137,10 @@ text remains unchanged, and its remaining matrix/all-gates scope stays open.
 
 Deferred minors remain: overlapping provider requests may share an index; cleanup
 rejection can omit detailed attached server/socket metadata while still failing.
+The disposable guard also lacks an option-label uniqueness check: captured forms
+have distinct labels, but broader form-validation claims require that refusal test
+and check first. The old duplicate Task7 prompt wording retains its one-submission
+ruling and stays deferred until that plan is next edited.
 Earlier unrelated deferred findings remain in their original reports. The former
 aggregate-deadline minor is fixed before any delayed cases. No delayed case ran.
 
