@@ -106,7 +106,12 @@ restoration and outside rejoin; unsubscribe alone is insufficient. For private
 TUI controls, name the primary before submission, preserve the exact native
 answer/unanswered outputs, and require zero outside responses. The automatic
 second start is an ephemeral `thread_title` feature with tools disabled; production
-discovery must ignore exactly that helper, without renaming user threads.
+discovery must ignore the TUI's exact ephemeral feature set, `system` and
+`thread_title`, without renaming user threads. Hold subscriptions only for live
+registry rows or unsettled entries, and unsubscribe otherwise. Rollout observation
+may continue after unsubscribe, but without the exact protocol turn transition
+matching output leaves handed answers unconfirmed. Provenance waits at most five
+seconds for the earlier call line; expiry stays unidentified/native.
 
 Oversized lines/files, unowned or changed rollout files and ambiguous provenance
 stay native. Other tool outputs are discarded in every shape; duplicate hashes

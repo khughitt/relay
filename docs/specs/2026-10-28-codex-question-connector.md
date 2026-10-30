@@ -1,10 +1,12 @@
 # Codex blocking question connector
 
-Status: r11, current contract proposed for the prerequisite package review.
+Status: r11, accepted with the production conditions recorded in spec round 17.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
-Production implementation requires approval of this spec and its production plan.
+Production implementation is authorized under the standing private envelope after
+one fresh review of its task-level implementation plan.
 Gate 7 and integration each require separate user approval. These probes ship no
-connector and authorize no live daemon, desktop, phone or model use.
+connector and authorize no live daemon, desktop, phone or real-model use.
+Relay `c6d074e` is the last layered revision retaining rejected alternatives and their rationale.
 
 ## Intent and architecture
 
@@ -46,10 +48,16 @@ and new arrivals. Joining must preserve model, instructions, approval policy,
 workspace and collaboration mode, start no work and never resurrect an unloaded
 thread. A registry row disappearing stops new discovery; it does not establish
 an already tracked question's death. Partial pages cannot establish absence.
+Hold a thread subscription only while its registry row is live or relay holds an
+unsettled entry for it (`pending`, `answered` or `handed`). Unsubscribe otherwise,
+including after a handed entry becomes `unconfirmed`; never prolong loading only
+to await a receipt. Released, closed and terminal entries do not retain subscriptions.
+Read-only rollout receipt observation may continue after unsubscribe, within the
+existing retention/bounds. Without an observed exact protocol turn transition,
+a handed answer stays unconfirmed even if matching output later appears.
 
-Exclude the automatic title helper before joining or publishing: it is ephemeral
-and feature-sourced `thread_title` (the protocol serializes this source as the
-string `"thread_title"`). Do not generalize this exception to arbitrary second
+Exclude the TUI's helper set before joining or publishing: ephemeral feature sources
+`"system"` and `"thread_title"` (serialized as those strings). Do not generalize this exception to arbitrary second
 starts. Missing or ambiguous ownership remains native. Production does not name
 user threads to suppress helpers; naming was private probe setup only.
 
@@ -69,7 +77,11 @@ form. The provenance predicate requires an earlier rollout `function_call` with
 `call_id == itemId`, name exactly `request_user_input`, and no namespace.
 App approvals use their differently named tool calls; skill dependency prompts
 lack that qualifying earlier call. Method name, labels, prose and `isBlocking`
-alone establish neither provenance nor mode. Pinned native mode enforcement,
+alone establish neither provenance nor mode. Wait at most five seconds, polling
+at most every 100 ms, for the earlier function_call line to become visible before
+classification; expiry is unidentified and stays native. Abort the wait on
+revocation/shutdown, and never publish or send from incomplete evidence.
+Pinned native mode enforcement,
 including a scripted Default refusal and Plan positive control, must support the
 mode proof. Mode changes and late/resumed joins do not waive it.
 
@@ -169,7 +181,10 @@ by type prefix, raising bounds or changing recovery requires review.
 
 Parse the actual exact-call built-in output using the pinned answer-map schema:
 `{answers: Record<string, {answers: string[]}>}`. Confirm a saved answer only by
-full native-map value equality with its validated translation. Same text in another
+full native-map value equality with its validated translation AND an observed
+terminal protocol transition for that exact thread/turn. Output read after
+unsubscribe without that transition stays unconfirmed; never resubscribe merely
+for receipt. Same text in another
 call, `serverRequest/resolved`, protocol completion, client order, elapsed time,
 source-shaped results and synthesized history outputs never confirm receipt.
 A missing/unknown actual output cannot establish consumed.
@@ -276,12 +291,15 @@ The evidence index pins every required source file. Required source proofs inclu
 - `core/src/config/mod.rs:4100–4101` and
   `app-server/src/request_processors/thread_lifecycle.rs:58–64`: unload defaults/conditions.
 - `tui/src/app/thread_routing.rs:2045–2077`, `thread_title.rs` and
-  `tui/src/temporary_structured_request.rs`: ephemeral title source and disabled tools.
+  `tui/src/temporary_structured_request.rs`: ephemeral title source and disabled tools;
+  `tui/src/app/app_server_events.rs:231–239` pins the exact ephemeral `system` /
+  `thread_title` exclusion set (including recap).
 - The pending slot and normalization sources above: replacement lifecycle versus receipt.
 
 1. **Transport/discovery:** private real handshake/initialize and listener source
    equivalence; complete loaded discovery, late/new arrivals, unchanged settings,
-   no work or unloaded resurrection; exact title-helper exclusion.
+   no work or unloaded resurrection; exact helper-set exclusion and subscription
+   release on registry/entry settlement, with post-unsubscribe receipt tests.
 2. **Admission/forms:** positive built-in provenance and Plan enforcement; app,
    secret, skill, async/default and unidentified exclusions; every admitted form,
    Other/multiple items/decline; unit/source supersession and version serial proof.
