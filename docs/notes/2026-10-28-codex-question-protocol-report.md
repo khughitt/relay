@@ -1,6 +1,29 @@
 # Codex question correction checkpoint: cancellation encoding unknown
 
-## Current outcome
+## Proposed r9 after checkpoint acceptance
+
+Implementation round 26 (claude-code/claude-opus-5-5) accepts checkpoint
+`c952e8f` with no findings; the user accepted that recommendation. The structural
+settlement recommendation is a new spec proposal, not an implementation finding.
+Proposed r9 of the [connector addendum](../specs/2026-10-28-codex-question-connector.md)
+requires positive built-in provenance plus an observed request, a non-answer
+string, a later matching rollout turn-end and the exact protocol turn transition.
+The conclusion is settled without an answer, without attributing a cause.
+Missing/earlier barriers, missing/wrong protocol evidence and structured built-in
+outputs remain unknown. Request resolution still stops sending immediately.
+
+The rechecked archive pins `request_user_input.rs`, `parallel.rs` and the added
+`context.rs` source (`f7c4945eebc54bedb8a53723cf9efe75331f67736ceab95c8b42ada11d9e2f73`).
+Only the serialized answer map is a handler success output; abort conversion
+produces a string. Every version change must re-prove these facts as well as the
+serial runtime. This is source evidence, not a newly captured handler output.
+
+No executable changed or native case reran. The captured timed form and current
+prototype remain unknown. R9 needs its own frozen-text review, followed by a
+reviewed correction plan before implementation or matrix continuation. The
+accepted checkpoint, deferred minors and unmerged branch remain preserved.
+
+## Accepted correction checkpoint outcome
 
 The user approved r8 and the correction plan (records `e4b4e2a66`, SHA-256
 `ef926147e87a8379d384cb9d495ca00ce8135c0113c9147b383b65a26408f62a`).

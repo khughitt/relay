@@ -1,10 +1,11 @@
 # Codex blocking question connector — addendum
 
-Status: r8 proposed for review, incorporating spec review round 13.
-R5 at relay `cc94eaf` remains the last approved complete text. R8 preserves all
-five round-12 corrections in proposed r7 at `f70dd8d` and adds the round-13
-single-request, cancellation and fingerprint-privacy requirements. No executable
-reader change or outstanding native gate is completed by this revision.
+Status: r9 proposed for review after accepted implementation round 26.
+R8 at relay `00f2d31` is the approved contract. R9 proposes cause-neutral
+settlement from correlated output/turn structure, preserving all r8 provenance,
+privacy, bounds, ownership and lifecycle requirements. The accepted correction
+checkpoint is `c952e8f`; its timed interruption output remains unknown in the
+current probe. No executable change or native gate is completed by this amendment.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
 
 ## Intent and authority
@@ -31,7 +32,8 @@ questions; `src/serve/inbox.js` serializes writes; the lifecycle's confirmation
 compares actual native answers. Socket waiter recovery assumes a hook process,
 which cannot serve as Codex thread liveness.
 
-The installed CLI is 0.165.0. Its generated experimental TypeScript protocol says:
+The probe CLI is explicitly pinned to 0.165.0; the shared 0.166.0 launcher is
+not covered. The pinned generated experimental TypeScript protocol says:
 
 - `ToolRequestUserInputParams` carries `threadId`, `turnId`, `itemId`, `questions`,
   `isBlocking`, and deprecated `autoResolutionMs`.
@@ -73,7 +75,10 @@ the next probe, not proof of current-version behavior. These facts establish the
 earlier route's viability, not current-version support.
 hq-25665e remains open, including no-client recovery; this design claims no result
 from it. Task notes locate the source transcript and retained generated protocol.
-No current-version live question probe has run for this addendum.
+That was the initial feasibility baseline. The accepted correction checkpoint
+now records private scripted native question/receipt and disconnect controls;
+interruption settlement remains unknown pending this amendment and its reviewed
+implementation. Real-model/phone/native-TUI acceptance remains outstanding.
 
 ## Approaches
 
@@ -239,7 +244,7 @@ are plain JSONL; compression applies only to rollouts at least seven days old.
   exist transiently while parsing a bounded line, but is never retained, logged or
   forwarded. An output with no earlier valid call is `unidentified`, not `other`;
   it makes evidence `unknown` and cannot establish receipt.
-- **Output content by predicate class (r8 proposal).** Classify the exact earlier
+- **Output content by predicate class.** Classify the exact earlier
   call by the provenance predicate below, not by whether Codex calls its tool
   built-in or MCP. `view_image`, shell tools and file tools can all be `other`.
   For **every** output shape belonging to an `other` call, discard the content.
@@ -256,7 +261,7 @@ are plain JSONL; compression applies only to rollouts at least seven days old.
   output as well as arrays, images and other JSON values; no descriptions, schemas,
   tool output text or inline image data are retained.
   For a positively identified `built-in` call, retain only the version-probed
-  string output needed for exact receipt or the cancellation classification below.
+  string output needed for exact receipt or the structural settlement below.
   Output presence alone is not proof of an answer. Structured built-in output and
   any output for an unidentified call remain `unknown`. Missing/invalid fields,
   malformed JSON, conflicting duplicate calls/outputs and file-validation failures
@@ -298,27 +303,47 @@ are plain JSONL; compression applies only to rollouts at least seven days old.
   before handoff/send: a malformed relay response must fail locally rather than
   silently becoming a native decline. The native TUI decline, receiver-failure
   trigger, competition and activation gates remain outstanding.
-- **Settled without an answer.** In 0.165.0 the built-in's dropped-channel
-  path emits `request_user_input was cancelled before receiving a response`.
-  Gate 3 must capture its exact native rollout encoding before the matcher relies
-  on it; the source text alone is not a newly observed native fixture. Once pinned,
-  that positively correlated cancellation result settles the exact call **without
-  an answer**, even though a matching output exists. It is never `answered` or
-  `consumed`. Do not guess that every non-answer string means cancellation:
-  unrecognized built-in strings leave that call's receipt/settlement unknown.
-  Before handoff, withdraw an unanswered question as `asker-gone` or retain a saved
-  answer as `undeliverable`; after handoff retain `unconfirmed`. No answer may be
-  resent to that settled call. The reader/settlement helper must distinguish this
-  case instead of classifying every matching output as `answered`.
-- **Recovery.** A matching record found after reconnect or relay restart can
-  settle reconciliation for that exact call. A version-probed cancellation output
-  follows the settled-without-answer rule above. For the separate case with **no
-  matching output**, the proposed disappearance sign still requires protocol
-  completion/abort of that `turnId`, its matching turn-end barrier in the rollout,
-  and no output for the call. Protocol completion alone, file end or elapsed time
-  is insufficient. The probe
-  must confirm the native barrier and ordering, including aborted calls. An
-  unfinished read or unknown file state never proves disappearance.
+- **Settled without an answer (r9 proposal).** Require positive built-in
+  provenance and an observed protocol request for the exact
+  `(threadId, turnId, itemId)` in that thread's validated rollout. Then require
+  all three:
+
+  1. Its matching output is a **string** that fails the version-pinned answer-map
+     parse. A valid answer map follows the receipt rule above instead.
+  2. That exact turn's rollout `task_complete` or `turn_aborted` barrier occurs
+     **after the output in file order**.
+  3. The protocol reports completion or abortion of that same thread and turn.
+
+  Without all three, non-answer strings stay `unknown`. An earlier barrier,
+  timestamps, EOF, request resolution alone, an unobserved request or wrong-turn
+  evidence cannot substitute. Structured built-in output and unknown/invalid
+  reader state remain unknown; reader failure outranks cached evidence.
+
+  This establishes an end without an answer, **not its cause**. Do not infer
+  interruption, steering, dropped channel or cancellation, and use no output
+  text, prefix or elapsed-time grammar as a recognizer. This replaces r8's
+  per-string cancellation recognition. The call is never `answered` or
+  `consumed`. Lifecycle labels stay `asker-gone` without a saved answer,
+  `undeliverable` if saved but not handed, and `unconfirmed` after handoff. Here
+  unconfirmed means the saved answer did not reach the model, not possible later
+  delivery. Never resend to the settled tuple. Request resolution already
+  revokes sending immediately, independently of this settlement rule.
+
+  The pinned invariant is load-bearing: after an observed built-in request,
+  the only success output is the serialized answer map; handler/runtime errors
+  and aborts emit non-answer strings. Pre-request validation failures create no
+  inbox entry. Every supported version change must re-prove this invariant and
+  string conversion by checking the handler, runner and output-conversion
+  source together, alongside the serial-runtime proof. Missing/failed proof
+  keeps the gate unknown; answer-carrying non-map output needs a new reviewed
+  mapping before that version can activate.
+- **Recovery.** Reconciliation uses the same exact-call rules, including the
+  observed request and correlated protocol transition for structural no-answer
+  settlement; a rollout alone cannot supply missing protocol evidence. The
+  separate **no matching output** disappearance sign still requires that exact
+  turn's protocol completion/abort, matching rollout turn-end and no call output.
+  Neither EOF, elapsed time, an unfinished read nor unknown file state is proof.
+  Confirm native barrier identity and ordering, including aborted calls.
 
 The rollout format is undocumented and version-specific. The evidence file must
 pin it alongside the protocol, and a version mismatch disables the connector.
@@ -434,10 +459,17 @@ equivalence; those gates remain separate.
    are refused before send, and nonempty saved answers cannot match an empty map.
    Record value equality without attributing the winning client. Source-shaped
    receiver-failure tests are distinct from native proof of what triggers them.
-   Capture the built-in cancellation/non-answer output during interruption and
-   cleanup; verify settled-without-answer rather than `answered`, no `consumed`,
-   and pre-/post-handoff lifecycle mappings. Test an unrecognized non-answer string
-   separately as unknown. No false `consumed` is allowed.
+   Use the captured timed interruption output to prove structural no-answer
+   settlement only after its later matching rollout barrier and protocol turn
+   transition, and unknown before either arrives. Include a source-shaped
+   dropped-channel string with a later turn-end, a non-answer string with no
+   barrier, a barrier before output, wrong-turn evidence, an unobserved request,
+   and array-shaped built-in output. Only the complete correlated string case
+   settles without an answer; the incomplete/unsupported cases remain unknown.
+   Verify no `answered`/`consumed`, unchanged pre-/post-handoff lifecycle labels,
+   and immediate send revocation on request resolution. Source re-proof must
+   establish the answer-map-only success invariant and string conversion for
+   every supported version. No false `consumed` or inferred cause is allowed.
 4. Defer leaves the native question usable and advances no turn until the desktop
    answers. Verify history and relay retry responses.
 5. Transport reconnects and relay restarts preserve identity; daemon restart/re-ask rejects stale
@@ -491,7 +523,9 @@ and daemon lifecycle management remain outside this task. None is implicitly
 delivered by this addendum or by the existing detached-question route.
 
 
-## R7/R8 evidence and next gate
+## Historical r7/r8 evidence and next gate
+
+The following records the earlier text revisions; r9's current gate follows below.
 
 R7 adopts the user's approved spec-round-12 review direction; the execution
 checkpoint and failed native results at `c36e7b7` remain unchanged. Pinned 0.165.0
@@ -541,3 +575,44 @@ sentence is replaced by the stronger receipt contract. No correction plan,
 production connector or activation is approved here. Concurrent pending requests
 remain unsupported; real-model provenance, phone/TUI acceptance and 0.166.0 remain
 unproved.
+
+
+## R9 structural settlement evidence and gate
+
+Implementation round 26 accepted checkpoint `c952e8f` with no findings. The
+controller adopts its structural proposal for r9; the new text still needs review.
+The preserved `call_interrupt` output is at native line 12, followed by matching
+`turn_aborted` at line 15, with observed request and interrupted protocol completion.
+Its current prototype classification and original verdict remain unknown.
+
+Archive SHA-256: `4e066a7dbd1234efa7458c2b137161bb7ddde1dde6be4ed4c8f38e6c45f862ab`.
+Pin and read these files together:
+
+| 0.165.0 source | SHA-256 | Proof |
+| --- | --- | --- |
+| `core/src/tools/handlers/request_user_input.rs` | `f4975978234d0ff7c143e6a5616d5523b9bddac044a6e39f8a0a32dcf0f56a38` | 96–151: only success output serializes the accepted answer map. |
+| `core/src/tools/context.rs` | `f7c4945eebc54bedb8a53723cf9efe75331f67736ceab95c8b42ada11d9e2f73` | 403–418 and 622–632: abort message becomes one text item, then a string. |
+| `core/src/tools/parallel.rs` | `7b65d5c5538db2fee9e9367490e46f3b64f0190efb94c842e5718a1abd90e87c` | 259–317 and 375–385: runtime abort results and sibling formats. The exec-command sibling does not qualify as request-input provenance. |
+
+Task evidence `r9-structural-settlement-source-0.165.0.json` pins the source and
+native correlation. A source-shaped handler string is not a native capture.
+
+- **Chosen: structural no-answer settlement.** Why: pinned success invariant plus
+  ordered rollout/protocol evidence establishes the end without a cause claim.
+  Cost if wrong: future answer-carrying non-map output could be called no answer;
+  exact-version refusal and source re-proof guard this risk.
+- **Rejected: exact strings/text grammars.** Why: elapsed formatting, runtime
+  siblings and handler text are brittle, with unobserved forms still unknown.
+  Cost if rejection is wrong: structural proof needs more source checks and waits
+  for both channels even when familiar text arrives earlier.
+- **Rejected: permanent unknown for all non-answer strings.** Why: complete
+  evidence supports withdrawal before expiry. Cost if rejection is wrong: an
+  incorrect source invariant could withdraw prematurely; it grants no new send
+  authority or consumed receipt, and handed answers remain unconfirmed.
+
+After r9 review, the next correction plan must specify ordered evidence,
+protocol/version/source refusal and the gate-3 regressions before executable
+changes or matrix continuation. Text approval alone resumes no case. Ownership,
+privacy, bounds, decline value-only meaning and outstanding production/phone/TUI/
+0.166.0 gates are unchanged. Recorded minors remain deferred; option-label
+uniqueness cannot be deferred while making broader form-validation claims.
