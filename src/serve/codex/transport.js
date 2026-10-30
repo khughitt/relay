@@ -6,7 +6,9 @@ const MiB=1024*1024;
 function reject(code){throw new Error(code)}
 /** @param {Buffer} bytes */
 const utf8=bytes=>{try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch{reject('utf8-invalid')}};
-/** @typedef {{peerLimitBytes:number,sendText:(text:string,beforeWrite?:()=>void)=>Promise<void>,close:()=>Promise<void>}} Wire */
+// Asynchronous admission returns a synchronous guard for the final wire boundary.
+/** @typedef {()=>void|Promise<()=>void>} BeforeWrite */
+/** @typedef {{peerLimitBytes:number,sendText:(text:string,beforeWrite?:BeforeWrite)=>Promise<void>,close:()=>Promise<void>}} Wire */
 /** @param {{socketPath:string,signal?:AbortSignal,onText:(text:string)=>void,onFailure?:(code:string)=>void,maxIncomingBytes?:number}} options @returns {Promise<Wire>} */
 export function connectUnixWebSocket({socketPath,signal,onText,onFailure,maxIncomingBytes=8*MiB}) {
  if(!Number.isSafeInteger(maxIncomingBytes)||maxIncomingBytes<1||maxIncomingBytes>8*MiB) return Promise.reject(new Error('invalid-incoming-limit'));
@@ -40,19 +42,25 @@ export function connectUnixWebSocket({socketPath,signal,onText,onFailure,maxInco
    const mask=randomBytes(4);mask.copy(header,2+extra);const bytes=Buffer.alloc(n);
    for(let i=0;i<n;i++)bytes[i]=payload[i]^mask[i%4];return Buffer.concat([header,bytes]);
   }
-  /** @param {Buffer} payload @param {number} op @param {(()=>void)|undefined} [beforeWrite] @returns {Promise<void>} */
+  /** @param {Buffer} payload @param {number} op @param {BeforeWrite|undefined} [beforeWrite] @returns {Promise<void>} */
   function write(payload,op,beforeWrite){
    if(failed||socket.destroyed)return Promise.reject(new Error('closed'));
    if(pendingBytes+payload.length>MiB)return Promise.reject(new Error('outbound-buffer-limit'));
    pendingBytes+=payload.length;
-   const run=writeChain.then(()=>new Promise((res,rej)=>{
+   const run=writeChain.then(()=>{
+    if(failed||socket.destroyed)throw new Error('closed');
+    const prepared=beforeWrite?.();
+    /** @param {(()=>void)|undefined} [guard] */
+    const writeNow=guard=>new Promise((res,rej)=>{
     if(failed||socket.destroyed){rej(new Error('closed'));return}
-    try{beforeWrite?.()}catch(e){rej(e);return}
+    try{guard?.()}catch(e){rej(e);return}
     const bytes=encode(payload,op);let callbackDone=false,drained=true,done=false;
     /** @param {Error|null} [error] */ const finish=error=>{if(done)return;if(!error&&(!callbackDone||!drained))return;done=true;writes.delete(cancel);socket.removeListener('drain',drain);error?rej(error):res(undefined)};
     /** @param {Error} error */ const cancel=error=>finish(error),drain=()=>{drained=true;finish()};writes.add(cancel);
     try{drained=socket.write(bytes,error=>{callbackDone=true;finish(error?new Error('socket-write'):null)});if(!drained)socket.once('drain',drain)}catch{finish(new Error('capture-or-write-failed'));fail('capture-or-write-failed')}
-   }));
+    });
+    return prepared?prepared.then(writeNow):writeNow();
+   });
    const result=run.finally(()=>{pendingBytes-=payload.length}).then(()=>{});writeChain=result.catch(()=>{});return result;
   }
   function close(){

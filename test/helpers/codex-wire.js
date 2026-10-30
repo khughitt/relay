@@ -42,5 +42,5 @@ async function peer(t,{headers=[],status='101 Switching Protocols',peerLimit='16
   t.after(async()=>{for(const s of sockets)s.destroy();await new Promise(r=>server.close(r));rmSync(root,{recursive:true,force:true});});
   return {path,received,get socket(){return sock},get request(){return request}};
 }
-async function until(fn){for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,5));}assert.fail('observation deadline');}
+async function until(fn,ms=1000){const deadline=performance.now()+ms;while(performance.now()<deadline){if(fn())return;await new Promise(r=>setTimeout(r,5));}assert.fail('observation deadline');}
 export {frame,peer,until};

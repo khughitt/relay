@@ -69,10 +69,11 @@ export async function openCodexConnector({config,inbox,readAgents,processOps,sig
   async function admit(t,request) {
     if(!t.selected||!t.record||t.request!==request||t.abort.signal.aborted)return;
     const p=request.params,old=entries().find((/** @type {any} */ e)=>callId(e.route.connector.tuple)===callId(p));
-    if(old&&(!isDeepStrictEqual(old.route.connector.generationBinding,generation)||!['pending','answered','handed','unconfirmed'].includes(old.state))){await release(t,'CODEX_JOIN_RACED');return;}
+    if(old&&(!isDeepStrictEqual(old.route.connector.generationBinding,generation)||!['pending','answered','handed'].includes(old.state))){await release(t,'CODEX_JOIN_RACED');return;}
     const provenance=await findProvenance(t.record,p.itemId,{signal:t.abort.signal,waitMs:provenanceMs});
     if(provenance!=='built-in'||t.mode!=='plan'||!waiting(statuses.get(t.id)?.status)){await release(t,'CODEX_JOIN_RACED');return;}
-    const a=await row(t.id);if(!a||!t.selected||t.abort.signal.aborted)return;
+    const a=await row(t.id);if(!a){await release(t,'CODEX_JOIN_RACED');return;}
+    if(!t.selected||t.abort.signal.aborted)return;
     if(!old&&inbox.presence().mode!=='away'){await release(t);return;}
     const message=toQuestion(p,{id:old?.id??randomUUID(),now:old?.question.createdAt??Date.now(),agentId:a.id,cwd:t.cwd,project:a.project});
     const owner={kind:/** @type {const} */ ('codex'),tuple:tuple(p),generationBinding:/** @type {import('../../types.js').Handle} */ (generation),items:p.questions.map((/** @type {any} */ q,/** @type {number} */ i)=>({relayId:`q${i+1}`,nativeId:q.id})),...(old?(old.route.connector.rolloutPath?{rolloutPath:old.route.connector.rolloutPath}:{}):{rolloutPath:t.recordPath})};
@@ -81,7 +82,7 @@ export async function openCodexConnector({config,inbox,readAgents,processOps,sig
     await delivery?.admit(p,true);
     if(!old){const r=await inbox.codexAsk(message,owner);if(r.error)throw Error('CODEX_STORE');}
     t.entryId=message.id;
-    await drain(message.id);if(old?.state==='unconfirmed')await release(t);
+    await drain(message.id);
   }
   /** @param {string} id */
   async function drain(id) {
@@ -136,17 +137,20 @@ export async function openCodexConnector({config,inbox,readAgents,processOps,sig
     }
     const t=threads.get(id);
     if(m.method==='turn/completed'&&validId(p.turn?.id)&&['completed','interrupted','failed'].includes(p.turn.status)) {
-      const ended=entries().filter(e=>e.route.connector.tuple.threadId===id&&e.route.connector.tuple.turnId===p.turn.id&&isDeepStrictEqual(e.route.connector.generationBinding,generation)).map(e=>({id:e.id,owner:e.route.connector}));
-      if(ended.length===0)return;
-      if(t?.request?.params.turnId===p.turn.id){delivery?.resolved(t.request.params);t.abort?.abort();}
-      const ownsCurrent=t&&(t.request?.params.turnId===p.turn.id||!t.selected&&!t.joining);
-      void enqueue(async()=>{for(const e of ended)await inbox.codexObserve(e.id,e.owner,{answers:null,terminal:true});await reconcile();if(ownsCurrent)await release(t);});return;
+      const turnId=p.turn.id,terminalGeneration=generation;
+      const matches=(/** @type {any} */ e)=>e.route.connector.tuple.threadId===id&&e.route.connector.tuple.turnId===turnId&&isDeepStrictEqual(e.route.connector.generationBinding,terminalGeneration);
+      const current=t?.request?.params.turnId===turnId;
+      if(!current&&!entries().some(matches))return;
+      if(current){delivery?.resolved(t.request.params);t.abort?.abort();}
+      // Admission may still be committing its first entry when the terminal arrives.
+      void enqueue(async()=>{for(const e of entries().filter(matches))await inbox.codexObserve(e.id,e.route.connector,{answers:null,terminal:true});await reconcile();if(t&&(t.request?.params.turnId===turnId||!t.selected&&!t.joining))await release(t);});return;
     }
     if(!t?.selected&&!t?.joining)return;
     if(m.method==='item/tool/requestUserInput') {
       const old=t.request;
       if(old&&(!validId(p.turnId)||!validId(p.itemId)||callId(old.params)!==callId(p))){delivery?.resolved(old.params);t.abort?.abort();if(validId(p.turnId)&&validId(p.itemId)&&p.turnId===old.params.turnId)void enqueue(()=>gone(old.params));}
       if(!validId(p.turnId)||!validId(p.itemId)||!(validId(m.id)||Number.isSafeInteger(m.id))){if(old)delivery?.resolved(old.params);t.abort?.abort();connection?.abort();return;}
+      if(entries().some(e=>callId(e.route.connector.tuple)===callId(p)&&!['pending','answered','handed'].includes(e.state))){t.abort?.abort();t.replayed?.();void enqueue(()=>release(t,'CODEX_JOIN_RACED'));return;}
       const projected=requestProjection(m);
       if(!projected){if(old){delivery?.resolved(old.params);t.abort?.abort();}t.request=null;void enqueue(()=>release(t));return;}
       if(old&&callId(old.params)===callId(projected.params)&&!isDeepStrictEqual(old.params,projected.params)){delivery?.resolved(old.params);t.abort?.abort();t.request=null;connection?.abort();return;}
@@ -171,15 +175,21 @@ export async function openCodexConnector({config,inbox,readAgents,processOps,sig
     if(!metadata||metadata.id!==id||typeof metadata.ephemeral!=='boolean'||typeof metadata.threadSource!=='string'||typeof metadata.cwd!=='string'||Buffer.byteLength(metadata.cwd)>4096||Buffer.byteLength(metadata.threadSource)>256)return;
     if(metadata.ephemeral&&['system','thread_title'].includes(metadata.threadSource))return;
     if(statuses.get(id)?.revision===version){const prior=statuses.get(id);statuses.set(id,{status:{type:metadata.status?.type,activeFlags:waiting(metadata.status)?['waitingOnUserInput']:[]},epoch:(prior?.epoch??0)+(waiting(metadata.status)&&!waiting(prior?.status)?1:0),revision:++revision});}
-    const observed=statuses.get(id);if(!waiting(observed?.status))return;
-    const key=JSON.stringify([id,observed.epoch]);if(raced.has(key))return;
+    const observed=statuses.get(id),key=JSON.stringify([id,observed.epoch]);
+    const history=entries().filter(e=>e.route.connector.tuple.threadId===id);
+    if(existing?.discoveryConnection!==connection&&history.length&&!history.some(e=>['pending','answered','handed'].includes(e.state))){
+      if(threads.size>=1000||raced.size>=1000){connection?.abort();return;}
+      const t=existing??{id};t.discoveryConnection=connection;threads.set(id,t);if(waiting(observed.status))raced.add(key);return;
+    }
+    if(!waiting(observed?.status)||raced.has(key))return;
     const latest=await row(id);if(!latest||!waiting(statuses.get(id)?.status)||statuses.get(id)?.epoch!==observed.epoch)return;
     if(threads.size>=1000&&!existing){connection?.abort();return;}
-    const t=existing??{id};Object.assign(t,{joining:true,selected:false,subscribed:false,epoch:observed.epoch,cwd:metadata.cwd,request:null,sentId:null});threads.set(id,t);
+    const t=existing??{id};Object.assign(t,{discoveryConnection:connection,joining:true,selected:false,subscribed:false,epoch:observed.epoch,cwd:metadata.cwd,request:null,sentId:null});threads.set(id,t);
     let resolveReplay=()=>{};const replayed=new Promise(/** @param {(value?:unknown)=>void} resolve */ resolve=>{resolveReplay=resolve});t.replayed=resolveReplay;
     try {
-      const resumed=resumeProjection(await rpc?.call('thread/resume',{threadId:id,excludeTurns:true},()=>{
-        if(connection?.signal.aborted||!waiting(statuses.get(id)?.status)||statuses.get(id)?.epoch!==t.epoch||processOps.probe(latest.process).status!=='alive'||inbox.presence().mode!=='away'&&!entries().some((/** @type {any} */ e)=>e.route.connector.tuple.threadId===id&&['pending','answered','handed'].includes(e.state)))throw Error('revoked');
+      const resumed=resumeProjection(await rpc?.call('thread/resume',{threadId:id,excludeTurns:true},async()=>{
+        const current=await row(id);
+        return ()=>{if(!current||connection?.signal.aborted||!waiting(statuses.get(id)?.status)||statuses.get(id)?.epoch!==t.epoch||processOps.probe(current.process).status!=='alive'||inbox.presence().mode!=='away'&&!entries().some((/** @type {any} */ e)=>e.route.connector.tuple.threadId===id&&['pending','answered','handed'].includes(e.state)))throw Error('revoked');};
       }));
       t.subscribed=true;
       if(!t.request)await Promise.race([replayed,pause(replayMs,undefined,{signal:connection?.signal})]);

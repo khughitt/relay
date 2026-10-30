@@ -37,12 +37,15 @@ export class Rpc {
     for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(this.error);}this.pending.clear();
     void this.wire?.close();try{this.onFailure(code);}catch{}
   }
-  /** @param {unknown} message @param {(()=>void)|undefined} [beforeWrite] */
+  /** @param {unknown} message @param {import('./transport.js').BeforeWrite|undefined} [beforeWrite] */
   async send(message,beforeWrite) {
     if(this.error)throw this.error;if(!this.wire)throw Error('not-connected');
-    await this.wire.sendText(JSON.stringify(message),()=>{if(this.error)throw this.error;beforeWrite?.();});
+    await this.wire.sendText(JSON.stringify(message),()=>{
+      if(this.error)throw this.error;const prepared=beforeWrite?.();
+      if(prepared)return prepared.then(guard=>()=>{if(this.error)throw this.error;guard();});
+    });
   }
-  /** @param {string} method @param {unknown} params @param {(()=>void)|undefined} [beforeWrite] */
+  /** @param {string} method @param {unknown} params @param {import('./transport.js').BeforeWrite|undefined} [beforeWrite] */
   call(method,params,beforeWrite) {
     if(this.error)return Promise.reject(this.error);if(this.pending.size>=32)return Promise.reject(Error('rpc-limit'));
     const id=++this.serial;

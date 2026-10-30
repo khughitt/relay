@@ -8,10 +8,10 @@ import {params,owner} from './codex-question.js';
 export {until};
 export const waiting={type:'active',activeFlags:['waitingOnUserInput']};
 export const line=(type,payload)=>JSON.stringify({type,payload})+'\n';
-export async function serverFixture(t,{replay=true,status=waiting,source='user',ephemeral=false,presence='away',state:existingState,clock=()=>Date.now()}={}){
+export async function serverFixture(t,{replay=true,status=waiting,source='user',ephemeral=false,presence='away',state:existingState,clock=()=>Date.now(),io}={}){
  const state=existingState??await tempState(t),home=join(state.stateDir,'home'),sessions=join(home,'sessions'),path=join(sessions,'rollout.jsonl');
  await mkdir(sessions,{recursive:true,mode:0o700});await writeFile(path,line('response_item',{type:'function_call',call_id:'call',name:'request_user_input'}),{mode:0o600});
- const {inbox}=await openInbox({stateDir:state.stateDir,expectAnswers,clock});await inbox.setPresence(presence);
+ const {inbox}=await openInbox({stateDir:state.stateDir,expectAnswers,clock,io});await inbox.setPresence(presence);
  const p=await peer(t),sent=[],logs=[],metadata={id:'thread',cwd:'/repo',ephemeral,threadSource:source,path,status};let cursor=0,fail;
  const push=m=>p.socket.write(frame(JSON.stringify(m)));
  const handler={async handle(m){

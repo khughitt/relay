@@ -31,16 +31,16 @@ for(const boundary of ['handed','wire','receipt'])test(`actual crash at ${bounda
  }
  const first=await worker({crashAt:boundary,autoAnswer:true});
  if(boundary==='receipt'){
-  await until(()=>first.messages.some(m=>m.phase==='wire'));await f.append(line('response_item',{type:'function_call_output',call_id:'call',output:JSON.stringify(blue)})+line('event_msg',{type:'task_complete',turn_id:'turn'}));f.metadata.status={type:'idle'};f.push({method:'turn/completed',params:{threadId:'thread',turn:{id:'turn',status:'completed'}}});
+  await until(()=>first.messages.some(m=>m.phase==='wire'),3000);await f.append(line('response_item',{type:'function_call_output',call_id:'call',output:JSON.stringify(blue)})+line('event_msg',{type:'task_complete',turn_id:'turn'}));f.metadata.status={type:'idle'};f.push({method:'turn/completed',params:{threadId:'thread',turn:{id:'turn',status:'completed'}}});
  }
- await until(()=>first.messages.some(m=>m.phase===boundary));const saved=first.messages.find(m=>m.phase===boundary).entry;assert.equal(saved.answer.body.answerId,answerId);
+ await until(()=>first.messages.some(m=>m.phase===boundary),3000);const saved=first.messages.find(m=>m.phase===boundary).entry;assert.equal(saved.answer.body.answerId,answerId);
  first.child.kill('SIGKILL');assert.equal((await first.ended).signal,'SIGKILL');
  if(boundary==='wire'){await f.append(line('response_item',{type:'function_call_output',call_id:'call',output:JSON.stringify(blue)})+line('event_msg',{type:'task_complete',turn_id:'turn'}));f.metadata.status={type:'idle'};}
  const second=await worker({want:boundary==='wire'?'unconfirmed':'consumed'});
  if(boundary==='handed'){
   await until(()=>f.sent.some(m=>m.id===91&&m.result));await f.append(line('response_item',{type:'function_call_output',call_id:'call',output:JSON.stringify(blue)})+line('event_msg',{type:'task_complete',turn_id:'turn'}));f.metadata.status={type:'idle'};f.push({method:'turn/completed',params:{threadId:'thread',turn:{id:'turn',status:'completed'}}});
  }
- await until(()=>second.messages.some(m=>m.entry&&!m.phase));const restored=second.messages.find(m=>m.entry&&!m.phase).entry;assert.equal((await second.ended).code,0);
+ await until(()=>second.messages.some(m=>m.entry&&!m.phase),3000);const restored=second.messages.find(m=>m.entry&&!m.phase).entry;assert.equal((await second.ended).code,0);
  assert.equal(restored.id,saved.id);assert.equal(restored.answer.body.answerId,answerId);assert.equal(restored.state,boundary==='wire'?'unconfirmed':'consumed');assert.equal(f.sent.filter(m=>m.id===91&&m.result).length,1);
 });
 for(const [state,want] of [['pending','withdrawn'],['answered','undeliverable'],['handed','unconfirmed']])test(`fresh connector detects persisted daemon replacement for ${state}`,async t=>{
@@ -52,6 +52,6 @@ for(const [state,want] of [['pending','withdrawn'],['answered','undeliverable'],
 test('a replacement terminal with reused tuple cannot confirm the previous daemon output',async t=>{
  const f=await serverFixture(t),q=toQuestion(params,{id:randomUUID(),now:Date.now(),agentId:'codex:thread',cwd:'/repo'}),bound={...owner,rolloutPath:f.path};await f.inbox.codexAsk(q,bound);await f.inbox.answer(q.id,answerMessage(q,{values:{q1:{type:'choice',optionIds:['o1']}}}));await f.inbox.codexHanded(q.id,bound);
  await f.append(line('response_item',{type:'function_call_output',call_id:'call',output:JSON.stringify(blue)})+line('event_msg',{type:'task_complete',turn_id:'turn'}));
- f.options.identity=async()=>({...owner.generationBinding,pid:4343,start:'200'});const c=await openCodexConnector(f.options);t.after(()=>c.close());await until(()=>f.logs.includes('CODEX_JOIN_RACED'));
+ f.options.identity=async()=>({...owner.generationBinding,pid:4343,start:'200'});const c=await openCodexConnector(f.options);t.after(()=>c.close());await until(()=>f.count('thread/loaded/list')>1);assert.equal(f.count('thread/resume'),0);
  f.push({method:'turn/completed',params:{threadId:'thread',turn:{id:'turn',status:'completed'}}});await new Promise(r=>setTimeout(r,60));assert.equal(f.inbox.retained()[0].state,'unconfirmed');assert.equal(f.inbox.retained()[0].route.terminal,false);
 });

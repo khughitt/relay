@@ -222,7 +222,10 @@ excluded. Provenance waits at most five seconds for the earlier call line;
 unidentified/unsupported requests stay native. Unselected automatic attachments
 are released immediately without retaining their content. Selected subscriptions
 are released once the question settles and its turn end is observed; relay does
-not keep idle threads loaded for later receipts.
+not keep idle threads loaded for later receipts. On startup, a thread with only
+receipt histories stays on read-only reconciliation; its initial waiting episode
+stays native. A newly observed non-waiting to waiting transition can admit a new
+question, with no authority inherited from the old history.
 
 0.165.0 has no atomic loaded-only join. The accepted residual is an unload during
 resume when the effective thread delay is shorter than resume latency and both

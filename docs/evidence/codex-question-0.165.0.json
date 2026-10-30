@@ -2,7 +2,7 @@
   "schema": 1,
   "harness": "codex",
   "version": "0.165.0",
-  "scope": "private scripted controls and accepted detected active-waiting join residual; production pilot/review pending, Gate7 and integration unrun",
+  "scope": "private scripted controls, native production pilot and accepted detected active-waiting join residual; production acceptance, Gate7 and integration unrun",
   "executable": {
     "sha256": "c06a67fd8ac76508dc78bd99ce20c9f317b8d568beda59485f3f4134df9962d5",
     "size": 309732776

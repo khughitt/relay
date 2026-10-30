@@ -81,9 +81,9 @@ for(const handed of [false,true])test(`structural non-answer ${handed?'after':'b
  await until(()=>f.inbox.retained()[0].state===(handed?'unconfirmed':'withdrawn'));assert.equal(f.inbox.retained()[0].observed,null);
 });
 test('an old turn terminal cannot revoke a new turn request',async t=>{
- const f=await serverFixture(t),oldParams={...params,turnId:'old',itemId:'old-call'},q=toQuestion(oldParams,{id:randomUUID(),now:Date.now(),agentId:'codex:thread',cwd:'/repo'});
+ const f=await serverFixture(t,{status:{type:'idle'}}),oldParams={...params,turnId:'old',itemId:'old-call'},q=toQuestion(oldParams,{id:randomUUID(),now:Date.now(),agentId:'codex:thread',cwd:'/repo'});
  await f.inbox.codexAsk(q,{...owner,tuple:{threadId:'thread',turnId:'old',itemId:'old-call'}});await f.inbox.defer(q.id,deferMessage(q));
- const c=await openCodexConnector(f.options);t.after(()=>c.close());await until(()=>f.inbox.retained().length===2);
+ const c=await openCodexConnector(f.options);t.after(()=>c.close());await until(()=>f.count('thread/loaded/list')>1);f.metadata.status={type:'active',activeFlags:['waitingOnUserInput']};f.push({method:'thread/status/changed',params:{threadId:'thread',status:f.metadata.status}});await until(()=>f.inbox.retained().length===2);
  f.push({method:'turn/completed',params:{threadId:'thread',turn:{id:'old',status:'completed'}}});await pause(30);
  const current=f.inbox.retained().find(e=>e.id!==q.id);await f.inbox.answer(current.id,answerMessage(current.question,{values:{q1:{type:'choice',optionIds:['o1']}}}));
  await until(()=>f.sent.some(m=>m.result));assert.equal(f.count('thread/unsubscribe'),0);

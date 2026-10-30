@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {readOwned,sameFile} from './files.js';
 export const VERSION='0.165.0';
 // This digest binds the reviewed source/protocol/native pins as one immutable artifact.
-const EVIDENCE_SHA256='ef5a7cc37a750c2b180ef7b8a51893167459d9175f51dfb680411950bfc735c2';
+const EVIDENCE_SHA256='a5d1098a998d5e1260d4e4b517c69f6b64f7fb4e77caaa28dc65b3444c38b9ac';
 /** @param {import('../../types.js').CodexConfig} config @returns {Promise<{version:string,blockingBuiltinImpliesPlan:boolean,gate7Passed:boolean}>} */
 export async function validateEvidence(config) {
   try {
