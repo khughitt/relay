@@ -1,670 +1,320 @@
-# Codex blocking question connector — addendum
+# Codex blocking question connector
 
-Status: r10 proposal for the final matrix package; not approved or implemented.
-R9 at relay `8db382b` is approved by spec review round 15 (accept, no findings,
-claude-code/claude-opus-5-5). The standing probe envelope on relay-a27e7c authorized
-one reviewed completion plan and fail-closed private collection through the matrix.
-Collection is complete; the gates have not all passed. This proposal preserves
-r9's eligibility, privacy, bounds, provenance, source and receipt requirements.
-Production work, gate 7 and integration remain gated.
+Status: r11, current contract proposed for the prerequisite package review.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
+Production implementation requires approval of this spec and its production plan.
+Gate 7 and integration each require separate user approval. These probes ship no
+connector and authorize no live daemon, desktop, phone or model use.
 
-## Intent and authority
+## Intent and architecture
 
 Answer an ordinary Codex Plan-mode question from the existing private phone inbox,
-or defer it and answer in Codex's native desktop UI. Keep the saved answer distinct
-from confirmed receipt, retain retry identity, and never deliver an old answer to a
-recovery turn's new question.
+or defer it and answer in Codex's native desktop UI. Keep a saved answer distinct
+from confirmed receipt, preserve retry identity, and never deliver an old answer
+to a recovery turn's new question. The accepted
+[typed-interaction spec](2026-10-11-typed-interaction-messages.md) §9.3 supplies the
+architecture: an internal connector in `relay serve` joins one explicitly
+configured, already running local Codex app-server. Claude and detached-question
+semantics remain unchanged.
 
-The accepted [typed-interaction spec](2026-10-11-typed-interaction-messages.md)
-§9.3 supplies the architecture: a connector inside `relay serve` joins the shared
-Codex app-server. Its async route remains later scope. This addendum refines the
-blocking route only. It does not change Claude or detached-question semantics.
+Use Node built-ins, Node >=22, and direct Unix WebSocket transport. Add no runtime
+dependency, root library export, HTTP endpoint, phone UI, general RPC framework or
+proxy child. Reuse the inbox's serial queue, persistence, HTTP guard and events.
+The connector is an internal route owner, not a fake hook waiter. Update private
+ownership, stored validation, JSDoc, recovery and native value types together;
+existing hook commands cannot acquire connector-owner operations.
 
-The source session's human asked for follow-ups after the Claude acceptance; its
-agent filed this Plan-mode-first slice. The parent goal supplies the phone answer
-and native-desktop defer requirements. The choices below are the current author's
-recommendations where changed below; the remaining contract retains its approval.
+Configuration is opt-in and names an absolute Codex executable, its home, control
+socket and validated evidence file. All absent means no connection; partial or
+malformed enablement fails early. Production never starts, restarts, updates or
+reconfigures Codex, reads authentication files, or copies credentials. Support is
+exactly the evidenced codex-cli 0.165.0; 0.166.0 and other versions are refused.
 
-## Evidence and unresolved feasibility
+## Transport and discovery
 
-Code inspected at relay `1019183`: `src/routes/index.js` supports Claude and detached
-questions; `src/serve/inbox.js` serializes writes; the lifecycle's confirmation
-compares actual native answers. Socket waiter recovery assumes a hook process,
-which cannot serve as Codex thread liveness.
+Validate the Unix endpoint, HTTP Upgrade and acceptance key; mask client frames,
+handle fragmentation, control frames, close, cancellation and backpressure, and
+bound message size and time. Reject compression. Require the 0.165.0 header
+`x-codex-websocket-max-unfragmented-message-bytes` to be a valid positive integer.
+Outbound messages must fit both that peer ceiling and the local 1 MiB cap; never
+fragment to evade either. Keep inbound frame/reassembly bounds separate, capped
+at 8 MiB. Shutdown aborts waits, closes sockets and cancels reconnect timers.
 
-The probe CLI is explicitly pinned to 0.165.0; the shared 0.166.0 launcher is
-not covered. The pinned generated experimental TypeScript protocol says:
+Discover only loaded threads associated with live Codex registry rows, using
+complete paginated loaded discovery and bounded refresh, including late joins
+and new arrivals. Joining must preserve model, instructions, approval policy,
+workspace and collaboration mode, start no work and never resurrect an unloaded
+thread. A registry row disappearing stops new discovery; it does not establish
+an already tracked question's death. Partial pages cannot establish absence.
 
-- `ToolRequestUserInputParams` carries `threadId`, `turnId`, `itemId`, `questions`,
-  `isBlocking`, and deprecated `autoResolutionMs`.
-- Each question has a native `id`, `isOther`, `isSecret`, and nullable options.
-  Native answers are a map from question ids to `{answers: string[]}`.
-- `ServerRequestResolvedNotification` carries only `threadId` and `requestId`.
-  Every subscribed connection receives the same request id. The first response
-  wins; a later one is logged and gets no reply, so a client cannot learn whose
-  answer was accepted.
-- Besides the built-in tool, the same request is emitted, with `isBlocking: true`
-  in any mode, by the app tool-approval fallback and by the skill
-  MCP-dependency prompt. Only naming conventions separate them; no typed field
-  names the emitter.
-- Raw response events describe calls and outputs with call ids, but only the
-  thread's starter can enable them (`thread/start.experimentalRawEvents`). The
-  TUI does not, and a joining client cannot. Typed `functionCallOutput` items are
-  produced only for injected pending input, never for ordinary tool results.
-  History reads drop those outputs too. The 0.165.0 source audit at `4162b6e`
-  establishes this; it is not a live observation.
-- `codex app-server proxy --sock <path>` forwards raw bytes to the existing daemon.
-  It does not translate newline JSON into WebSocket messages. A private 0.165.0
-  run timed out on newline JSON; a separate HTTP Upgrade through that proxy
-  returned `101 Switching Protocols`. Neither run sent authentication or started
-  a model turn. See the [transport probe report](../notes/2026-10-28-codex-question-protocol-report.md).
+Exclude the automatic title helper before joining or publishing: it is ephemeral
+and feature-sourced `thread_title` (the protocol serializes this source as the
+string `"thread_title"`). Do not generalize this exception to arbitrary second
+starts. Missing or ambiguous ownership remains native. Production does not name
+user threads to suppress helpers; naming was private probe setup only.
 
-The [official app-server documentation](https://learn.chatgpt.com/docs/app-server#toolrequestuserinput)
-says resolution notifications also occur when a pending request is cleared by turn
-start, completion, or interruption. It also describes app approvals using the
-question method. Thus a method name alone establishes neither receipt nor an
-ordinary clarification. Those are material gaps in the earlier short §9.3.
+In 0.165.0 unloading requires both no subscribers and inactivity for
+`thread_unload_delay_secs`, whose production default is **1800 seconds (30 minutes)**.
+The deadline follows the later of subscriber loss and inactivity. The private
+unloaded probe uses a root config value of 2 seconds; the connector never changes
+that production setting. Complete loaded absence, followed by restoration by the
+native controller and only then an outside join, establishes the probe result.
+Unsubscribe success or elapsed time alone does not establish absence.
 
-hq's `answer-server-terminal` and `answer-server-managed` facts were probed on
-0.162.1 on 2026-10-11 under hq-d85ede. The terminal fact explicitly records
-WebSocket over the Unix control socket and native refusal of the blocking tool in
-Default mode. The prior approved spec cited those facts but overlooked the
-transport statement; the 0.165.0 check confirms earlier evidence rather than
-discovering a new transport. The mode observation is also relevant evidence for
-the next probe, not proof of current-version behavior. These facts establish the
-earlier route's viability, not current-version support.
-hq-25665e remains open, including no-client recovery; this design claims no result
-from it. Task notes locate the source transcript and retained generated protocol.
-That was the initial feasibility baseline. The accepted correction checkpoint
-now records private scripted native question/receipt, structural interruption,
-competition, delay, defer and recovery controls. Unloaded-thread absence,
-authoritative old-call reconciliation after daemon restart and private TUI
-answer/decline remain unproved. Real-model/phone/native-desktop acceptance is
-outstanding. The current all-gates report distinguishes these limits.
+## Admission, identity and translation
 
-## Approaches
+Publish only positively identified built-in blocking `request_user_input` calls
+in Plan mode, with `isBlocking: true`, nonsecret questions and a representable
+form. The provenance predicate requires an earlier rollout `function_call` with
+`call_id == itemId`, name exactly `request_user_input`, and no namespace.
+App approvals use their differently named tool calls; skill dependency prompts
+lack that qualifying earlier call. Method name, labels, prose and `isBlocking`
+alone establish neither provenance nor mode. Pinned native mode enforcement,
+including a scripted Default refusal and Plan positive control, must support the
+mode proof. Mode changes and late/resumed joins do not waive it.
 
-1. **Connect directly to the Unix WebSocket, recommended revision.** Use Node
-   built-ins for the Unix socket, HTTP Upgrade and bounded WebSocket framing.
-   No new runtime dependency or proxy child. Validate the upgrade response and
-   acceptance key, mask client frames, handle fragmentation and control frames,
-   bound aggregate message size and time, and reject unsupported compression.
-   Respect the server's `x-codex-websocket-max-unfragmented-message-bytes` header:
-   for the evidenced 0.165.0 route require a valid positive integer, cap outbound
-   messages at the smaller of that value and the local message limit, and never
-   use fragmentation to evade that ceiling. Keep inbound frame/reassembly limits
-   separately bounded. Reject missing/malformed limits for this version; any
-   different version's policy needs its own evidence. Test a peer limit smaller
-   than the local cap, not just the observed 16 MiB advertisement.
-   Test malformed and truncated frames, close/ping/pong, cancellation and reconnect
-   before live use. Cost: relay owns a small but security-sensitive transport;
-   the next reviewed plan must specify and test that boundary before probing.
-2. **Use the existing `ws` library.** Its [IPC API](https://github.com/websockets/ws/blob/master/doc/ws.md#ipc-connections)
-   supports Unix sockets directly. The inspected 8.22.0 package has no mandatory
-   runtime dependencies; its native peers are optional. It would avoid owning
-   the framing implementation but add a second runtime dependency beside
-   `jsonc-parser`. Rejected under this repository's Node-builtins runtime rule.
-   The intended peer is a trusted local daemon and no extensions are needed;
-   that bounds the implementation but does not excuse malformed-frame tests.
-   Cost if wrong: relay maintains framing and protocol edge cases the library
-   already covers. Reconsider through design review if the bounded client cannot
-   be kept small and fully tested; do not add the dependency silently.
-3. **Keep the raw proxy and add WebSocket framing.** Technically possible, but
-   requires the same framing implementation plus a child lifecycle. Rejected
-   because the proxy supplies no framing or local-connection benefit here.
-4. **Use detached questions instead of native integration.** Already supported, but
-   requires agents to change how they ask and does not answer the native waiting
-   tool call. Does not meet this task.
-
-Node's browser-compatible built-in `WebSocket` is not a direct Unix-socket
-alternative on the supported Node 22 floor: the installed 22.23.2 rejects the
-`ws+unix:` scheme and exposes no public `node:undici` module. Undici's custom
-dispatcher extension is not a built-in Unix-socket connector; using an external
-Undici agent or a private Node API would change the dependency/API boundary.
-
-The implementation plan starts with a bounded probe phase. Passing the evidence
-gates below is required before production connector implementation, not merely
-before installation. A failed gate stops that implementation and brings its
-evidence back for a revised design; shipping permanently unconfirmed answers is
-not an alternative completion criterion.
-
-## Scope and selection
-
-One explicitly configured local daemon, one `relay serve`, Node built-ins, no new
-root library export. Configuration names and exact internal function boundaries
-are left to the implementation plan. Configuration is opt-in and names an absolute
-Codex executable, its home, the control socket, and a validated evidence file.
-Do not auto-start, restart, update or reconfigure the daemon. Disabled configuration
-does not open a connection. Missing or malformed enablement fields fail early.
-
-Join loaded threads associated with live Codex rows in relay's registry, including
-new arrivals; use paginated loaded-thread discovery and bounded refresh. Joining
-must not change model, instructions, approvals, workspace or collaboration mode,
-nor resurrect an unloaded thread. Confirm these properties in the probe. A
-disappearing registry row stops new discovery for that row; it is not proof that
-an already tracked native question died. Codex request/turn evidence owns that fact.
-
-Publish only positively identified built-in blocking `request_user_input` calls in
-Plan mode, with `isBlocking: true`, nonsecret questions, and a representable form.
-Prove their provenance using correlated native call evidence, including when
-joining after the question was asked. A guessed tool name from prose or labels is
-not provenance. Secret questions, app approvals, permission requests, async/default
-questions, and unidentified calls stay native; emit a bounded diagnostic code
-without question text or answers. If the protocol cannot distinguish these, the
-route does not activate.
-
-The revised feasibility plan must test native mode enforcement as a candidate
-way to establish the Plan-mode requirement. hq-d85ede recorded that 0.162.1
-refused the blocking built-in tool in Default mode. Re-probe on 0.165.0 with a
-Plan positive control and either an actual attempted blocking-tool call in Default
-with native refusal, or native evidence that the blocking tool is unavailable in
-Default from captured tool-availability data or version-pinned source applicable
-to the tested configuration; model prose or merely choosing not to call the tool
-does not count.
-If the current-version evidence establishes that enforcement for the supported
-route, positive built-in-call provenance together with `isBlocking: true` may
-establish the question's Plan-mode qualification. This is a candidate proof of
-the same requirement, not permission to use `isBlocking` alone or to assume the
-historical rule persists. Contradictory, unavailable or incomplete enforcement
-evidence leaves the mode gate unknown and returns to design review. The plan
-must address mode changes and resumed/late-joined calls before relying on it.
-
-Presence `here` admits no new inbox question. Existing questions retain their
-identity when presence changes. When `away`, supported questions enter the inbox;
-Codex's native UI may still display them. Unsupported content is never truncated
-or silently converted into a different question.
-
-## Identity and translation
+Secret, permission, app-approval, async/default and unidentified requests stay
+native. Unsupported content is never truncated or silently converted. Diagnostics
+contain bounded codes, no question text or answers. Presence `here` admits no new
+inbox question; `away` admits eligible questions. Existing identity survives
+presence changes, and the native UI may still display an admitted question.
 
 Use the exact `(threadId, turnId, itemId)` tuple as native identity. Encode it
-unambiguously in `native.callId`, including the thread id; set `sessionId` to the
-thread id. The RPC request id is only a connection-local response address, never
-the durable identity. Reuse the stored inbox UUID and immutable message on replay;
-the same tuple with changed question content is an explicit conflict.
+unambiguously, including thread id, in `native.callId`; `sessionId` is thread id.
+The numeric RPC request id is a live connection-local response address only.
+Replay reuses the stored inbox UUID and immutable message/question mapping; the
+same tuple with changed content is a conflict. Re-asks with new tuples get new
+UUIDs; never match question text.
 
 **One pending native request per thread and turn.** Never publish or answer a
-second request for the same `(threadId, turnId)` while one is pending. A replay
-of the same tuple is not a second request; several question items inside one
-request remain supported. Any new distinct native tuple for that thread/turn
-supersedes the old delivery address, including when the new request is ineligible
-for publication. Revoke the old request's send capability and withdraw its pending
-entry through the serial queue before considering the new request. No saved or
-late answer to the old tuple may be sent afterward; recheck this immediately before
-send. Apply the existing cleared-request lifecycle to an old pending entry:
-`asker-gone` without a saved answer, `undeliverable` if saved but not handed, and
-`unconfirmed` after handoff without confirmed receipt. Do not rewrite a completed
-receipt. Publish the new request only if it independently satisfies admission.
+second request for the same `(threadId, turnId)` while one is pending. Same-tuple
+replay and multiple question items in one request are not second requests. A new
+distinct request supersedes the old address, including an ineligible app approval
+or skill prompt sharing the turn-keyed slot. Revoke the old send capability at
+receipt, then serialize withdrawal before new admission. Recheck the full tuple,
+connection, generation and response address at the actual socket write, after
+all asynchronous queues. No saved or late answer may reach a superseded tuple.
+Apply the lifecycle below without rewriting a confirmed receipt.
 
-This rule is load-bearing: 0.165.0 keys pending user input and submitted answers by
-turn id, so replacing the pending slot could route an old answer into the new call.
-Its serial tool runtime prevents simultaneous built-in requests today: the executor
-default is nonparallel and `request_user_input` does not override it. That explains
-the sequential two-call probe; it does not authorize concurrent pending requests.
-Every supported version change must re-prove that serial runtime before activation.
+This is load-bearing: pending user input and submitted answers are keyed by turn.
+The pinned executor defaults to serial execution, and `request_user_input` has no
+parallel override. Thus simultaneous built-in requests cannot be reproduced
+natively on this version. Supersession tests are source-shaped/unit-level;
+every version change must re-prove the serial runtime from pinned source.
 
-Relay item ids are `q1` onward and option ids `o1` onward, assigned once in native
-order. Preserve the native question-id mapping in validated private route metadata,
-not public presentation fields. Duplicate native ids or ambiguous option labels
-make the entire call unsupported. Copy prompt, header, labels and descriptions
-within existing limits; `recommended` stays null. Native options become single
-choice with `allowOther = isOther`. On 0.165.0 the built-in rejects null or empty
-options before sending a request, and forces Other on admitted choices. Free text
-therefore uses Other; a null/empty-options request is unsupported and stays native.
-No multiselect is invented. The route's maximum waiting period is 23 hours, as for Claude.
+Assign relay question ids `q1` onward and option ids `o1` onward once, in native
+order. Keep the native question-id map in private validated route metadata.
+Duplicate native ids or ambiguous option labels make the whole call unsupported.
+Copy header, prompt, labels and descriptions within existing limits;
+`recommended` is null. Native options become single choice with
+`allowOther = isOther`; invent no multiselect. This built-in rejects null/empty
+options before requesting input and forces Other on admitted choices. Free text
+uses Other; null/empty-options calls stay native. Maximum wait is 23 hours.
 
-An answer maps back to native ids and exact labels or text. The probe establishes
-the native declined representation and receipt; never substitute a guessed empty
-object. Until proved, the route cannot activate, since the existing inbox offers
-decline. Request bodies, unrelated transcript content, secrets and credentials are
-not persisted or logged. Persist only the question, minimal routing metadata and
-the actual matching answer observation required by the lifecycle.
+Validate the complete outside answer before handoff/send: every mapped question
+must have its single admitted value, translated to the exact native label or Other
+text. Unknown/duplicate ids, malformed bodies or unsupported values fail locally.
+A relay decline is exactly `{"answers":{}}`; never rely on a native malformed-body
+fallback. Persist only the question, minimal routing/ownership data, saved answer
+and approved native answer observation. Retain no unrelated request/transcript,
+secret or credential content.
 
-## Provenance and receipt from the rollout record
+Native answer observations preserve the full answer map and string arrays without
+flattening. The captured native TUI unanswered submission is
+`{"answers":{"q_color":{"answers":[]}}}` for the fixed probe question. It is a
+valid answer-map output, distinct from an empty-root relay decline. It follows
+answer-map equality, never structural no-answer classification, and cannot
+confirm a saved relay decline. This native observation does not authorize relay
+to submit empty arrays or broaden admitted phone forms.
 
-The protocol supplies the request and its resolution. It supplies neither the
-call's provenance nor the result the model received. Both come from the thread's
-own rollout record, the JSONL file Codex appends for every persistent thread.
-This is the route's only evidence channel outside the protocol. It adds no
-transport, and the connector never writes to the file.
+## Read-only rollout evidence
 
-In 0.165.0 the source shows three properties this channel depends on. The
-model's `function_call` item is persisted before the tool is dispatched. Its
-`function_call_output` is persisted when the result is recorded. Both kinds
-persist in every history mode, including the TUI's paginated mode. After the
-first user prompt, each append is written and flushed in turn. Live rollouts
-are plain JSONL; compression applies only to rollouts at least seven days old.
+The protocol supplies requests and transitions; the thread's own rollout supplies
+call provenance and what the model received. Those are the only answer/provenance
+channels. Validated daemon process identity supplies the separate replacement
+lifecycle proof below, never an answer. The connector never writes the rollout.
 
-- **Locating the file.** Take the path from the thread object that
-  `thread/resume` returns. Accept it only as a regular, non-symlink `.jsonl`
-  file owned by the user, under the configured Codex home's sessions directory.
-  Revalidate its identity on every read. A missing, compressed, replaced,
-  shrunk or unreadable file leaves the evidence unknown.
-- **Reading.** Every open starts at byte 0 and rebuilds the call table from
-  that file; no previous table, classification or offset is reused. Thereafter,
-  read appended bytes incrementally from a remembered offset. Inspect only the
-  response-item and turn-end fields this contract names. Other line content may
-  exist transiently while parsing a bounded line, but is never retained, logged or
-  forwarded. An output with no earlier valid call is `unidentified`, not `other`;
-  it makes evidence `unknown` and cannot establish receipt.
-- **Output content by predicate class.** Classify the exact earlier
-  call by the provenance predicate below, not by whether Codex calls its tool
-  built-in or MCP. `view_image`, shell tools and file tools can all be `other`.
-  For **every** output shape belonging to an `other` call, discard the content.
-  Retain only its call id and a SHA-256 fingerprint of the UTF-8
-  `JSON.stringify(output)` value. JSON types and object field order are preserved
-  by this fingerprint. Fingerprints stay only in the in-memory reader table:
-  never log, persist or forward them, including in telemetry or durable route
-  metadata. Short outputs can be recovered by guessing their hashes; fingerprints
-  are private content derivatives, not safe diagnostics. Reopen rebuilds them from
-  byte 0. Same-id/same-hash output is idempotent, while a different
-  hash for that id makes evidence sticky `unknown`. Require a present output
-  field and valid earlier call/id before hashing. Neither this fingerprint nor
-  an `other` output can establish built-in receipt. This discards unrelated string
-  output as well as arrays, images and other JSON values; no descriptions, schemas,
-  tool output text or inline image data are retained.
-  For a positively identified `built-in` call, retain only the version-probed
-  string output needed for exact receipt or the structural settlement below.
-  Output presence alone is not proof of an answer. Structured built-in output and
-  any output for an unidentified call remain `unknown`. Missing/invalid fields,
-  malformed JSON, conflicting duplicate calls/outputs and file-validation failures
-  remain fail-closed. No guessed conversion of structured content to answer text
-  is permitted.
-- **Residual size limits.** A line over 1 MiB or cumulative read/file size over
-  64 MiB makes the reader sticky `unknown`, before content classification or
-  discard. The bound applies even to a valid `other` output or an ignored event,
-  image, compaction or patch record. Reopening the same oversized file from byte 0
-  encounters the same limit; that thread stays native while its rollout exceeds
-  the bound. R8 preserves this accepted residual limit. Skipping oversized lines
-  by a type prefix, raising limits or adding a different recovery policy
-  requires separate review; the content-discard rule does not bypass these bounds.
-- **Provenance.** A request qualifies only when the file holds a `function_call`
-  whose `call_id` equals the request's `itemId` and whose `name` is exactly
-  `request_user_input` with no namespace. App tool approvals carry the MCP
-  call's id, and that call's record names a different tool. The skill
-  MCP-dependency prompt has no function-call record at all. Both therefore stay
-  native. Because the call is enqueued before dispatch, a bounded wait for its
-  line covers writer lag. When the wait expires, the request is unidentified and
-  stays native.
-- **Mode.** For the built-in tool the source sets `isBlocking` exactly when the
-  turn is in Plan mode. Positive provenance plus `isBlocking: true` therefore
-  establishes the Plan-mode requirement for that version. The probe must confirm
-  this against a Default-mode control, as the mode paragraph above requires.
-- **Receipt.** `consumed` requires a `function_call_output` for the exact
-  native call, classified `built-in`, whose parsed answer map equals the saved
-  answer under the version-probed mapping. Scripted native 0.165.0 probes observed
-  `{"answers":{}}` for an empty-map decline and a client error response. Source
-  also maps a failed response receiver and a response body that cannot deserialize
-  to that same empty answer map. The client-error path excludes the explicitly
-  handled turn-transition error, which returns without submitting an answer.
-  Therefore matching a saved decline to `{}` establishes the model's value only:
-  it does not prove whose response won or whether an intentional decline caused
-  it. Preserve that limit in presentation and the runbook; no causal/winner claim
-  may be derived from empty-map equality. A nonempty saved answer followed by an
-  empty native map is a mismatch, never `consumed`.
-  Validate the complete native response body against the pinned answer mapping
-  before handoff/send: a malformed relay response must fail locally rather than
-  silently becoming a native decline. The native TUI decline, receiver-failure
-  trigger, competition and activation gates remain outstanding.
-- **Settled without an answer (r9 proposal).** Require positive built-in
-  provenance and an observed protocol request for the exact
-  `(threadId, turnId, itemId)` in that thread's validated rollout. Then require
-  all three:
+Accept only the path returned by `thread/resume`, a regular, owned, non-symlink
+`.jsonl` under the configured home's sessions directory. Revalidate identity on
+every read. Missing, compressed, replaced, shrunk or unreadable files are unknown.
+Every open starts at byte 0 and rebuilds the call table; thereafter read appended
+bytes incrementally. EOF, writer lag and unfinished reads are not disappearance.
 
-  1. Its matching output is a **string** that fails the version-pinned answer-map
-     parse. A valid answer map follows the receipt rule above instead.
-  2. That exact turn's rollout `task_complete` or `turn_aborted` barrier occurs
-     **after the output in file order**.
-  3. The protocol reports completion or abortion of that same thread and turn.
+Retain only response-item envelope/type, call id, name/namespace, approved output,
+and turn-end type/turn id needed by these rules. Other fields may exist transiently
+while parsing a bounded line but must never be retained, logged or forwarded.
+Classify by the exact provenance predicate, not tool family: `view_image`, shell
+and file tools can all be `other`. For **every shape** of `other` output, discard
+content; retain only call id and SHA-256 of UTF-8 `JSON.stringify(output)`, preserving
+JSON type and field order. Require a present output and valid earlier call/id.
+Fingerprints stay in memory only, never logs, persistence, forwarding or telemetry.
+Short outputs can be recovered by guessing their hash. Reopen rebuilds them.
+Same-id/same-hash output is idempotent; conflicting duplicates make evidence sticky
+unknown. Fingerprints and `other` output never establish receipt.
 
-  Without all three, non-answer strings stay `unknown`. An earlier barrier,
-  timestamps, EOF, request resolution alone, an unobserved request or wrong-turn
-  evidence cannot substitute. Structured built-in output and unknown/invalid
-  reader state remain unknown; reader failure outranks cached evidence.
+An output without an earlier valid call is unidentified and unknown, not `other`.
+Repeated/ambiguous dispatch identities, malformed JSON/fields, conflicting output,
+file validation failure and structured built-in output remain unknown. Never
+convert arbitrary structured content to answer text. For a positively identified
+built-in retain only the bounded string needed for receipt or joint settlement.
+Unknown reader state outranks cached evidence.
 
-  This establishes an end without an answer, **not its cause**. Do not infer
-  interruption, steering, dropped channel or cancellation, and use no output
-  text, prefix or elapsed-time grammar as a recognizer. This replaces r8's
-  per-string cancellation recognition. The call is never `answered` or
-  `consumed`. Lifecycle labels stay `asker-gone` without a saved answer,
-  `undeliverable` if saved but not handed, and `unconfirmed` after handoff. Here
-  unconfirmed means the saved answer did not reach the model, not possible later
-  delivery. Never resend to the settled tuple. Request resolution already
-  revokes sending immediately, independently of this settlement rule.
+A line over 1 MiB or cumulative read/file size over 64 MiB makes evidence sticky
+unknown **before classification or discard**, even for irrelevant images,
+compaction or patch events. Reopening encounters the same limit; the thread stays
+native while oversized. This is an accepted residual restriction. Skipping lines
+by type prefix, raising bounds or changing recovery requires review.
 
-  The pinned invariant is load-bearing: after an observed built-in request,
-  the only success output is the serialized answer map; handler/runtime errors
-  and aborts emit non-answer strings. Pre-request validation failures create no
-  inbox entry. Every supported version change must re-prove this invariant and
-  string conversion by checking the handler, runner and output-conversion
-  source together, alongside the serial-runtime proof. Missing/failed proof
-  keeps the gate unknown; answer-carrying non-map output needs a new reviewed
-  mapping before that version can activate.
-- **Recovery.** Reconciliation uses the same exact-call rules, including the
-  observed request and correlated protocol transition for structural no-answer
-  settlement; a rollout alone cannot supply missing protocol evidence. The
-  separate **no matching output** disappearance sign still requires that exact
-  turn's protocol completion/abort, matching rollout turn-end and no call output.
-  Neither EOF, elapsed time, an unfinished read nor unknown file state is proof.
-  Confirm native barrier identity and ordering, including aborted calls.
+### Exact receipt
 
-The rollout format is undocumented and version-specific. The evidence file must
-pin it alongside the protocol, and a version mismatch disables the connector.
-Probe fixtures come from captured real lines and are then extended with
-malformed, oversized, truncated and rotated cases. Rejected alternatives:
+Parse the actual exact-call built-in output using the pinned answer-map schema:
+`{answers: Record<string, {answers: string[]}>}`. Confirm a saved answer only by
+full native-map value equality with its validated translation. Same text in another
+call, `serverRequest/resolved`, protocol completion, client order, elapsed time,
+source-shaped results and synthesized history outputs never confirm receipt.
+A missing/unknown actual output cannot establish consumed.
 
-- Leaving handed answers permanently unconfirmed. Why: it contradicts the
-  parent's done criterion and this spec's acceptance. Cost if wrong: an
-  extra file reader to maintain.
-- Starting relay-owned threads with raw events enabled. Why: such threads do not
-  serve the user's TUI questions, and the flag is documented for internal use.
-  Cost if wrong: none for this route.
-- Waiting for an upstream typed result. Why: no such request was found and no
-  release date exists. Cost if wrong: if upstream ships one, the file reader
-  becomes the second-best channel and should be replaced. A prepared upstream
-  request is posted only with the user's approval.
+Native client errors, failed receivers and response deserialization failures can
+all become `{"answers":{}}`; the turn-transition-error path is a separate exception.
+Matching a saved decline confirms only the model's empty-map value, not an
+intentional decline, winning client or cause. A nonempty saved answer cannot
+match an empty map. The native unanswered per-question empty-array map is also
+different from empty root. Keep these distinctions in history and the runbook.
 
-## Delivery, native competition and defer
+### Settled without an answer
 
-All inbox transitions use its existing serial queue and durable commit discipline.
-Persist `handed` before sending the native response. Send only to a currently
-replayed, validated native request of that exact tuple. Uncertain delivery never
-permits sending to another request just because its numeric RPC id is equal.
+Require positive built-in provenance and an observed protocol request for the exact
+tuple, plus **all** of:
 
-`serverRequest/resolved` closes the pending RPC address; it does not establish who
-answered or what the model received. Mark `consumed` only after a native tool result
-for the exact call contains the saved answer, using a version-probed mapping. A
-matching late result can confirm `unconfirmed` after the existing 60-second window.
-For decline, this confirms only empty-map value equality, never the winning client
-or the cause of that value.
-After handoff, a different result leaves the saved answer intact, records the
-actual observed answer, and reports `unconfirmed`; do not claim the saved answer
-won. Before handoff, loss of the request with a different native answer leaves a
-saved answer `undeliverable`, as the lifecycle rule below requires. No model prose
-or timing inference counts as receipt. If no correlated output is available, the
-receipt gate fails and the route remains disabled.
+1. Its actual output is a string failing the pinned answer-map parse.
+2. The same turn's rollout `task_complete` or `turn_aborted` barrier follows that
+   output in file order.
+3. The protocol reports that exact thread/turn completed, interrupted or failed.
 
-First-answer-wins has two boundaries: relay serializes its own submissions and
-replays the same `answerId`; Codex chooses between responses from its native UI and
-relay. There is no atomic transaction spanning them. A saved phone answer can lose
-at Codex. The existing saved/handed/unconfirmed/consumed labels remain truthful,
-with mismatching native values retained in `observed`. The runbook must explain
-this race. This is an explicit clarification of §5.3 for a native competing client,
-not a claim that saving in relay locks Codex's desktop.
+An earlier/wrong-turn barrier, timestamps, EOF, resolution alone or an unobserved
+request cannot substitute. Incomplete evidence and structured output stay unknown.
+No text grammar or prefix recognizes a cause: this proves an end without an
+answer, never interruption, steering or dropped channel. It is never answered or
+consumed. Pre-request validation failures create no inbox entry.
 
-If the native answer arrives before any relay answer, withdraw the inbox question
-as `answered-elsewhere`. A request cleared without a known native answer is
-`asker-gone`, never guessed to be answered. If a relay answer was already saved,
-retain it: before handoff, loss of the request makes it `undeliverable`; after
-handoff, absent or mismatching receipt leaves it `unconfirmed`.
+The separate disappearance case with **no matching output** requires the exact
+protocol terminal, matching rollout turn-end and no call output. Neither a caught-up
+read nor elapsed time proves disappearance. Reconciliation cannot invent a missing
+protocol transition; detected replacement below is a separate lifecycle authority.
 
-Defer uses `handback: true`: the inbox entry becomes `released`, relay sends no
-answer or interrupt, and the native question remains available. A subsequent native
-answer is recorded for history without changing `released`. Answer/defer races
-inside relay retain the existing winner rule. Expiry similarly stops remote delivery
-without inventing a native answer. A local withdrawal closes the relay entry only;
-it does not cancel an unrelated part of the native turn. Document that the Codex
-question can remain visible; native cancellation is outside this slice.
+## Delivery, lifecycle and recovery
 
-## Disconnection and recovery
+All inbox transitions use the existing serial queue and durable commit discipline.
+Persist handed before the guarded wire write. Relay serializes its own submissions
+and replays the same answerId; Codex independently chooses between native and relay
+responses. There is no cross-client atomic transaction. Saving does not lock the
+native UI. Resolution revokes the live response address immediately, independently
+of receipt and settlement classification.
 
-The connector is an internal route owner, not a fake hook waiter. Extend the private
-route representation only as needed and update validation, stored schema, JSDoc and
-recovery together; leave existing hook ownership and local socket commands intact.
-Connector operations cannot be invoked as Codex hook-waiter operations.
+| Evidence/state | Lifecycle |
+| --- | --- |
+| Native answer before any saved relay answer | Withdraw as `answered-elsewhere`. |
+| Proven end without an answer, pending | Withdraw with reason `asker-gone`. |
+| Saved, not handed, request lost or a different native answer wins | Retain saved answer, mark `undeliverable`. |
+| Handed, absent/mismatching/unknown receipt | Retain saved answer, remain `unconfirmed`; retain valid actual answer in `observed`. |
+| Handed, actual exact output equals saved native map | `consumed`, including matching late receipt after the existing 60-second window. |
 
-On transport disconnection stop sending immediately. Reconnect with bounded backoff
-while the service lives; shutdown cancels timers and closes its socket. Do not infer
-daemon death merely from losing the connection. Reconcile exact pending requests and
-correlated outputs before any retry. Replay the same saved answer only if that exact
-native call is proven pending; if resolved, obtain its result rather than resend.
-Absence from a partial page or an unfinished replay is not proof of disappearance.
+For structural no-answer settlement, post-handoff `unconfirmed` means a known end
+without an answer: the saved answer did not reach the model, and later delivery to
+that settled tuple is forbidden. For ordinary absent/mismatching/unknown receipt it
+states only the corresponding uncertainty. Never rewrite completed receipt from
+weaker lifecycle evidence. No retry of a settled, released, expired or superseded
+tuple is allowed.
 
-The probe must identify an authoritative way to finish this reconciliation, including
-late attachment and relay restart. If a changed daemon identity or a completed
-reconciliation proves the old call gone, withdraw pending entries as `asker-gone`
-and mark saved-but-unhanded answers `undeliverable`. Already handed answers retain
-their uncertain receipt state. Re-asks with new item/turn ids get new inbox UUIDs;
-never match question text. Unknown liveness cannot authorize replay; existing expiry
-and confirmation deadlines still apply. Persistent uncertainty is a failed acceptance
-case, not permission to enable an incomplete route.
+Defer uses `handback: true`: durably release the entry, send no answer or interrupt,
+and leave the native question available. Later native answers update history
+without reopening `released`. Answer/defer races retain the existing relay winner
+rule. Expiry stops remote delivery without inventing an answer or cancelling an
+unrelated native turn; the Codex question can remain visible.
 
-## Evidence gates and acceptance
+On disconnection stop sending. Reconnect with bounded backoff while the service
+lives. Socket loss alone does not prove daemon replacement, decline or continued
+waiting. Before retry obtain exact pending replay and validate immutable tuple,
+mapping and current ownership; resolved calls get readback without resend.
+Unknown liveness cannot authorize replay; expiry and confirmation deadlines apply.
+Relay restart must recover real persisted ownership and answer state, not just
+reconstruct an RPC message.
 
-The plan must record exact CLI and daemon versions, protocol fixture hashes, native
-id/answer mappings, and a verdict for each gate. Version mismatch disables the
-connector with an actionable diagnostic; the existing inbox continues serving.
-An evidence file must be validated, not just present. No substring version match.
+**Detected daemon replacement independently settles lifecycle.** A validated
+change of daemon instance/process identity makes old pending entries `asker-gone`
+and saved-but-unhanded answers `undeliverable`. Handed stays `unconfirmed` unless
+an actual exact-call matching output appears; replacement supplies no receipt.
+Do not require an unavailable old protocol terminal/barrier for this lifecycle
+transition. Preserve completed receipts and released/closed entries. A disconnected
+socket, reused RPC id or local generation counter alone is not validated replacement;
+unknown identity stays fail-closed. New re-asks have new tuple/UUID and reject all
+old answers.
 
-Start the revised native probes with a real WebSocket handshake and `initialize`
-round trip against the private foreground server, without authentication or
-inference. The earlier 101 response alone is insufficient. Derive subsequent
-fake-process transport fixtures from captured real frames, then add malformed
-and boundary cases; fake JSON-line success cannot establish the native wire
-contract. Confirm from version-pinned source that the managed daemon and private
-`--listen unix://` endpoint select the same listener, without connecting to the
-live daemon. Listener equivalence does not prove recovery or other lifecycle
-equivalence; those gates remain separate.
+The source basis is the in-memory pending oneshot slot in
+`core/src/session/mod.rs:3340–3354` and history normalization in
+`core/src/context_manager/normalize.rs:52–66`. Replacement loses the old pending
+receiver; synthesized `aborted` history is not an actual rollout answer and never
+receipt. Production tests must prove identity detection, all three lifecycle
+states, stale-generation refusal and late actual-output reconciliation. This is a
+production testing requirement, not a remaining native research prerequisite.
 
-1. Transport connects to an isolated daemon and closes cleanly; joining loaded threads
-   does not change their settings or start work. Test late join and new-thread discovery.
-2. Ordinary blocking questions are positively distinguishable from app approvals,
-   secret and async requests by the rollout provenance rule. The rule must also
-   leave the skill-dependency prompt and unidentified calls native. Exercise all
-   forms the translator will admit, including free text, Other, multiple items,
-   and decline. Enforce the one-pending-request contract, including supersession
-   by an ineligible request, and re-prove the serial tool runtime for the pinned
-   version; no old-tuple answer may reach a later request in that turn.
-3. A phone-equivalent answer gets a correlated rollout `function_call_output`
-   carrying its exact values. The rollout reader's limits, rotation and
-   compression refusals and writer-lag wait are tested against captured lines. Test desktop-first and phone-first races, cleanup-only resolution,
-   mismatch, interruption, and delayed confirmation. Include empty-map decline
-   collisions with client error, failed receiver and malformed response body; test
-   the turn-transition-error exception separately. Verify malformed relay bodies
-   are refused before send, and nonempty saved answers cannot match an empty map.
-   Record value equality without attributing the winning client. Source-shaped
-   receiver-failure tests are distinct from native proof of what triggers them.
-   Use the captured timed interruption output to prove structural no-answer
-   settlement only after its later matching rollout barrier and protocol turn
-   transition, and unknown before either arrives. Include a source-shaped
-   dropped-channel string with a later turn-end, a non-answer string with no
-   barrier, a barrier before output, wrong-turn evidence, an unobserved request,
-   and array-shaped built-in output. Only the complete correlated string case
-   settles without an answer; the incomplete/unsupported cases remain unknown.
-   Verify no `answered`/`consumed`, unchanged pre-/post-handoff lifecycle labels,
-   and immediate send revocation on request resolution. Source re-proof must
-   establish the answer-map-only success invariant and string conversion for
-   every supported version. No false `consumed` or inferred cause is allowed.
-4. Defer leaves the native question usable and advances no turn until the desktop
-   answers. Verify history and relay retry responses.
-5. Transport reconnects and relay restarts preserve identity; daemon restart/re-ask rejects stale
-   answers. Include recovery with no client attached and later attachment, either
-   from current hq-25665e evidence or a focused isolated probe owned here. Do not
-   wait for that task's unrelated OpenCode or exec probes. Explicitly test whether
-   disconnecting a joined relay client while a question is pending causes receiver
-   failure or an empty-map result, both with another client attached and with no
-   client attached. This effect is unverified; socket loss alone proves neither
-   decline nor continued waiting. If it silently declines, keep the gate failed
-   and return for design review rather than call disconnect safe.
-6. Unit and real local IPC fixtures cover queue ordering, durable restart, duplicate
-   delivery, native-id reuse, evidence/version refusal, and child cleanup. Run through
-   `just test-one`, `just test-fast` and `just gate`, on Node 22 and the development
-   runtime. Build subprocess environments from explicit safe keys and fake credentials.
-7. After automated gates, a user-present run answers one real Plan-mode question
-   from the phone and separately defers another to the native desktop. Record both
-   results, actual receipt, isolation and cleanup. Prepare exact temporary state,
-   endpoint and rollback first; obtain host-use/host-change approval at execution.
+## Version evidence and acceptance
 
-The first probe is the smallest end-to-end pilot before an extended run. Do not
-touch this session's daemon or use the live desktop to probe. Gates 1–5 concern
-the protocol and the rollout record, not model behaviour. They run against the
-installed Codex binary with a local scripted Responses provider in place of the
-model. That spends no subscription turns, needs no credential, and makes each
-tool call deterministic. The source's own tests use the same technique. The
-model's real behaviour is exercised in gate 7. Mode enforcement stays a source
-proof plus a scripted Default-mode control call. A scripted call cannot show
-what a real model chooses, and gate 7 covers that. Implementation begins
-only after the reviewed plan and passing protocol gates; activation and the human
-acceptance remain distinct gates. If native identity, receipt or clarification-only
-routing cannot be proved, record the blocker and return for a design decision.
+The [all-gates report](../notes/2026-10-28-codex-question-protocol-report.md) and its
+retained evidence index distinguish native captures, source proofs, unit fixtures
+and production obligations. Validate exact executable/version, protocol/native
+fixture hashes and pinned source, not just evidence-file presence. A mismatch
+disables this connector with a content-free actionable diagnostic; other inbox
+routes continue. The source archive SHA-256 is
+`4e066a7dbd1234efa7458c2b137161bb7ddde1dde6be4ed4c8f38e6c45f862ab`.
+The evidence index pins every required source file. Required source proofs include:
 
-## Change surface and exclusions
+- `request_user_input.rs`, `context.rs` and `parallel.rs` together: the only success
+  output after an observed request is the serialized answer map; other handler/runtime
+  outputs are non-answer strings. Every version change re-proves this and conversion.
+- The turn-keyed slot, executor and router: the serial runtime and supersession risk.
+- `core/src/config/mod.rs:4100–4101` and
+  `app-server/src/request_processors/thread_lifecycle.rs:58–64`: unload defaults/conditions.
+- `tui/src/app/thread_routing.rs:2045–2077`, `thread_title.rs` and
+  `tui/src/temporary_structured_request.rs`: ephemeral title source and disabled tools.
+- The pending slot and normalization sources above: replacement lifecycle versus receipt.
 
-Expected code: `src/routes`, `src/serve/{serve,config,inbox,socket}.js`, lifecycle
-and stored-entry validation, `src/types.js`, and their test fixtures/type checks.
-Reuse the existing inbox, persistence, HTTP guard and event stream. Add only the
-internal connector, its read-only rollout-record reader and necessary route
-operations; no new HTTP endpoints, root exports, question-policy engine or
-second transport implementation.
+1. **Transport/discovery:** private real handshake/initialize and listener source
+   equivalence; complete loaded discovery, late/new arrivals, unchanged settings,
+   no work or unloaded resurrection; exact title-helper exclusion.
+2. **Admission/forms:** positive built-in provenance and Plan enforcement; app,
+   secret, skill, async/default and unidentified exclusions; every admitted form,
+   Other/multiple items/decline; unit/source supersession and version serial proof.
+3. **Receipt/competition:** actual answer-map equality, native-first/relay-first,
+   mismatch, empty-map collisions, malformed-relay local refusal, transition-error
+   exception, delayed matching/mismatching read, immediate resolved-send revocation;
+   structural settlement positive/incomplete/wrong-order/wrong-turn/unobserved/array
+   cases and reader bounds/rotation/compression/writer lag/privacy.
+4. **Defer:** native question remains usable without turn advance until answered;
+   production history, retries, expiry and answer/defer races.
+5. **Recovery:** reconnect, genuine durable relay restart, replacement lifecycle
+   and exact receipt split, no-client recovery, new re-ask/generation/id reuse,
+   complete unloaded absence and controller-only restoration. Native disconnect
+   controls must not be silently reclassified as safe from socket loss alone.
+6. **Production/unit/private TUI:** real IPC, queue/durable crash boundaries,
+   ownership/storage/native arrays, duplicate delivery, evidence refusal and child
+   cleanup; native TUI answer and unanswered output with zero outside responses.
+   Explicit safe subprocess environments; both Node 22 and development runtime,
+   policy-appropriate `just test-one`, `just test-fast` and integration `just gate`.
+7. **Separately approved user-present acceptance:** after automated gates, one real
+   model Plan question answered by phone and another deferred to native desktop,
+   actual receipt, exact temporary state/endpoint and rollback, host-use approval
+   at execution. Scripted provider/private tmux do not satisfy this gate.
 
-Update `docs/api.md`, the inbox-service runbook, route-probe instructions and
-portable version evidence when implemented. The plan chooses the smallest private
-metadata shape after the probes settle the actual native fields. No compatibility
-layer or separate general-purpose RPC framework is requested.
+Private scripted prerequisites establish protocol capability, not real-model
+behavior or shipped inbox durability. Implement only after this package's spec
+and production plan are reviewed. Production automated tests precede activation;
+permanently unconfirmed normal delivery is not a completion criterion. A version
+change must re-prove all version-specific invariants before activation.
 
-Default-mode async/new-turn delivery, `codex exec`, OpenCode, new phone UI, automatic
-presence, public exposure, permission/authorization routing, persistent installation
-and daemon lifecycle management remain outside this task. None is implicitly
-delivered by this addendum or by the existing detached-question route.
-
-
-## Historical r7/r8 evidence and next gate
-
-The following records the earlier text revisions; r9's current gate follows below.
-
-R7 adopts the user's approved spec-round-12 review direction; the execution
-checkpoint and failed native results at `c36e7b7` remain unchanged. Pinned 0.165.0
-source confirms inline-image output in `view_image.rs:238–254` and empty-answer
-fallbacks, including the turn-transition exception, in
-`bespoke_event_handling.rs:1705–1747`. No new native probe ran for r7.
-
-Discarding all `other` output content with an id/fingerprint record replaces r6's
-array-only discard; interpreting arbitrary tool content as answer text is rejected.
-Why: unrelated strings and images are not receipt evidence. Cost if wrong: a
-misclassified call could hide evidence, so earlier-call validation and the exact
-provenance predicate remain mandatory. MCP is one example, not the scope of `other`.
-
-The size limits remain an accepted residual restriction, rather than being bypassed
-by type-prefix skipping. Why: preserve bounded fail-closed parsing. Cost: some valid
-threads stay native indefinitely. The reviewer reported a size-only local census
-of 87/12,697 rollouts with a line over 1 MiB and two files over 64 MiB (largest about
-80 MB); this session did not repeat it or inspect live rollout content.
-
-After frozen-text review of r8, the correction plan must cover:
-
-- Byte-0 rebuild; unidentified outputs without an earlier call; strings and arrays
-  from `other` retaining only memory-private id/hash, including non-MCP image output;
-  identical/conflicting duplicates; later built-in receipts without unrelated retention.
-  Prove fingerprints never enter logs, persistence, forwarding or telemetry.
-- Unknown built-in structured/unidentified output, malformed JSON/IDs and existing
-  file/size refusals, including oversized irrelevant lines and oversized-file reopen.
-- Gate 3 empty-map collisions, local malformed-body refusal and value-only decline
-  receipt; gate 5 proof of disconnect behavior, whose receiver-failure effect is
-  unverified. Keep source-shaped tests distinct from native trigger evidence.
-- Aggregate deadlines before any delayed case; remaining competition, defer,
-  recovery and private-TUI gates; app exclusion/no-execution without approval receipt.
-- Turn-level supersession, the last pre-send check and version-pinned serial runtime;
-  recognized cancellation output as settled without an answer, unknown non-answer
-  strings and lifecycle behavior on both sides of handoff. These are corrections
-  the current prototype does not implement.
-
-Round-13 source checks: `core/src/session/mod.rs:3340–3354` and
-`core/src/state/turn.rs:162–168` show replacement of the turn-keyed pending slot;
-`tools/src/tool_executor.rs:122–124` defaults to serial execution, and the
-request-input handler has no parallel override. `request_user_input.rs:87–94`
-contains the cancellation text. No new native probe ran; a short re-check of this
-diff is sufficient before text approval.
-
-Provider-index and duplicate-prompt minors remain deferred. The stale decline
-sentence is replaced by the stronger receipt contract. No correction plan,
-production connector or activation is approved here. Concurrent pending requests
-remain unsupported; real-model provenance, phone/TUI acceptance and 0.166.0 remain
-unproved.
-
-
-## R9 structural settlement evidence and gate
-
-Implementation round 26 accepted checkpoint `c952e8f` with no findings. The
-controller adopted its structural proposal for r9, approved in spec round 15.
-The preserved `call_interrupt` output is at native line 12, followed by matching
-`turn_aborted` at line 15, with observed request and interrupted protocol completion.
-Its original verdict remains unknown. Separate r9 re-evaluation now establishes
-`no-answer`, and a fresh native pilot independently supplies the same joint proof.
-Neither result attributes an interruption cause or marks an answer consumed.
-
-Archive SHA-256: `4e066a7dbd1234efa7458c2b137161bb7ddde1dde6be4ed4c8f38e6c45f862ab`.
-Pin and read these files together:
-
-| 0.165.0 source | SHA-256 | Proof |
-| --- | --- | --- |
-| `core/src/tools/handlers/request_user_input.rs` | `f4975978234d0ff7c143e6a5616d5523b9bddac044a6e39f8a0a32dcf0f56a38` | 96–151: only success output serializes the accepted answer map. |
-| `core/src/tools/context.rs` | `f7c4945eebc54bedb8a53723cf9efe75331f67736ceab95c8b42ada11d9e2f73` | 403–418 and 622–632: abort message becomes one text item, then a string. |
-| `core/src/tools/parallel.rs` | `7b65d5c5538db2fee9e9367490e46f3b64f0190efb94c842e5718a1abd90e87c` | 259–317 and 375–385: runtime abort results and sibling formats. The exec-command sibling does not qualify as request-input provenance. |
-
-Task evidence `r9-structural-settlement-source-0.165.0.json` pins the source and
-native correlation. A source-shaped handler string is not a native capture.
-
-- **Chosen: structural no-answer settlement.** Why: pinned success invariant plus
-  ordered rollout/protocol evidence establishes the end without a cause claim.
-  Cost if wrong: future answer-carrying non-map output could be called no answer;
-  exact-version refusal and source re-proof guard this risk.
-- **Rejected: exact strings/text grammars.** Why: elapsed formatting, runtime
-  siblings and handler text are brittle, with unobserved forms still unknown.
-  Cost if rejection is wrong: structural proof needs more source checks and waits
-  for both channels even when familiar text arrives earlier.
-- **Rejected: permanent unknown for all non-answer strings.** Why: complete
-  evidence supports withdrawal before expiry. Cost if rejection is wrong: an
-  incorrect source invariant could withdraw prematurely; it grants no new send
-  authority or consumed receipt, and handed answers remain unconfirmed.
-
-The completion plan at records `0227d5374230c4c2515260b522443eb5616d09be`
-received fresh plan round 4 acceptance with no findings. It implemented r9 and
-collected the remaining private scripted matrix under the user's standing envelope.
-Original failures stay immutable; the evidence index and all-gates report identify
-separate corrected runs and evaluations. Option-label uniqueness now has a narrow
-refusal check; this is not a claim of general native form validation.
-
-## R10 batched matrix clarifications for review
-
-These amendments describe the observed limits and proposed production prerequisites.
-They authorize no additional send, consumed mapping, privacy exception or version.
-The [all-gates report](../notes/2026-10-28-codex-question-protocol-report.md) and
-records `docs/plans/2026-10-30-codex-question-production-proposal.md` form one package.
-
-- **Competition is value-only.** Four private controller/outside controls each
-  produced one native answer. Both concurrent contenders reached the wire before
-  observed resolution; caller order identifies no winning client. Resolved-tuple
-  delivery is locally refused. No deliberately late outside response bypassed
-  the guard. Probe lifecycle fields are unit expectations, not shipped inbox state.
-- **Delayed receipt is evidence, not elapsed time.** The matching and mismatching
-  controls deferred the first post-send rollout read for at least 65 seconds.
-  Only exact-call value equality confirms a saved answer; 65 seconds alone does
-  not do so. A 30-second silent outside observation followed by a controller
-  answer proves the private question remained usable over that interval, not
-  production handback/history/retry behavior.
-- **Daemon generation does not settle an old call.** A replacement process,
-  disappeared socket, local generation counter or offline rollout supplies no
-  missing protocol transition. Re-asks get new tuples and reject old answers;
-  old delivery stays unknown until the existing joint evidence rules resolve it.
-  The production prerequisite requires authoritative reconciliation, not only
-  safe stale-answer refusal. The private replay child proves reconstruction from
-  saved route metadata, not production inbox restart or crash durability.
-- **Unloaded discovery remains a blocker.** Both private subscribers successfully
-  unsubscribed, but complete loaded discovery still listed the thread during the
-  bounded observation. No outside resume followed that result. Unsubscribe status
-  and elapsed time do not establish absence. Production may not activate until
-  the absence/controller-restoration case is proved without outside resurrection.
-- **Private TUI remains a blocker.** Native composer, start policy, Plan settings
-  success and the pinned built-in instruction expansion were proved. The intended
-  first submission was followed by an unexpected second `thread/start`, refused
-  by the observer. No native question answer/decline or real-model/desktop/phone
-  claim follows. A replacement thread needs its own source and native ownership
-  proof before any question keys; do not weaken uniqueness to finish the test.
-  Source suggests native unanswered submission may use an empty array under each
-  question id rather than the saved-decline empty root map. That form was not
-  captured here and has no approved translation or consumed mapping.
-
-The production proposal is conditional: resolve the failed/unknown prerequisites
-and review their evidence before implementation begins. This r10 text itself
-remains under the final package review. Gate 7 and integration require separate
-user approvals even if that package is accepted.
+Update `src/routes`, `src/serve`, lifecycle/stored-entry validation, `src/types.js`
+and affected fixtures/type checks together. Update API, inbox-service runbook,
+route-probe instructions and portable evidence when implemented. No compatibility
+layer is requested. Default-mode async/new-turn delivery, `codex exec`, OpenCode,
+automatic presence, public exposure, permission routing, persistent installation
+and daemon lifecycle management remain outside this task.

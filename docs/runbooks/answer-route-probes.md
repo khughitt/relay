@@ -52,25 +52,63 @@ session id `00000000-0000-4000-8000-000000000000`, transcript `/tmp/x.jsonl`, cw
 `/tmp/ws` and tool id `toolu_fixture`, preserving its tool input and response.
 
 
-## Proposed Codex connector: gated cancellation contract
+## Proposed Codex connector: receipt and lifecycle probes
 
-The [Codex connector addendum](../specs/2026-10-28-codex-question-connector.md)
-is a gated contract, not an installed connector. Its disposable private probes
-must establish native provenance, receipt and lifecycle forms before activation.
+The [current Codex connector contract](../specs/2026-10-28-codex-question-connector.md)
+is proposed, not installed. The [all-gates report](../notes/2026-10-28-codex-question-protocol-report.md)
+points to the retained evidence index. Private scripted probes establish protocol
+capability; production inbox durability and real-model/phone/native-desktop
+acceptance remain separate obligations.
 
-For the proposed Codex connector, post-handoff recognized cancellation keeps the
-existing `unconfirmed` label, but it proves the call ended without an answer and
-the saved answer did not reach the model. It does not mean delivery might still
-occur: never retry that settled old tuple. Other uses of `unconfirmed` retain
-their separate absent/mismatching/uncertain-receipt meaning. Before handoff, a
-recognized cancellation means `asker-gone` without a saved answer and
-`undeliverable` with one. These labels describe the proposed lifecycle, not an
-inbox behavior shipped by these probes.
+Use the exact pinned 0.165.0 executable, private homes with no auth file or
+credentials, and the local scripted Responses provider. Verify source/protocol
+pins before running. Keep failed runs and a single directory manifest/hash per
+checkpoint. No live daemon, shared launcher, desktop or subscription turn belongs
+to these probes. Build subprocess environments from explicit safe keys, retain
+owned process ids, and inspect cleanup before another run.
 
-An unrecognized non-answer string stays unknown even after a turn-end barrier.
-The 0.165.0 interruption control observed a timed runner abort string and leaves
-its cancellation mapping unconfigured pending review. See the
-[correction checkpoint](../notes/2026-10-28-codex-question-protocol-report.md).
-A missing-output disappearance additionally needs both the exact protocol turn
-transition and the matching rollout turn-end barrier; reaching EOF is not proof.
-Do not retry a settled old tuple or treat request resolution alone as receipt.
+A saved phone answer can lose to the native UI: relay serializes its own answers,
+but saving does not lock Codex. Only the actual exact-call rollout answer map,
+compared by full native value, confirms consumed. Resolution, client order and
+elapsed time do not identify the winner or establish receipt. Preserve native
+string arrays in observations. Native unanswered submission is a per-question
+empty array (`{"answers":{"q_color":{"answers":[]}}}` in the fixed capture),
+not relay decline (`{"answers":{}}`). The former cannot confirm the latter.
+Empty-root receipt is value-only: errors and receiver/deserialization failures
+can produce the same value, so never attribute its cause or winning client.
+
+A positively identified built-in with an observed exact protocol request settles
+without an answer only when its non-answer string output is followed in file
+order by the matching turn-end barrier AND the exact protocol turn is terminal.
+No output text grammar identifies cancellation. Missing either channel, an earlier
+barrier, structured output or invalid reader state stays unknown. The separate
+no-output disappearance case also requires matching protocol and rollout turn-end;
+EOF and elapsed time do not suffice. Resolution revokes sends immediately.
+
+Before handoff, a proven end without an answer means asker-gone when pending and
+undeliverable when saved. After handoff it stays unconfirmed: in this case that
+means a known end without an answer, the saved answer did not reach the model,
+and it must never be retried to that tuple. Other unconfirmed cases retain their
+absent/mismatching/unknown receipt meaning. A matching late actual output may
+confirm receipt; no synthetic history entry can do so.
+
+Validated daemon replacement independently settles pending -> asker-gone and
+saved-unhanded -> undeliverable; handed remains unconfirmed unless actual matching
+output appears. Do not require an old protocol terminal for replacement lifecycle.
+Socket loss, local generation counters or a changed RPC id alone prove no
+replacement. These lifecycle rules are production tests, not behavior shipped by
+the probe reader or a reason to invent receipt.
+
+For an unloaded control, set root `thread_unload_delay_secs = 2` only in the
+private home. The production default is 1800 seconds (30 minutes), after both no
+subscribers and inactivity. Prove complete loaded absence before native-controller
+restoration and outside rejoin; unsubscribe alone is insufficient. For private
+TUI controls, name the primary before submission, preserve the exact native
+answer/unanswered outputs, and require zero outside responses. The automatic
+second start is an ephemeral `thread_title` feature with tools disabled; production
+discovery must ignore exactly that helper, without renaming user threads.
+
+Oversized lines/files, unowned or changed rollout files and ambiguous provenance
+stay native. Other tool outputs are discarded in every shape; duplicate hashes
+are private in-memory derivatives and must never enter logs or retained evidence.
+Gate 7 and integration require separate approvals after production automated gates.
