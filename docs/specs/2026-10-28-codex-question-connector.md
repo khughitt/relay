@@ -1,12 +1,10 @@
 # Codex blocking question connector — addendum
 
-Status: r6 proposed; user review required before replanning or changing the reader.
-The user approved r5 at relay `cc94eaf` (spec review round 10). That remains the
-last approved contract. This revision proposes two bounded corrections established
-by scripted native 0.165.0 probes: null/empty options stay native, and a structured
-output belonging to a positively identified non-built-in call is discarded without
-invalidating unrelated built-in evidence. No correction is implemented by this doc.
-The r5 transport/nontransport architecture and remaining acceptance gates stand.
+Status: r7 proposed for review, incorporating spec review round 12.
+R5 at relay `cc94eaf` remains the last approved complete text. The user approved
+folding round 12's four Important findings and one Minor finding into this revision
+before the correction plan. R7 supersedes proposed r6 at `c36e7b7`; it does not
+implement a reader change or close any outstanding evidence gate.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
 
 ## Intent and authority
@@ -214,24 +212,39 @@ are plain JSONL; compression applies only to rollouts at least seven days old.
   file owned by the user, under the configured Codex home's sessions directory.
   Revalidate its identity on every read. A missing, compressed, replaced,
   shrunk or unreadable file leaves the evidence unknown.
-- **Reading.** Read appended bytes incrementally from a remembered offset,
-  scanning line by line. Lines and total read volume are bounded. Parse only a
-  line whose top-level `type` is `response_item`, and keep only the fields
-  named below. Never retain, log or forward any other content. An oversized or
-  malformed line makes that read's evidence unknown; it is not skipped
-  silently.
-- **Structured non-built-in outputs (r6 proposal).** Native MCP results can encode
-  `function_call_output.output` as an array of content objects. Before examining an
-  output, correlate its `call_id` to an earlier persisted call. If that exact call
-  is positively `other` under the provenance predicate, discard an array output's
-  content; retain no text, schema or answer observation for it. It cannot settle a
-  built-in call or produce `consumed`. Continue scanning subsequent lines.
-  A structured output for a built-in or an unidentified call still makes the
-  reader `unknown`. Missing/invalid call IDs, malformed JSON, file identity changes,
-  limits and all other current unknown conditions remain fail-closed. This is an
-  explicit scoped discard of known unrelated output, not permission to skip
-  malformed or unclassified evidence. String output handling and exact built-in
-  receipt equality are unchanged.
+- **Reading.** Every open starts at byte 0 and rebuilds the call table from
+  that file; no previous table, classification or offset is reused. Thereafter,
+  read appended bytes incrementally from a remembered offset. Inspect only the
+  response-item and turn-end fields this contract names. Other line content may
+  exist transiently while parsing a bounded line, but is never retained, logged or
+  forwarded. An output with no earlier valid call is `unidentified`, not `other`;
+  it makes evidence `unknown` and cannot establish receipt.
+- **Output content by predicate class (r7 proposal).** Classify the exact earlier
+  call by the provenance predicate below, not by whether Codex calls its tool
+  built-in or MCP. `view_image`, shell tools and file tools can all be `other`.
+  For **every** output shape belonging to an `other` call, discard the content.
+  Retain only its call id and a SHA-256 fingerprint of the UTF-8
+  `JSON.stringify(output)` value. JSON types and object field order are preserved
+  by this fingerprint; same-id/same-hash output is idempotent, while a different
+  hash for that id makes evidence sticky `unknown`. Require a present output
+  field and valid earlier call/id before hashing. Neither this fingerprint nor
+  an `other` output can establish built-in receipt. This discards unrelated string
+  output as well as arrays, images and other JSON values; no descriptions, schemas,
+  tool output text or inline image data are retained.
+  For a positively identified `built-in` call, retain only the version-probed
+  string answer output needed for exact receipt. Structured built-in output and
+  any output for an unidentified call remain `unknown`. Missing/invalid fields,
+  malformed JSON, conflicting duplicate calls/outputs and file-validation failures
+  remain fail-closed. No guessed conversion of structured content to answer text
+  is permitted.
+- **Residual size limits.** A line over 1 MiB or cumulative read/file size over
+  64 MiB makes the reader sticky `unknown`, before content classification or
+  discard. The bound applies even to a valid `other` output or an ignored event,
+  image, compaction or patch record. Reopening the same oversized file from byte 0
+  encounters the same limit; that thread stays native while its rollout exceeds
+  the bound. R7 accepts this residual limit for this slice. Skipping oversized
+  lines by a type prefix, raising limits or adding a different recovery policy
+  requires separate review; the content-discard rule does not bypass these bounds.
 - **Provenance.** A request qualifies only when the file holds a `function_call`
   whose `call_id` equals the request's `itemId` and whose `name` is exactly
   `request_user_input` with no namespace. App tool approvals carry the MCP
@@ -244,13 +257,22 @@ are plain JSONL; compression applies only to rollouts at least seven days old.
   turn is in Plan mode. Positive provenance plus `isBlocking: true` therefore
   establishes the Plan-mode requirement for that version. The probe must confirm
   this against a Default-mode control, as the mode paragraph above requires.
-- **Receipt.** `consumed` requires a `function_call_output` with the same
-  `call_id`. Its output must parse as the native answer map, and its values must
-  equal the saved answer after the version-probed mapping. A different value is
-  the observed native answer and is handled as described below. The native
-  encodings for decline and for error responses must be captured by the probe
-  before activation, never guessed. The source suggests an empty answer map,
-  and that remains unconfirmed.
+- **Receipt.** `consumed` requires a `function_call_output` for the exact
+  native call, classified `built-in`, whose parsed answer map equals the saved
+  answer under the version-probed mapping. Scripted native 0.165.0 probes observed
+  `{"answers":{}}` for an empty-map decline and a client error response. Source
+  also maps a failed response receiver and a response body that cannot deserialize
+  to that same empty answer map. The client-error path excludes the explicitly
+  handled turn-transition error, which returns without submitting an answer.
+  Therefore matching a saved decline to `{}` establishes the model's value only:
+  it does not prove whose response won or whether an intentional decline caused
+  it. Preserve that limit in presentation and the runbook; no causal/winner claim
+  may be derived from empty-map equality. A nonempty saved answer followed by an
+  empty native map is a mismatch, never `consumed`.
+  Validate the complete native response body against the pinned answer mapping
+  before handoff/send: a malformed relay response must fail locally rather than
+  silently becoming a native decline. The native TUI decline, receiver-failure
+  trigger, competition and activation gates remain outstanding.
 - **Recovery.** A matching record found after reconnect or relay restart can
   settle reconciliation for that exact call. The proposed authoritative sign
   that a call is gone without an answer has three parts: protocol completion or
@@ -286,6 +308,8 @@ permits sending to another request just because its numeric RPC id is equal.
 answered or what the model received. Mark `consumed` only after a native tool result
 for the exact call contains the saved answer, using a version-probed mapping. A
 matching late result can confirm `unconfirmed` after the existing 60-second window.
+For decline, this confirms only empty-map value equality, never the winning client
+or the cause of that value.
 A different result leaves the saved answer intact, records the actual observed
 answer, and reports `unconfirmed`; do not claim the saved answer won. No model prose
 or timing inference counts as receipt. If no correlated output is available, the
@@ -363,13 +387,24 @@ equivalence; those gates remain separate.
 3. A phone-equivalent answer gets a correlated rollout `function_call_output`
    carrying its exact values. The rollout reader's limits, rotation and
    compression refusals and writer-lag wait are tested against captured lines. Test desktop-first and phone-first races, cleanup-only resolution,
-   mismatch, interruption, and delayed confirmation. No false `consumed` is allowed.
+   mismatch, interruption, and delayed confirmation. Include empty-map decline
+   collisions with client error, failed receiver and malformed response body; test
+   the turn-transition-error exception separately. Verify malformed relay bodies
+   are refused before send, and nonempty saved answers cannot match an empty map.
+   Record value equality without attributing the winning client. Source-shaped
+   receiver-failure tests are distinct from native proof of what triggers them.
+   No false `consumed` is allowed.
 4. Defer leaves the native question usable and advances no turn until the desktop
    answers. Verify history and relay retry responses.
 5. Transport reconnects and relay restarts preserve identity; daemon restart/re-ask rejects stale
    answers. Include recovery with no client attached and later attachment, either
    from current hq-25665e evidence or a focused isolated probe owned here. Do not
-   wait for that task's unrelated OpenCode or exec probes.
+   wait for that task's unrelated OpenCode or exec probes. Explicitly test whether
+   disconnecting a joined relay client while a question is pending causes receiver
+   failure or an empty-map result, both with another client attached and with no
+   client attached. This effect is unverified; socket loss alone proves neither
+   decline nor continued waiting. If it silently declines, keep the gate failed
+   and return for design review rather than call disconnect safe.
 6. Unit and real local IPC fixtures cover queue ordering, durable restart, duplicate
    delivery, native-id reuse, evidence/version refusal, and child cleanup. Run through
    `just test-one`, `just test-fast` and `just gate`, on Node 22 and the development
@@ -412,54 +447,40 @@ and daemon lifecycle management remain outside this task. None is implicitly
 delivered by this addendum or by the existing detached-question route.
 
 
-## R6 evidence, alternatives and next gate
+## R7 evidence and next gate
 
-The recorded task and r5 specify native Plan-mode phone answers and defer, with
-positive provenance and exact receipt. Their intent is unchanged. The following
-calls are this revision author's proposals, not additional user approval.
+R7 adopts the user's approved spec-round-12 review direction; the execution
+checkpoint and failed native results at `c36e7b7` remain unchanged. Pinned 0.165.0
+source confirms inline-image output in `view_image.rs:238–254` and empty-answer
+fallbacks, including the turn-transition exception, in
+`bespoke_event_handling.rs:1705–1747`. No new native probe ran for r7.
 
-Native `scripted-app-02` identified `noop` in namespace `mcp__relay_fixture` as
-`other`, observed `mcp_tool_call_approval_<id>`, sent Cancel only through the
-controller, and recorded no `tools/call`. Codex then persisted a valid array
-`function_call_output.output` for that call, followed by `task_complete` for the
-same turn. The string-only probe reader became sticky `unknown`, as designed.
-Reopening it cannot help: the valid array remains in history. This blocks truthful
-capability claims for ordinary threads containing MCP history. The minimized
-observation and its raw-line hashes are attached to relay-a27e7c as
-`scripted-structured-output-observation.json`; the protocol report records runs,
-versions, limits and hashes.
+Discarding all `other` output content with an id/fingerprint record replaces r6's
+array-only discard; interpreting arbitrary tool content as answer text is rejected.
+Why: unrelated strings and images are not receipt evidence. Cost if wrong: a
+misclassified call could hide evidence, so earlier-call validation and the exact
+provenance predicate remain mandatory. MCP is one example, not the scope of `other`.
 
-Approaches considered:
+The size limits remain an accepted residual restriction, rather than being bypassed
+by type-prefix skipping. Why: preserve bounded fail-closed parsing. Cost: some valid
+threads stay native indefinitely. The reviewer reported a size-only local census
+of 87/12,697 rollouts with a line over 1 MiB and two files over 64 MiB (largest about
+80 MB); this session did not repeat it or inspect live rollout content.
 
-1. **Discard only arrays belonging to a previously identified non-built-in call**
-   (recommended). The connector needs no receipt for an excluded approval; it must
-   keep answering later ordinary questions in the same thread. This keeps string
-   built-in receipt and privacy boundaries intact. Cost if wrong: a misclassified
-   call could hide evidence; the unchanged exact name/namespace predicate and
-   unknown-on-unidentified rule are therefore mandatory.
-2. **Interpret all content arrays as text.** Rejected for this slice: unrelated
-   tools have arbitrary content, and concatenating their text invents a receipt
-   mapping this version has not proved. Cost of rejection: future built-in array
-   output requires renewed evidence and review.
-3. **Keep the current reader and disable threads with MCP history.** Rejected as
-   the proposed direction: one ordinary tool permanently poisons evidence for all
-   later calls, including after a fresh read. Keeping the connector disabled until
-   review remains correct; this is not an activation waiver.
+After frozen-text review of r7, the correction plan must cover:
 
-After user approval of r6, a separately reviewed probe-plan revision must specify:
+- Byte-0 rebuild; unidentified outputs without an earlier call; strings and arrays
+  from `other` retaining only id/hash, including non-MCP image output; identical
+  and conflicting duplicates; later built-in receipts without unrelated retention.
+- Unknown built-in structured/unidentified output, malformed JSON/IDs and existing
+  file/size refusals, including oversized irrelevant lines and oversized-file reopen.
+- Gate 3 empty-map collisions, local malformed-body refusal and value-only decline
+  receipt; gate 5 proof of disconnect behavior, whose receiver-failure effect is
+  unverified. Keep source-shaped tests distinct from native trigger evidence.
+- Aggregate deadlines before any delayed case; remaining competition, defer,
+  recovery and private-TUI gates; app exclusion/no-execution without approval receipt.
 
-- RED→GREEN checks for an `other` array followed by a valid built-in call/output;
-  no unrelated content retained; a built-in or unidentified array remains unknown;
-  malformed JSON/IDs and existing file/byte-limit checks retain their refusals.
-- The app control proves exclusion and no tool execution. It does not require an
-  answer receipt for an approval this route must never answer. Keep the original
-  failed attempts and reconcile their observations explicitly.
-- Apply the declared aggregate case deadline before running delayed cases.
-- Resume the remaining competition, defer, recovery and private-TUI evidence gates.
-  Sequential two-call success proves no concurrent pending-call safety; the
-  production plan must still enforce the turn-level single-question rule.
-
-No new production plan, connector, activation or phone acceptance is authorized by
-this proposed revision. The first real-model rollout check remains gate 7, and
-version evidence must match the eventual activation binary; current scripted
-0.165.0 evidence does not establish the shared launcher's 0.166.0 behavior.
+Provider-index and duplicate-prompt minors remain deferred. The stale decline
+sentence is replaced by the stronger receipt contract. No correction plan,
+production connector or activation is approved here. Simultaneous pending-call
+safety, real-model provenance, phone/TUI acceptance and 0.166.0 remain unproved.

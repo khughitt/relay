@@ -1,6 +1,28 @@
 # Codex question scripted probes: structured-output blocker
 
-## Current outcome
+## Review update: proposed r7
+
+Spec review round 12 (claude-code/claude-opus-5-5: revise, Important 4, Minor 1)
+was supplied by the user, who approved incorporating its findings before the
+correction plan. Proposed r7 of the [connector addendum](../specs/2026-10-28-codex-question-connector.md)
+discards every `other` output shape with only id/fingerprint retained, uses predicate
+classes rather than MCP/built-in taxonomy, states the persistent 1 MiB/64 MiB
+fail-closed limits, and limits decline receipt to value equality. It also specifies
+byte-0 rebuild and unidentified outputs without an earlier call.
+
+The pinned source confirms non-MCP inline-image output and empty-map fallbacks
+for client errors, receiver failure and malformed response bodies. Turn-transition
+errors are an exception: they return without an answer. Whether disconnect causes
+receiver failure remains unverified and belongs to gate 5. The reviewer supplied
+a size-only local census (87/12,697 oversized-line files; two over 64 MiB); this
+session neither repeated that census nor read live rollout content.
+
+No executable reader changed, no native case reran, and no new runtime verification
+is claimed. The current probe starts each open at byte 0, but still retains strings
+for `other` or not-yet-classified calls; r7 specifies a correction, not a capability
+already present. R7 awaits frozen-text review before a correction plan.
+
+## Frozen c36e7b7 execution checkpoint
 
 Approved scripted plan r3 (records `82be32595`, SHA-256
 `bfea9cdee60ec7eeddddf08e3da836b9483be9276541737e00e3389694ac9c14`) executed
