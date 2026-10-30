@@ -69,3 +69,10 @@ test('same-process reconnect never resumes an admitted question that became rece
  f.p.socket.destroy();await until(()=>f.count('initialize')===2,3000);await until(()=>f.count('thread/loaded/list')>3);await pause(100);
  assert.equal(f.count('thread/resume'),1);assert.equal(responses(f).length,1);assert.equal(f.inbox.retained()[0].state,'unconfirmed');
 });
+test('join retired by its RPC deadline never resumes after registry preparation completes',async t=>{
+ const f=await serverFixture(t);let armed=false,started=false,release;const blocked=new Promise(r=>release=r);t.after(()=>release());const read=f.options.readAgents;
+ f.options.readAgents=async()=>{if(armed){started=true;await blocked}return read()};
+ f.options.connect=async opts=>{const rpc=await connectRpc(opts),call=rpc.call.bind(rpc);rpc.call=(method,p,before)=>{if(method==='thread/resume'){armed=true;rpc.timeout=100}return call(method,p,before)};return rpc};
+ await start(t,f);await until(()=>started);await until(()=>f.logs.includes('CODEX_JOIN_RACED'));release();await until(()=>f.count('thread/unsubscribe')===1);
+ assert.equal(f.count('thread/resume'),0);assert.equal(f.inbox.retained().length,0);assert.equal(responses(f).length,0);
+});

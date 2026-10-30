@@ -25,3 +25,11 @@ test('RPC bounds pending calls and abort rejects every outstanding request',asyn
 test('RPC request deadline rejects only its bounded pending operation',async t=>{
  const a=new AbortController(),{rpc}=await setup(t);const fast=new Rpc(rpc.wire,()=>{},a.signal,10);t.after(()=>fast.close());await assert.rejects(fast.call('thread/read',{}),/rpc-deadline/);assert.equal(fast.pending.size,0);
 });
+for(const phase of ['preparation','queue'])test(`expired RPC cannot write after asynchronous ${phase}`,async t=>{
+ const {p,rpc}=await setup(t);rpc.timeout=30;let release,started=false;const blocked=new Promise(r=>release=r);t.after(()=>release());
+ const prepare=async()=>{started=true;await blocked;return ()=>{}};
+ const holding=phase==='queue'?rpc.send({method:'hold'},prepare):null;
+ const expired=rpc.call('thread/resume',{threadId:'retired'},phase==='preparation'?prepare:undefined),rejected=assert.rejects(expired,/rpc-deadline/);
+ await until(()=>started);await rejected;release();await holding;await rpc.send({method:'after'});await until(()=>p.received.some(f=>JSON.parse(f.payload).method==='after'));
+ assert.equal(p.received.filter(f=>JSON.parse(f.payload).method==='thread/resume').length,0);
+});

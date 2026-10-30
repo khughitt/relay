@@ -52,7 +52,11 @@ export class Rpc {
     return new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>{this.pending.delete(id);reject(Error('rpc-deadline'));},this.timeout);
       this.pending.set(id,{resolve,reject,timer});
-      this.send({id,method,params},beforeWrite).catch(e=>{clearTimeout(timer);this.pending.delete(id);reject(e);});
+      const active=()=>{if(!this.pending.has(id))throw Error('rpc-retired');};
+      this.send({id,method,params},()=>{
+        active();const prepared=beforeWrite?.();
+        if(prepared)return prepared.then(guard=>()=>{active();guard();});
+      }).catch(e=>{clearTimeout(timer);this.pending.delete(id);reject(e);});
     });
   }
   async close(){this.signal.removeEventListener('abort',this.onAbort);this.stop('closed');await this.wire?.close();}
