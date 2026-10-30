@@ -44,7 +44,9 @@ at 8 MiB. Shutdown aborts waits, closes sockets and cancels reconnect timers.
 
 Discover only loaded threads associated with live Codex registry rows, using
 complete paginated loaded discovery and bounded refresh, including late joins
-and new arrivals. Joining must preserve model, instructions, approval policy,
+and new arrivals. A row is live only when its qualified process probe is alive;
+stale, replaced, missing or unknown processes do not authorize joins or retain
+subscriptions without an unsettled entry. Recheck before queued resume. Joining must preserve model, instructions, approval policy,
 workspace and collaboration mode, start no work and never resurrect an unloaded
 thread. A registry row disappearing stops new discovery; it does not establish
 an already tracked question's death. Partial pages cannot establish absence.
@@ -232,7 +234,7 @@ of receipt and settlement classification.
 | Proven end without an answer, pending | Withdraw with reason `asker-gone`. |
 | Saved, not handed, request lost or a different native answer wins | Retain saved answer, mark `undeliverable`. |
 | Handed, absent/mismatching/unknown receipt | Retain saved answer, remain `unconfirmed`; retain valid actual answer in `observed`. |
-| Handed, actual exact output equals saved native map | `consumed`, including matching late receipt after the existing 60-second window. |
+| Handed, actual exact output equals saved native map AND the exact protocol turn terminal was observed | `consumed`, including matching late receipt after the existing 60-second window. |
 
 For structural no-answer settlement, post-handoff `unconfirmed` means a known end
 without an answer: the saved answer did not reach the model, and later delivery to
@@ -258,7 +260,8 @@ reconstruct an RPC message.
 **Detected daemon replacement independently settles lifecycle.** A validated
 change of daemon instance/process identity makes old pending entries `asker-gone`
 and saved-but-unhanded answers `undeliverable`. Handed stays `unconfirmed` unless
-an actual exact-call matching output appears; replacement supplies no receipt.
+an actual exact-call matching output and the observed exact protocol turn terminal
+establish receipt; replacement supplies neither receipt nor that terminal.
 Do not require an unavailable old protocol terminal/barrier for this lifecycle
 transition. Preserve completed receipts and released/closed entries. A disconnected
 socket, reused RPC id or local generation counter alone is not validated replacement;

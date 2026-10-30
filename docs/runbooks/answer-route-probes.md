@@ -69,7 +69,8 @@ owned process ids, and inspect cleanup before another run.
 
 A saved phone answer can lose to the native UI: relay serializes its own answers,
 but saving does not lock Codex. Only the actual exact-call rollout answer map,
-compared by full native value, confirms consumed. Resolution, client order and
+compared by full native value AND accompanied by an observed exact protocol turn
+terminal, confirms consumed. Resolution, client order and
 elapsed time do not identify the winner or establish receipt. Preserve native
 string arrays in observations. Native unanswered submission is a per-question
 empty array (`{"answers":{"q_color":{"answers":[]}}}` in the fixed capture),
@@ -89,12 +90,12 @@ Before handoff, a proven end without an answer means asker-gone when pending and
 undeliverable when saved. After handoff it stays unconfirmed: in this case that
 means a known end without an answer, the saved answer did not reach the model,
 and it must never be retried to that tuple. Other unconfirmed cases retain their
-absent/mismatching/unknown receipt meaning. A matching late actual output may
+absent/mismatching/unknown receipt meaning. A matching late actual output with the observed exact protocol terminal may
 confirm receipt; no synthetic history entry can do so.
 
 Validated daemon replacement independently settles pending -> asker-gone and
 saved-unhanded -> undeliverable; handed remains unconfirmed unless actual matching
-output appears. Do not require an old protocol terminal for replacement lifecycle.
+output and the observed exact protocol terminal establish receipt. Do not require an old protocol terminal for replacement lifecycle.
 Socket loss, local generation counters or a changed RPC id alone prove no
 replacement. These lifecycle rules are production tests, not behavior shipped by
 the probe reader or a reason to invent receipt.
