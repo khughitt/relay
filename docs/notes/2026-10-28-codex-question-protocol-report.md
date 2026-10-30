@@ -94,11 +94,22 @@ A restart or disappearance from partial discovery is never a terminal proof.
 
 ## Validation and outstanding work
 
-The combined affected probe checks passed **174/174** on Node 26.5.0 and
-Node 22.23.2. Strict checkJs, whitespace and task checks passed; task checks
+Initial combined affected checks passed **174/174** on both runtimes. After
+whole-branch review, all task-local probe checks passed **343/343** on
+Node 26.5.0 and Node 22.23.2, including Rpc/transport and the corrective cases. Strict checkJs, whitespace and task checks passed; task checks
 reported historical unlinked-plan-step warnings, with no errors. The final `just test-fast` passed **773/773** repository tests. Review results and directory checkpoint are recorded in the final task note
 and matrix evidence index. A skipped or unrun gate is not a passed test. The execution baseline also passed 773/773; neither run proves the unknown native
 gates.
+
+Whole-branch impl round 29 (codex/gpt-6-astra) returned three Important findings:
+queued writer revocation, skipped tmux cleanup after observer failure, and TUI
+keys behind unknown menus. Each reproduced RED. The corrected prototype now
+checks tuple/address ownership at socket.write after the transport queue, attempts
+both TUI cleanups independently with unresolved ownership retained, and requires
+exact active screens plus known bootstrap content before keys. Connected IPC,
+real tmux cleanup and composite-menu regressions pass. The repository suite also
+passed 773/773 again. Fresh scoped re-review is required before final handoff.
+No native case reran or changed verdict for these unexercised paths.
 
 Before production code, prove unloaded absence/controller restoration, authoritative
 old-call reconciliation and private TUI answer/decline. If a proof requires widening
@@ -110,3 +121,7 @@ Deferred minors: provider request-index overlap; repeated prompt wording in the
 historical plan (the completion plan uses one fixed prompt); detailed server/socket
 metadata can be lost when cleanup stop itself fails, although the run fails closed.
 The empty-collection and duplicate-option-label minors were fixed before broader use.
+A fourth minor from impl29 remains deferred: `docs/runbooks/answer-route-probes.md`
+still describes recognized-string cancellation and an unconfigured timed mapping.
+This report and approved r9 supply the current cause-neutral rule; that stale
+paragraph grants no mapping or native pass.
