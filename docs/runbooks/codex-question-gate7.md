@@ -33,18 +33,28 @@ stops this gate; do not manufacture private-pilot metadata in the live home.
 The four opt-in variables are exactly:
 
 ```sh
-RELAY_CODEX_BIN="$HOME/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/bin/codex"
 RELAY_CODEX_HOME="<canonical existing Codex home>"
+DAEMON_PID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["pid"])' "$RELAY_CODEX_HOME/app-server-daemon/daemon.pid")"
+RELAY_CODEX_BIN="$(realpath "/proc/$DAEMON_PID/exe")"
 RELAY_CODEX_SOCKET="<resolved existing physical Unix listener>"
 RELAY_CODEX_EVIDENCE="$RELAY/docs/evidence/codex-question-0.166.0.json"
 ```
 
 `RELAY` is the absolute `.worktrees/codex-question` path, never a shared launcher.
-Require the evidence digest and executable SHA-256 from the
+Derive the executable from the live daemon's validated PID record and `/proc`
+link, not from the standalone package path. Require its bytes and size to match
+the evidence executable pin before connecting. `identity.js` compares executable
+realpaths as well as process birth and listener ownership; identical version text
+or identical bytes at a different executable path cannot substitute. Require the
+evidence digest and executable SHA-256 from the
 [private re-proof](codex-question-reproof.md). The socket and temporary
 `$STATE/serve.sock` paths must each fit the 103-byte limit. Runtime admission also
 checks actual PID birth/executable/listener ownership; a refusal is a failed
 preflight, never permission to bypass it.
+Recheck the qualified daemon identity and executable before each case and after
+each terminal result. Any identity, disable or version diagnostic stops the run
+and rolls back. A daemon update during the run makes the affected case interrupted;
+do not silently reconnect the acceptance run to another daemon generation.
 
 Choose a fresh mode-0700 `$WORK_ROOT/relay/relay-a27e7c/gate7-<run-id>` directory;
 `RUN` names it and `STATE="$RUN/state"` is a fresh mode-0700 child. Keep private
