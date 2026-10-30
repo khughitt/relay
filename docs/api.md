@@ -759,8 +759,10 @@ accepted answer, defer and withdrawal messages. Codex's internal native value
 preserves full string arrays, including empty arrays; it is never flattened into
 Claude's string map. Public responses omit connector ownership, generation and
 question-id mapping metadata; their route is the handback/waiter capability view.
-The Codex connector remains disabled by its native subscription capability gate,
-so these internal types do not establish an available Codex answer route. `observations` retains native answer
+The opt-in exact-version Codex connector joins admitted Active+WaitingOnUserInput
+threads and detects the accepted unload/resume residual. It is off when its four
+configuration paths are absent. Public routes also omit the private rollout path
+and terminal proof. `observations` retains native answer
 observations, including answers from the terminal after release or expiry. `observed`
 is the latest such map. The full saved entry and its histories are returned to clients.
 Raw harness payloads, transcripts and environment values are never persisted.
@@ -782,7 +784,9 @@ Raw harness payloads, transcripts and environment values are never persisted.
 Only `consumed` means receipt. JSON retains the machine state; human CLI output uses
 the fixed labels above. A valid first answer moves pending → answered; the recorded
 waiter moves answered → handed before writing the harness reply. A matching native
-confirmation moves handed or unconfirmed → consumed. A mismatching confirmation,
+confirmation moves handed or unconfirmed → consumed. Codex additionally requires
+the actual exact-call full answer map and observed exact protocol turn end; a
+matching output after unsubscribe without that transition stays unconfirmed. A mismatching confirmation,
 or 60 seconds without confirmation after handoff, yields unconfirmed. Late matching
 confirmation still consumes it. Released/expired native receipts are recorded without
 changing that terminal state.

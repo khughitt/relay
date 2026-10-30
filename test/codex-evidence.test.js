@@ -18,6 +18,6 @@ test('evidence refuses wrong version, altered pins, malformed/symlink files and 
  for(const text of [valid.replace('0.165.0','0.166.0'),valid.replace(/d7b21f2f9ca15e6550e105f1140b8312bb36d4563119478bf8748ebab81e6d4b/,'0'.repeat(64)),'not json',valid]){await fs.writeFile(evidence,text,{mode:0o600});await assert.rejects(mod.validateEvidence({...cfg,evidence,bin}),/CODEX_/);}
  await fs.rm(evidence);await fs.symlink(bin,evidence);await assert.rejects(mod.validateEvidence({...cfg,evidence,bin}),/CODEX_/);assert.deepEqual((await fs.readdir(dir)).sort(),['codex','e.json']);
 });
-test('pinned evidence and actual binary still refuse connection without selective atomic native subscription',{skip:!process.env.RELAY_CODEX_TEST_BIN},async()=>{
- assert.equal(typeof mod.validateEvidence,'function');await assert.rejects(mod.validateEvidence({...cfg,evidence:resolve('docs/evidence/codex-question-0.165.0.json'),bin:process.env.RELAY_CODEX_TEST_BIN}),{message:'CODEX_NO_ATOMIC_SUBSCRIPTION'});
+test('pinned evidence admits only the accepted active-waiting detected residual',{skip:!process.env.RELAY_CODEX_TEST_BIN},async()=>{
+ assert.equal(typeof mod.validateEvidence,'function');assert.deepEqual(await mod.validateEvidence({...cfg,evidence:resolve('docs/evidence/codex-question-0.165.0.json'),bin:process.env.RELAY_CODEX_TEST_BIN}),{version:'0.165.0',blockingBuiltinImpliesPlan:true,gate7Passed:false});
 });

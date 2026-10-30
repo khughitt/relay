@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {readOwned,sameFile} from './files.js';
 export const VERSION='0.165.0';
 // This digest binds the reviewed source/protocol/native pins as one immutable artifact.
-const EVIDENCE_SHA256='c829cabdbe68bf9562c6afcb95a840e4588f8780248a789574ee93ae1d2c9ddf';
+const EVIDENCE_SHA256='ef5a7cc37a750c2b180ef7b8a51893167459d9175f51dfb680411950bfc735c2';
 /** @param {import('../../types.js').CodexConfig} config @returns {Promise<{version:string,blockingBuiltinImpliesPlan:boolean,gate7Passed:boolean}>} */
 export async function validateEvidence(config) {
   try {
@@ -21,9 +21,9 @@ export async function validateEvidence(config) {
       const hash=createHash('sha256');for await(const chunk of fd.createReadStream({autoClose:false,highWaterMark:65536}))hash.update(chunk);
       if(hash.digest('hex')!==proof.executable.sha256||!sameFile(before,await fd.stat())||!sameFile(before,await fs.lstat(config.bin)))throw Error('CODEX_BINARY');
     }finally{await fd.close();}
-    if(proof.protocolPrerequisitesComplete!==true||proof.subscriptionCapability?.loadedOnlyJoin!==true||proof.subscriptionCapability?.optOutAutomaticAttachment!==true)throw Error('CODEX_NO_ATOMIC_SUBSCRIPTION');
+    if(proof.protocolPrerequisitesComplete!==true||proof.subscriptionCapability?.selection!=='active-waiting'||proof.subscriptionCapability?.detectedJoinResidual!==true||proof.subscriptionCapability?.nativeStatusBroadcast!==true||proof.subscriptionCapability?.pendingRequestReplay!==true)throw Error('CODEX_SUBSCRIPTION_EVIDENCE');
     return {version:VERSION,blockingBuiltinImpliesPlan:true,gate7Passed:false};
-  }catch(caught){if(caught instanceof Error&&caught.message==='CODEX_NO_ATOMIC_SUBSCRIPTION')throw caught;throw Error('CODEX_EVIDENCE_OR_BINARY');}
+  }catch(caught){if(caught instanceof Error&&caught.message==='CODEX_SUBSCRIPTION_EVIDENCE')throw caught;throw Error('CODEX_EVIDENCE_OR_BINARY');}
 }
 /** @param {any} value @param {import('../../types.js').CodexConfig} config */
 export function validateInitialize(value,config) {

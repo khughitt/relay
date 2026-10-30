@@ -4,8 +4,8 @@ Status: r11, accepted with the production conditions recorded in spec round 17.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
 Production implementation is authorized under the standing private envelope after
 one fresh review of its task-level implementation plan.
-Gate 7 and integration each require separate user approval. These probes ship no
-connector and authorize no live daemon, desktop, phone or real-model use.
+Gate 7 and integration each require separate user approval. Private production
+implementation authorizes no live daemon, desktop, phone or real-model use.
 Relay `c6d074e` is the last layered revision retaining rejected alternatives and their rationale.
 
 ## Intent and architecture

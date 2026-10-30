@@ -52,20 +52,29 @@ session id `00000000-0000-4000-8000-000000000000`, transcript `/tmp/x.jsonl`, cw
 `/tmp/ws` and tool id `toolu_fixture`, preserving its tool input and response.
 
 
-## Proposed Codex connector: receipt and lifecycle probes
+## Codex connector: receipt and lifecycle probes
 
-Current production admission refuses `CODEX_NO_ATOMIC_SUBSCRIPTION` even for the
-pinned binary: 0.165.0 has no selective atomic loaded-only join, and automatic
-new-thread attachment precedes client filtering. Fresh loaded checks cannot make
-resume safe against intervening unload. Keep the connector disabled; do not bypass
-the evidence gate or substitute a mocked loaded-only server for native proof.
+The [current connector contract](../specs/2026-10-28-codex-question-connector.md)
+and [all-gates report](../notes/2026-10-28-codex-question-protocol-report.md)
+cover the disabled-by-default production route and preserved private controls.
+0.165.0 has no atomic loaded-only join. The accepted detected residual selects
+only Active+WaitingOnUserInput through full admission; a qualifying first replay
+is required, and reconnect requires the stored exact tuple. No replay or changed
+replay means immediate unsubscribe, content-free `CODEX_JOIN_RACED`, no send or
+publication, and no retry of that waiting episode. No timing minimum is inferred
+from merged config or a latency sample. The private short-override control must
+exercise a real cold resume, detection, release and normal subsequent unload;
+controlled delivery lag demonstrates the schedule, not its production frequency.
 
-
-The [current Codex connector contract](../specs/2026-10-28-codex-question-connector.md)
-is proposed, not installed. The [all-gates report](../notes/2026-10-28-codex-question-protocol-report.md)
-points to the retained evidence index. Private scripted probes establish protocol
-capability; production inbox durability and real-model/phone/native-desktop
-acceptance remain separate obligations.
+The production private pilot uses the actual worktree `relay serve`, exact native
+binary, real Linux process/listener qualification, isolated registry and durable
+inbox, with no injected identity/evidence. Prove one saved answer reaches the
+scripted model and becomes consumed; then defer a new question and prove the
+native answer reaches the model and released history. Check auto-attached helper
+release, public metadata exclusion, no extra turns and owned cleanup. Use
+`list` with `since: 0` when counting retained terminal histories: the default list
+contains only active entries. Preserve failed attempts and their original verdicts.
+This scripted client does not establish Gate 7 phone rendering or human acceptance.
 
 Use the exact pinned 0.165.0 executable, private homes with no auth file or
 credentials, and the local scripted Responses provider. Verify source/protocol
@@ -104,8 +113,8 @@ Validated daemon replacement independently settles pending -> asker-gone and
 saved-unhanded -> undeliverable; handed remains unconfirmed unless actual matching
 output and the observed exact protocol terminal establish receipt. Do not require an old protocol terminal for replacement lifecycle.
 Socket loss, local generation counters or a changed RPC id alone prove no
-replacement. These lifecycle rules are production tests, not behavior shipped by
-the probe reader or a reason to invent receipt.
+replacement. Production tests cover these lifecycle rules; the probe reader
+alone supplies no lifecycle authority and cannot invent receipt.
 
 For an unloaded control, set root `thread_unload_delay_secs = 2` only in the
 private home. The production default is 1800 seconds (30 minutes), after both no
@@ -115,8 +124,9 @@ TUI controls, name the primary before submission, preserve the exact native
 answer/unanswered outputs, and require zero outside responses. The automatic
 second start is an ephemeral `thread_title` feature with tools disabled; production
 discovery must ignore the TUI's exact ephemeral feature set, `system` and
-`thread_title`, without renaming user threads. Hold subscriptions only for live
-registry rows or unsettled entries, and unsubscribe otherwise. Rollout observation
+`thread_title`, without renaming user threads. Unsubscribe after a selected question settles and its turn end is seen; a live
+registry row alone never justifies holding an idle thread. Release unselected
+auto-attached threads immediately, retaining no content. Rollout observation
 may continue after unsubscribe, but without the exact protocol turn transition
 matching output leaves handed answers unconfirmed. Provenance waits at most five
 seconds for the earlier call line; expiry stays unidentified/native.

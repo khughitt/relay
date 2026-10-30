@@ -1,18 +1,19 @@
 # Codex question connector — prerequisite and all-gates report
 
-The private scripted matrix controls are complete. Production implementation began
-under the user's extended envelope, but a subsequent pinned-source review found
-that 0.165.0 cannot provide the required selective, atomic loaded-only subscription.
-Loaded discovery followed by resume can cold-start a thread unloaded in between;
-new threads can also be attached automatically before client filtering. The
-production evidence gate now refuses connection with
-`CODEX_NO_ATOMIC_SUBSCRIPTION`. No discovery/recovery resume or activation is added.
+The private scripted matrix controls and the production connector's automated
+implementation are complete, subject to final fresh review. The user accepted a
+detected unload/resume residual in exact 0.165.0 rather than an unavailable atomic
+loaded-only API or an unprovable timing bound. Selection requires native
+Active+WaitingOnUserInput, admission and qualifying replay; a raced join releases
+immediately with `CODEX_JOIN_RACED`, without publication, send or retry.
 
-The independent transport, reader, durable owner and qualification work is retained.
-Production acceptance is incomplete; relay-a27e7c stays open for the required
-server-capability or contract decision. Gate 7 and integration remain separate
-approvals, and the locked `feat/codex-question` branch stays unmerged. Source proof,
-review and checkpoint are indexed in the task's production evidence.
+The actual worktree service passed its private native pilot: saved Blue reached
+the model and was confirmed consumed; a fresh deferred question accepted native
+Red and updated released history. Both processes and private endpoint resources
+were cleaned. The failed first pilot is retained: its final count used the
+active-only inbox list, corrected to include terminal history in the passing run.
+Gate 7 and integration remain separate approvals. The locked
+`feat/codex-question` branch stays unmerged; nothing is installed or activated.
 
 ## Authority and evidence
 
@@ -22,7 +23,10 @@ recorded before edits. R11 gained subscription lifetime, bounded provenance wait
 the exact ephemeral system/thread_title exclusion and c6d074e rationale pointer.
 The task-level implementation plan received plan8 acceptance after plan7 corrections.
 Plan9's source review then established the subscription capability blocker above.
-The exact authority and full reviews are retained under production/ and on the task.
+The user subsequently approved the detected residual and clarified first-join
+replay qualification versus exact stored-tuple reconnect. Tasks4–6 implement that
+contract. Exact authority and full reviews are retained under production/ and on
+the task; historical blocked checkpoints retain their original verdicts.
 
 One canonical index, `$WORK_ROOT/relay/relay-a27e7c/matrix/evidence-index.json`,
 locates native result hashes, source/protocol pins, fixture derivations, original
@@ -33,7 +37,9 @@ rewritten to make a corrected run pass.
 
 All native controls used explicit codex-cli 0.165.0, private homes, no auth file
 or credentials, and a local scripted Responses provider. No subscription turn,
-live daemon, shared launcher, host pointer, desktop, push or post was used.
+live daemon, shared launcher, host pointer, desktop or push was used. Separately,
+the user authorized posting the prepared atomic-join request as khughitt:
+[upstream issue 58423](https://github.com/openai/codex/issues/58423).
 Private tmux did not access the user's desktop.
 
 ## Prerequisite results
@@ -76,12 +82,12 @@ Private tmux did not access the user's desktop.
 
 | Gate | Established evidence | Remaining obligation |
 | --- | --- | --- |
-| 1 transport/discovery | Private WebSocket/initialize, source listener equivalence, complete loaded and late/new join controls, unchanged settings/no join work, new unloaded control | Blocked by missing selective atomic subscription; ordinary resume cannot guarantee no resurrection. |
-| 2 admission/forms | Built-in provenance/Plan enforcement, enumerated option/Other/multiple/decline controls and native exclusions; source serial runtime, unit ineligible supersession, unique option labels | Translator and durable owner are implemented/tested; connector admission remains blocked. No broad form-validation claim. Simultaneous native same-turn requests are prevented by the pinned serial runtime. |
-| 3 receipt/competition | Actual rollout/provider values, four guarded competition leaves, both >=65-second delayed match/mismatch reads, decline/error collisions, malformed-body refusal, structural no-answer controls | Durable owner/receipt units passed; connector end-to-end and real phone acceptance remain blocked/unrun. Equality identifies no winning client or cause. |
-| 4 defer | Outside silent for 30 seconds with no turn advance, followed by native controller answer | Core released/history/retry units passed; connector handback and native desktop acceptance remain unrun. |
-| 5 recovery | Pending reconnect, post-send readback/no resend, fresh replay process, controlled replacements including 20 seconds without clients, new-tuple stale refusal, complete unloaded absence/controller restoration | Real persisted inbox restart/crash windows and replacement identity/lifecycle tests. Existing native disconnect controls do not imply safety from socket loss alone. |
-| 6 IPC/private TUI | Reader/transport/guard/provider/observer unit and real local IPC/cleanup checks; native TUI answer and unanswered with zero outside responses | Owner/schema/native-array integration is tested; complete connector and native end-to-end production gates remain blocked. |
+| 1 transport/discovery | Private WebSocket/initialize, source listener equivalence, complete loaded and late/new join controls, unchanged settings/no join work, new unloaded control | Accepted detected residual tested with private short override; no absolute no-resurrection or timing claim. |
+| 2 admission/forms | Built-in provenance/Plan enforcement, enumerated option/Other/multiple/decline controls and native exclusions; source serial runtime, unit ineligible supersession, unique option labels | Translator, durable owner and connector admission are implemented/tested. No broad form-validation claim. Simultaneous native same-turn requests are prevented by the pinned serial runtime. |
+| 3 receipt/competition | Actual rollout/provider values, four guarded competition leaves, both >=65-second delayed match/mismatch reads, decline/error collisions, malformed-body refusal, structural no-answer controls | Durable connector receipt and actual private native end-to-end passed; real phone acceptance remains unrun. Equality identifies no winning client or cause. |
+| 4 defer | Outside silent for 30 seconds with no turn advance, followed by native controller answer | Connector defer/history and private native pilot passed; real desktop acceptance remains unrun. |
+| 5 recovery | Pending reconnect, post-send readback/no resend, fresh replay process, controlled replacements including 20 seconds without clients, new-tuple stale refusal, complete unloaded absence/controller restoration | Fresh-process durable restart, SIGKILL crash windows and qualified replacement lifecycle tests passed. Existing native disconnect controls do not imply safety from socket loss alone. |
+| 6 IPC/private TUI | Reader/transport/guard/provider/observer unit and real local IPC/cleanup checks; native TUI answer and unanswered with zero outside responses | Owner/schema/native arrays, real local IPC and private native production pilot passed. |
 | 7 real model/phone/desktop | Not run | Separate user-present approval after production automated gates. |
 
 ## Contract and runbook
@@ -108,12 +114,13 @@ and tasks checks passed (historical unlinked-step warnings, zero errors). The
 evidence index and task checkpoint record current production verification and review. The unchanged
 repository execution baseline also passed 773/773. No skipped or unbuilt gate is a pass.
 
-The reviewed task-level production plan has completed independent Tasks1–3.
-Transport/reader, internal ownership/native arrays and process/evidence qualification
-are implemented, with strict admission refusal before Codex initialization.
-Tasks4–6 remain unfinished because of the confirmed native subscription gap.
-Current verification/review and the source-backed checkpoint are indexed under
-production/. Gate7 and integration remain separately gated.
+The reviewed task-level plan now implements Tasks1–6: bounded transport/reader,
+internal durable ownership, exact version/process qualification, discovery,
+delivery/receipt/recovery and opt-in service lifecycle. Current verification and
+fresh review are indexed under production/. The passing native pilot uses real
+production defaults for identity/evidence; fault fixtures and controlled resume
+lag are distinguished from native normal-operation evidence. Gate7 and integration
+remain separately gated. No unrun human acceptance is presented as a pass.
 
 Three minors remain deferred: provider request-index overlap; repeated prompt
 wording in the historical plan (the completion plan uses one fixed prompt); and

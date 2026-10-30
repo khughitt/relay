@@ -2,7 +2,7 @@
   "schema": 1,
   "harness": "codex",
   "version": "0.165.0",
-  "scope": "private scripted matrix controls; production blocked by native subscription capability, Gate 7 and integration unrun",
+  "scope": "private scripted controls and accepted detected active-waiting join residual; production pilot/review pending, Gate7 and integration unrun",
   "executable": {
     "sha256": "c06a67fd8ac76508dc78bd99ce20c9f317b8d568beda59485f3f4134df9962d5",
     "size": 309732776
@@ -104,6 +104,22 @@
     {
       "file": "app-server/src/lib.rs",
       "sha256": "314e9b2fe129e053b8c7cf261c366a19f9df681f9bc2c7288761d695152fad2f"
+    },
+    {
+      "file": "app-server/src/thread_status.rs",
+      "sha256": "7948ede1c98af3467d8a1b1ec4cd3fe5487574b0789dfc4fac10987e6f1238f1"
+    },
+    {
+      "file": "app-server/src/outgoing_message.rs",
+      "sha256": "5ca12d1577c595eb872a8b48603df4ece3c9f0c675a02527f2e1207d424a4b86"
+    },
+    {
+      "file": "app-server/src/config_manager_service.rs",
+      "sha256": "75ff0c8a553c2cdeca5aa7eeaa340657e11b7388daec31da0bb4972e3de63a62"
+    },
+    {
+      "file": "app-server-protocol/src/protocol/v2/config.rs",
+      "sha256": "71817a3d06e1919b100e7027e6d9a72b146866cc056a56cd9211a9bd5446e5fd"
     }
   ],
   "protocol": [
@@ -169,16 +185,36 @@
       "case": "tui-named-04",
       "sha256": "1b35da835eed924def3caa9038f4760c8cba5ca47c7c3174921688c98a9016a3",
       "status": "passed"
+    },
+    {
+      "case": "native-status-01",
+      "sha256": "7ab43a4a8ef9f8816d002781b158830a300098709937901210b2d9af89557f50",
+      "status": "prerequisite-failed"
+    },
+    {
+      "case": "residual-race-01",
+      "sha256": "dd86b5025b0744ffe10a164f8e7922c3e7612795cdaa57b9c33f6bfd9bb9e927",
+      "status": "failed"
+    },
+    {
+      "case": "residual-race-02",
+      "sha256": "0cf96dab50d8b95b14d1d58b9b13e32ffaef2ecd722a0f1b58f927ff311ed006",
+      "status": "passed"
     }
   ],
-  "protocolPrerequisitesComplete": false,
+  "protocolPrerequisitesComplete": true,
   "blockingBuiltinImpliesPlan": true,
   "gate7Passed": false,
   "privateMatrixControlsComplete": true,
   "subscriptionCapability": {
     "loadedOnlyJoin": false,
     "optOutAutomaticAttachment": false,
-    "disposition": "Do not initialize or resume from this connector under the current contract"
+    "selection": "active-waiting",
+    "detectedJoinResidual": true,
+    "nativeStatusBroadcast": true,
+    "pendingRequestReplay": true,
+    "minimumUnloadDelayRequired": false,
+    "disposition": "Require qualifying first replay or exact stored tuple; raced episodes unsubscribe without retry; release idle and unselected auto-attached threads"
   },
   "productionAcceptanceComplete": false
 }
