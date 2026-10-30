@@ -7,6 +7,7 @@ import { readJson } from '../bus/store.js';
 import { loadStore, writeDurable } from '../interaction/store.js';
 import * as L from '../interaction/lifecycle.js';
 import { expiryLimit } from '../routes/index.js';
+import {validateOwner} from './codex/owner.js';
 // The service's inbox (spec §5-§6, §8): every operation runs one at a time on a promise chain,
 // the clock is applied to an entry before any write to it, and listeners hear each persisted
 // change after the store has it.
@@ -78,18 +79,21 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
     const entry = await current(id, now);
     return entry ? commit(fn(entry, now)) : { entry: null, error: { code: 'NOT_FOUND' } };
   });
-  const inbox = {
-    /** @param {import("../types.js").QuestionMessage} message @param {{handback: boolean, waiter: import("../types.js").Handle|null}} route @returns {Promise<import("../types.js").InboxResult>} */
-    ask: (message, { handback, waiter }) => serial(async (now) => {
+    /** @param {import("../types.js").QuestionMessage} message @param {import("../types.js").QuestionRoute} route @returns {Promise<import("../types.js").InboxResult>} */
+  const askWithRoute = (message, route) => serial(async (now) => {
+      const {handback}=route,waiter=route.connector?null:route.waiter;
       const detached = message.body.native === null;
       if (detached && (waiter !== null || handback !== false || message.from.kind !== 'agent' || message.to.kind !== 'user'
         || message.createdAt > now + 1000)) throw relayError('INVALID_MESSAGE', 'detached ask requires an agent sender, user recipient, null waiter, false handback, and createdAt no more than one second ahead');
       const question = bounded(message);
+      const duplicate=store.all().find(e=>e.kind==='question'&&e.question.body.native?.harness==='codex'&&question.body.native?.harness==='codex'&&e.question.body.native.callId===question.body.native.callId);
+      if(duplicate&&duplicate.id!==question.id)return {entry:duplicate,error:{code:'ID_CONFLICT'}};
       const existing = await current(question.id, now);
+      if(existing?.kind==='question'&&route.connector&&!isDeepStrictEqual(existing.route.connector,route.connector))return {entry:existing,error:{code:'OWNER_CONFLICT'}};
       if (existing) return existing.kind === 'question' && isDeepStrictEqual(existing.question, question)
         ? { entry: existing, error: null } : { entry: existing, error: { code: 'ID_CONFLICT' } };
       if (presence.mode === 'here' && !detached) return { passthrough: true };
-      const entry = L.applyClock(L.createEntry(question, { handback, waiter, now }), now).entry;
+      const entry = L.applyClock({...L.createEntry(question, { handback, waiter, now }),route}, now).entry;
       const x = question.body.supersedes;
       if (x === null) return commit({ entry, changed: true, error: null });
       if (entry.state === 'expired') {
@@ -101,7 +105,23 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
       const [n, w] = await persist(() => store.supersede(entry, L.applySuperseded(/** @type {import("../types.js").QuestionEntry} */ (predecessor), entry.id, now).entry));
       for (const e of [n, w]) { onCommit(e); publish({ type: 'entry', entry: e }); }
       return { entry: n, error: null };
+    });
+  const inbox = {
+    /** @param {import('../types.js').QuestionMessage} message @param {{handback:boolean,waiter:import('../types.js').Handle|null}} route */
+    ask:async(message,route)=>{if(message.body.native?.harness==='codex')throw relayError('UNSUPPORTED_ROUTE','Codex ownership is internal');return askWithRoute(message,route);},
+    /** @param {import('../types.js').QuestionMessage} message @param {import('../types.js').CodexOwner} owner */
+    codexAsk:async(message,owner)=>askWithRoute(message,{handback:true,connector:validateOwner(owner,message),terminal:false}),
+    /** @param {string} id @param {import('../types.js').CodexOwner} owner */
+    codexHanded:(id,owner)=>on(id,(e,now)=>L.applyCodexHanded(/** @type {import('../types.js').QuestionEntry} */ (e),owner,now)),
+    /** @param {string} id @param {import('../types.js').CodexOwner} owner @param {string} reason */
+    codexGone:(id,owner,reason)=>on(id,(e,now)=>L.applyCodexGone(/** @type {import('../types.js').QuestionEntry} */ (e),owner,reason,now)),
+    /** @param {string} id @param {import('../types.js').CodexOwner} owner @param {{answers:import('../types.js').CodexAnswers|null,terminal:boolean}} proof */
+    codexObserve:(id,owner,proof)=>on(id,(e,now)=>{
+      if(e.kind!=='question')return {entry:e,changed:false,error:{code:'NOT_A_QUESTION'}};
+      const matches=proof.answers!==null&&e.answer!==null&&isDeepStrictEqual(expectAnswers(e),proof.answers);
+      return L.applyCodexObserve(e,owner,{...proof,matches},now);
     }),
+    retained:()=>store.all(),
     /** @param {string} id @param {import("../types.js").AnswerMessage} message */
     answer: (id, message) => on(id, (e, now) => e.kind === 'question' ? L.applyAnswer(e, message, now) : { entry: e, changed: false, error: { code: 'NOT_A_QUESTION' } }),
     /** @param {string} id @param {import("../types.js").DeferMessage} message */
@@ -118,6 +138,7 @@ export async function openInbox({ stateDir, clock = Date.now, io = fs, expectAns
     seen: (id) => on(id, (e, now) => L.applySeen(e, now)),
     /** @param {{harness: string, callId: string, observed: Record<string, string>}} observation */
     confirm: ({ harness, callId, observed }) => serial(async (now) => {
+      if(harness==='codex')throw relayError('UNSUPPORTED_ROUTE','Codex receipt is internal');
       const found = store.all().find((e) => e.kind === 'question' && e.question.body.native?.harness === harness && e.question.body.native.callId === callId);
       if (!found) return { entry: null, error: { code: 'NOT_FOUND' } };
       const e = /** @type {import("../types.js").QuestionEntry} */ (await current(found.id, now));

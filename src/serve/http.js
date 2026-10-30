@@ -6,6 +6,7 @@ import { extname, resolve, sep } from 'node:path';
 import { relayError } from '../protocol.js';
 import { validateMessage } from '../interaction/message.js';
 import { classify } from './guard.js';
+import {publicEntry,publicView} from './public-entry.js';
 const BODY_LIMIT = 64 * 1024;
 /** @type {Record<string, string>} */
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -14,7 +15,7 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 const STATUS = { NOT_FOUND: 404, INVALID_MESSAGE: 400, INVALID_INPUT: 400, INVALID_ANSWER: 409, TOO_LARGE: 413 };
 /** @param {import("node:http").ServerResponse} res @param {number} status @param {unknown} value */
 const json = (res, status, value) => {
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(value));
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(publicView(value)));
 };
 /** @param {import("node:http").ServerResponse} res @param {number} status @param {string} code @param {string} message @param {Record<string, unknown>} [extra] */
 const fail = (res, status, code, message, extra = {}) => json(res, status, { error: { code, message }, ...extra });
@@ -100,7 +101,7 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     /** @param {import("../types.js").InboxEvent} event */
     const write = (event) => {
       if (res.destroyed || res.writableEnded) return;
-      if (event.type === 'entry') res.write(`id: ${event.entry.seq}\nevent: entry\ndata: ${JSON.stringify(event.entry)}\n\n`);
+      if (event.type === 'entry') res.write(`id: ${event.entry.seq}\nevent: entry\ndata: ${JSON.stringify(publicEntry(event.entry))}\n\n`);
       else res.write(`event: presence\ndata: ${JSON.stringify(event.presence)}\n\n`);
     };
     ({ unsubscribe } = await inbox.watch(since, write));

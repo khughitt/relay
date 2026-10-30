@@ -7,13 +7,14 @@ import { ensurePrivateDir } from '../bus/store.js';
 import { relayError, validateHandle } from '../protocol.js';
 import { isUuid, validateMessage } from '../interaction/message.js';
 import { lineReader } from './lines.js';
+import {publicView} from './public-entry.js';
 /** @typedef {import("node:net").Socket & {waiting: Map<string, Owner>, watching?: boolean, unwatch?: () => void}} ServiceSocket */
 /** @typedef {{socket: ServiceSocket, previous: Owner|null|undefined, accepted: boolean, refused: boolean}} Owner */
 // relay serve's local socket (spec §7.2, §9.1 step 5). A connection that asked a question is that
 // question's waiter: it receives a state line on every transition, and its close is the asker's
 // death unless the service itself is closing.
 /** @param {import("node:net").Socket} socket @param {unknown} value */
-const send = (socket, value) => { if (!socket.destroyed) socket.write(`${JSON.stringify(value)}\n`); };
+const send = (socket, value) => { if (!socket.destroyed) socket.write(`${JSON.stringify(publicView(value))}\n`); };
 /** @template {import("../types.js").Message["kind"]} K @param {import("../types.js").Message} message @param {K} expected @returns {Extract<import("../types.js").Message, {kind: K}>} */
 const kind = (message, expected) => { if (message.kind !== expected) throw relayError('INVALID_MESSAGE', `expected a ${expected} message`); return /** @type {Extract<import("../types.js").Message, {kind: K}>} */ (message); };
 /** @param {{inbox: import("../types.js").Inbox, socketPath: string, processOps: import("../types.js").ProcessOps, reattachMs?: number, log: (line: string) => void}} options */
