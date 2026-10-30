@@ -17,6 +17,11 @@ node bin/relay.js reap
 node bin/relay.js hook --harness claude-code PreToolUse < payload.json
 ```
 
+Test-policy adoption is prepared but not activated: local broad checks remain enabled
+until accepted hosted coverage and separate publication approval. See the
+[test execution policy](docs/test-execution-policy.md) for focused checks, forced
+verification and hosted coverage limits.
+
 The fast and full suites are intentionally identical; there is no affected-only
 selector. The one runtime npm dependency, `jsonc-parser`, is installed by npm with relay and
 used only by `relay install`; `just setup` also installs development-only TypeScript and Node 22
@@ -48,7 +53,7 @@ question route is evidence-gated; the user-present [acceptance run](docs/runbook
 passed phone answer, phone defer and desk withdrawal.
 
 The approved parent design is in ops
-`docs/specs/2026-09-16-relay-design.md` (approved after `d7e2c33`).
+at docs/specs/2026-09-16-relay-design.md in that separate repository (approved after `d7e2c33`).
 The [extraction plan](docs/plans/2026-09-17-extraction.md) and
 [lock-safety addendum](docs/specs/2026-09-17-registry-lock-safety.md) record local work.
 The release goal is `relay-1231bf`; familiar migration is `fam-6e8321`, tasks identity

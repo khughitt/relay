@@ -20,6 +20,11 @@
 - Use `just test-one <file>` or `just test-one --test-name-pattern "<regex>" <file>`
   while working; arguments pass intact to `node --test`. Run `just test-fast` before
   committing and `just gate` before integration.
+  Execution policy comes from the invoking code root’s .tt.toml; absent means enabled.
+  After validated activation, focused tests and hygiene remain required; policy skips
+  are not passing tests. Use `just test-full` to force the suite, and TT_FORCE=1
+  with `just check` to force type checks too. Read docs/test-execution-policy.md for
+  current activation state and coverage gaps.
   Fast and full commands intentionally run the same suite. Hooks use the vendored
   ops front door; install core.hooksPath .githooks in a new clone.
 - `just check` runs strict `tsc --checkJs --noEmit` on every `src/` and `bin/` file.
