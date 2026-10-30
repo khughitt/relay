@@ -4,7 +4,10 @@
   `tasks check` before commits, and completion on the task's branch before it merges.
 - Planned work requires reviewed specs and plans before implementation. Reuse the
   approved extraction spec in ops; tasks identity has a separate design gate.
-- Committed designs live in `docs/specs/`; implementation plans in `docs/plans/`.
+- New design specs, implementation plans, briefs and handoffs go under the
+  project's records directory (`docs/specs/`, `docs/plans/`, `docs/notes/` there),
+  committed in the records repository, never in this tree. Documents this tree
+  already tracks stay here and are revised in place.
 - Use task worktrees under the main checkout’s .worktrees directory, native `git worktree add`, and `just setup`
   immediately when defined. Follow the host's WORK_ROOT lock/removal convention.
 - Use conventional commits without AI attribution.
