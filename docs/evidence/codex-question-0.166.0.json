@@ -1,0 +1,324 @@
+{
+  "schema": 1,
+  "harness": "codex",
+  "version": "0.166.0",
+  "scope": "0.166.0 source reproof and private native pilot; original0.165.0 matrix retained as baseline; Gate7 and integration unrun",
+  "executable": {
+    "sha256": "b8a11fedf24b2dfb59a70c9e52b030f9a508dcd49cd2dd0d41956f4c785156b8",
+    "size": 319346888
+  },
+  "archive": "718c86dcd7104919f2820aa79db0fa0083b5f240aa16da704f43e4acf7b544e5",
+  "sources": [
+    {
+      "file": "app-server/src/bespoke_event_handling.rs",
+      "sha256": "c6f220dae8f746ce98c15c23d2038c6720b1a9433f1f459edfe18a7dd6c84d2e"
+    },
+    {
+      "file": "app-server/src/server_request_error.rs",
+      "sha256": "c1778757901c1030ec130521dccac53da87d27d3f76adae545579942aee94a21"
+    },
+    {
+      "file": "core/src/session/mod.rs",
+      "sha256": "17be0b1a7962343f5904cfa4514bced6c4ca5642ca39c7426d6be9d1f9f5c4a0"
+    },
+    {
+      "file": "core/src/state/turn.rs",
+      "sha256": "f6d21d85c1a48abbf9541926eef95a648eb1d0a004e6f66d244976ec92dc6234"
+    },
+    {
+      "file": "core/src/tools/context.rs",
+      "sha256": "9c8739fead59795f09d36fe9fce1df07bab8bd7f1194e7eabedd28a3ae07586f"
+    },
+    {
+      "file": "core/src/tools/handlers/request_user_input.rs",
+      "sha256": "f4975978234d0ff7c143e6a5616d5523b9bddac044a6e39f8a0a32dcf0f56a38"
+    },
+    {
+      "file": "core/src/tools/parallel.rs",
+      "sha256": "7a096b14256318249d17bd879ad550b55653f1a5f01b2820d202786f2a2bbfe0"
+    },
+    {
+      "file": "core/src/tools/router.rs",
+      "sha256": "004482b5398df9b02c503a9115f4899802f6793661f84212e00af76a167ff2d4"
+    },
+    {
+      "file": "tools/src/tool_executor.rs",
+      "sha256": "06ddd20a3cfb34887e3bf0b657d386e403681e1583675e913da9779852ff2741"
+    },
+    {
+      "file": "core/src/config/mod.rs",
+      "sha256": "e027e9fb2e4cd101abdb3984768eef07d1d0ac7c8aa631989011cd17bda0c6df"
+    },
+    {
+      "file": "app-server/src/request_processors/thread_lifecycle.rs",
+      "sha256": "83b82bf10fde5098f1682484206c2704abd2c54af176db7e729c594c9464ecb6"
+    },
+    {
+      "file": "tui/src/app/thread_routing.rs",
+      "sha256": "bf7d3b1cc5d07df91b98fde364b66843a91e9dd2e172256f96b410627544306e"
+    },
+    {
+      "file": "tui/src/temporary_structured_request.rs",
+      "sha256": "3cb5754578dbcf98ca43d1e2b4a66c16f5e41552652fbe8b64b18bddcbfcdc05"
+    },
+    {
+      "file": "core/src/context_manager/normalize.rs",
+      "sha256": "a7b0aadc44591fa8bc550ef9cef22671076270d77e401fd0546173a86eab96a2"
+    },
+    {
+      "file": "tui/src/app/thread_title.rs",
+      "sha256": "f06237886e7849919bb592cf5db4c5ed66e809c58c414455c535f237d673e5da"
+    },
+    {
+      "file": "protocol/src/protocol.rs",
+      "sha256": "35d4a01a35c1771e7ae24d3c55964c2d6ecfe880a91539c1045f75cac0c8e356"
+    },
+    {
+      "file": "app-server-protocol/src/protocol/v2/thread.rs",
+      "sha256": "edc34b2b8cdbeefd48756f7f540b96ab7c4dc4580b9a17c0b8e3aa4f686ae7ce"
+    },
+    {
+      "file": "tui/src/app/app_server_events.rs",
+      "sha256": "6f5d309666a47ab9346518f61469b2b009d43881a7907287f8d448574def7075"
+    },
+    {
+      "file": "app-server-daemon/src/lib.rs",
+      "sha256": "2f3f97619c89027f37a9ca851d532534178c7da432a249e94ef2376f18e5bcd9"
+    },
+    {
+      "file": "app-server-daemon/src/backend/pid.rs",
+      "sha256": "9698fd390adabd2d6a7582d00f289a6148ec5ed674764f6be92dd23179e5285c"
+    },
+    {
+      "file": "app-server-daemon/src/backend/pid_identity.rs",
+      "sha256": "d962f176457c649b6f46cedc670fe40d566eea73243973b19207422e59788038"
+    },
+    {
+      "file": "app-server/src/request_processors/thread_processor.rs",
+      "sha256": "c03d31e07c8831c7cf153e6429f4ab908d1035b21ba593e701d5a3767121b5a8"
+    },
+    {
+      "file": "app-server-protocol/src/protocol/common.rs",
+      "sha256": "b7f0a90dcc822962e59890b252a43142a113cb1355f333d8c6b0f704b97f89f7"
+    },
+    {
+      "file": "app-server/src/lib.rs",
+      "sha256": "a44b0266619d6adda0c1e7135d5be18e6581cff44307e78097efecc5195f8b6c"
+    },
+    {
+      "file": "app-server/src/thread_status.rs",
+      "sha256": "82e31a2d76e2a51bf2e2d9aa55d2ca2cff53426ea79aacf43a39fe24f017172f"
+    },
+    {
+      "file": "app-server/src/outgoing_message.rs",
+      "sha256": "bb8062823bc2bb5699121bd64981527603ff6be4aafcc1b061d43d89e9de7053"
+    },
+    {
+      "file": "app-server/src/config_manager_service.rs",
+      "sha256": "3d3f0e314645ff109dc6eaf222529c5c1da41c5a788ebbe7f5ea31c41fd80a61"
+    },
+    {
+      "file": "app-server-protocol/src/protocol/v2/config.rs",
+      "sha256": "288b3b28e87ceca0b88e107226d032b2c3c9754a78a65e331ef175ff16f3f3a4"
+    }
+  ],
+  "protocol": [
+    {
+      "file": "protocol-0.166.0/v2/TurnStatus.ts",
+      "sha256": "c69049363f97e97844e9fc851f0cd4122da057ba1371de003a28c00ab7a6ef1a"
+    },
+    {
+      "file": "protocol-0.166.0/v2/ThreadUnsubscribeParams.ts",
+      "sha256": "5780913f01bac19e8edb8c01c77151efefdae62bf451968270e5bb8e0dda37b2"
+    },
+    {
+      "file": "protocol-0.166.0/v2/ThreadUnsubscribeResponse.ts",
+      "sha256": "cc18c7d986480b502fbce152748943c2dece2d6c79cd932c0550ee9a307efae9"
+    },
+    {
+      "file": "protocol-0.166.0/v2/ThreadUnsubscribeStatus.ts",
+      "sha256": "0efe48aff131c9c0270d6ad2c5db92e4660e7e89a27d03c05053648ac349382a"
+    }
+  ],
+  "native": [
+    {
+      "case": "production-native-pilot",
+      "sha256": "6e90f7548f72cab1f0c1f3298aae34c19fa48b3e50786521620022f9a9e1eb45",
+      "status": "passed",
+      "assertions": 15
+    }
+  ],
+  "protocolPrerequisitesComplete": true,
+  "blockingBuiltinImpliesPlan": true,
+  "gate7Passed": false,
+  "privateMatrixControlsComplete": true,
+  "subscriptionCapability": {
+    "loadedOnlyJoin": false,
+    "optOutAutomaticAttachment": false,
+    "selection": "active-waiting",
+    "detectedJoinResidual": true,
+    "nativeStatusBroadcast": true,
+    "pendingRequestReplay": true,
+    "minimumUnloadDelayRequired": false,
+    "disposition": "Require qualifying first replay or exact stored tuple; raced episodes unsubscribe without retry; release idle and unselected auto-attached threads"
+  },
+  "productionAcceptanceComplete": false,
+  "additionalSources": [
+    {
+      "file": "core/src/context_manager/history.rs",
+      "sha256": "8551719410d5fd4452cba29e169ffe3c16c2dc42816e90ca307cfdf955116040"
+    },
+    {
+      "file": "rollout/src/policy.rs",
+      "sha256": "c736d6790544fea4c853827ed3d9684956c62de91cfb2cc83b6ec12d80fe3bac"
+    }
+  ],
+  "sourceReproof": {
+    "baseline": {
+      "version": "0.165.0",
+      "evidenceSha256": "a5d1098a998d5e1260d4e4b517c69f6b64f7fb4e77caaa28dc65b3444c38b9ac"
+    },
+    "checks": [
+      {
+        "id": "builtin-answer-map",
+        "files": [
+          "core/src/tools/handlers/request_user_input.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "serial-default",
+        "files": [
+          "tools/src/tool_executor.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "serial-runtime",
+        "files": [
+          "core/src/tools/parallel.rs",
+          "core/src/tools/router.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "turn-slot",
+        "files": [
+          "core/src/session/mod.rs",
+          "core/src/state/turn.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "decline-collisions",
+        "files": [
+          "app-server/src/bespoke_event_handling.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "string-output",
+        "files": [
+          "core/src/tools/context.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "abort-output",
+        "files": [
+          "core/src/tools/parallel.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "status-broadcast",
+        "files": [
+          "app-server/src/thread_status.rs",
+          "app-server/src/outgoing_message.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "waiting-status",
+        "files": [
+          "app-server/src/thread_status.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "resume-replay",
+        "files": [
+          "app-server/src/request_processors/thread_lifecycle.rs",
+          "app-server/src/outgoing_message.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "unload-conditions",
+        "files": [
+          "app-server/src/request_processors/thread_lifecycle.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "unload-default",
+        "files": [
+          "core/src/config/mod.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "helper-set",
+        "files": [
+          "tui/src/app/app_server_events.rs",
+          "tui/src/temporary_structured_request.rs",
+          "tui/src/app/thread_title.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "pid-identity",
+        "files": [
+          "app-server-daemon/src/backend/pid.rs",
+          "app-server-daemon/src/backend/pid_identity.rs",
+          "app-server-daemon/src/lib.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "resume-residual",
+        "files": [
+          "app-server/src/request_processors/thread_processor.rs",
+          "app-server-protocol/src/protocol/v2/thread.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "raw-rollout",
+        "files": [
+          "rollout/src/policy.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "synthetic-history",
+        "files": [
+          "core/src/context_manager/history.rs",
+          "core/src/context_manager/normalize.rs"
+        ],
+        "passed": true
+      },
+      {
+        "id": "first-party-override-census",
+        "passed": true,
+        "files": [
+          "tui/src/app/tests.rs",
+          "tui/src/app/tests/resume_shutdown_tests.rs"
+        ]
+      }
+    ],
+    "facts": {
+      "unloadDefaultSeconds": 60
+    }
+  }
+}

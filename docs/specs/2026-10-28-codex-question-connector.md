@@ -1,6 +1,6 @@
 # Codex blocking question connector
 
-Status: r11, accepted with the production conditions recorded in spec round 17.
+Status: r11, with the authorized 0.166.0 version re-proof; Gate 7 remains unrun.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
 Production implementation is authorized under the standing private envelope after
 one fresh review of its task-level implementation plan.
@@ -30,13 +30,13 @@ Configuration is opt-in and names an absolute Codex executable, its home, contro
 socket and validated evidence file. All absent means no connection; partial or
 malformed enablement fails early. Production never starts, restarts, updates or
 reconfigures Codex, reads authentication files, or copies credentials. Support is
-exactly the evidenced codex-cli 0.165.0; 0.166.0 and other versions are refused.
+exactly the evidenced codex-cli 0.166.0; all other versions are refused.
 
 ## Transport and discovery
 
 Validate the Unix endpoint, HTTP Upgrade and acceptance key; mask client frames,
 handle fragmentation, control frames, close, cancellation and backpressure, and
-bound message size and time. Reject compression. Require the 0.165.0 header
+bound message size and time. Reject compression. Require the 0.166.0 header
 `x-codex-websocket-max-unfragmented-message-bytes` to be a valid positive integer.
 Outbound messages must fit both that peer ceiling and the local 1 MiB cap; never
 fragment to evade either. Keep inbound frame/reassembly bounds separate, capped
@@ -54,7 +54,7 @@ starts no work. Never resurrect except in this stated residual: a thread whose
 effective unload delay is shorter than relay's resume latency, whose turn ends
 and whose other subscribers all leave inside that window. Make no timing claim.
 Merged `config/read` does not bound a loaded thread's per-thread retention.
-Pinned open-source 0.165.0 first-party client callsites do not set a per-thread
+Pinned open-source 0.166.0 first-party client callsites do not set a per-thread
 unload override; the TUI occurrences are tests. Custom clients/configuration can
 set one, so the residual is accepted rather than inferred impossible.
 
@@ -85,8 +85,8 @@ Exclude the TUI's helper set before joining or publishing: ephemeral feature sou
 starts. Missing or ambiguous ownership remains native. Production does not name
 user threads to suppress helpers; naming was private probe setup only.
 
-In 0.165.0 unloading requires both no subscribers and inactivity for
-`thread_unload_delay_secs`, whose production default is **1800 seconds (30 minutes)**.
+In 0.166.0 unloading requires both no subscribers and inactivity for
+`thread_unload_delay_secs`, whose production default is **60 seconds**.
 The deadline follows the later of subscriber loss and inactivity. The private
 unloaded probe uses a root config value of 2 seconds; the connector never changes
 that production setting. Complete loaded absence, followed by restoration by the
@@ -295,8 +295,8 @@ unknown identity stays fail-closed. New re-asks have new tuple/UUID and reject a
 old answers.
 
 The source basis is the in-memory pending oneshot slot in
-`core/src/session/mod.rs:3340–3354` and history normalization in
-`core/src/context_manager/normalize.rs:52–66`. Replacement loses the old pending
+`core/src/session/mod.rs` (`request_user_input`) and history normalization in
+`core/src/context_manager/normalize.rs` (`ensure_call_outputs_present`). Replacement loses the old pending
 receiver; synthesized `aborted` history is not an actual rollout answer and never
 receipt. Production tests must prove identity detection, all three lifecycle
 states, stale-generation refusal and late actual-output reconciliation. This is a
@@ -310,18 +310,22 @@ and production obligations. Validate exact executable/version, protocol/native
 fixture hashes and pinned source, not just evidence-file presence. A mismatch
 disables this connector with a content-free actionable diagnostic; other inbox
 routes continue. The source archive SHA-256 is
-`4e066a7dbd1234efa7458c2b137161bb7ddde1dde6be4ed4c8f38e6c45f862ab`.
-The evidence index pins every required source file. Required source proofs include:
+`718c86dcd7104919f2820aa79db0fa0083b5f240aa16da704f43e4acf7b544e5`.
+The [repeatable re-proof](../runbooks/codex-question-reproof.md) compares all 28
+previously pinned sources, checks version-specific invariants and runs the private
+native pilot before emitting new pins. The original 0.165.0 matrix remains the
+comparison baseline; it is not a second supported version. The evidence index
+pins every required source file. Required source proofs include:
 
 - `request_user_input.rs`, `context.rs` and `parallel.rs` together: the only success
   output after an observed request is the serialized answer map; other handler/runtime
   outputs are non-answer strings. Every version change re-proves this and conversion.
 - The turn-keyed slot, executor and router: the serial runtime and supersession risk.
-- `core/src/config/mod.rs:4100–4101` and
-  `app-server/src/request_processors/thread_lifecycle.rs:58–64`: unload defaults/conditions.
-- `tui/src/app/thread_routing.rs:2045–2077`, `thread_title.rs` and
+- `core/src/config/mod.rs` (`thread_unload_delay_secs`) and
+  `app-server/src/request_processors/thread_lifecycle.rs` (unload watcher): unload defaults/conditions.
+- `tui/src/app/thread_routing.rs`, `thread_title.rs` and
   `tui/src/temporary_structured_request.rs`: ephemeral title source and disabled tools;
-  `tui/src/app/app_server_events.rs:231–239` pins the exact ephemeral `system` /
+  `tui/src/app/app_server_events.rs` pins the exact ephemeral `system` /
   `thread_title` exclusion set (including recap).
 - The pending slot and normalization sources above: replacement lifecycle versus receipt.
 
@@ -348,7 +352,8 @@ The evidence index pins every required source file. Required source proofs inclu
    ownership/storage/native arrays, duplicate delivery, evidence refusal and child
    cleanup; native TUI answer and unanswered output with zero outside responses.
    Explicit safe subprocess environments; both Node 22 and development runtime,
-   policy-appropriate `just test-one`, `just test-fast` and integration `just gate`.
+   policy-appropriate focused checks and mandatory hygiene; broad targets obey the
+   invoking checkout's validated test policy.
 7. **Separately approved user-present acceptance:** after automated gates, one real
    model Plan question answered by phone and another deferred to native desktop,
    actual receipt, exact temporary state/endpoint and rollback, host-use approval

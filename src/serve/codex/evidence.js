@@ -3,9 +3,9 @@ import * as fs from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {readOwned,sameFile} from './files.js';
-export const VERSION='0.165.0';
+export const VERSION='0.166.0';
 // This digest binds the reviewed source/protocol/native pins as one immutable artifact.
-const EVIDENCE_SHA256='a5d1098a998d5e1260d4e4b517c69f6b64f7fb4e77caaa28dc65b3444c38b9ac';
+const EVIDENCE_SHA256='b2876cc8617c2edd89cd9589ac3a23f6eba510c55d1175f45d75b1aab12ef48a';
 /** @param {import('../../types.js').CodexConfig} config @returns {Promise<{version:string,blockingBuiltinImpliesPlan:boolean,gate7Passed:boolean}>} */
 export async function validateEvidence(config) {
   try {
@@ -27,5 +27,5 @@ export async function validateEvidence(config) {
 }
 /** @param {any} value @param {import('../../types.js').CodexConfig} config */
 export function validateInitialize(value,config) {
-  if(typeof value?.userAgent!=='string'||!/^[^/\s]+\/0\.165\.0(?: \(|$)/.test(value.userAgent)||value.codexHome!==config.home)throw Error('CODEX_DAEMON_VERSION_OR_HOME');
+  if(typeof value?.userAgent!=='string'||!/^[^/\s]+\/0\.166\.0(?: \(|$)/.test(value.userAgent)||value.codexHome!==config.home)throw Error('CODEX_DAEMON_VERSION_OR_HOME');
 }

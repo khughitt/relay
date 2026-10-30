@@ -57,7 +57,11 @@ session id `00000000-0000-4000-8000-000000000000`, transcript `/tmp/x.jsonl`, cw
 The [current connector contract](../specs/2026-10-28-codex-question-connector.md)
 and [all-gates report](../notes/2026-10-28-codex-question-protocol-report.md)
 cover the disabled-by-default production route and preserved private controls.
-0.165.0 has no atomic loaded-only join. The accepted detected residual selects
+The original matrix is 0.165.0 evidence. The current 0.166.0 source/pilot overlay
+is produced by the [repeatable re-proof](codex-question-reproof.md); it does not
+claim to rerun the entire original matrix. The [Gate 7 runbook](codex-question-gate7.md)
+is prepared only and requires live host-use approval.
+0.166.0 has no atomic loaded-only join. The accepted detected residual selects
 only Active+WaitingOnUserInput through full admission; a qualifying first replay
 is required, and reconnect requires the stored exact tuple. No replay or changed
 replay means immediate unsubscribe, content-free `CODEX_JOIN_RACED`, no send or
@@ -76,7 +80,7 @@ release, public metadata exclusion, no extra turns and owned cleanup. Use
 contains only active entries. Preserve failed attempts and their original verdicts.
 This scripted client does not establish Gate 7 phone rendering or human acceptance.
 
-Use the exact pinned 0.165.0 executable, private homes with no auth file or
+Use the exact pinned 0.166.0 executable, private homes with no auth file or
 credentials, and the local scripted Responses provider. Verify source/protocol
 pins before running. Keep failed runs and a single directory manifest/hash per
 checkpoint. No live daemon, shared launcher, desktop or subscription turn belongs
@@ -117,7 +121,7 @@ replacement. Production tests cover these lifecycle rules; the probe reader
 alone supplies no lifecycle authority and cannot invent receipt.
 
 For an unloaded control, set root `thread_unload_delay_secs = 2` only in the
-private home. The production default is 1800 seconds (30 minutes), after both no
+private home. The 0.166.0 production default is 60 seconds, after both no
 subscribers and inactivity. Prove complete loaded absence before native-controller
 restoration and outside rejoin; unsubscribe alone is insufficient. For private
 TUI controls, name the primary before submission, preserve the exact native

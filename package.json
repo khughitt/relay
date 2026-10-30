@@ -27,7 +27,7 @@
     "schemas/",
     "docs/runbooks/inbox-service.md",
     "LICENSE",
-    "docs/evidence/codex-question-0.165.0.json"
+    "docs/evidence/codex-question-0.166.0.json"
   ],
   "bin": {
     "relay": "bin/relay.js"

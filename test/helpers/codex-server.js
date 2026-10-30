@@ -15,7 +15,7 @@ export async function serverFixture(t,{replay=true,status=waiting,source='user',
  const p=await peer(t),sent=[],logs=[],metadata={id:'thread',cwd:'/repo',ephemeral,threadSource:source,path,status};let cursor=0,fail;
  const push=m=>p.socket.write(frame(JSON.stringify(m)));
  const handler={async handle(m){
-  if(m.method==='initialize')return {userAgent:'fixture/0.165.0 (test)',codexHome:home};
+  if(m.method==='initialize')return {userAgent:'fixture/0.166.0 (test)',codexHome:home};
   if(m.method==='thread/loaded/list')return {data:['thread'],nextCursor:null};
   if(m.method==='thread/read')return {thread:structuredClone(metadata)};
   if(m.method==='thread/resume'){if(replay)push({id:91,method:'item/tool/requestUserInput',params});return {thread:structuredClone(metadata),collaborationMode:{mode:'plan'}};}
