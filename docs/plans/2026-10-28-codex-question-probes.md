@@ -10,7 +10,19 @@
 
 **Spec:** [Codex blocking question connector addendum](../specs/2026-10-28-codex-question-connector.md), approved by the user at relay `741a546dde23a4271ab640b7bfde8aabadfbc87c` (task spec review round 9). Read the accepted parent spec's §5, §8 and §9.3 too.
 
-## Scope and phase boundary
+## Current authority
+
+This original plan is historical. R9 at relay `8db382b` and the standing probe
+envelope on relay-a27e7c superseded its per-attempt stops. The reviewed completion
+plan is records `0227d5374230c4c2515260b522443eb5616d09be`,
+`relay/docs/plans/2026-10-30-codex-question-complete-matrix.md`.
+Private collection is complete on its mixed passed/unknown outcome path. The
+[current all-gates report](../notes/2026-10-28-codex-question-protocol-report.md)
+and r10/production proposal now await one package review. No original budget or
+approval paragraph below authorizes production, gate 7, integration or another run.
+
+## Historical scope and phase boundary
+
 
 **Execution checkpoint: approved0492f74 is exhausted.** The r16 alias correction
 passed201checks on each runtime and independent review. readiness-05 passed

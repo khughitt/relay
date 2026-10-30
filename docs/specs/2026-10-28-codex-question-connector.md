@@ -1,11 +1,12 @@
 # Codex blocking question connector — addendum
 
-Status: r9 proposed for review after accepted implementation round 26.
-R8 at relay `00f2d31` is the approved contract. R9 proposes cause-neutral
-settlement from correlated output/turn structure, preserving all r8 provenance,
-privacy, bounds, ownership and lifecycle requirements. The accepted correction
-checkpoint is `c952e8f`; its timed interruption output remains unknown in the
-current probe. No executable change or native gate is completed by this amendment.
+Status: r10 proposal for the final matrix package; not approved or implemented.
+R9 at relay `8db382b` is approved by spec review round 15 (accept, no findings,
+claude-code/claude-opus-5-5). The standing probe envelope on relay-a27e7c authorized
+one reviewed completion plan and fail-closed private collection through the matrix.
+Collection is complete; the gates have not all passed. This proposal preserves
+r9's eligibility, privacy, bounds, provenance, source and receipt requirements.
+Production work, gate 7 and integration remain gated.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
 
 ## Intent and authority
@@ -76,9 +77,11 @@ earlier route's viability, not current-version support.
 hq-25665e remains open, including no-client recovery; this design claims no result
 from it. Task notes locate the source transcript and retained generated protocol.
 That was the initial feasibility baseline. The accepted correction checkpoint
-now records private scripted native question/receipt and disconnect controls;
-interruption settlement remains unknown pending this amendment and its reviewed
-implementation. Real-model/phone/native-TUI acceptance remains outstanding.
+now records private scripted native question/receipt, structural interruption,
+competition, delay, defer and recovery controls. Unloaded-thread absence,
+authoritative old-call reconciliation after daemon restart and private TUI
+answer/decline remain unproved. Real-model/phone/native-desktop acceptance is
+outstanding. The current all-gates report distinguishes these limits.
 
 ## Approaches
 
@@ -374,8 +377,10 @@ for the exact call contains the saved answer, using a version-probed mapping. A
 matching late result can confirm `unconfirmed` after the existing 60-second window.
 For decline, this confirms only empty-map value equality, never the winning client
 or the cause of that value.
-A different result leaves the saved answer intact, records the actual observed
-answer, and reports `unconfirmed`; do not claim the saved answer won. No model prose
+After handoff, a different result leaves the saved answer intact, records the
+actual observed answer, and reports `unconfirmed`; do not claim the saved answer
+won. Before handoff, loss of the request with a different native answer leaves a
+saved answer `undeliverable`, as the lifecycle rule below requires. No model prose
 or timing inference counts as receipt. If no correlated output is available, the
 receipt gate fails and the route remains disabled.
 
@@ -580,10 +585,12 @@ unproved.
 ## R9 structural settlement evidence and gate
 
 Implementation round 26 accepted checkpoint `c952e8f` with no findings. The
-controller adopts its structural proposal for r9; the new text still needs review.
+controller adopted its structural proposal for r9, approved in spec round 15.
 The preserved `call_interrupt` output is at native line 12, followed by matching
 `turn_aborted` at line 15, with observed request and interrupted protocol completion.
-Its current prototype classification and original verdict remain unknown.
+Its original verdict remains unknown. Separate r9 re-evaluation now establishes
+`no-answer`, and a fresh native pilot independently supplies the same joint proof.
+Neither result attributes an interruption cause or marks an answer consumed.
 
 Archive SHA-256: `4e066a7dbd1234efa7458c2b137161bb7ddde1dde6be4ed4c8f38e6c45f862ab`.
 Pin and read these files together:
@@ -610,9 +617,54 @@ native correlation. A source-shaped handler string is not a native capture.
   incorrect source invariant could withdraw prematurely; it grants no new send
   authority or consumed receipt, and handed answers remain unconfirmed.
 
-After r9 review, the next correction plan must specify ordered evidence,
-protocol/version/source refusal and the gate-3 regressions before executable
-changes or matrix continuation. Text approval alone resumes no case. Ownership,
-privacy, bounds, decline value-only meaning and outstanding production/phone/TUI/
-0.166.0 gates are unchanged. Recorded minors remain deferred; option-label
-uniqueness cannot be deferred while making broader form-validation claims.
+The completion plan at records `0227d5374230c4c2515260b522443eb5616d09be`
+received fresh plan round 4 acceptance with no findings. It implemented r9 and
+collected the remaining private scripted matrix under the user's standing envelope.
+Original failures stay immutable; the evidence index and all-gates report identify
+separate corrected runs and evaluations. Option-label uniqueness now has a narrow
+refusal check; this is not a claim of general native form validation.
+
+## R10 batched matrix clarifications for review
+
+These amendments describe the observed limits and proposed production prerequisites.
+They authorize no additional send, consumed mapping, privacy exception or version.
+The [all-gates report](../notes/2026-10-28-codex-question-protocol-report.md) and
+records `docs/plans/2026-10-30-codex-question-production-proposal.md` form one package.
+
+- **Competition is value-only.** Four private controller/outside controls each
+  produced one native answer. Both concurrent contenders reached the wire before
+  observed resolution; caller order identifies no winning client. Resolved-tuple
+  delivery is locally refused. No deliberately late outside response bypassed
+  the guard. Probe lifecycle fields are unit expectations, not shipped inbox state.
+- **Delayed receipt is evidence, not elapsed time.** The matching and mismatching
+  controls deferred the first post-send rollout read for at least 65 seconds.
+  Only exact-call value equality confirms a saved answer; 65 seconds alone does
+  not do so. A 30-second silent outside observation followed by a controller
+  answer proves the private question remained usable over that interval, not
+  production handback/history/retry behavior.
+- **Daemon generation does not settle an old call.** A replacement process,
+  disappeared socket, local generation counter or offline rollout supplies no
+  missing protocol transition. Re-asks get new tuples and reject old answers;
+  old delivery stays unknown until the existing joint evidence rules resolve it.
+  The production prerequisite requires authoritative reconciliation, not only
+  safe stale-answer refusal. The private replay child proves reconstruction from
+  saved route metadata, not production inbox restart or crash durability.
+- **Unloaded discovery remains a blocker.** Both private subscribers successfully
+  unsubscribed, but complete loaded discovery still listed the thread during the
+  bounded observation. No outside resume followed that result. Unsubscribe status
+  and elapsed time do not establish absence. Production may not activate until
+  the absence/controller-restoration case is proved without outside resurrection.
+- **Private TUI remains a blocker.** Native composer, start policy, Plan settings
+  success and the pinned built-in instruction expansion were proved. The intended
+  first submission was followed by an unexpected second `thread/start`, refused
+  by the observer. No native question answer/decline or real-model/desktop/phone
+  claim follows. A replacement thread needs its own source and native ownership
+  proof before any question keys; do not weaken uniqueness to finish the test.
+  Source suggests native unanswered submission may use an empty array under each
+  question id rather than the saved-decline empty root map. That form was not
+  captured here and has no approved translation or consumed mapping.
+
+The production proposal is conditional: resolve the failed/unknown prerequisites
+and review their evidence before implementation begins. This r10 text itself
+remains under the final package review. Gate 7 and integration require separate
+user approvals even if that package is accepted.
