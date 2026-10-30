@@ -1,4 +1,158 @@
-# Codex question scripted probes: structured-output blocker
+# Codex question correction checkpoint: cancellation encoding unknown
+
+## Current outcome
+
+The user approved r8 and the correction plan (records `e4b4e2a66`, SHA-256
+`ef926147e87a8379d384cb9d495ca00ce8135c0113c9147b383b65a26408f62a`).
+The correction plan executed inline through its blocker-report path. A stale
+approval park was a controller error, cleared before execution; no repeat approval
+of this plan is owed. Spec r8 at `00f2d31` remains the approved contract.
+
+The reader and delivery prerequisites are corrected. The native mixed-history
+pilot, decline controls and both disconnect variants passed. Interruption produced
+an unrecognized non-answer output, `aborted by user after 0.1s`, followed by the
+matching turn-aborted barrier. The reader correctly returns **unknown**, never
+answered or consumed. The native cancellation mapping remains **unobserved**:
+no cancellation fixture or decoder was fabricated from source text. This stops
+continuation of the original races/defer/recovery/TUI matrix under the approved
+plan. No production plan or connector implementation was written.
+
+The next controller action is a scoped source/native cancellation-contract review,
+using the captured output and pinned runner source, before proposing a bounded
+recognizer or any further native attempt. This is a new evidence gap, not a renewed
+approval request for the plan already executed. The parent relay-a27e7c remains
+open and owns this follow-up and all original production/acceptance obligations.
+
+## Fresh native controls
+
+| Run | Outcome | Wall time | Evidence and limit |
+| --- | --- | ---: | --- |
+| `corrected-pilot-01` | passed | 521 ms | MCP approval is other; controller Cancel prevents tools/call; its array is discarded; a later built-in in the same thread/rollout has exact protocol/rollout/provider Blue receipt |
+| `interrupt-pending-01` | unknown | 2419 ms | correlated resolution and interrupted completion; unknown non-answer output precedes matching turn-aborted; delayed read/reopen stays unknown; no cancellation decoder configured |
+| `decline-collisions-01` | passed | 2747 ms | valid decline, generic client error and malformed controller body each yield exactly `{"answers":{}}`; equality identifies neither winning client nor cause |
+| `disconnect-pending-01` | passed | 40566 ms | outside-only and last-client loss each observed for 20 s; still-loaded discovery precedes resume; exact tuple replay then outside Blue has three matching witnesses |
+
+The turn-transition client-error exception was a separate fourth decline turn.
+Request resolution occurred without provider continuation, matching output or
+turn-end during a 2-second observation. The still-pending turn was then explicitly
+interrupted. Pinned source supplies the early-return fact; elapsed time alone does
+not establish an unbounded negative. Receiver-failure fallback is source/unit
+knowledge, not an inferred consequence of every disconnect.
+
+Both disconnect observations were pending/absent before reattachment and later
+had positive replay and receipt evidence. These results establish only the two
+observed private controls on 0.165.0. They do not establish daemon restart,
+generation handling, stale-answer rejection, re-ask, explicit unloaded-thread
+behavior, or recovery of a live native TUI.
+
+## Evidence types and corrected prerequisites
+
+- **Source:** archive/file hashes pin the nonparallel executor default, absent
+  request-input override, router lookup and exclusive execution lock. Pending input
+  and answer submission use turn ids. A version change requires checking the pinned
+  source again. Native simultaneous supersession cannot be reproduced on this serial
+  runtime; the earlier two-call observation was sequential.
+- **Unit:** one turn owner; arrival of an ineligible successor revokes the old send
+  before filtering; queued withdrawal precedes admission; send ownership is checked
+  again immediately before sending. Same-tuple replay cannot change questions.
+  Closed/resolved owners and malformed outside answer maps never send. These are
+  disposable guard checks, not shipped inbox lifecycle behavior.
+- **Reader:** every open starts at byte 0; orphan outputs are unknown. Every other
+  output shape is discarded. Duplicate fingerprints stay in memory only, never
+  exposed in snapshots/logs/persistence/forwarding. Conflicting duplicates make
+  unknown sticky. Native and synthetic privacy checks inspect actual Map entries
+  and serialized protocol/provider/rollout/result evidence.
+- **Settlement:** valid answer maps, including empty decline, are answers; only a
+  validated native cancellation mapping may identify a cancellation. Arbitrary
+  non-answer strings remain unknown even when a matching turn barrier exists.
+  Reader failure outranks cached receipt. A no-output/barrier reader result alone
+  is insufficient for disappearance without the matching protocol transition.
+- **Limits:** a line over 1 MiB or file over 64 MiB remains unknown after reopening,
+  including unrelated image history. This accepted fail-closed limit keeps those
+  threads native; no prefix skipping was added.
+- **Deadlines:** the original case owns one aggregate deadline across all leaves.
+  Idle observation honors abort; canceled work cannot pass. Independent cleanup
+  attempts have a separate 60-second allowance and persist failure/unresolved
+  ownership on timeout. The server also bounds its post-SIGKILL close wait.
+- **Runbook:** the proposed post-handoff recognized-cancellation label remains
+  unconfirmed but means a known end without an answer, not possible future delivery.
+  The three lifecycle expectations in the interruption result are explicitly unit
+  expectations; no inbox transition was observed.
+
+## Why the native interruption remains unknown
+
+`interruption-0.165.0.json` pins the raw native file, selected line hashes, minimized
+unknown-output fixture and `core/src/tools/parallel.rs` SHA-256
+`7b65d5c5538db2fee9e9367490e46f3b64f0190efb94c842e5718a1abd90e87c`.
+Lines 275–317 create an aborted response for cancellation outside the handler;
+lines 363–385 format elapsed seconds as `aborted by user after {secs:.1}s`.
+This is a separate source path from the handler's dropped-channel text. The native
+capture contains the timed form; the handler form was not observed.
+
+No elapsed-time grammar, prefix matcher, source-text default, or interpretation of
+an arbitrary non-answer string was added. The captured timed output has a regression
+that remains unknown and never consumes either a saved answer or decline. Source
+plus one native capture makes the next review concrete; it does not silently amend
+the approved reader contract.
+
+## Gate disposition and preservation
+
+| Gate | Current state |
+| --- | --- |
+| 1 transport/discovery/join | earlier pilot and fresh still-loaded reconnect controls pass; explicit unloaded/native TUI cases remain open |
+| 2 forms/provenance/exclusions | prior forms/exclusions retained; fresh mixed MCP-to-built-in history now passes; supersession guard is unit/source evidence |
+| 3 receipt/competition/clear/delay | exact supported receipts and decline value collisions pass; new interruption form remains unknown; races and delays unrun |
+| 4 defer | unrun |
+| 5 reconnect/restart/re-ask | two bounded disconnect controls pass; original restart/re-ask/generation obligations remain unrun |
+| 6 production unit/IPC | no production implementation |
+| 7 real model/phone/native desktop | unchanged, unrun; no 0.166.0 capability established |
+
+Original failed runs and historical text below are preserved as historical evidence.
+The original Task5–7 records remain unstarted behind the correction checkpoint.
+The all-gates report and later production plan remain obligations of the parent;
+repurposing the former blocker-report record did not retire them.
+
+## Verification, review and retained evidence
+
+`just setup` succeeded; fresh execution baseline `just test` passed **773/773**.
+With no `.tt.toml` in this checkout, the enabled test policy applies. All task-local
+checks used `just test-one`: final combined **85/85** on Node **26.5.0** and
+**22.23.2** (reader21, guard10, provider8, driver46). Privacy/classification,
+ownership and new controls were written and observed RED before implementation.
+The new native timed-string regression characterizes the intentional unknown
+result and passes without widening the decoder.
+
+Pre-native impl23 found Important3; expiry/cleanup regressions were reproduced RED
+and fixed GREEN, and receive-hook coverage was corrected. Fresh impl24 accepted
+prerequisites with no Critical/Important finding. Full reports and exact reviewer
+identity `codex/gpt-6-astra` are attached to the parent. Final hygiene and whole-
+correction review are recorded on the task before freezing this checkpoint.
+`just test-fast` passed **773/773** after the correction controls.
+`just check`, `tasks check` and whitespace checks pass with no errors. Four
+historical r3 headings are reported as unlinked after their records were
+intentionally retasked; provenance notes preserve the old links. The frozen r3
+text remains unchanged, and its remaining matrix/all-gates scope stays open.
+
+Deferred minors remain: overlapping provider requests may share an index; cleanup
+rejection can omit detailed attached server/socket metadata while still failing.
+Earlier unrelated deferred findings remain in their original reports. The former
+aggregate-deadline minor is fixed before any delayed cases. No delayed case ran.
+
+`correction-evidence-index.json` and `interruption-0.165.0.json` are attached to
+relay-3ff852 along with corrected probes, native unknown fixture and focused logs.
+Raw runs, manifests and canonical task-local inputs stay on persistent task-owned
+storage, located by retained-item notes. The parent owns cleanup/review follow-up.
+Every owned server PID and exact socket/lock path was independently absent after
+each run. No process survived, no subscription/credential turn was spent, no shared
+launcher or live daemon/desktop setting changed, and nothing was pushed.
+
+The branch `feat/codex-question` remains unmerged in `.worktrees/codex-question`.
+It integrates only after reviewed implementation, outstanding native/phone gates,
+and the user's approval; this checkpoint grants no merge or activation.
+
+---
+
+# Historical checkpoint: structured-output blocker
 
 ## Review update: proposed r8
 

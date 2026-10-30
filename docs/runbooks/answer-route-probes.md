@@ -50,3 +50,27 @@ path. Do not invent a receipt fixture when no PostToolUse event was observed.
 Build the receipt fixture from the actual hook-answer PostToolUse log, with fixed
 session id `00000000-0000-4000-8000-000000000000`, transcript `/tmp/x.jsonl`, cwd
 `/tmp/ws` and tool id `toolu_fixture`, preserving its tool input and response.
+
+
+## Proposed Codex connector: gated cancellation contract
+
+The [Codex connector addendum](../specs/2026-10-28-codex-question-connector.md)
+is a gated contract, not an installed connector. Its disposable private probes
+must establish native provenance, receipt and lifecycle forms before activation.
+
+For the proposed Codex connector, post-handoff recognized cancellation keeps the
+existing `unconfirmed` label, but it proves the call ended without an answer and
+the saved answer did not reach the model. It does not mean delivery might still
+occur: never retry that settled old tuple. Other uses of `unconfirmed` retain
+their separate absent/mismatching/uncertain-receipt meaning. Before handoff, a
+recognized cancellation means `asker-gone` without a saved answer and
+`undeliverable` with one. These labels describe the proposed lifecycle, not an
+inbox behavior shipped by these probes.
+
+An unrecognized non-answer string stays unknown even after a turn-end barrier.
+The 0.165.0 interruption control observed a timed runner abort string and leaves
+its cancellation mapping unconfigured pending review. See the
+[correction checkpoint](../notes/2026-10-28-codex-question-protocol-report.md).
+A missing-output disappearance additionally needs both the exact protocol turn
+transition and the matching rollout turn-end barrier; reaching EOF is not proof.
+Do not retry a settled old tuple or treat request resolution alone as receipt.
