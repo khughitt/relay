@@ -108,7 +108,8 @@ checks tuple/address ownership at socket.write after the transport queue, attemp
 both TUI cleanups independently with unresolved ownership retained, and requires
 exact active screens plus known bootstrap content before keys. Connected IPC,
 real tmux cleanup and composite-menu regressions pass. The repository suite also
-passed 773/773 again. Fresh scoped re-review is required before final handoff.
+passed 773/773 again. Fresh scoped impl round 30 (codex/gpt-6-astra) accepted all three corrections
+with no findings, independently passing 255/255 focused checks on each runtime.
 No native case reran or changed verdict for these unexercised paths.
 
 Before production code, prove unloaded absence/controller restoration, authoritative
