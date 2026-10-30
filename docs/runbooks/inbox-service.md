@@ -202,3 +202,17 @@ writers first, diagnose and preserve the tokens, and remove only the diagnosed p
 under that procedure. Preserve the registry and inbox data. Never sweep control or
 temporary files with a wildcard. Restart the unit and inspect its journal before
 restoring hook invocations.
+
+## Codex connector qualification checkpoint
+
+The four opt-in paths are RELAY_CODEX_BIN, RELAY_CODEX_HOME, RELAY_CODEX_SOCKET and
+RELAY_CODEX_EVIDENCE. All absent leaves Codex off; partial or malformed paths fail
+configuration. The current exact0.165.0 evidence is deliberately blocked by
+CODEX_NO_ATOMIC_SUBSCRIPTION. With configured paths, relay serve logs CODEX_DISABLED
+and continues its existing inbox routes without connecting to Codex.
+
+The pinned server cannot perform selective atomic loaded-only subscription and
+automatically attaches initialized clients to new threads. Repeated loaded checks
+do not remove the cold-resume race. Keep this gate closed; a changed server artifact
+or a contract revision needs user approval. No production connector/pilot, Gate7
+or integration is established by the implemented ownership and qualification units.

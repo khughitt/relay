@@ -63,3 +63,7 @@ test('request bookkeeping has a finite connection bound and oversized projection
  const {g}=guard();for(let i=0;i<4096;i++){const r=request('call'+i,{turnId:'turn'+i});await g.observe(r);await g.admit(r.params,false);}await assert.rejects(g.observe(request('extra',{turnId:'extra'})),/request-limit/);g.close();
  const h=guard();await active(h.g);await assert.rejects(h.g.observe(request('new',{questions:[{...q,question:'x'.repeat(1024*1024)}]})),/request-limit/);await assert.rejects(h.g.sendAnswer(tuple,answer),/revoked/);h.g.close();
 });
+
+test('aggregate question retention is bounded and resolution releases its private payload budget',async()=>{
+ const large={...q,question:'x'.repeat(600000)},first=request('big',{turnId:'a',questions:[large]}),second=request('big2',{turnId:'b',questions:[large]});const {g}=guard();await g.observe(first);await assert.rejects(g.observe(second),/request-limit/);g.resolved(first.params);await g.observe(second);assert.equal(await g.admit(second.params,false),false);await g.observe(request('big3',{turnId:'c',questions:[large]}));g.close();
+});

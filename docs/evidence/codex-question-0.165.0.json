@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "harness": "codex",
+  "version": "0.165.0",
+  "scope": "private scripted matrix controls; production blocked by native subscription capability, Gate 7 and integration unrun",
+  "executable": {
+    "sha256": "c06a67fd8ac76508dc78bd99ce20c9f317b8d568beda59485f3f4134df9962d5",
+    "size": 309732776
+  },
+  "archive": "4e066a7dbd1234efa7458c2b137161bb7ddde1dde6be4ed4c8f38e6c45f862ab",
+  "sources": [
+    {
+      "file": "app-server/src/bespoke_event_handling.rs",
+      "sha256": "c02cdef8d166be171f6218cfaf0c5e3b714a6589487f62dce71b1f1e17903952"
+    },
+    {
+      "file": "app-server/src/server_request_error.rs",
+      "sha256": "c1778757901c1030ec130521dccac53da87d27d3f76adae545579942aee94a21"
+    },
+    {
+      "file": "core/src/session/mod.rs",
+      "sha256": "3f61ed4dab05cd45e09112e80201be2ceee162522101ee8b332ed03bf67d4bca"
+    },
+    {
+      "file": "core/src/state/turn.rs",
+      "sha256": "f6d21d85c1a48abbf9541926eef95a648eb1d0a004e6f66d244976ec92dc6234"
+    },
+    {
+      "file": "core/src/tools/context.rs",
+      "sha256": "f7c4945eebc54bedb8a53723cf9efe75331f67736ceab95c8b42ada11d9e2f73"
+    },
+    {
+      "file": "core/src/tools/handlers/request_user_input.rs",
+      "sha256": "f4975978234d0ff7c143e6a5616d5523b9bddac044a6e39f8a0a32dcf0f56a38"
+    },
+    {
+      "file": "core/src/tools/parallel.rs",
+      "sha256": "7b65d5c5538db2fee9e9367490e46f3b64f0190efb94c842e5718a1abd90e87c"
+    },
+    {
+      "file": "core/src/tools/router.rs",
+      "sha256": "004482b5398df9b02c503a9115f4899802f6793661f84212e00af76a167ff2d4"
+    },
+    {
+      "file": "tools/src/tool_executor.rs",
+      "sha256": "06ddd20a3cfb34887e3bf0b657d386e403681e1583675e913da9779852ff2741"
+    },
+    {
+      "file": "core/src/config/mod.rs",
+      "sha256": "e7bcb5c92c73308d7170da9d0c811fc1082973b9b074e52687dad5c3d38f77cc"
+    },
+    {
+      "file": "app-server/src/request_processors/thread_lifecycle.rs",
+      "sha256": "eed1cc9bf38608be6ff2aa7a812b988fa9ecdcd5802944feda6839fe9361656e"
+    },
+    {
+      "file": "tui/src/app/thread_routing.rs",
+      "sha256": "92da606c25a4cdbc3ca046f37140360d096b0d9cfa1a68e187516a52a0d1d874"
+    },
+    {
+      "file": "tui/src/temporary_structured_request.rs",
+      "sha256": "084dfe5d16c8f92822d0ba40ea0449e4cc773171b7753802b9e9dbed8639f91b"
+    },
+    {
+      "file": "core/src/context_manager/normalize.rs",
+      "sha256": "a7b0aadc44591fa8bc550ef9cef22671076270d77e401fd0546173a86eab96a2"
+    },
+    {
+      "file": "tui/src/app/thread_title.rs",
+      "sha256": "86a614735acf46d3b3a68bf5b4ea50c2d0202a591667e7e90502ff527fdd0910"
+    },
+    {
+      "file": "protocol/src/protocol.rs",
+      "sha256": "7b896ec457c55d6d8edb959cc08cc7e903fbc73b643cbe98cccec66c2325b1e4"
+    },
+    {
+      "file": "app-server-protocol/src/protocol/v2/thread.rs",
+      "sha256": "3532f87c9e55c9e539ed3c48c74701a14f4b9e401564b5cbafe624941302755c"
+    },
+    {
+      "file": "tui/src/app/app_server_events.rs",
+      "sha256": "d7b21f2f9ca15e6550e105f1140b8312bb36d4563119478bf8748ebab81e6d4b"
+    },
+    {
+      "file": "app-server-daemon/src/lib.rs",
+      "sha256": "97e438b2dc60371b98a4ba8b57b796f0f1a9d4b4654641acbd1d4c0571ddd19a"
+    },
+    {
+      "file": "app-server-daemon/src/backend/pid.rs",
+      "sha256": "65387bd8848aca6caa98d370bc774b732f6f41ec6e0caa70bf26023f041988b1"
+    },
+    {
+      "file": "app-server-daemon/src/backend/pid_identity.rs",
+      "sha256": "d962f176457c649b6f46cedc670fe40d566eea73243973b19207422e59788038"
+    },
+    {
+      "file": "app-server/src/request_processors/thread_processor.rs",
+      "sha256": "37ff0875e2b6d3def2fc727fd065574bd243cea2aa836021ebb218ac83b898e7"
+    },
+    {
+      "file": "app-server-protocol/src/protocol/common.rs",
+      "sha256": "b9fff3f4317b0e976e8ddd3e4bf0dcb40a1c09e19a8cc54e42144d468e7f08da"
+    },
+    {
+      "file": "app-server/src/lib.rs",
+      "sha256": "314e9b2fe129e053b8c7cf261c366a19f9df681f9bc2c7288761d695152fad2f"
+    }
+  ],
+  "protocol": [
+    {
+      "file": "protocol-0.165.0/v2/TurnStatus.ts",
+      "sha256": "c69049363f97e97844e9fc851f0cd4122da057ba1371de003a28c00ab7a6ef1a"
+    },
+    {
+      "file": "protocol-0.165.0/v2/ThreadUnsubscribeParams.ts",
+      "sha256": "5780913f01bac19e8edb8c01c77151efefdae62bf451968270e5bb8e0dda37b2"
+    },
+    {
+      "file": "protocol-0.165.0/v2/ThreadUnsubscribeResponse.ts",
+      "sha256": "cc18c7d986480b502fbce152748943c2dece2d6c79cd932c0550ee9a307efae9"
+    },
+    {
+      "file": "protocol-0.165.0/v2/ThreadUnsubscribeStatus.ts",
+      "sha256": "0efe48aff131c9c0270d6ad2c5db92e4660e7e89a27d03c05053648ac349382a"
+    }
+  ],
+  "native": [
+    {
+      "case": "scripted-forms-01",
+      "sha256": "2a47d7ad2fe084ca518f21fe08f12f0cde33b696bbf67315ea6f2fc46ee55d46",
+      "status": "passed"
+    },
+    {
+      "case": "matrix-pilot-01",
+      "sha256": "fb48c277f53885a5272497f1bf2380d7b11dc70d28506a20993b05d0e6b7413a",
+      "status": "passed"
+    },
+    {
+      "case": "competition-01",
+      "sha256": "132f39f3e4ee51d207877ba180970cf1b3b97a497b99bf1c72adafd119fe8997",
+      "status": "passed"
+    },
+    {
+      "case": "delay-01",
+      "sha256": "3e0774e6d1a45e191ba83b9410a500b26427a05ebf3338291ebaf2c3ee43a5a7",
+      "status": "passed"
+    },
+    {
+      "case": "defer-01",
+      "sha256": "047708f7db822fb7e4e496d803b5747c5db58416b8b3adb3df1662af49a57cad",
+      "status": "passed"
+    },
+    {
+      "case": "recovery-02",
+      "sha256": "11080469ef06ddbe65e5b9f4a87b9d74118779a6161608df61c09c2648e01036",
+      "status": "passed"
+    },
+    {
+      "case": "unloaded-02",
+      "sha256": "77f29fabb427306644fbe5b4c83ff233bc3bbbeafb1ef2f021ed607492ec7a14",
+      "status": "passed"
+    },
+    {
+      "case": "tui-title-01",
+      "sha256": "009fc00016b766afb6b9f9ab138525d8bffeddcbaf1cea349b0186a07fa337ff",
+      "status": "unknown"
+    },
+    {
+      "case": "tui-named-04",
+      "sha256": "1b35da835eed924def3caa9038f4760c8cba5ca47c7c3174921688c98a9016a3",
+      "status": "passed"
+    }
+  ],
+  "protocolPrerequisitesComplete": false,
+  "blockingBuiltinImpliesPlan": true,
+  "gate7Passed": false,
+  "privateMatrixControlsComplete": true,
+  "subscriptionCapability": {
+    "loadedOnlyJoin": false,
+    "optOutAutomaticAttachment": false,
+    "disposition": "Do not initialize or resume from this connector under the current contract"
+  },
+  "productionAcceptanceComplete": false
+}

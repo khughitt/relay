@@ -5,7 +5,7 @@ function fail(code){throw Error(code)}
 /** @param {unknown} v @returns {v is Record<string,any>} */
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 /** @param {any} t */
-const tupleOf=t=>{if(!object(t)||['threadId','turnId','itemId'].some(k=>typeof t[k]!=='string'||!t[k]))fail('request-tuple');return {threadId:t.threadId,turnId:t.turnId,itemId:t.itemId}};
+const tupleOf=t=>{if(!object(t)||['threadId','turnId','itemId'].some(k=>typeof t[k]!=='string'||!t[k]||Buffer.byteLength(t[k])>256))fail('request-tuple');return {threadId:t.threadId,turnId:t.turnId,itemId:t.itemId}};
 /** @param {any} t */
 const slot=t=>JSON.stringify([t.threadId,t.turnId]);
 /** @param {any} t */
@@ -27,7 +27,9 @@ function validate(params,body) {
 }
 /** @param {{send:(message:any,beforeWrite:()=>void)=>Promise<void>,onSuperseded:(tuple:any)=>Promise<unknown>}} options */
 export function createRequestDelivery({send,onSuperseded}) {
- /** @type {Map<string,any>} */ const current=new Map();const retired=new Set();let chain=Promise.resolve(),closed=false;
+ /** @type {Map<string,any>} */ const current=new Map();const retired=new Set();let chain=Promise.resolve(),closed=false,heldBytes=0;
+ /** @param {any} entry */
+ const discard=entry=>{heldBytes-=entry.privateBytes??0;entry.privateBytes=0;entry.immutable=null;};
  /** @param {()=>any} fn */
  const queue=fn=>{const work=chain.then(fn);chain=work.catch(()=>{});return work};
  /** @param {any} t */
@@ -36,20 +38,21 @@ export function createRequestDelivery({send,onSuperseded}) {
   /** @param {any} request */
   async observe(request) {
    const tuple=tupleOf(request?.params);
-   if(request.method!=='item/tool/requestUserInput'||!(typeof request.id==='string'||Number.isSafeInteger(request.id)))fail('request-envelope');
+   if(request.method!=='item/tool/requestUserInput'||!(typeof request.id==='string'&&Buffer.byteLength(request.id)<=256||Number.isSafeInteger(request.id)))fail('request-envelope');
    if(closed)fail('closed');
    const address=slot(tuple),id=key(tuple),old=current.get(address);
    if(old&&key(old.tuple)===id&&old.decided&&!old.admitted){old.rpcId=request.id;return chain;}
    const projected={questions:request.params.questions,isBlocking:request.params.isBlocking};
-   if(Buffer.byteLength(JSON.stringify(projected))>1024*1024||(!old&&current.size>=4096)||retired.size>=4096){if(old)old.revoked=true;fail('request-limit');}
+   const privateBytes=Buffer.byteLength(JSON.stringify(projected));
+   if(heldBytes-(old?.privateBytes??0)+privateBytes>1024*1024||(!old&&current.size>=4096)||retired.size>=4096){if(old){old.revoked=true;discard(old);}fail('request-limit');}
    const immutable=structuredClone(projected);
    if(retired.has(id))fail('revoked');
    if(old&&key(old.tuple)===id) {
-    if(!isDeepStrictEqual(old.immutable,immutable)){old.revoked=true;retired.add(id);fail('request-replay-conflict')}
+    if(!isDeepStrictEqual(old.immutable,immutable)){old.revoked=true;retired.add(id);discard(old);fail('request-replay-conflict')}
     old.rpcId=request.id;return chain;
    }
-   if(old){old.revoked=true;retired.add(key(old.tuple))}
-   const entry={tuple,immutable,rpcId:request.id,admitted:false,decided:false,ready:false,revoked:false};current.set(address,entry);
+   if(old){old.revoked=true;retired.add(key(old.tuple));discard(old)}
+   heldBytes+=privateBytes;const entry={tuple,immutable,privateBytes,rpcId:request.id,admitted:false,decided:false,ready:false,revoked:false};current.set(address,entry);
    return queue(async()=>{
     try{if(old)await onSuperseded({...old.tuple});if(!closed&&!entry.revoked)entry.ready=true}
     catch(e){entry.revoked=true;retired.add(id);throw e}
@@ -59,15 +62,15 @@ export function createRequestDelivery({send,onSuperseded}) {
   async admit(tuple,eligible) {
    tuple=tupleOf(tuple);await chain;const entry=owned(tuple);if(!entry.ready)fail('revoked');
    if(entry.decided&&!entry.admitted)return false;
-   if(eligible&&!supported(entry.immutable))fail('unsupported-request');entry.admitted=eligible===true;entry.decided=true;if(!entry.admitted)entry.immutable=null;return entry.admitted;
+   if(eligible&&!supported(entry.immutable))fail('unsupported-request');entry.admitted=eligible===true;entry.decided=true;if(!entry.admitted)discard(entry);return entry.admitted;
   },
   /** @param {any} tuple */
-  resolved(tuple) {tuple=tupleOf(tuple);const entry=current.get(slot(tuple));if(entry&&key(entry.tuple)===key(tuple)){entry.revoked=true;retired.add(key(tuple))}},
+  resolved(tuple) {tuple=tupleOf(tuple);const entry=current.get(slot(tuple));if(entry&&key(entry.tuple)===key(tuple)){entry.revoked=true;retired.add(key(tuple));discard(entry)}},
   /** @param {any} tuple @param {unknown} body */
   async sendAnswer(tuple,body) {
    tuple=tupleOf(tuple);const entry=owned(tuple);if(!entry.admitted)fail('revoked');validate(entry.immutable,body);const result=structuredClone(body);
    return queue(()=>{const rpcId=entry.rpcId;const beforeWrite=()=>{const now=owned(tuple);if(now!==entry||!now.admitted||!now.ready||now.rpcId!==rpcId)fail('revoked')};beforeWrite();return send({id:rpcId,result},beforeWrite)});
   },
-  close() {closed=true;for(const entry of current.values())entry.revoked=true}
+  close() {closed=true;for(const entry of current.values()){entry.revoked=true;discard(entry);}current.clear();retired.clear();}
  };
 }

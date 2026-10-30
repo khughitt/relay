@@ -12,6 +12,7 @@ import { serveSocket } from './socket.js';
 import { serveConfig } from './config.js';
 import { serveHttp } from './http.js';
 import { readSnapshot } from '../bus/transaction.js';
+import {validateEvidence} from './codex/evidence.js';
 // relay serve (spec §7.1): holds the registry's lock primitive on serve.lock for its whole life,
 // so a second instance fails and a dead holder's lock is reclaimed by the reviewed path.
 /** @param {string} stateDir */
@@ -43,6 +44,10 @@ export async function runServe({ env = process.env, signal, io = fs, clock = Dat
     /** @type {(() => void)|undefined} */
     let onAbort;
     try {
+      if(config.codex) {
+        try { await validateEvidence(config.codex); }
+        catch(caught) { log(`CODEX_DISABLED: ${caught instanceof Error?caught.message:'CODEX_EVIDENCE_OR_BINARY'}`); }
+      }
       await inbox.prune(); arm();
       daily = setInterval(() => inbox.prune().catch(report), DAY_MS);
       socket = await serveSocket({ inbox, socketPath: sp.socketPath, processOps, reattachMs, log });

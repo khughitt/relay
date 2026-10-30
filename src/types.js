@@ -50,6 +50,7 @@
  * @typedef {'pending'|'answered'|'handed'|'consumed'|'unconfirmed'|'undeliverable'|'released'|'withdrawn'|'expired'} QuestionState
  * @typedef {{seq: number|null, at: number, state: string, cause: string}} LogRow
  * @typedef {{schema: 1, id: string, seq: number|null, updatedAt: number, log: LogRow[]}} EntryFrame
+ * @typedef {{bin:string,home:string,socket:string,evidence:string}} CodexConfig
  * @typedef {{threadId:string,turnId:string,itemId:string}} CodexTuple
  * @typedef {{answers:Record<string,{answers:string[]}>}} CodexAnswers
  * @typedef {Record<string,string>|CodexAnswers} NativeAnswers

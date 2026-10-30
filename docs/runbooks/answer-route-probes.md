@@ -54,6 +54,13 @@ session id `00000000-0000-4000-8000-000000000000`, transcript `/tmp/x.jsonl`, cw
 
 ## Proposed Codex connector: receipt and lifecycle probes
 
+Current production admission refuses `CODEX_NO_ATOMIC_SUBSCRIPTION` even for the
+pinned binary: 0.165.0 has no selective atomic loaded-only join, and automatic
+new-thread attachment precedes client filtering. Fresh loaded checks cannot make
+resume safe against intervening unload. Keep the connector disabled; do not bypass
+the evidence gate or substitute a mocked loaded-only server for native proof.
+
+
 The [current Codex connector contract](../specs/2026-10-28-codex-question-connector.md)
 is proposed, not installed. The [all-gates report](../notes/2026-10-28-codex-question-protocol-report.md)
 points to the retained evidence index. Private scripted probes establish protocol

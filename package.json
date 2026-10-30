@@ -26,7 +26,8 @@
     "docs/runbooks/registry-lock-repair.md",
     "schemas/",
     "docs/runbooks/inbox-service.md",
-    "LICENSE"
+    "LICENSE",
+    "docs/evidence/codex-question-0.165.0.json"
   ],
   "bin": {
     "relay": "bin/relay.js"

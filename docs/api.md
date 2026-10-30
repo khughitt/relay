@@ -738,11 +738,11 @@ type QuestionEntry = EntryFrame & {
   route: { handback: boolean; waiter: Handle | null };
   answer: Message | null;
   handedAt: number | null;
-  observed: Record<string, string> | null;
+  observed: Record<string, string> | { answers: Record<string, { answers: string[] }> } | null;
   withdrawal: WithdrawalBody | null;
   supersededBy: string | null;
   messages: { at: number; message: Message }[];
-  observations: { at: number; surface: 'terminal'; answers: Record<string, string> }[];
+  observations: { at: number; surface: 'terminal'; answers: Record<string, string> | { answers: Record<string, { answers: string[] }> } }[];
 };
 type NoticeEntry = EntryFrame & {
   kind: 'notice';
@@ -755,7 +755,12 @@ type Presence = { mode: 'here' | 'away'; updatedAt: number };
 ```
 
 `question`/`notice` retains the original normalized message; `messages` retains
-accepted answer, defer and withdrawal messages. `observations` retains native answer
+accepted answer, defer and withdrawal messages. Codex's internal native value
+preserves full string arrays, including empty arrays; it is never flattened into
+Claude's string map. Public responses omit connector ownership, generation and
+question-id mapping metadata; their route is the handback/waiter capability view.
+The Codex connector remains disabled by its native subscription capability gate,
+so these internal types do not establish an available Codex answer route. `observations` retains native answer
 observations, including answers from the terminal after release or expiry. `observed`
 is the latest such map. The full saved entry and its histories are returned to clients.
 Raw harness payloads, transcripts and environment values are never persisted.
