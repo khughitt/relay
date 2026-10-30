@@ -1,3 +1,131 @@
+# Codex question feasibility: receipt gate blocked by protocol source
+
+## Current outcome after checkpoint be590be
+
+Planning of the first-question/direct-join pilot stopped before drafting. An
+offline audit of the Codex 0.165.0 source found that the receipt gate (spec
+gate 3) cannot pass on the route this task targets. No native run, model turn,
+driver change or daemon contact occurred. Budget is unchanged at **373609ms,
+two charged turns**, inactive.
+
+The question the report left open was whether a client that joins late gets
+tool-call evidence. The audit answers it for receipt. For a thread the native TUI
+started, an outside app-server client has no protocol record of the answer the
+model received for a built-in `request_user_input` call. It also cannot tell
+whether its own response or the TUI's was accepted:
+
+- The handler serializes the answer into an ordinary function output for the
+  model (`core/src/tools/handlers/request_user_input.rs:129–153`). Core maps
+  only message, reasoning, web-search and image-generation response items to
+  typed turn items (`core/src/event_mapping.rs:196–271`). The only producer of a
+  `functionCallOutput` turn item is injected pending input
+  (`core/src/hook_runtime.rs:760–780`), not an ordinary tool result.
+- Raw response items reach clients only when the thread's raw-event flag is set
+  (`app-server/src/request_processors/thread_lifecycle.rs:343–356`). Only
+  `thread/start.experimentalRawEvents` sets it (`app-server/src/thread_state.rs:602–627`,
+  `app-server-protocol/src/protocol/v2/thread.rs:161–165`, documented internal
+  use only). The TUI leaves it false (`tui/src/app_server_session.rs:2190–2231`).
+  `thread/resume` has no such parameter; upstream openai/codex#34353 records the
+  same resume gap, last reconfirmed by a commenter on 0.164.0.
+- Stored and paginated history keep only typed items, so `thread/turns/list`,
+  `thread/items/list` and resume pages have no other source for the output
+  (`app-server-protocol/src/protocol/thread_history.rs:430–441,481–505`;
+  `thread-store/src/local/thread_history.rs:515–540`).
+- One server request id is shared by every subscribed connection. The first
+  response removes the callback; a later one is only logged, and nothing is sent
+  back (`app-server/src/outgoing_message.rs:484–512,578–597`).
+  `serverRequest/resolved` carries only `threadId` and `requestId`. Upstream's own
+  round-trip test asserts nothing more before `turn/completed`
+  (`app-server/tests/suite/v2/request_user_input.rs:143–176`).
+
+The approved spec says: "If no correlated output is available, the receipt gate
+fails and the route remains disabled." It also rules out shipping permanently
+unconfirmed answers. A paid pilot would spend turns confirming a gate that the
+source already shows it cannot pass, so none is proposed. A bounded check of the
+same code paths in 0.166.0, released 2026-10-29, found the same structure. That
+was not a full audit of 0.166.0.
+
+Two other source facts bear on whatever plan follows:
+
+- Besides the built-in tool, two other core paths emit the same
+  `item/tool/requestUserInput` request with `isBlocking: true` in any mode.
+  The first is the app tool-approval fallback: its `itemId` is the MCP call id,
+  with one question whose id is `mcp_tool_call_approval_<id>`
+  (`core/src/mcp_tool_call.rs:1474,1667,1744–1762,1994–2030`). It runs only
+  when the default-on, stable `tool_call_mcp_elicitation` feature is off;
+  otherwise approval uses `mcpServer/elicitation/request`
+  (`features/src/lib.rs:2043–2047`). The second is the skill MCP
+  dependency-install prompt: `itemId` `mcp-deps-<turnId>`, question id
+  `skill_mcp_dependency_install` (`core/src/mcp_skill_dependencies.rs:36,285–293`).
+  No typed field names the emitter. Only these naming conventions separate the
+  three, and they are not a protocol contract.
+- In core, the pending answer slot is keyed by turn id. A second question in
+  the same turn overwrites the first. An error response from any client also
+  resolves the request, and the model then receives an empty answer map
+  (`core/src/session/mod.rs:3333–3369`; `bespoke_event_handling.rs:1694–1770`).
+- A fresh TUI thread becomes resumable only after its first turn materializes
+  the rollout. Before that, a running-thread resume fails at its stored read,
+  ahead of any subscription or client-info change. A successful join records the
+  joining client's name and version on the thread
+  (`app-server/src/request_processors/thread_processor.rs:1774–1783,4624–4668,4800–4805`).
+
+Each cited file was hashed and the full map retained as
+`receipt-source-audit.json` (SHA256
+`4cfc4c550db6338a13da7b2eb21f191002016fabaa2ad9f88db01d90d77cda6c`). The
+tarball matches the earlier per-file source pins. This is static source
+evidence, not a live observation. A second, independent read of the same tree
+(Claude Code subagent, with the questions posed open-endedly rather than seeded
+with this conclusion) reached the same receipt and winner conclusions. It
+supplied the emitter and rollout-persistence corrections above. Its open
+gaps are rollout flush timing, ordering of the approval prompt relative to its
+`mcpToolCall` item, and code-mode invocation of the tool.
+
+## Decision needed
+
+Ruling: stop before drafting the pilot plan and return the receipt gate for a
+design decision (be590be plus this audit). Why: Task 3's failure path requires
+the smallest blocking contract and its alternatives rather than guessed
+production work. Cost: if a protocol path was overlooked, a source-verified
+counterexample reopens the pilot plan; no native evidence is lost.
+
+Supported alternatives, none implemented:
+
+1. **Read receipt from the thread's own rollout record.** Correlate the
+   `function_call_output` whose call id equals `itemId`. This needs a spec
+   revision, because it is a second evidence channel outside the protocol, which
+   the plan currently rejects. It ties relay to an undocumented on-disk format
+   and requires reading a private transcript file under the daemon's home.
+   The rollout policy persists `FunctionCallOutput` items
+   (`rollout/src/policy.rs:85–92`), and `Thread.path` (marked unstable)
+   exposes the file's location. Flush timing, ephemeral threads and the
+   paginated-history interaction have not been audited.
+2. **Keep handed answers unconfirmed.** This is honest about the gap, but it
+   contradicts the parent task's done criterion ("confirms native receipt") and
+   the spec's rule against permanently unconfirmed answers. It needs a change of
+   intent by the user.
+3. **Ask upstream for a typed per-call result or a raw-event opt-in on join.**
+   Then wait for a release. The search found related open requests
+   (openai/codex#39426 for an output-only input lifecycle, #34353's later comment
+   on resume raw events) but no request for per-call receipt. Any post is
+   outside the repository and needs the user's approval.
+4. **Have relay start its own threads with raw events.** Rejected: it does not
+   serve questions from the user's TUI threads, and the flag is documented for
+   internal use.
+
+Recommendation, independent of the choice: run any later protocol matrix
+against a local mocked Responses provider. The Codex binary stays native; only
+the model is scripted. That costs no subscription turns, makes tool calls
+deterministic and needs no credential. Upstream reporters use the same
+technique. Model behaviour and phone acceptance still need the real model at
+the user-present gate.
+
+Task 2 and Task 3 remain open, along with the parent. The branch is unmerged.
+
+## Historical report through be590be
+
+The following preserves earlier evidence and proposals, not renewed execution
+authorization.
+
 # Codex question feasibility: native readiness established
 
 ## Current outcome after approved0492f74

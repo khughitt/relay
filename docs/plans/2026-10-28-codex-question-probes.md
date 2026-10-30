@@ -21,6 +21,15 @@ first-question/direct-join plan must handle the TUI settings/turn lifecycle.
 The original requirements below remain historical obligations of that plan;
 the completed readiness sequence does not unlock them automatically.
 
+**Receipt blocker after be590be.** An offline audit of the 0.165.0 source found
+no typed protocol path for a joined client to observe the answer a built-in
+`request_user_input` call returned to the model on a TUI-started thread. It also
+found no path to learn whose response won. Spec gate 3 cannot pass on this
+route, so the first-question/direct-join plan was not drafted. Task 3 follows
+its failure path: the [protocol report](../notes/2026-10-28-codex-question-protocol-report.md)
+records the blocking contract and its alternatives for a design decision. No
+pilot or matrix case is authorized until that decision is made.
+
 The approved spec makes
 provenance, receipt, decline and reconciliation prerequisites of production work.
 The generated types establish field shapes, but do not prove those prerequisites.
