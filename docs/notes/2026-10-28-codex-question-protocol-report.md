@@ -1,6 +1,24 @@
 # Codex question scripted probes: structured-output blocker
 
-## Review update: proposed r7
+## Review update: proposed r8
+
+Supplied spec review round 13 (claude-code/claude-opus-5-5: revise,
+Important 2, Minor 1) accepts the round-12 corrections and asks for a short r8.
+R8 restores one pending native request per thread/turn, supersession with old-answer
+send revocation, and serial-runtime re-proof for every supported version change.
+It also defines version-probed cancellation output as settled without an answer,
+with pre-/post-handoff lifecycle handling, and keeps output fingerprints only in
+memory, never in logs, persistence or forwarding. Gate 3 must capture the native
+cancellation encoding; the source string is not new native observation.
+
+Pinned 0.165.0 source confirms turn-keyed replacement, default serial tools without
+a request-input override, and the handler's dropped-channel cancellation text.
+The current probe's output-presence-based `callSettled` does not implement the new
+classification. No executable file changed or native case reran. R8 is frozen for
+a short diff re-check/text review before correction planning; the execution blocker
+and all remaining gates stay as recorded below.
+
+## Frozen f70dd8d r7 review update
 
 Spec review round 12 (claude-code/claude-opus-5-5: revise, Important 4, Minor 1)
 was supplied by the user, who approved incorporating its findings before the

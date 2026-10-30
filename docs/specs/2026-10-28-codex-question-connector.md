@@ -1,10 +1,10 @@
 # Codex blocking question connector — addendum
 
-Status: r7 proposed for review, incorporating spec review round 12.
-R5 at relay `cc94eaf` remains the last approved complete text. The user approved
-folding round 12's four Important findings and one Minor finding into this revision
-before the correction plan. R7 supersedes proposed r6 at `c36e7b7`; it does not
-implement a reader change or close any outstanding evidence gate.
+Status: r8 proposed for review, incorporating spec review round 13.
+R5 at relay `cc94eaf` remains the last approved complete text. R8 preserves all
+five round-12 corrections in proposed r7 at `f70dd8d` and adds the round-13
+single-request, cancellation and fingerprint-privacy requirements. No executable
+reader change or outstanding native gate is completed by this revision.
 Task: relay-a27e7c, extending relay-f58531 for ops-cb50a8 milestone 4.
 
 ## Intent and authority
@@ -175,6 +175,26 @@ thread id. The RPC request id is only a connection-local response address, never
 the durable identity. Reuse the stored inbox UUID and immutable message on replay;
 the same tuple with changed question content is an explicit conflict.
 
+**One pending native request per thread and turn.** Never publish or answer a
+second request for the same `(threadId, turnId)` while one is pending. A replay
+of the same tuple is not a second request; several question items inside one
+request remain supported. Any new distinct native tuple for that thread/turn
+supersedes the old delivery address, including when the new request is ineligible
+for publication. Revoke the old request's send capability and withdraw its pending
+entry through the serial queue before considering the new request. No saved or
+late answer to the old tuple may be sent afterward; recheck this immediately before
+send. Apply the existing cleared-request lifecycle to an old pending entry:
+`asker-gone` without a saved answer, `undeliverable` if saved but not handed, and
+`unconfirmed` after handoff without confirmed receipt. Do not rewrite a completed
+receipt. Publish the new request only if it independently satisfies admission.
+
+This rule is load-bearing: 0.165.0 keys pending user input and submitted answers by
+turn id, so replacing the pending slot could route an old answer into the new call.
+Its serial tool runtime prevents simultaneous built-in requests today: the executor
+default is nonparallel and `request_user_input` does not override it. That explains
+the sequential two-call probe; it does not authorize concurrent pending requests.
+Every supported version change must re-prove that serial runtime before activation.
+
 Relay item ids are `q1` onward and option ids `o1` onward, assigned once in native
 order. Preserve the native question-id mapping in validated private route metadata,
 not public presentation fields. Duplicate native ids or ambiguous option labels
@@ -219,20 +239,25 @@ are plain JSONL; compression applies only to rollouts at least seven days old.
   exist transiently while parsing a bounded line, but is never retained, logged or
   forwarded. An output with no earlier valid call is `unidentified`, not `other`;
   it makes evidence `unknown` and cannot establish receipt.
-- **Output content by predicate class (r7 proposal).** Classify the exact earlier
+- **Output content by predicate class (r8 proposal).** Classify the exact earlier
   call by the provenance predicate below, not by whether Codex calls its tool
   built-in or MCP. `view_image`, shell tools and file tools can all be `other`.
   For **every** output shape belonging to an `other` call, discard the content.
   Retain only its call id and a SHA-256 fingerprint of the UTF-8
   `JSON.stringify(output)` value. JSON types and object field order are preserved
-  by this fingerprint; same-id/same-hash output is idempotent, while a different
+  by this fingerprint. Fingerprints stay only in the in-memory reader table:
+  never log, persist or forward them, including in telemetry or durable route
+  metadata. Short outputs can be recovered by guessing their hashes; fingerprints
+  are private content derivatives, not safe diagnostics. Reopen rebuilds them from
+  byte 0. Same-id/same-hash output is idempotent, while a different
   hash for that id makes evidence sticky `unknown`. Require a present output
   field and valid earlier call/id before hashing. Neither this fingerprint nor
   an `other` output can establish built-in receipt. This discards unrelated string
   output as well as arrays, images and other JSON values; no descriptions, schemas,
   tool output text or inline image data are retained.
   For a positively identified `built-in` call, retain only the version-probed
-  string answer output needed for exact receipt. Structured built-in output and
+  string output needed for exact receipt or the cancellation classification below.
+  Output presence alone is not proof of an answer. Structured built-in output and
   any output for an unidentified call remain `unknown`. Missing/invalid fields,
   malformed JSON, conflicting duplicate calls/outputs and file-validation failures
   remain fail-closed. No guessed conversion of structured content to answer text
@@ -242,8 +267,8 @@ are plain JSONL; compression applies only to rollouts at least seven days old.
   discard. The bound applies even to a valid `other` output or an ignored event,
   image, compaction or patch record. Reopening the same oversized file from byte 0
   encounters the same limit; that thread stays native while its rollout exceeds
-  the bound. R7 accepts this residual limit for this slice. Skipping oversized
-  lines by a type prefix, raising limits or adding a different recovery policy
+  the bound. R8 preserves this accepted residual limit. Skipping oversized lines
+  by a type prefix, raising limits or adding a different recovery policy
   requires separate review; the content-discard rule does not bypass these bounds.
 - **Provenance.** A request qualifies only when the file holds a `function_call`
   whose `call_id` equals the request's `itemId` and whose `name` is exactly
@@ -273,13 +298,27 @@ are plain JSONL; compression applies only to rollouts at least seven days old.
   before handoff/send: a malformed relay response must fail locally rather than
   silently becoming a native decline. The native TUI decline, receiver-failure
   trigger, competition and activation gates remain outstanding.
+- **Settled without an answer.** In 0.165.0 the built-in's dropped-channel
+  path emits `request_user_input was cancelled before receiving a response`.
+  Gate 3 must capture its exact native rollout encoding before the matcher relies
+  on it; the source text alone is not a newly observed native fixture. Once pinned,
+  that positively correlated cancellation result settles the exact call **without
+  an answer**, even though a matching output exists. It is never `answered` or
+  `consumed`. Do not guess that every non-answer string means cancellation:
+  unrecognized built-in strings leave that call's receipt/settlement unknown.
+  Before handoff, withdraw an unanswered question as `asker-gone` or retain a saved
+  answer as `undeliverable`; after handoff retain `unconfirmed`. No answer may be
+  resent to that settled call. The reader/settlement helper must distinguish this
+  case instead of classifying every matching output as `answered`.
 - **Recovery.** A matching record found after reconnect or relay restart can
-  settle reconciliation for that exact call. The proposed authoritative sign
-  that a call is gone without an answer has three parts: protocol completion or
-  abort of the request's `turnId`, a rollout read caught up past that point, and
-  no matching output. The probe must confirm this, including what an aborted
-  call records. An unfinished read or an unknown file state is never a sign of
-  disappearance.
+  settle reconciliation for that exact call. A version-probed cancellation output
+  follows the settled-without-answer rule above. For the separate case with **no
+  matching output**, the proposed disappearance sign still requires protocol
+  completion/abort of that `turnId`, its matching turn-end barrier in the rollout,
+  and no output for the call. Protocol completion alone, file end or elapsed time
+  is insufficient. The probe
+  must confirm the native barrier and ordering, including aborted calls. An
+  unfinished read or unknown file state never proves disappearance.
 
 The rollout format is undocumented and version-specific. The evidence file must
 pin it alongside the protocol, and a version mismatch disables the connector.
@@ -383,7 +422,9 @@ equivalence; those gates remain separate.
    secret and async requests by the rollout provenance rule. The rule must also
    leave the skill-dependency prompt and unidentified calls native. Exercise all
    forms the translator will admit, including free text, Other, multiple items,
-   and decline.
+   and decline. Enforce the one-pending-request contract, including supersession
+   by an ineligible request, and re-prove the serial tool runtime for the pinned
+   version; no old-tuple answer may reach a later request in that turn.
 3. A phone-equivalent answer gets a correlated rollout `function_call_output`
    carrying its exact values. The rollout reader's limits, rotation and
    compression refusals and writer-lag wait are tested against captured lines. Test desktop-first and phone-first races, cleanup-only resolution,
@@ -393,7 +434,10 @@ equivalence; those gates remain separate.
    are refused before send, and nonempty saved answers cannot match an empty map.
    Record value equality without attributing the winning client. Source-shaped
    receiver-failure tests are distinct from native proof of what triggers them.
-   No false `consumed` is allowed.
+   Capture the built-in cancellation/non-answer output during interruption and
+   cleanup; verify settled-without-answer rather than `answered`, no `consumed`,
+   and pre-/post-handoff lifecycle mappings. Test an unrecognized non-answer string
+   separately as unknown. No false `consumed` is allowed.
 4. Defer leaves the native question usable and advances no turn until the desktop
    answers. Verify history and relay retry responses.
 5. Transport reconnects and relay restarts preserve identity; daemon restart/re-ask rejects stale
@@ -447,7 +491,7 @@ and daemon lifecycle management remain outside this task. None is implicitly
 delivered by this addendum or by the existing detached-question route.
 
 
-## R7 evidence and next gate
+## R7/R8 evidence and next gate
 
 R7 adopts the user's approved spec-round-12 review direction; the execution
 checkpoint and failed native results at `c36e7b7` remain unchanged. Pinned 0.165.0
@@ -467,11 +511,12 @@ threads stay native indefinitely. The reviewer reported a size-only local census
 of 87/12,697 rollouts with a line over 1 MiB and two files over 64 MiB (largest about
 80 MB); this session did not repeat it or inspect live rollout content.
 
-After frozen-text review of r7, the correction plan must cover:
+After frozen-text review of r8, the correction plan must cover:
 
 - Byte-0 rebuild; unidentified outputs without an earlier call; strings and arrays
-  from `other` retaining only id/hash, including non-MCP image output; identical
-  and conflicting duplicates; later built-in receipts without unrelated retention.
+  from `other` retaining only memory-private id/hash, including non-MCP image output;
+  identical/conflicting duplicates; later built-in receipts without unrelated retention.
+  Prove fingerprints never enter logs, persistence, forwarding or telemetry.
 - Unknown built-in structured/unidentified output, malformed JSON/IDs and existing
   file/size refusals, including oversized irrelevant lines and oversized-file reopen.
 - Gate 3 empty-map collisions, local malformed-body refusal and value-only decline
@@ -479,8 +524,20 @@ After frozen-text review of r7, the correction plan must cover:
   unverified. Keep source-shaped tests distinct from native trigger evidence.
 - Aggregate deadlines before any delayed case; remaining competition, defer,
   recovery and private-TUI gates; app exclusion/no-execution without approval receipt.
+- Turn-level supersession, the last pre-send check and version-pinned serial runtime;
+  recognized cancellation output as settled without an answer, unknown non-answer
+  strings and lifecycle behavior on both sides of handoff. These are corrections
+  the current prototype does not implement.
+
+Round-13 source checks: `core/src/session/mod.rs:3340–3354` and
+`core/src/state/turn.rs:162–168` show replacement of the turn-keyed pending slot;
+`tools/src/tool_executor.rs:122–124` defaults to serial execution, and the
+request-input handler has no parallel override. `request_user_input.rs:87–94`
+contains the cancellation text. No new native probe ran; a short re-check of this
+diff is sufficient before text approval.
 
 Provider-index and duplicate-prompt minors remain deferred. The stale decline
 sentence is replaced by the stronger receipt contract. No correction plan,
-production connector or activation is approved here. Simultaneous pending-call
-safety, real-model provenance, phone/TUI acceptance and 0.166.0 remain unproved.
+production connector or activation is approved here. Concurrent pending requests
+remain unsupported; real-model provenance, phone/TUI acceptance and 0.166.0 remain
+unproved.
