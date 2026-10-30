@@ -2,6 +2,7 @@
 import {isDeepStrictEqual} from 'node:util';
 import {validateHandle,relayError} from '../../protocol.js';
 import {callId} from '../../routes/codex.js';
+import {isAbsolute} from 'node:path';
 /** @param {unknown} v @returns {v is Record<string,any>} */
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 /** @param {Record<string,any>} v @param {string[]} names */
@@ -9,7 +10,8 @@ const exact=(v,names)=>Object.keys(v).length===names.length&&names.every(k=>Obje
 /** @param {unknown} value @param {import('../../types.js').QuestionMessage} question @returns {import('../../types.js').CodexOwner} */
 export function validateOwner(value,question) {
   const invalid=()=>{throw relayError('INVALID_OWNER','invalid Codex owner');};
-  if(!object(value)||!exact(value,['kind','tuple','generationBinding','items'])||value.kind!=='codex'||!object(value.tuple)||!exact(value.tuple,['threadId','turnId','itemId']))return invalid();
+  if(!object(value)||!['kind','tuple','generationBinding','items'].every(k=>Object.hasOwn(value,k))||Object.keys(value).some(k=>!['kind','tuple','generationBinding','items','rolloutPath'].includes(k))||value.kind!=='codex'||!object(value.tuple)||!exact(value.tuple,['threadId','turnId','itemId']))return invalid();
+  if(Object.hasOwn(value,'rolloutPath')&&(typeof value.rolloutPath!=='string'||value.rolloutPath.length>4096||value.rolloutPath.includes('\0')||!isAbsolute(value.rolloutPath)||!value.rolloutPath.endsWith('.jsonl')))return invalid();
   if(Object.values(value.tuple).some(v=>typeof v!=='string'||v.length<1||v.length>256))return invalid();
   const handle=validateHandle(value.generationBinding);
   if(!isDeepStrictEqual(handle,value.generationBinding)||handle.platform==='linux'&&handle.bootId===null)return invalid();

@@ -54,7 +54,7 @@
  * @typedef {{threadId:string,turnId:string,itemId:string}} CodexTuple
  * @typedef {{answers:Record<string,{answers:string[]}>}} CodexAnswers
  * @typedef {Record<string,string>|CodexAnswers} NativeAnswers
- * @typedef {{kind:'codex',tuple:CodexTuple,generationBinding:Handle,items:{relayId:string,nativeId:string}[]}} CodexOwner
+ * @typedef {{kind:'codex',tuple:CodexTuple,generationBinding:Handle,items:{relayId:string,nativeId:string}[],rolloutPath?:string}} CodexOwner
  * @typedef {{handback:boolean,waiter:Handle|null,connector?:never,terminal?:never}|{handback:true,connector:CodexOwner,terminal:boolean,waiter?:never}} QuestionRoute
  * @typedef {EntryFrame & {kind: 'question', question: QuestionMessage, state: QuestionState, presentation: 'inbox'|'desktop', route: QuestionRoute, answer: AnswerMessage|null, handedAt: number|null, observed: NativeAnswers|null, withdrawal: {reason: string}|null, supersededBy: string|null, messages: {at: number, message: Message}[], observations: {at: number, surface: string, answers: NativeAnswers}[]}} QuestionEntry
  * @typedef {EntryFrame & {kind: 'notice', notice: NoticeMessage, state: 'active'|'expired', seen: boolean}} NoticeEntry

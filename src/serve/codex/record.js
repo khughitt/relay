@@ -107,8 +107,8 @@ export function matchReceipt(record,itemId,savedAnswers) {
  const value=parseAnswers(record.outputs.get(itemId));if(value===null)return 'unknown';
  return isDeepStrictEqual(value,savedAnswers)?'consumed':'mismatch';
 }
-/** @param {any} record @param {any} tuple @param {{request?:any,terminal?:any}} [proof] */
-export function callSettled(record,tuple,{request,terminal}={}) {
+/** @param {any} record @param {any} tuple @param {{request?:any,terminal?:any,terminalObserved?:boolean}} [proof] */
+export function callSettled(record,tuple,{request,terminal,terminalObserved=false}={}) {
  const {threadId,turnId,itemId}=tuple;
  if(record.state!=='ok')return 'unknown';
  if(record.outputs.has(itemId)) {
@@ -116,7 +116,7 @@ export function callSettled(record,tuple,{request,terminal}={}) {
   if(parseAnswers(output)!==null)return 'answered';
   const call=record.calls.get(itemId),order=orders.get(record);
   const observed=typeof threadId==='string'&&threadId.length>0&&request?.method==='item/tool/requestUserInput'&&['threadId','turnId','itemId'].every(k=>typeof tuple[k]==='string'&&tuple[k].length>0&&request.params?.[k]===tuple[k]);
-  const ended=terminal?.method==='turn/completed'&&terminal.params?.threadId===threadId&&terminal.params?.turn?.id===turnId&&['completed','interrupted','failed'].includes(terminal.params?.turn?.status);
+  const ended=terminalObserved===true||terminal?.method==='turn/completed'&&terminal.params?.threadId===threadId&&terminal.params?.turn?.id===turnId&&['completed','interrupted','failed'].includes(terminal.params?.turn?.status);
   return call?.name==='request_user_input'&&call.namespace===null&&typeof output==='string'&&observed&&ended&&order?.ends.get(turnId)>order?.outputs.get(itemId)?'no-answer':'unknown';
  }
  if(record.turnEnds.has(turnId))return 'gone';

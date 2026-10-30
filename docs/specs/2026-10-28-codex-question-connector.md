@@ -152,7 +152,9 @@ must have its single admitted value, translated to the exact native label or Oth
 text. Unknown/duplicate ids, malformed bodies or unsupported values fail locally.
 A relay decline is exactly `{"answers":{}}`; never rely on a native malformed-body
 fallback. Persist only the question, minimal routing/ownership data, saved answer
-and approved native answer observation. Retain no unrelated request/transcript,
+and approved native answer observation. The qualified resume rollout path stays
+in private owner metadata for read-only receipt after restart, never client
+projections. Retain no unrelated request/transcript,
 secret or credential content.
 
 Native answer observations preserve the full answer map and string arrays without
@@ -173,7 +175,9 @@ lifecycle proof below, never an answer. The connector never writes the rollout.
 Accept only the path returned by `thread/resume`, a regular, owned, non-symlink
 `.jsonl` under the configured home's sessions directory. Revalidate identity on
 every read. Missing, compressed, replaced, shrunk or unreadable files are unknown.
-Every open starts at byte 0 and rebuilds the call table; thereafter read appended
+The service also caps retained readers at 16 and their charged file bytes at
+64 MiB total; exhaustion is unknown/native, never a partial receipt. Every open
+starts at byte 0 and rebuilds the call table; thereafter read appended
 bytes incrementally. EOF, writer lag and unfinished reads are not disappearance.
 
 Retain only response-item envelope/type, call id, name/namespace, approved output,

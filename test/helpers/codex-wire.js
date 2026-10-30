@@ -15,9 +15,9 @@ function frame(payload='', {op=1,fin=true,mask=false,rsv=0,lengthBytes}={}) {
 }
 async function peer(t,{headers=[],status='101 Switching Protocols',peerLimit='16777216',tail=Buffer.alloc(0),hang=false,badAccept=false}={}) {
   assert.equal(typeof mod.connectUnixWebSocket,'function','bounded Unix WebSocket implementation is required');
-  const root=mkdtempSync(join(tmpdir(),'rq-wire-')),path=join(root,'s');let sock,request,buf=Buffer.alloc(0),upgraded=false;
+  const root=mkdtempSync(join(tmpdir(),'rq-wire-')),path=join(root,'s');let sock,request;
   const received=[];const sockets=new Set();
-  const server=net.createServer(s=>{sock=s;sockets.add(s);s.on('error',()=>{});s.on('close',()=>sockets.delete(s));
+  const server=net.createServer(s=>{let buf=Buffer.alloc(0),upgraded=false;sock=s;sockets.add(s);s.on('error',()=>{});s.on('close',()=>sockets.delete(s));
     s.on('data',chunk=>{buf=Buffer.concat([buf,chunk]);
       if(!upgraded){const end=buf.indexOf('\r\n\r\n');if(end<0)return;
         request=buf.subarray(0,end+4).toString();buf=buf.subarray(end+4);upgraded=true;

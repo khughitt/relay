@@ -66,10 +66,10 @@ export function createRequestDelivery({send,onSuperseded}) {
   },
   /** @param {any} tuple */
   resolved(tuple) {tuple=tupleOf(tuple);const entry=current.get(slot(tuple));if(entry&&key(entry.tuple)===key(tuple)){entry.revoked=true;retired.add(key(tuple));discard(entry)}},
-  /** @param {any} tuple @param {unknown} body */
-  async sendAnswer(tuple,body) {
+  /** @param {any} tuple @param {unknown} body @param {()=>void} [canWrite] */
+  async sendAnswer(tuple,body,canWrite=()=>{}) {
    tuple=tupleOf(tuple);const entry=owned(tuple);if(!entry.admitted)fail('revoked');validate(entry.immutable,body);const result=structuredClone(body);
-   return queue(()=>{const rpcId=entry.rpcId;const beforeWrite=()=>{const now=owned(tuple);if(now!==entry||!now.admitted||!now.ready||now.rpcId!==rpcId)fail('revoked')};beforeWrite();return send({id:rpcId,result},beforeWrite)});
+   return queue(()=>{const rpcId=entry.rpcId;const beforeWrite=()=>{const now=owned(tuple);if(now!==entry||!now.admitted||!now.ready||now.rpcId!==rpcId)fail('revoked');canWrite();};beforeWrite();return send({id:rpcId,result},beforeWrite)});
   },
   close() {closed=true;for(const entry of current.values()){entry.revoked=true;discard(entry);}current.clear();retired.clear();}
  };
