@@ -1,7 +1,8 @@
 # Codex question connector — prerequisite and all-gates report
 
 The private scripted matrix controls and the production connector's automated
-implementation are complete, subject to final fresh review. The user accepted a
+implementation are complete. Fresh whole-branch review and two corrective rounds
+accepted the implementation. The user accepted a
 detected unload/resume residual in exact 0.165.0 rather than an unavailable atomic
 loaded-only API or an unprovable timing bound. Selection requires native
 Active+WaitingOnUserInput, admission and qualifying replay; a raced join releases
@@ -12,7 +13,9 @@ the model and was confirmed consumed; a fresh deferred question accepted native
 Red and updated released history. Both processes and private endpoint resources
 were cleaned. The failed first pilot is retained: its final count used the
 active-only inbox list, corrected to include terminal history in the passing run.
-Gate 7 and integration remain separate approvals. The locked
+Current verification passed952/952 on both Node26.5.0 and22.23.2; final corrective
+review round35 accepted with no findings. Gate 7 and integration remain separate
+approvals. The locked
 `feat/codex-question` branch stays unmerged; nothing is installed or activated.
 
 ## Authority and evidence
