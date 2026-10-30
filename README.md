@@ -10,22 +10,25 @@ ohai remains the notification client.
 
 ```sh
 just setup
-just test-fast
-just gate
+just check-hygiene
+just test-one test/cli.test.js
+# Deliberate full verification:
+TT_FORCE=1 just gate
 node bin/relay.js list --json
 node bin/relay.js reap
 node bin/relay.js hook --harness claude-code PreToolUse < payload.json
 ```
 
-Test-policy adoption is prepared but not activated: local broad checks remain enabled
-until accepted hosted coverage and separate publication approval. See the
+Routine broad local checks are disabled by .tt.toml after accepted
+[hosted Node 22/26 verification](https://github.com/khughitt/relay/actions/runs/41063297144).
+Focused implementation tests and hygiene remain required. See the
 [test execution policy](docs/test-execution-policy.md) for focused checks, forced
 verification and hosted coverage limits.
 
 The fast and full suites are intentionally identical; there is no affected-only
 selector. The one runtime npm dependency, `jsonc-parser`, is installed by npm with relay and
 used only by `relay install`; `just setup` also installs development-only TypeScript and Node 22
-types. `just check` runs strict JSDoc type checking over every `src/` and `bin/` file
+types. `TT_FORCE=1 just check` runs strict JSDoc type checking over every `src/` and `bin/` file
 without emitting code. Shared contracts live in `src/types.js`; compile-time
 regressions live in `test/types/`. JavaScript runs directly, with no build step.
 

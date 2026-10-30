@@ -18,16 +18,16 @@
   needs it), plus development-only
   TypeScript and Node 22 types.
 - Use `just test-one <file>` or `just test-one --test-name-pattern "<regex>" <file>`
-  while working; arguments pass intact to `node --test`. Run `just test-fast` before
-  committing and `just gate` before integration.
-  Execution policy comes from the invoking code root’s .tt.toml; absent means enabled.
-  After validated activation, focused tests and hygiene remain required; policy skips
-  are not passing tests. Use `just test-full` to force the suite, and TT_FORCE=1
+  while working; arguments pass intact to `node --test`. Run fresh focused checks
+  for changed behavior and `just check-hygiene` before committing or integration.
+  The invoking code root’s .tt.toml disables routine broad local checks; a missing
+  policy file means enabled. Do not rerun broad targets solely for a commit or gate.
+  Policy skips are not passing tests. Use `just test-full` to force the suite, and TT_FORCE=1
   with `just check` to force type checks too. Read docs/test-execution-policy.md for
   current activation state and coverage gaps.
   Fast and full commands intentionally run the same suite. Hooks use the vendored
   ops front door; install core.hooksPath .githooks in a new clone.
-- `just check` runs strict `tsc --checkJs --noEmit` on every `src/` and `bin/` file.
+- When forced or policy-enabled, `just check` runs strict `tsc --checkJs --noEmit` on every `src/` and `bin/` file.
   Shared JSDoc contracts live in `src/types.js`; preserve runtime validation at JSON
   boundaries. `test/types/` holds compile-time contract checks, never runtime tests.
 - Test the Node 22 floor as well as the development runtime. The suite includes an
