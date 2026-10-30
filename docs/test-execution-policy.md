@@ -29,6 +29,10 @@ a hosted broad skip without force is a configuration error.
 
 Prepared hosted verification uses standard Ubuntu 24.04 runners on Node 22 and
 26, once per branch push with superseded runs cancelled, plus manual dispatch.
+The pinned setup installs attr, lsof and util-linux; just is copied into /usr/bin
+so tests with a system-only PATH can find it. Checkout keeps no token in Git
+configuration. Both jobs force nested verification with TT_FORCE=1.
+
 Tags and other remotes have no declared automatic coverage. An uncovered push
 warns under policy-off and does not silently restore local broad testing.
 Cancelled, missing, failed or empty runs are unverified.

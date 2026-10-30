@@ -30,6 +30,10 @@ check_hygiene_cmd := "python3 tools/ops-check && tasks check"
 check_code_cmd := "npx --no-install tsc --noEmit"
 ci_hygiene_cmd := "python3 tools/ops-check"
 
+# The prepared workflow covers every branch, including names containing slashes.
+ci_remote := "origin"
+ci_suite_refs := "refs/heads/*"
+
 # What a fresh checkout or worktree needs before the suite can run: dependency installs
 # (npm ci, uv sync) and any gitignored inputs the tests read, hydrated from the main
 # checkout or a store. Idempotent; safe to rerun. The worktree convention runs it right
