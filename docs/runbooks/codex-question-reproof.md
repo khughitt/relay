@@ -31,8 +31,8 @@ node tools/codex-question/reprove.mjs \
 
 The driver validates archive and executable bytes before execution, verifies the
 baseline's 28 source hashes, compares all 28 files, and emits a full source diff.
-Two additional history/persistence sources support the raw-versus-synthetic proof.
-Seventeen lexical source checks plus a bounded TUI override census must pass
+Three additional sources support history/persistence and native PID publication.
+Eighteen lexical source checks plus a bounded TUI override census must pass
 before the executable runs. The census scans all TUI Rust sources; the two
 literal unload-key occurrences are under the cfg(test) module. This is a
 callsite census, not a claim that custom configuration cannot set an override.
@@ -45,10 +45,17 @@ the accepted unload/resume residual or supplies a timing guarantee.
 
 The private run generates four protocol artifacts and runs the actual production
 transport, evidence validator, process/listener qualifier and durable inbox. Its
-15 assertions cover exact binary/version, scripted model receipt and consumed,
+16 assertions cover exact binary/version, scripted model receipt and consumed,
 fresh re-ask identity, defer/native answer history, helper release, privacy and
-cleanup. The fixture records its actual owned foreground PID in its own private
-home; it injects no production identity/evidence bypass. Expect under two minutes.
+cleanup. The PID-mode assertion requires0644 in the private fixture; run with
+umask022 (for example, `umask 022` in the probe shell). The fixture records its actual owned foreground PID in its own private
+home; it injects no production identity/evidence bypass.
+Pinned `app-server-daemon/src/backend/pid_start.rs:272–296` writes and renames a
+temporary PID file without a permissions override: default0666 filtered by
+umask022 yields0644, matching the observed live record. The re-proof pins that
+source and checks the write/rename/no-override invariant; group/other-writable
+records still refuse. Only the private fixture is written; no live permission
+change is made. Expect under two minutes.
 SIGINT/SIGTERM aborts the run and cleans owned processes. Keep its result and
 cleanup verdict, including failures, before retrying.
 

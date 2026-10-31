@@ -211,7 +211,10 @@ partial or malformed paths fail configuration. The evidence path names
 `docs/evidence/codex-question-0.166.0.json` from this build. Admission checks its
 pinned digest, exact executable bytes/version, private home, owned Unix listener
 and the native PID record's actual process birth identity. Missing or ambiguous
-identity fails closed. Relay never starts, updates or reconfigures Codex or reads
+identity fails closed. The owned daemon PID record may be0644; group/other write,
+foreign ownership, symlink, oversize or unstable reads refuse. Its permissions
+are never changed. This exception does not relax socket or inbox privacy.
+Relay never starts, updates or reconfigures Codex or reads
 authentication files. This Linux qualification has no permissive platform fallback.
 
 With valid evidence, relay joins only loaded threads observed Active with

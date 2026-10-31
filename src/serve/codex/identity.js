@@ -26,7 +26,7 @@ export async function daemonIdentity(config,processOps) {
     const deadline=performance.now()+1000,home=await directory(config.home),base=join(config.home,'app-server-daemon'),parent=await directory(base),socket=await socketStat(config.socket);
     const candidates=[];for(const name of ['app-server.pid','daemon.pid']){const path=join(base,name);try{await fs.lstat(path);candidates.push(path);}catch(e){if(/** @type {NodeJS.ErrnoException} */ (e).code!=='ENOENT')throw e;}}
     if(candidates.length!==1)return null;
-    const path=candidates[0],saved=await readOwned(path,16*1024,true),record=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(saved.bytes));
+    const path=candidates[0],saved=await readOwned(path,16*1024),record=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(saved.bytes));
     if(!Number.isSafeInteger(record.pid)||record.pid<1||typeof record.processStartTime!=='string'||!record.processStartTime||!record.processIdentity)return null;
     const handle=processOps.handleOf(record.pid);
     if(!handle||handle.platform!=='linux'||!handle.bootId||handle.bootId!==record.processIdentity.bootId||!Number.isSafeInteger(record.processIdentity.startTicks)||handle.start!==String(record.processIdentity.startTicks)||processOps.probe(handle).status!=='alive'||await fs.realpath(processOps.executableOf(record.pid))!==await fs.realpath(config.bin))return null;
@@ -41,7 +41,7 @@ export async function daemonIdentity(config,processOps) {
     let owns=false;for(const fd of fds){if(performance.now()>=deadline)return null;try{if(await fs.readlink(`/proc/${record.pid}/fd/${fd}`)===`socket:[${inode}]`){owns=true;break;}}catch{}}
     if(!owns||performance.now()>=deadline||!isDeepStrictEqual(handle,processOps.handleOf(record.pid))||processOps.probe(handle).status!=='alive'||await fs.realpath(processOps.executableOf(record.pid))!==await fs.realpath(config.bin))return null;
     if(!sameFile(home,await fs.lstat(config.home))||!sameFile(parent,await fs.lstat(base))||!sameFile(socket,await socketStat(config.socket)))return null;
-    const after=await readOwned(path,16*1024,true);if(!sameFile(saved.stat,after.stat)||!saved.bytes.equals(after.bytes))return null;
+    const after=await readOwned(path,16*1024);if(!sameFile(saved.stat,after.stat)||!saved.bytes.equals(after.bytes))return null;
     return handle;
   }catch{return null;}
 }

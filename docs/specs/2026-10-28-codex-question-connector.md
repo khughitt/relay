@@ -32,6 +32,14 @@ malformed enablement fails early. Production never starts, restarts, updates or
 reconfigures Codex, reads authentication files, or copies credentials. Support is
 exactly the evidenced codex-cli 0.166.0; all other versions are refused.
 
+The daemon PID record alone may be mode0644: require an owned regular non-symlink
+file, no group/other write, at most16KiB, stable open/path identity and unchanged
+bytes across qualification. Do not require0600 or change its permissions. Keep
+all process-birth/executable/listener checks. This exception changes neither
+other files' privacy rules nor the socket's required0600 mode. The pinned native
+writer uses ordinary file creation permissions filtered by umask.
+
+
 ## Transport and discovery
 
 Validate the Unix endpoint, HTTP Upgrade and acceptance key; mask client frames,

@@ -40,7 +40,9 @@ try{
  const processOps=createProcessOps(),handle=processOps.handleOf(server.pid);check('native foreground process qualified',!!handle);
  const processStartTime=execFileSync('/usr/bin/ps',['-p',String(server.pid),'-o','lstart='],{env:probeEnvironment(privateDir),encoding:'utf8'}).trim();
  const metadataDir=join(env.CODEX_HOME,'app-server-daemon');mkdirSync(metadataDir,{mode:0o700});metadataPath=join(metadataDir,'app-server.pid');
- const record={pid:server.pid,processStartTime,processIdentity:{bootId:handle.bootId,startTicks:Number(handle.start)}};writeFileSync(metadataPath,JSON.stringify(record),{mode:0o600});result.nativeIdentity=record;
+ // pid_start.rs:272-296 writes/renames with ordinary creation permissions:0644 under umask022.
+ const record={pid:server.pid,processStartTime,processIdentity:{bootId:handle.bootId,startTicks:Number(handle.start)}};writeFileSync(metadataPath,JSON.stringify(record),{mode:0o644});result.nativeIdentity=record;
+ check('native PID metadata mode0644',(statSync(metadataPath).mode&0o777)===0o644);
  const stateDir=join(privateDir,'relay');mkdirSync(stateDir,{mode:0o700});
  const row={id:'codex:'+threadId,harness:'codex',sessionId:threadId,scope:'session',process:handle,cwd:privateDir,repoRoot:null,remote:null,projectKey:privateDir,project:'private pilot',state:'working',updatedAt:Date.now()};
  writeFileSync(join(stateDir,'agents.json'),JSON.stringify({schema:2,generation:randomUUID(),revision:1,agents:{[row.id]:row}}),{mode:0o600});

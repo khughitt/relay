@@ -143,9 +143,9 @@
   "native": [
     {
       "case": "production-native-pilot",
-      "sha256": "6e90f7548f72cab1f0c1f3298aae34c19fa48b3e50786521620022f9a9e1eb45",
+      "sha256": "709f4595b50be5ba9bdf28458d0e64d7dcaa9b3a53fe1a43528fb7ab0d22650c",
       "status": "passed",
-      "assertions": 15
+      "assertions": 16
     }
   ],
   "protocolPrerequisitesComplete": true,
@@ -171,6 +171,10 @@
     {
       "file": "rollout/src/policy.rs",
       "sha256": "c736d6790544fea4c853827ed3d9684956c62de91cfb2cc83b6ec12d80fe3bac"
+    },
+    {
+      "file": "app-server-daemon/src/backend/pid_start.rs",
+      "sha256": "8ded330f05e2119a5295090f5dc66ba3dd86dd361433d65c9cfc8ab772febc1d"
     }
   ],
   "sourceReproof": {
@@ -286,6 +290,13 @@
         "passed": true
       },
       {
+        "id": "pid-write-mode",
+        "files": [
+          "app-server-daemon/src/backend/pid_start.rs"
+        ],
+        "passed": true
+      },
+      {
         "id": "resume-residual",
         "files": [
           "app-server/src/request_processors/thread_processor.rs",
@@ -318,7 +329,8 @@
       }
     ],
     "facts": {
-      "unloadDefaultSeconds": 60
+      "unloadDefaultSeconds": 60,
+      "pidFileCreationMode": 438
     }
   }
 }

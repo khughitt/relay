@@ -29,6 +29,11 @@ Use the actual canonical Codex home, not an assumed default. Do not run daemon
 manager commands, connect merely to discover endpoints, or read authentication
 files. A missing/mismatched/ambiguous daemon birth record, executable or listener
 stops this gate; do not manufacture private-pilot metadata in the live home.
+An owned0644 daemon PID record is supported. It must remain a regular non-symlink
+file with no group/other write, within16KiB and stable across qualification.
+This relaxation applies only to that record; the Unix socket still requires0600.
+Never chmod or rewrite anything in the live Codex home.
+
 
 The four opt-in variables are exactly:
 

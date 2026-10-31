@@ -7,6 +7,8 @@ import {once} from 'node:events';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createProcessOps} from '../src/bus/proc.js';
+import promises from 'node:fs/promises';
+import {syncBuiltinESMExports} from 'node:module';
 const mod=await import('../src/serve/codex/identity.js').catch(e=>{if(e.code==='ERR_MODULE_NOT_FOUND')return {};throw e});
 async function fixture(t){
  assert.equal(typeof mod.daemonIdentity,'function');const home=await fs.mkdtemp(join(tmpdir(),'relay-daemon-'));t.after(()=>fs.rm(home,{recursive:true,force:true}));await fs.mkdir(join(home,'app-server-daemon'),{mode:0o700});const socket=join(home,'server.sock'),ops=createProcessOps(),handle=ops.handleOf(process.pid);const server=net.createServer();await new Promise((r,j)=>server.once('error',j).listen(socket,r));await fs.chmod(socket,0o600);t.after(()=>new Promise(r=>server.close(r)));
@@ -32,4 +34,40 @@ test('invalid UTF-8 metadata is unknown even when its birth fields would otherwi
  const f=await fixture(t),text=JSON.stringify(f.record);
  // Corrupt a non-authoritative string too; native serde must still reject the JSON bytes.
  const at=text.indexOf('processStartTime')+'processStartTime'.length+3;const corrupt=Buffer.from(text);corrupt[at]=255;await fs.writeFile(f.pidFile,corrupt);assert.equal(await mod.daemonIdentity(f.config,f.ops),null);
+});
+
+test('owned0644 PID metadata qualifies without weakening socket privacy',async t=>{
+ const f=await fixture(t);await fs.chmod(f.pidFile,0o644);
+ assert.deepEqual(await mod.daemonIdentity(f.config,f.ops),f.handle);
+ await fs.chmod(f.socket,0o644);assert.equal(await mod.daemonIdentity(f.config,f.ops),null);
+});
+test('group or other writable PID metadata refuses',async t=>{
+ const f=await fixture(t);
+ for(const mode of [0o664,0o666]){await fs.chmod(f.pidFile,mode);assert.equal(await mod.daemonIdentity(f.config,f.ops),null);}
+ await fs.chmod(f.pidFile,0o644);assert.deepEqual(await mod.daemonIdentity(f.config,f.ops),f.handle);
+});
+test('foreign PID-record ownership refuses even with otherwise valid0644 metadata',async t=>{
+ const f=await fixture(t);await fs.chmod(f.pidFile,0o644);
+ const original=promises.lstat;
+ // An unprivileged test cannot chown a file; replace only the OS ownership observation.
+ const mocked=t.mock.method(promises,'lstat',async(path,...args)=>{const s=await original(path,...args);return path===f.pidFile?new Proxy(s,{get:(s,key)=>key==='uid'?s.uid+1:Reflect.get(s,key)}):s;});
+ syncBuiltinESMExports();try{assert.equal(await mod.daemonIdentity(f.config,f.ops),null);}finally{mocked.mock.restore();syncBuiltinESMExports();}
+ assert.deepEqual(await mod.daemonIdentity(f.config,f.ops),f.handle);
+});
+test('a symlink to valid0644 PID metadata refuses',async t=>{
+ const f=await fixture(t),target=join(f.home,'record.json');await fs.rename(f.pidFile,target);await fs.chmod(target,0o644);await fs.symlink(target,f.pidFile);
+ assert.equal(await mod.daemonIdentity(f.config,f.ops),null);
+});
+test('PID metadata changed during the actual file read refuses',async t=>{
+ const f=await fixture(t);await fs.chmod(f.pidFile,0o644);const original=promises.open;let changed=false;
+ const mocked=t.mock.method(promises,'open',async(path,...args)=>{
+  const fd=await original(path,...args);
+  if(path===f.pidFile){const read=fd.read.bind(fd);fd.read=async(...args)=>{if(!changed){changed=true;await fs.writeFile(f.pidFile,JSON.stringify({...f.record,processStartTime:'X'+f.record.processStartTime.slice(1)}));}return read(...args);};}
+  return fd;
+ });
+ syncBuiltinESMExports();try{const identity=await mod.daemonIdentity(f.config,f.ops);assert.equal(changed,true);assert.equal(identity,null);}finally{mocked.mock.restore();syncBuiltinESMExports();}
+});
+test('PID-record size bound still refuses oversized valid JSON',async t=>{
+ const f=await fixture(t);await fs.chmod(f.pidFile,0o644);await f.put({...f.record,padding:'x'.repeat(16384)});
+ assert.equal(await mod.daemonIdentity(f.config,f.ops),null);
 });

@@ -4,7 +4,7 @@ export const ARCHIVES={
  '0.165.0':'4e066a7dbd1234efa7458c2b137161bb7ddde1dde6be4ed4c8f38e6c45f862ab',
  '0.166.0':'718c86dcd7104919f2820aa79db0fa0083b5f240aa16da704f43e4acf7b544e5'
 };
-export const ADDITIONAL_SOURCES=['core/src/context_manager/history.rs','rollout/src/policy.rs'];
+export const ADDITIONAL_SOURCES=['core/src/context_manager/history.rs','rollout/src/policy.rs','app-server-daemon/src/backend/pid_start.rs'];
 export const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 // These lexical checks accompany an exact archive pin and review of every changed source.
 const tokens=/b?r(#+)"[\s\S]*?"\1|b?r"[\s\S]*?"|b?"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])'|\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
@@ -39,9 +39,10 @@ export function proveSourceInvariants(files,version){
  check('unload-default',['core/src/config/mod.rs'],()=>new RegExp('cfg\\.thread_unload_delay_secs\\.unwrap_or\\(\\s*'+expected+'\\)').test(source('core/src/config/mod.rs')));
  check('helper-set',['tui/src/app/app_server_events.rs','tui/src/temporary_structured_request.rs','tui/src/app/thread_title.rs'],()=>all(source('tui/src/app/app_server_events.rs'),/&& started.thread.ephemeral/,/ThreadSource::Feature\(feature\).*"system" \| "thread_title"/)&&all(source('tui/src/temporary_structured_request.rs'),/ephemeral: Some\(true\)/,/dynamic_tools: Some\(Vec::new\(\)\)/,/"tools.experimental_request_user_input.enabled".to_string\(\),\s*false.into\(\)/)&&/ThreadSource::Feature\("thread_title".to_string\(\)\)/.test(source('tui/src/app/thread_title.rs')));
  check('pid-identity',['app-server-daemon/src/backend/pid.rs','app-server-daemon/src/backend/pid_identity.rs','app-server-daemon/src/lib.rs'],()=>all(block(source('app-server-daemon/src/backend/pid.rs'),'struct PidRecord'),/pid: u32/,/process_start_time: String/,/process_identity: Option<identity::ProcessIdentity>/)&&all(source('app-server-daemon/src/backend/pid_identity.rs'),/rename_all_fields = "camelCase"/,/boot_id: String/,/start_ticks: u64/)&&/app-server.pid/.test(source('app-server-daemon/src/lib.rs')));
+ check('pid-write-mode',['app-server-daemon/src/backend/pid_start.rs'],()=>{const s=fn('app-server-daemon/src/backend/pid_start.rs','start_inner');return all(s,/self.pid_file.with_extension\("pid.tmp"\)/,/fs::write\(&temp_pid_file, &contents\)/,/fs::rename\(&temp_pid_file, &self.pid_file\)/)&&!/\.mode\s*\(|set_permissions|Permissions/.test(s)});
  check('resume-residual',[processor,'app-server-protocol/src/protocol/v2/thread.rs'],()=>all(fn(processor,'thread_resume_inner'),/RunningThreadResumeResult::NotRunning/,/\.start_thread\(/)&&!/loaded_only|loadedOnly/.test(block(source('app-server-protocol/src/protocol/v2/thread.rs'),'struct ThreadResumeParams')));
  check('raw-rollout',['rollout/src/policy.rs'],()=>{const s=fn('rollout/src/policy.rs','should_persist_response_item');return all(s,/ResponseItem::FunctionCallOutput/,/ResponseItem::CustomToolCallOutput/)&&s.indexOf('ResponseItem::FunctionCallOutput')<s.indexOf('=> true')&&s.indexOf('ResponseItem::CustomToolCallOutput')<s.indexOf('=> true')});
  check('synthetic-history',['core/src/context_manager/history.rs','core/src/context_manager/normalize.rs'],()=>all(fn('core/src/context_manager/history.rs','for_prompt_annotated'),/mut self/,/self.normalize_history\(input_modalities\)/)&&/ensure_call_outputs_present/.test(fn('core/src/context_manager/history.rs','normalize_history'))&&/FunctionCallOutputPayload::from_text\("aborted".to_string\(\)\)/.test(source('core/src/context_manager/normalize.rs')));
  const passed=checks.every(c=>c.passed);
- return {schema:1,version,status:passed?'passed':'failed',checks,facts:{unloadDefaultSeconds:checks.find(c=>c.id==='unload-default').passed?expected:null},evidenceKind:'pinned-source-lexical-invariants-and-changed-source-review'};
+ return {schema:1,version,status:passed?'passed':'failed',checks,facts:{unloadDefaultSeconds:checks.find(c=>c.id==='unload-default').passed?expected:null,pidFileCreationMode:checks.find(c=>c.id==='pid-write-mode').passed?0o666:null},evidenceKind:'pinned-source-lexical-invariants-and-changed-source-review'};
 }

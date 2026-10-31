@@ -4,12 +4,15 @@ import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
 const mod=await import('../tools/codex-question/source-proof.mjs').catch(e=>{if(e.code==='ERR_MODULE_NOT_FOUND')return {};throw e});
 const root=process.env.RELAY_CODEX_SOURCE_ROOT,version=process.env.RELAY_CODEX_SOURCE_VERSION??'0.165.0';
-function sources(){const pins=JSON.parse(readFileSync(new URL('../docs/evidence/codex-question-0.165.0.json',import.meta.url)));return Object.fromEntries([...pins.sources.map(p=>p.file),'core/src/context_manager/history.rs','rollout/src/policy.rs'].map(f=>[f,readFileSync(join(root,f),'utf8')]))}
+function sources(){const pins=JSON.parse(readFileSync(new URL('../docs/evidence/codex-question-0.165.0.json',import.meta.url)));return Object.fromEntries([...pins.sources.map(p=>p.file),'core/src/context_manager/history.rs','rollout/src/policy.rs','app-server-daemon/src/backend/pid_start.rs'].map(f=>[f,readFileSync(join(root,f),'utf8')]))}
 test('source proof rejects absent input and unauthorized versions without accepting evidence',()=>{
  assert.equal(typeof mod.proveSourceInvariants,'function');assert.equal(mod.proveSourceInvariants({},'0.166.0').status,'failed');assert.equal(mod.proveSourceInvariants({},'0.167.0').status,'failed');
 });
 test('version-specific source invariants pass the actual archived source',{skip:!root},()=>{
  assert.equal(typeof mod.proveSourceInvariants,'function');const p=mod.proveSourceInvariants(sources(),version);assert.deepEqual(p.checks.filter(c=>!c.passed),[]);assert.equal(p.status,'passed');assert.equal(p.facts.unloadDefaultSeconds,version==='0.165.0'?1800:60);
+});
+test('native PID writer uses ordinary file creation permissions rather than a private-mode override',{skip:!root},()=>{
+ const p=mod.proveSourceInvariants(sources(),version);assert.equal(p.status,'passed');assert.equal(p.checks.find(c=>c.id==='pid-write-mode')?.passed,true);assert.equal(p.facts.pidFileCreationMode,0o666);
 });
 for(const [id,file,from,to] of [
  ['builtin-answer-map','core/src/tools/handlers/request_user_input.rs','serde_json::to_string(&response)','"different answer encoding".to_string()'],
@@ -24,7 +27,8 @@ for(const [id,file,from,to] of [
  ['unload-conditions','app-server/src/request_processors/thread_lifecycle.rs','((false, has_no_subscribers_since), (false, is_inactive_since))','((false, has_no_subscribers_since), (_, is_inactive_since))'],
  ['helper-set','tui/src/app/app_server_events.rs','"system" | "thread_title"','"thread_title"'],
  ['pid-identity','app-server-daemon/src/backend/pid.rs','process_identity: Option<identity::ProcessIdentity>','process_identity: String'],
- ['raw-rollout','rollout/src/policy.rs','| ResponseItem::FunctionCallOutput { .. }','| ResponseItem::UnknownOutput { .. }']
+ ['raw-rollout','rollout/src/policy.rs','| ResponseItem::FunctionCallOutput { .. }','| ResponseItem::UnknownOutput { .. }'],
+ ['pid-write-mode','app-server-daemon/src/backend/pid_start.rs','fs::write(&temp_pid_file, &contents)','write_private_pid(&temp_pid_file, &contents)']
 ])test(`source invariant ${id} fails closed after its load-bearing condition changes`,{skip:!root},()=>{
  assert.equal(typeof mod.proveSourceInvariants,'function');const input=sources();assert.ok(input[file].includes(from),'fixture mutation must hit archived production source');input[file]=input[file].replace(from,to);const p=mod.proveSourceInvariants(input,version);assert.equal(p.status,'failed');assert.equal(p.checks.find(c=>c.id===id)?.passed,false);
 });
