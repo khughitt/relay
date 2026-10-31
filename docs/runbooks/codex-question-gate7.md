@@ -85,16 +85,44 @@ authorized consumer fix. Relay changes no phone client in this package.
 
 ## Isolate admission, then start the temporary relay
 
-After host approval, the user creates a new native thread, selects Plan mode,
-and identifies its exact thread id as `G7_THREAD`. No other turn is submitted.
+After host approval, the user must launch the native TUI with an explicit
+connection to the same physical socket used by relay:
+
+```sh
+co --remote "unix://$RELAY_CODEX_SOCKET"
+```
+
+Select Plan mode and identify its exact thread id as `G7_THREAD`. For an existing
+test thread, first cancel its pending question and exit its old TUI, then resume
+that same thread against the explicit endpoint instead of creating another:
+
+```sh
+co resume --remote "unix://$RELAY_CODEX_SOCKET" "$G7_THREAD"
+```
+
+Plain `co` does not establish shared ownership: 0.166.0 can use an embedded
+app-server or an implicit daemon path with embedded fallback. Pinned
+`tui/src/lib.rs` (`resolve_remote_addr`, `app_server_target_for_launch`) and
+`tui/src/app_server_connection.rs` establish the explicit Unix endpoint path;
+`cli/src/main.rs` tests the resume syntax. An explicit physical endpoint selects
+the remote server without embedded fallback. No launcher/configuration is changed.
+Before any test prompt, the controller must complete `thread/loaded/list` on the
+qualified daemon and find this exact thread. A `notLoaded` metadata result while
+the TUI is active stops the case; never cold-resume from relay to conceal a wrong
+TUI backend. No other turn is submitted.
 Read the ordinary registry with the explicit worktree CLI under its original
 state environment: `node "$RELAY/bin/relay.js" list --json`. It is read-only.
 Require exactly one matching Codex session row and `liveness[row.id].status`
 equal to `alive`. Copy only that existing row into `$STATE/agents.json`, preserving
 its process handle and session id unchanged. Use schema 2, a fresh UUID generation
 and revision 1, and mode 0600. This is a filtered snapshot, not a fabricated row.
-If no row exists, stop; do not register a fake session or repoint hooks. Before each
-case refresh this one-row snapshot from the ordinary registry and recheck the
+An empty or switched thread may have no row until its first prompt hook. In that
+case start with an empty temporary registry, submit only the approved first
+prompt after phone readiness, and copy only the naturally emitted exact-session
+row once its process qualifies. Until then relay admits nothing and the question
+stays native. If that row never appears, the case fails; never register a fake
+session, borrow another row or repoint hooks. Before each case refresh this
+one-row snapshot from the ordinary registry and recheck the
 same alive native session. Never add other sessions. The connector independently
 rechecks admission; the snapshot does not prove displayed-thread ownership.
 Create and refresh the filtered snapshot with the original registry environment
