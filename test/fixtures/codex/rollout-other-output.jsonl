@@ -1,0 +1,14 @@
+{"type": "response_item", "payload": {"type": "function_call", "call_id": "o0", "name": "shell"}}
+{"type": "response_item", "payload": {"type": "function_call_output", "call_id": "o0", "output": "PRIVATE-shell"}}
+{"type": "response_item", "payload": {"type": "function_call", "call_id": "o1", "name": "read_file"}}
+{"type": "response_item", "payload": {"type": "function_call_output", "call_id": "o1", "output": "PRIVATE-file"}}
+{"type": "response_item", "payload": {"type": "function_call", "call_id": "o2", "name": "noop", "namespace": "mcp"}}
+{"type": "response_item", "payload": {"type": "function_call_output", "call_id": "o2", "output": [{"type": "input_text", "text": "PRIVATE-mcp"}]}}
+{"type": "response_item", "payload": {"type": "function_call", "call_id": "o3", "name": "view_image"}}
+{"type": "response_item", "payload": {"type": "function_call_output", "call_id": "o3", "output": [{"type": "image", "data": "PRIVATE-image"}]}}
+{"type": "response_item", "payload": {"type": "function_call", "call_id": "o4", "name": "other"}}
+{"type": "response_item", "payload": {"type": "function_call_output", "call_id": "o4", "output": {"secret": "PRIVATE-object"}}}
+{"type": "response_item", "payload": {"type": "function_call", "call_id": "o5", "name": "other"}}
+{"type": "response_item", "payload": {"type": "function_call_output", "call_id": "o5", "output": 17}}
+{"type": "response_item", "payload": {"type": "function_call", "call_id": "o6", "name": "other"}}
+{"type": "response_item", "payload": {"type": "function_call_output", "call_id": "o6", "output": null}}

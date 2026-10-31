@@ -61,3 +61,17 @@ if (taken.ok) {
   // @ts-expect-error A take reply is an entry, not a list.
   taken.entries;
 }
+
+const codexPublic = await connection.request('get', { id: 'unused' });
+if(codexPublic.ok&&codexPublic.entry.kind==='question') {
+  // @ts-expect-error Private connector identity/mapping never belongs to a socket response.
+  codexPublic.entry.route.connector;
+}
+/** @param {import('../../src/types.js').Inbox} inbox @param {import('../../src/types.js').CodexOwner} owner */
+async function codexOwnership(inbox,owner) {
+  await inbox.codexHanded('id',owner);
+  // @ts-expect-error A hook process handle is not a connector owner.
+  await inbox.codexHanded('id',sameHandle);
+  // @ts-expect-error Raw RPC ids cannot authorize a handoff.
+  await inbox.codexHanded('id',1);
+}

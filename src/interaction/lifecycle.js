@@ -1,5 +1,7 @@
 // @ts-check
 import { isDeepStrictEqual } from 'node:util';
+import {validateOwner} from '../serve/codex/owner.js';
+import {parseAnswers,nativeAnswers as codexAnswers} from '../routes/codex.js';
 import { relayError, validateHandle } from '../protocol.js';
 import { checkAnswer, isUuid, validateMessage, LOCAL_SURFACES, WITHDRAWAL_REASONS } from './message.js';
 // The question lifecycle as pure functions (spec §5). Each returns { entry, changed, error };
@@ -88,7 +90,7 @@ export function checkSupersede(predecessor, replacement) {
 }
 /** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").Handle|null} waiter @param {number} now */
 export function applyHanded(entry, waiter, now) {
-  if (!sameHandle(entry.route.waiter, waiter)) return refuse(entry, 'NOT_WAITER');
+  if (entry.route.connector || !sameHandle(entry.route.waiter ?? null, waiter)) return refuse(entry, 'NOT_WAITER');
   if (['handed', 'unconfirmed', 'consumed'].includes(entry.state)) return keep(entry);
   if (entry.state === 'pending') return refuse(entry, 'NOT_ANSWERED');
   if (entry.state !== 'answered') return refuse(entry, CLOSED[entry.state]);
@@ -103,6 +105,38 @@ export function applyConfirm(entry, { matches, observed }, now) {
   const patch = { observed, observations: [...entry.observations, { at: now, surface: 'terminal', answers: observed }] };
   if (native) return annotate(entry, now, 'native-answer', patch);
   return move(entry, now, matches ? 'consumed' : 'unconfirmed', matches ? 'confirm' : 'confirm-mismatch', patch);
+}
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").CodexOwner} owner */
+const ownsCodex = (entry,owner) => entry.question?.body.native?.harness==='codex' && isDeepStrictEqual(entry.route.connector,owner);
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").CodexOwner} owner @param {number} now */
+export function applyCodexHanded(entry,owner,now) {
+  if(!ownsCodex(entry,owner))return refuse(entry,'NOT_OWNER');
+  if(['handed','unconfirmed','consumed'].includes(entry.state))return keep(entry);
+  if(entry.state==='pending')return refuse(entry,'NOT_ANSWERED');
+  if(entry.state!=='answered')return refuse(entry,CLOSED[entry.state]);
+  return move(entry,now,'handed','handed',{handedAt:now});
+}
+/** @param {import("../types.js").QuestionEntry} entry @param {import("../types.js").CodexOwner} owner @param {string} reason @param {number} now */
+export function applyCodexGone(entry,owner,reason,now) {
+  if(!ownsCodex(entry,owner))return refuse(entry,'NOT_OWNER');
+  if(!['replacement','no-answer','superseded','disappeared'].includes(reason))throw relayError('INVALID_INPUT','invalid Codex settlement');
+  if(entry.state==='handed')return move(entry,now,'unconfirmed','codex-ended');
+  return applyAskerGone(entry,now);
+}
+/** @param {import("../types.js").QuestionEntry} original @param {import("../types.js").CodexOwner} owner @param {{answers:import("../types.js").CodexAnswers|null,terminal:boolean,matches:boolean}} proof @param {number} now */
+export function applyCodexObserve(original,owner,{answers,terminal,matches},now) {
+  if(!ownsCodex(original,owner))return refuse(original,'NOT_OWNER');
+  if(typeof terminal!=='boolean'||(answers!==null&&parseAnswers(JSON.stringify(answers))===null))throw relayError('INVALID_INPUT','invalid Codex observation');
+  let entry=original,changed=false;
+  if(terminal&&!entry.route.terminal){const result=annotate(entry,now,'codex-terminal',{route:{handback:true,connector:owner,terminal:true}});entry=result.entry;changed=true;}
+  if(answers===null||entry.state==='consumed')return {entry,changed,error:null};
+  const confirms=matches&&entry.route.terminal===true&&['handed','unconfirmed'].includes(entry.state);
+  if(isDeepStrictEqual(entry.observed,answers)&&!confirms)return {entry,changed,error:null};
+  const patch={observed:answers,observations:[...entry.observations,{at:now,surface:'terminal',answers}]};
+  if(entry.state==='pending')return move(entry,now,'withdrawn','codex-native-answer',{...patch,withdrawal:{reason:'answered-elsewhere'}});
+  if(entry.state==='answered')return move(entry,now,'undeliverable','codex-native-answer',patch);
+  if(entry.state==='handed'||entry.state==='unconfirmed')return move(entry,now,confirms?'consumed':'unconfirmed',confirms?'confirm':'codex-unconfirmed',patch);
+  return annotate(entry,now,'codex-native-answer',patch);
 }
 /** @param {import("../types.js").QuestionEntry} entry @param {number} now */
 export function applyAskerGone(entry, now) {
@@ -179,9 +213,16 @@ export function validateEntry(v) {
       'handedAt', 'observed', 'withdrawal', 'supersededBy', 'messages', 'observations', 'seq', 'updatedAt', 'log'])
       || normalized(v.question).kind !== 'question' || v.question.id !== v.id
       || !QUESTION_STATES.includes(v.state) || !v.log.every((l) => QUESTION_STATES.includes(l.state))) fail('invalid question entry');
-    if (!['inbox', 'desktop'].includes(v.presentation) || !object(v.route) || !keys(v.route, ['handback', 'waiter'])
-      || typeof v.route.handback !== 'boolean') fail('invalid route');
-    if (v.route.waiter !== null && !isDeepStrictEqual(validateHandle(v.route.waiter), v.route.waiter)) fail('invalid waiter');
+    if (!['inbox', 'desktop'].includes(v.presentation) || !object(v.route) || typeof v.route.handback !== 'boolean') fail('invalid route');
+    const codex=v.question.body.native?.harness==='codex';
+    if(codex){
+      if(!keys(v.route,['handback','connector','terminal'])||v.route.handback!==true||typeof v.route.terminal!=='boolean')fail('invalid Codex route');
+      validateOwner(v.route.connector,v.question);
+      if(v.state==='consumed'&&!v.route.terminal)fail('Codex receipt needs protocol terminal');
+    }else{
+      if(!keys(v.route,['handback','waiter'])||!Object.hasOwn(v.route,'waiter'))fail('invalid hook route');
+      if(v.route.waiter!==null&&!isDeepStrictEqual(validateHandle(v.route.waiter),v.route.waiter))fail('invalid waiter');
+    }
     const detached = v.question.body.native === null;
     if (detached && (v.route.waiter !== null || v.route.handback || v.question.from.kind !== 'agent' || v.question.to.kind !== 'user'
       || v.handedAt !== null || v.observed !== null || !Array.isArray(v.observations) || v.observations.length !== 0
@@ -216,7 +257,11 @@ export function validateEntry(v) {
         && v.withdrawal?.reason === 'superseded' && v.supersededBy !== null;
       else if (row.cause === 'asker-gone') valid = previous === 'pending' ? row.state === 'withdrawn' && v.withdrawal?.reason === 'asker-gone'
         : previous === 'answered' && row.state === 'undeliverable';
-      else if (row.cause === 'handed') valid = previous === 'answered' && row.state === 'handed' && row.at === v.handedAt && v.route.waiter !== null;
+      else if (row.cause === 'handed') valid = previous === 'answered' && row.state === 'handed' && row.at === v.handedAt && (codex || v.route.waiter !== null);
+      else if(row.cause==='codex-terminal') valid=codex&&v.route.terminal===true&&row.state===previous;
+      else if(row.cause==='codex-ended') valid=codex&&previous==='handed'&&row.state==='unconfirmed';
+      else if(row.cause==='codex-unconfirmed') valid=codex&&['handed','unconfirmed'].includes(previous)&&row.state==='unconfirmed';
+      else if(row.cause==='codex-native-answer') valid=codex&&(previous==='pending'?row.state==='withdrawn'&&v.withdrawal?.reason==='answered-elsewhere':previous==='answered'?row.state==='undeliverable':['released','expired','withdrawn','undeliverable','unconfirmed'].includes(previous)&&row.state===previous);
       else if (row.cause === 'confirm' || row.cause === 'confirm-mismatch') valid = ['handed', 'unconfirmed'].includes(previous)
         && row.state === (row.cause === 'confirm' ? 'consumed' : 'unconfirmed');
       else if (row.cause === 'window') valid = previous === 'handed' && row.state === 'unconfirmed' && row.at >= v.handedAt + CONFIRM_WINDOW_MS;
@@ -225,6 +270,7 @@ export function validateEntry(v) {
       else if (row.cause === 'native-answer') valid = ['released', 'expired'].includes(previous) && row.state === previous;
       if (!valid) fail('invalid question transition');
     }
+    if (codex && v.route.terminal!==v.log.some((l)=>l.cause==='codex-terminal'))fail('Codex terminal lacks evidence');
     if (v.supersededBy !== null && !v.log.some((l) => l.cause === 'superseded')) fail('supersededBy lacks evidence');
     if (v.presentation !== (!v.route.handback && v.log.some((l) => l.cause.startsWith('defer:')) ? 'desktop' : 'inbox')) fail('presentation lacks evidence');
     if (!Array.isArray(v.messages)) fail('invalid message history');
@@ -257,12 +303,13 @@ export function validateEntry(v) {
     if (!Array.isArray(v.observations)) fail('invalid observation history');
     for (const observation of v.observations) {
       if (!object(observation) || !keys(observation, ['at', 'surface', 'answers']) || !ms(observation.at)
-        || observation.surface !== 'terminal' || !answers(observation.answers)) fail('invalid native observation');
-      consume(observation.at, ['confirm', 'confirm-mismatch', 'native-answer']);
+        || observation.surface !== 'terminal' || !(codex ? parseAnswers(JSON.stringify(observation.answers))!==null : answers(observation.answers))) fail('invalid native observation');
+      consume(observation.at, ['confirm', 'confirm-mismatch', 'native-answer', 'codex-native-answer', 'codex-unconfirmed']);
     }
-    if (evidence.some((l) => ['answer', 'confirm', 'confirm-mismatch', 'native-answer'].includes(l.cause)
+    if (evidence.some((l) => ['answer', 'confirm', 'confirm-mismatch', 'native-answer', 'codex-native-answer', 'codex-unconfirmed'].includes(l.cause)
       || l.cause.startsWith('defer:') || l.cause.startsWith('withdrawal:'))) fail('transition lacks history');
     if (!isDeepStrictEqual(v.observed, v.observations.at(-1)?.answers ?? null)) fail('observed does not match history');
+    if(codex&&v.state==='consumed'&&!isDeepStrictEqual(codexAnswers(v.question,v.answer.body,v.route.connector.items),v.observed))fail('Codex consumed value mismatch');
     return /** @type {import("../types.js").StoredEntry} */ (v);
   } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught);
     if (error.code === 'INVALID_ENTRY') throw error;

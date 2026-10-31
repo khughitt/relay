@@ -12,6 +12,8 @@ import { serveSocket } from './socket.js';
 import { serveConfig } from './config.js';
 import { serveHttp } from './http.js';
 import { readSnapshot } from '../bus/transaction.js';
+import {validateEvidence} from './codex/evidence.js';
+import {openCodexConnector} from './codex/connector.js';
 // relay serve (spec §7.1): holds the registry's lock primitive on serve.lock for its whole life,
 // so a second instance fails and a dead holder's lock is reclaimed by the reviewed path.
 /** @param {string} stateDir */
@@ -31,6 +33,7 @@ export async function runServe({ env = process.env, signal, io = fs, clock = Dat
     /** @type {NodeJS.Timeout|undefined} */
     let timer;
     let socket = null, web = null, daily = /** @type {NodeJS.Timeout|undefined} */ (undefined), stopping = false;
+    /** @type {Awaited<ReturnType<typeof openCodexConnector>>|null} */ let codex = null;
     const arm = () => {
       if (!inbox || stopping) return;
       clearTimeout(timer);
@@ -43,6 +46,10 @@ export async function runServe({ env = process.env, signal, io = fs, clock = Dat
     /** @type {(() => void)|undefined} */
     let onAbort;
     try {
+      if(config.codex) {
+        try { await validateEvidence(config.codex); codex = await openCodexConnector({config:config.codex,inbox,readAgents:()=>readSnapshot({paths:registryPaths}),processOps,signal,log}); }
+        catch(caught) { log(`CODEX_DISABLED: ${caught instanceof Error?caught.message:'CODEX_EVIDENCE_OR_BINARY'}`); }
+      }
       await inbox.prune(); arm();
       daily = setInterval(() => inbox.prune().catch(report), DAY_MS);
       socket = await serveSocket({ inbox, socketPath: sp.socketPath, processOps, reattachMs, log });
@@ -57,9 +64,9 @@ export async function runServe({ env = process.env, signal, io = fs, clock = Dat
     } finally {
       stopping = true; clearTimeout(timer); clearInterval(daily);
       signal?.removeEventListener('abort', /** @type {() => void} */ (onAbort));
-      await web?.close();
-      await socket?.close();
+      const cleaned=await Promise.allSettled([codex?.close(),web?.close(),socket?.close()]);
       await inbox.idle();
+      if(cleaned.some(result=>result.status==='rejected'))throw relayError('CLEANUP_FAILED','service cleanup failed');
     }
   }
   let held;

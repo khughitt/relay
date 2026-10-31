@@ -1,0 +1,3 @@
+{"type":"response_item","payload":{"type":"function_call","call_id":"call_interrupt","name":"request_user_input"}}
+{"type":"response_item","payload":{"type":"function_call_output","call_id":"call_interrupt","output":"aborted by user after 0.1s"}}
+{"type":"event_msg","payload":{"type":"turn_aborted","turn_id":"01a18cbf-c6e0-7540-875e-b433882f771c"}}

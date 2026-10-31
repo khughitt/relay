@@ -45,13 +45,13 @@ function call(port, { method = 'GET', path, headers = {}, body, rawBody }) {
 const answerBody = (patch = {}) => ({ answerId: uuid(), surface: 'cli', outcome: 'answered', artifactRevision: null, values: { q1: { type: 'choice', optionIds: ['o2'] } }, ...patch });
 
 test('config: off without a port; host and login together; port and paths checked', () => {
-  assert.deepEqual(serveConfig({}), { http: null });
+  assert.deepEqual(serveConfig({}), { http: null, codex:null });
   assert.throws(() => serveConfig({ RELAY_SERVE_HOST: HOST, RELAY_SERVE_LOGIN: LOGIN }), { code: 'INVALID_CONFIG' });
   assert.throws(() => serveConfig({ RELAY_HTTP_PORT: '3340', RELAY_SERVE_HOST: HOST }), { code: 'INVALID_CONFIG', message: /RELAY_SERVE_LOGIN/ });
   assert.throws(() => serveConfig({ RELAY_HTTP_PORT: '3340', RELAY_SERVE_LOGIN: LOGIN }), { code: 'INVALID_CONFIG', message: /RELAY_SERVE_HOST/ });
   assert.throws(() => serveConfig({ RELAY_HTTP_PORT: '70000' }), { code: 'INVALID_CONFIG' });
   assert.throws(() => serveConfig({ RELAY_HTTP_PORT: '3340', RELAY_CLIENT_DIR: 'rel' }), { code: 'INVALID_CONFIG' });
-  assert.deepEqual(serveConfig({ RELAY_HTTP_PORT: '3340' }), { http: { port: 3340, serveHost: null, serveLogin: null, clientDir: null } });
+  assert.deepEqual(serveConfig({ RELAY_HTTP_PORT: '3340' }), { codex:null, http: { port: 3340, serveHost: null, serveLogin: null, clientDir: null } });
 });
 test('guard: proxied needs exact login and host and no Funnel; local needs loopback host on the port', () => {
   const cfg = { port: 3340, serveHost: HOST, serveLogin: LOGIN };

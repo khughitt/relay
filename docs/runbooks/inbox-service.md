@@ -202,3 +202,62 @@ writers first, diagnose and preserve the tokens, and remove only the diagnosed p
 under that procedure. Preserve the registry and inbox data. Never sweep control or
 temporary files with a wildcard. Restart the unit and inspect its journal before
 restoring hook invocations.
+
+## Codex blocking question connector
+
+The four opt-in absolute paths are `RELAY_CODEX_BIN`, `RELAY_CODEX_HOME`,
+`RELAY_CODEX_SOCKET` and `RELAY_CODEX_EVIDENCE`. All absent leaves Codex off;
+partial or malformed paths fail configuration. The evidence path names
+`docs/evidence/codex-question-0.166.0.json` from this build. Admission checks its
+pinned digest, exact executable bytes/version, private home, owned Unix listener
+and the native PID record's actual process birth identity. Missing or ambiguous
+identity fails closed. The owned daemon PID record may be0644; group/other write,
+foreign ownership, symlink, oversize or unstable reads refuse. Its permissions
+are never changed. This exception does not relax socket or inbox privacy.
+Relay never starts, updates or reconfigures Codex or reads
+authentication files. This Linux qualification has no permissive platform fallback.
+
+With valid evidence, relay joins only loaded threads observed Active with
+WaitingOnUserInput and admitted by a live Codex registry row, away presence,
+Plan provenance and supported form. Registry rows establish admission, not which
+thread a TUI displays. Ephemeral feature sources `system` and `thread_title` are
+excluded. Provenance waits at most five seconds for the earlier call line;
+unidentified/unsupported requests stay native. Unselected automatic attachments
+are released immediately without retaining their content. Selected subscriptions
+are released once the question settles and its turn end is observed; relay does
+not keep idle threads loaded for later receipts. On startup, a thread with only
+receipt histories stays on read-only reconciliation; its initial waiting episode
+stays native. A newly observed non-waiting to waiting transition can admit a new
+question, with no authority inherited from the old history.
+
+0.166.0 has no atomic loaded-only join. The accepted residual is an unload during
+resume when the effective thread delay is shorter than resume latency and both
+the turn ends and all other subscribers leave. No timing bound is claimed. First
+join requires a qualifying pending replay during resume; reconnect requires the
+stored exact tuple. Missing or changed replay releases the subscription, emits
+content-free `CODEX_JOIN_RACED`, and never retries that waiting episode. An atomic
+loaded-only join must replace this residual when available and re-proved.
+
+An answer is durably marked handed before its sole guarded response. Only the
+actual exact-call answer map plus the observed exact protocol turn end confirms
+consumed, including after unsubscribe. Without that transition it stays
+unconfirmed. Defer sends nothing and leaves native answering available; later
+native answers update released history. Socket loss alone proves no asker loss.
+A validated daemon replacement settles pending/saved lifecycle, while handed
+stays unconfirmed without receipt. Public clients receive no private owner,
+generation, rollout path or question-id mapping metadata.
+
+`CODEX_DISABLED` leaves ordinary inbox routes serving when admission fails;
+`CODEX_CONNECTION` indicates unavailable qualified connection. Diagnostics carry
+no question/output content. Rollout bounds remain 1 MiB per line, 64 MiB per file,
+and 16 retained paths/64 MiB charged bytes service-wide; exhaustion stays unknown.
+See [answer-route probes](answer-route-probes.md) and the
+[connector contract](../specs/2026-10-28-codex-question-connector.md).
+Gate 7 real-model/phone/native-desktop acceptance and integration require separate
+approvals; this implementation does not authorize installation or activation.
+
+The current supported version is exactly 0.166.0. Its default unload delay is
+60 seconds; relay does not change it or infer a timing guarantee. See the
+[repeatable private re-proof](codex-question-reproof.md) and the
+[prepared Gate 7 runbook](codex-question-gate7.md). The latter requires separate
+user approval for live host use.
