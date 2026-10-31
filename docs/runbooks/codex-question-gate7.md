@@ -197,7 +197,8 @@ phone is connected, the temporary inbox is empty and presence is away.
    model continuation and exact observed answer. Never use model prose as receipt.
 2. **Desktop defer.** After the first turn ends and the row is refreshed, submit
    the same instruction with ‘Gate 7 shape?’ and Circle/Square options. Require
-   a new tuple and UUID. Press the phone's defer action once. Expect released,
+   a new tuple and UUID. Press **Send back to terminal** on the phone once
+   (the defer action, separate from Decline and Other). Expect released,
    no relay answer/interrupt and the same pending native question. The user
    selects Square in the native TUI. Expect native continuation and released
    history with the exact native answer; it must not reopen or become consumed
