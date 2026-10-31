@@ -89,7 +89,7 @@ After host approval, the user must launch the native TUI with an explicit
 connection to the same physical socket used by relay:
 
 ```sh
-co --remote "unix://$RELAY_CODEX_SOCKET"
+"$RELAY_CODEX_BIN" --remote "unix://$RELAY_CODEX_SOCKET"
 ```
 
 Select Plan mode and identify its exact thread id as `G7_THREAD`. For an existing
@@ -97,9 +97,11 @@ test thread, first cancel its pending question and exit its old TUI, then resume
 that same thread against the explicit endpoint instead of creating another:
 
 ```sh
-co resume --remote "unix://$RELAY_CODEX_SOCKET" "$G7_THREAD"
+"$RELAY_CODEX_BIN" resume --remote "unix://$RELAY_CODEX_SOCKET" "$G7_THREAD"
 ```
 
+Use the preflight-pinned executable directly. A shell alias such as `co` may
+inject `--no-daemon`, which conflicts with `--remote`; do not change that alias.
 Plain `co` does not establish shared ownership: 0.166.0 can use an embedded
 app-server or an implicit daemon path with embedded fallback. Pinned
 `tui/src/lib.rs` (`resolve_remote_addr`, `app_server_target_for_launch`) and
