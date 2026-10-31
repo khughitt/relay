@@ -48,10 +48,12 @@ test('group or other writable PID metadata refuses',async t=>{
 });
 test('foreign PID-record ownership refuses even with otherwise valid0644 metadata',async t=>{
  const f=await fixture(t);await fs.chmod(f.pidFile,0o644);
- const original=promises.lstat;
+ const original=promises.lstat,open=promises.open;
  // An unprivileged test cannot chown a file; replace only the OS ownership observation.
- const mocked=t.mock.method(promises,'lstat',async(path,...args)=>{const s=await original(path,...args);return path===f.pidFile?new Proxy(s,{get:(s,key)=>key==='uid'?s.uid+1:Reflect.get(s,key)}):s;});
- syncBuiltinESMExports();try{assert.equal(await mod.daemonIdentity(f.config,f.ops),null);}finally{mocked.mock.restore();syncBuiltinESMExports();}
+ const foreign=s=>new Proxy(s,{get:(s,key)=>key==='uid'?process.getuid()+1:Reflect.get(s,key)});
+ const mocked=t.mock.method(promises,'lstat',async(path,...args)=>{const s=await original(path,...args);return path===f.pidFile?foreign(s):s;});
+ const opened=t.mock.method(promises,'open',async(path,...args)=>{const fd=await open(path,...args);if(path===f.pidFile){const stat=fd.stat.bind(fd);fd.stat=async(...args)=>foreign(await stat(...args));}return fd;});
+ syncBuiltinESMExports();try{assert.equal(await mod.daemonIdentity(f.config,f.ops),null);}finally{mocked.mock.restore();opened.mock.restore();syncBuiltinESMExports();}
  assert.deepEqual(await mod.daemonIdentity(f.config,f.ops),f.handle);
 });
 test('a symlink to valid0644 PID metadata refuses',async t=>{
