@@ -88,7 +88,10 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   const { loadConfig = loadSubscribers, loadConfigFrom = loadSubscribersFrom, run = runChild, apply = applyEvent, readInput = readNativeInput, applyOptions = {} } = deps;
   /** @param {import("./types.js").Failure} error */
   const failure = (error) => ({ stdout: '', stderr: `${describe(error)}\n`, exitCode: adapter?.failureExitCode ?? 1 });
-  let adapter, budget;
+  /** @type {import("./types.js").Adapter|undefined} */
+  let adapter;
+  /** @type {ReturnType<typeof budgetFor>|undefined} */
+  let budget;
   try { adapter = adapterFor(harness); adapter.stateForEvent(nativeEvent); budget = budgetFor({ harness, nativeEvent, outerMs }); }
   catch (caught) { const error = /** @type {import('./types.js').Failure} */ (caught); return failure(error); }
   const capability = adapter.replies[nativeEvent] ?? NONE;

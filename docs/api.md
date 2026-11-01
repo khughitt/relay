@@ -14,7 +14,7 @@ Named root exports are exactly those below. Package subpath
 
 ## Persisted and transient contracts
 
-Harness is the closed union `claude-code | codex | opencode`. IDs split at the
+Harness is the closed union `claude-code | codex | opencode | agy`. IDs split at the
 first colon, preserving all remaining colons in sessionId. OpenCode records have
 process scope and raw sessionId opencode:PID, yielding agentId
 opencode:opencode:PID. This deliberate projection preserves existing consumer keys.
@@ -30,7 +30,7 @@ type Handle = {
 };
 type Agent = {
   id: string;
-  harness: 'claude-code' | 'codex' | 'opencode';
+  harness: 'claude-code' | 'codex' | 'opencode' | 'agy';
   sessionId: string;
   scope: 'session' | 'process' | 'worker';
   root?: string;         // Codex workers only: the root session's agent id
@@ -64,7 +64,7 @@ A Codex worker has its own row (spec `docs/specs/2026-10-15-codex-worker-rows.md
 `id: codex:<agent_id>`, `sessionId: <agent_id>` (the worker's thread id),
 `scope: "worker"` and `root: codex:<session_id>`, the root session's agent id, never an
 immediate parent. It shares its root's process handle. `scope` is `process` for
-OpenCode, `session` for Claude Code, and for Codex `session` without `root` or `worker`
+OpenCode, `session` for Claude Code and agy, and for Codex `session` without `root` or `worker`
 with it; any other combination is `INVALID_SCHEMA`. A relay from before worker rows
 accepts only `session` for Codex, so it refuses a snapshot holding a worker row and
 writes nothing, rather than publishing the rows without their `root`.
@@ -277,25 +277,34 @@ abort. Timestamps are sampled at write time, never derived from process start.
 
 ## Event mappings
 
-| Harness | Native event | Kind | Level |
-| --- | --- | --- | --- |
-| Claude, Codex | SessionStart | session-start | idle |
-| Claude, Codex | UserPromptSubmit | prompt | working |
-| Claude, Codex | PreToolUse | before-tool | working |
-| Claude | Notification:idle_prompt | needs-input | needs-input |
-| Claude | Notification:permission_prompt | needs-approval | needs-approval |
-| Claude | StopFailure | turn-error | error |
-| Codex | PermissionRequest | needs-approval | needs-approval |
-| Codex | SubagentStart | session-start | working |
-| Claude, Codex | Stop | turn-end | done |
-| Codex | SubagentStop | turn-end | done |
-| Claude, Codex | SessionEnd | session-end | remove |
-| OpenCode | init | session-start | idle |
-| OpenCode | session.busy | activity | working |
-| OpenCode | permission.pending | needs-approval | needs-approval |
-| OpenCode | session.error | turn-error | error |
-| OpenCode | session.idle | idle | reduce against prior |
-| OpenCode | dispose | session-end | remove |
+| Harness | Native event | Kind | Level | Refuse | Context |
+| --- | --- | --- | --- | --- | --- |
+| Claude, Codex, agy | SessionStart | session-start | idle | no | no |
+| Claude, Codex | UserPromptSubmit | prompt | working | yes | yes |
+| Claude, Codex | PreToolUse | before-tool | working | yes | yes |
+| agy | PreToolUse | before-tool | working | yes | no |
+| Claude | Notification:idle_prompt | needs-input | needs-input | no | no |
+| Claude | Notification:permission_prompt | needs-approval | needs-approval | no | no |
+| Claude | StopFailure | turn-error | error | no | no |
+| Codex | PermissionRequest | needs-approval | needs-approval | no | no |
+| Codex | SubagentStart | session-start | working | no | no |
+| Claude, Codex, agy | Stop | turn-end | done | Claude, Codex: yes; agy: no | no |
+| Codex | SubagentStop | turn-end | done | yes | no |
+| Claude, Codex | SessionEnd | session-end | remove | no | no |
+| OpenCode | init | session-start | idle | no | no |
+| OpenCode | session.busy | activity | working | no | no |
+| OpenCode | permission.pending | needs-approval | needs-approval | no | no |
+| OpenCode | session.error | turn-error | error | no | no |
+| OpenCode | session.idle | idle | reduce against prior | no | no |
+| OpenCode | dispose | session-end | remove | no | no |
+
+Refuse and Context come from each adapter's `replies` export; an event absent from it has
+neither channel. agy refuses on PreToolUse only, with exit 0 and stdout
+`{"decision":"deny","reason":R}`; an allow is always empty stdout, never
+`{"decision":"allow"}`, which agy treats as auto-approval. agy hooks run with cwd
+`~/.gemini/config`, so the event's `cwd` comes from `workspacePaths[0]`. agy's default handler
+timeout is 30 s (measured kill at 30 s) and a handler `timeout` raises it, so an install must
+raise the handler `timeout` and `--outer-ms` together.
 
 Claude Code `Stop`'s optional `background_tasks` becomes `Event.background`.
 A readable report is an array of non-null, non-array objects with string `type` and
@@ -473,8 +482,15 @@ root SessionStart's retired rows) appear only as their absence from the snapshot
 | Code | Meaning |
 | --- | --- |
 | 0 | An allow reply (with or without context). |
-| 2 | The JSON refusal on stdout and the reason on stderr for any refusal. |
-| 1 | An error on an event without a refusal channel, or an allow reply whose registry publication failed, or a published event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`). The harness shows a non-blocking notice; the guard result stands. Exit 1 does not imply the registry is unchanged. |
+| 2 | The JSON refusal on stdout and the reason on stderr for any refusal (not agy: exit 0 with `{"decision":"deny","reason":R}`). |
+| 1 | (agy exits 0 instead; see below.) An error on an event without a refusal channel, or an allow reply whose registry publication failed, or a published event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`). The harness shows a non-blocking notice; the guard result stands. Exit 1 does not imply the registry is unchanged. |
+
+For agy (`Adapter.failureExitCode: 0`) every failure that would exit 1 (an event without a
+refusal channel, or an allow whose registry publication failed) exits 0 with empty stdout and
+the diagnostic on stderr, because exit 1 fails agy's PreToolUse tool call (Task 1 probe). On agy
+Stop and SessionStart a hook's exit 1 or timeout kill is only logged in agy's own log, never
+shown to the user. Other harnesses still exit 1. agy refusals (PreToolUse only) exit 0 with the
+JSON decision on stdout, not 2.
 
 Observer failures never change the exit code; they are stderr diagnostics.
 `BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries`
@@ -524,7 +540,7 @@ and says publication completed. Do not blindly retry as if publication rolled ba
 Callback and cleanup failures are preserved together in AggregateError.
 
 The registry, hook dispatch, installation and model commands are `relay list`, `relay reap [--outer-ms N]`,
-`relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT`,
+`relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT` (NAME may be `agy`; `install` does not accept it),
 `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--evidence FILE]
 [--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`, `relay rollback --artifact FILE`, and `relay model --harness codex`; `relay --help`,
 `relay help [<command>]`, `relay <command> --help`, and `relay --version` provide help and version information.

@@ -75,3 +75,15 @@ async function codexOwnership(inbox,owner) {
   // @ts-expect-error Raw RPC ids cannot authorize a handoff.
   await inbox.codexHanded('id',1);
 }
+
+/** @type {import('../../src/types.js').Harness} */
+const agyHarness = 'agy';
+/** @type {import('../../src/types.js').Adapter['nativeFields']} */
+const agyNativeFields = (data, nativeEvent) => ({ ...data, nativeEvent });
+/** @type {Pick<import('../../src/types.js').Adapter, 'nativeFields' | 'failureExitCode'>} */
+const agyAdapter = { nativeFields: agyNativeFields, failureExitCode: 0 };
+/** @type {NonNullable<import('../../src/types.js').Question['native']>['harness']} */
+const askHarness = 'codex';
+/** @type {NonNullable<import('../../src/types.js').Question['native']>['harness']} */
+// @ts-expect-error agy has no interaction route.
+const noAgyAsk = 'agy';
