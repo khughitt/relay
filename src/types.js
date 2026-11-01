@@ -1,6 +1,6 @@
 // Shared contracts for checked JavaScript; this module has no runtime exports.
 /**
- * @typedef {'claude-code'|'codex'|'opencode'} Harness
+ * @typedef {'claude-code'|'codex'|'opencode'|'agy'} Harness
  * @typedef {'idle'|'working'|'needs-input'|'needs-approval'|'done'|'error'} State
  * @typedef {'session-start'|'prompt'|'before-tool'|'activity'|'idle'|'needs-input'|'needs-approval'|'turn-end'|'turn-error'|'session-end'} Kind
  * @typedef {{platform: 'linux'|'darwin', host: string, bootId: string|null, pid: number, start: string}} Handle
@@ -22,7 +22,7 @@
  * @typedef {{decision: 'allow'|'deny', reason?: string, context?: string}} Reply
  * @typedef {{stdout: string, stderr: string, exitCode: number}} Output
  * @typedef {{startPid?: number, ancestors?: (pid: number) => ProcessRow[], executableOf?: (pid: number) => string, argvOf?: (pid: number) => string[]}} AncestryOptions
- * @typedef {{events: Readonly<Record<string, {kind: Kind, level: State|null}>>, replies: Readonly<Record<string, Capability>>, outerTimeouts: Readonly<{default: number, max: Readonly<Record<string, number>>} & Record<string, number|Readonly<Record<string, number>>>>, stateForEvent: (event: string) => State|null, reduceState: (level: State|null, previous?: State|null, context?: {background?: Background}) => State|null, encodeReply: (event: string, reply: Reply) => Output, resolveSessionPid: (options?: AncestryOptions) => number|null, resolveTerminalPid: (options?: AncestryOptions) => number|null, isHarness: (row: ProcessRow, ops: {executableOf: (pid: number) => string}) => boolean, backgroundOf?: (data: Record<string, any>, nativeEvent: string) => Background|null|undefined, workerIdOf?: (data: Record<string, any>, nativeEvent: string) => string|null}} Adapter
+ * @typedef {{events: Readonly<Record<string, {kind: Kind, level: State|null}>>, replies: Readonly<Record<string, Capability>>, outerTimeouts: Readonly<{default: number, max: Readonly<Record<string, number>>} & Record<string, number|Readonly<Record<string, number>>>>, stateForEvent: (event: string) => State|null, reduceState: (level: State|null, previous?: State|null, context?: {background?: Background}) => State|null, encodeReply: (event: string, reply: Reply) => Output, resolveSessionPid: (options?: AncestryOptions) => number|null, resolveTerminalPid: (options?: AncestryOptions) => number|null, isHarness: (row: ProcessRow, ops: {executableOf: (pid: number) => string}) => boolean, backgroundOf?: (data: Record<string, any>, nativeEvent: string) => Background|null|undefined, workerIdOf?: (data: Record<string, any>, nativeEvent: string) => string|null, nativeFields?: (data: Record<string, any>, nativeEvent: string) => Record<string, any>}} Adapter
  * @typedef {{name: string, role: 'guard'|'observer', kinds: (Kind|'reconcile')[], harnesses: Harness[]|null, tools: string[]|null, argv: string[], timeoutMs: number}} Subscriber
  * @typedef {{schema: 1, subscribers: Subscriber[]}} Subscribers
  * @typedef {{outerMs: number, totalMs: number, inputMs: number, registryMs: number, reserveMs: number, marginMs: number, subscribersMs: number}} Budget
@@ -31,7 +31,7 @@
  * @typedef {{project: string|null, taskId: string|null, cwd: string|null}} Context
  * @typedef {{id: string, label: string, description: string|null}} Option
  * @typedef {{id: string, header: string, prompt: string, type: 'boolean'|'single'|'multi'|'text', options: Option[], recommended: string|null, allowOther: boolean, maxLength: number|null}} Item
- * @typedef {{class: 'clarification'|'artifact-review'|'authorization', expiresAt: number, native: {harness: Harness, sessionId: string, callId: string}|null, artifact: {ref: string, revision: string}|null, supersedes: string|null, items: Item[]}} Question
+ * @typedef {{class: 'clarification'|'artifact-review'|'authorization', expiresAt: number, native: {harness: 'claude-code'|'codex'|'opencode', sessionId: string, callId: string}|null, artifact: {ref: string, revision: string}|null, supersedes: string|null, items: Item[]}} Question
  * @typedef {{type: 'boolean', value: boolean}|{type: 'choice', optionIds: string[]}|{type: 'other'|'text', text: string}} Value
  * @typedef {{answerId: string, surface: string, outcome: 'answered'|'declined', artifactRevision: string|null, values: Record<string, Value>}} Answer
  */

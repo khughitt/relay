@@ -61,6 +61,7 @@ test('OpenCode has no reply channel and every adapter states its outer timeouts'
   assert.deepEqual(adapterFor('claude-code').outerTimeouts, { default: 600000, UserPromptSubmit: 30000, SessionEnd: 1500, max: { SessionEnd: 60000 } });
   assert.deepEqual(adapterFor('codex').outerTimeouts, { default: 600000, SessionEnd: 1000, max: { SessionEnd: 3000 } });
   assert.deepEqual(opencode.outerTimeouts, { default: 5000, max: {} });
+  assert.deepEqual(adapterFor('agy').outerTimeouts, { default: 30000, max: {} });
   assert.equal(KINDS.length, 10);
   assert.ok(Object.isFrozen(KINDS));
 });

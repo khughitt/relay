@@ -2,15 +2,16 @@
 import { isAbsolute } from 'node:path';
 import { relayError } from '../protocol.js';
 const MAX_BYTES = 4 * 1024 * 1024;
-/** @param {unknown} raw @param {string} nativeEvent @returns {Record<string, any>} */
-export function parsePayload(raw, nativeEvent) {
+/** @param {unknown} raw @param {string} nativeEvent @param {import("../types.js").Adapter['nativeFields']} [nativeFields] @returns {Record<string, any>} */
+export function parsePayload(raw, nativeEvent, nativeFields) {
   if (!(typeof raw === 'string' || Buffer.isBuffer(raw))) throw relayError('INVALID_INPUT', 'native input must be bytes or text');
   if (Buffer.byteLength(raw) > MAX_BYTES) throw relayError('INPUT_TOO_LARGE', 'native input exceeds byte limit');
   let data;
   try { data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.isBuffer(raw) ? raw : Buffer.from(raw))); }
   catch (cause) { throw relayError('INVALID_INPUT', 'native input is not valid UTF-8 JSON', cause); }
-  if (!data || typeof data !== 'object' || Array.isArray(data)
-      || typeof data.session_id !== 'string' || !data.session_id.trim()
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw relayError('INVALID_INPUT', 'native input requires session and absolute cwd');
+  if (nativeFields) data = nativeFields(data, nativeEvent);
+  if (typeof data.session_id !== 'string' || !data.session_id.trim()
       || typeof data.cwd !== 'string' || !isAbsolute(data.cwd)) throw relayError('INVALID_INPUT', 'native input requires session and absolute cwd');
   if (Object.hasOwn(data, 'stop_hook_active') && typeof data.stop_hook_active !== 'boolean') throw relayError('INVALID_INPUT', 'invalid stop flag');
   if (Object.hasOwn(data, 'hook_event_name') && data.hook_event_name !== nativeEvent.split(':')[0]) throw relayError('INVALID_INPUT', 'native event does not match argv');

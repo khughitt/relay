@@ -82,6 +82,13 @@ test('a Claude row keeps its background counts through validation', () => {
   assert.deepEqual(validateSnapshot(alone(row)), alone({ ...claudeRow, background: { agents: 1, other: 2 } }));
   assert.equal(Object.hasOwn(validateSnapshot(alone(claudeRow)).agents[claudeRow.id], 'background'), false);
 });
+test('an agy row is a session row without root or background', () => {
+  const row = { ...agent, id: 'agy:s:1', harness: 'agy' };
+  assert.deepEqual(validateSnapshot(alone(row)), alone(row));
+  assert.throws(() => validateSnapshot(alone({ ...row, root: 'codex:r' })), { code: 'INVALID_SCHEMA' });
+  assert.throws(() => validateSnapshot(alone({ ...row, background: { agents: 0, other: 0 } })), { code: 'INVALID_SCHEMA' });
+  assert.throws(() => validateSnapshot(alone({ ...row, scope: 'process' })), { code: 'INVALID_SCHEMA' });
+});
 test('row background is counts on a Claude row only', () => {
   for (const row of [agent, { ...agent, id: 'opencode:s:1', harness: 'opencode', scope: 'process' }]) {
     assert.throws(() => validateSnapshot(alone({ ...row, background: { agents: 0, other: 0 } })), { code: 'INVALID_SCHEMA' });

@@ -1,11 +1,12 @@
 // @ts-check
 import * as claudeCode from './claude-code.js';
+import * as agy from './agy.js';
 import * as codex from './codex.js';
 import * as opencode from './opencode.js';
 import { parsePayload } from './payload.js';
 import { relayError, validateEvent } from '../protocol.js';
 /** @type {Record<string, import("../types.js").Adapter>} */
-const adapters = { 'claude-code': claudeCode, codex, opencode };
+const adapters = { 'claude-code': claudeCode, codex, opencode, agy };
 /** @param {string} harness */
 export function adapterFor(harness) {
   if (!Object.hasOwn(adapters, harness)) throw relayError('UNSUPPORTED_HARNESS', 'unsupported harness');
@@ -25,7 +26,7 @@ export function normalizeEvent(harness, nativeEvent, raw) {
   const adapter = adapterFor(harness);
   adapter.stateForEvent(nativeEvent);
   const kind = adapter.events[nativeEvent].kind;
-  const data = parsePayload(raw, nativeEvent);
+  const data = parsePayload(raw, nativeEvent, adapter.nativeFields);
   const worker = adapter.workerIdOf?.(data, nativeEvent) ?? null, sessionId = worker ?? data.session_id;
   const background = adapter.backgroundOf?.(data, nativeEvent);
   return validateEvent({ schema: 1, kind, harness, nativeEvent, agentId: `${harness}:${sessionId}`, sessionId,

@@ -1,0 +1,10 @@
+{
+  "artifactDirectoryPath": "<sandbox-home>/.gemini/antigravity-cli/brain/b1b18d52-5ec4-4e3f-8f03-a900db97de5e",
+  "conversationId": "b1b18d52-5ec4-4e3f-8f03-a900db97de5e",
+  "lastUserInput": "Call run_command once with CommandLine \"touch probe_marker.txt\", then reply DONE. Do nothing else.",
+  "modelName": "gemini-3.8-flash-low",
+  "transcriptPath": "<sandbox-home>/.gemini/antigravity-cli/brain/b1b18d52-5ec4-4e3f-8f03-a900db97de5e/.system_generated/logs/transcript_full.jsonl",
+  "workspacePaths": [
+    "/work/project"
+  ]
+}

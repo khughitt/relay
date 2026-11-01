@@ -12,17 +12,19 @@ import { adapterFor } from '../src/adapters/index.js';
 const rows = {
   'claude-code': [['SessionStart','session-start','idle'], ['UserPromptSubmit','prompt','working'], ['PreToolUse','before-tool','working'], ['Notification:idle_prompt','needs-input','needs-input'], ['Notification:permission_prompt','needs-approval','needs-approval'], ['Stop','turn-end','done'], ['StopFailure','turn-error','error'], ['SessionEnd','session-end',null]],
   codex: [['SessionStart','session-start','idle'], ['UserPromptSubmit','prompt','working'], ['PreToolUse','before-tool','working'], ['PermissionRequest','needs-approval','needs-approval'], ['Stop','turn-end','done'], ['SessionEnd','session-end',null], ['SubagentStart','session-start','working',{ agent_id: 'w' }], ['SubagentStop','turn-end','done',{ agent_id: 'w' }]],
-  opencode: [['init','session-start','idle'], ['session.busy','activity','working'], ['permission.pending','needs-approval','needs-approval'], ['session.error','turn-error','error'], ['session.idle','idle','idle'], ['dispose','session-end',null]]
+  opencode: [['init','session-start','idle'], ['session.busy','activity','working'], ['permission.pending','needs-approval','needs-approval'], ['session.error','turn-error','error'], ['session.idle','idle','idle'], ['dispose','session-end',null]],
+  agy: [['SessionStart','session-start','idle'], ['PreToolUse','before-tool','working'], ['Stop','turn-end','done']]
 };
+const agyRaw = () => JSON.stringify({ conversationId: 'c', workspacePaths: ['/repo'], toolCall: { name: 'run_command', args: { CommandLine: 'ls' } } });
 const raw = (over = {}) => JSON.stringify({ session_id: 's', cwd: '/repo', ...over });
-test('all twenty-two mappings have literal kind and level expectations', () => {
+test('all twenty-five mappings have literal kind and level expectations', () => {
   for (const [harness, expected] of Object.entries(rows)) {
     const adapter = adapterFor(harness);
     assert.equal(Object.keys(adapter.events).length, expected.length);
     assert.ok(Object.isFrozen(adapter.events));
     for (const fn of ['stateForEvent','reduceState','resolveSessionPid','resolveTerminalPid']) assert.equal(typeof adapter[fn], 'function');
     for (const [event, kind, level, extra = {}] of expected) {
-      const e = normalizeEvent(harness, event, raw({ tool_name: 'Bash', tool_input: {}, ...extra }));
+      const e = normalizeEvent(harness, event, harness === 'agy' ? agyRaw() : raw({ tool_name: 'Bash', tool_input: {}, ...extra }));
       assert.equal(e.kind, kind); assert.equal(adapter.stateForEvent(event), level);
       assert.ok(Object.isFrozen(adapter.events[event]));
     }
@@ -63,7 +65,7 @@ test('stdin counts bytes, requires EOF and removes all owned listeners', async (
   await assert.rejects(readNativeInput(new PassThrough(),{clock:()=>1,deadline:1}),{code:'INPUT_TIMEOUT'});
 });
 test('session lookup takes the nearest harness process; terminal lookup the nearest with a terminal', () => {
-  for (const [harness,comm] of [['claude-code','claude'],['codex','codex'],['opencode','opencode']]) {
+  for (const [harness,comm] of [['claude-code','claude'],['codex','codex'],['opencode','opencode'],['agy','agy']]) {
     const adapter = adapterFor(harness), argvOf = () => [comm];
     const chain = () => [{pid:5,comm,tty:true},{pid:4,comm,tty:null},{pid:3,comm,tty:true},{pid:2,comm,tty:true}];
     assert.equal(adapter.resolveSessionPid({ancestors:chain,executableOf:()=>'',argvOf}),4);

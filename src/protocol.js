@@ -21,7 +21,7 @@ function counts(v) {
 }
 /** @param {unknown} v */
 const uuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-const harnesses = ['claude-code', 'codex', 'opencode'];
+const harnesses = ['claude-code', 'codex', 'opencode', 'agy'];
 /** @param {unknown} text @returns {string} */
 export function parseStart(text) {
   if (typeof text !== 'string' || !/^(0|[1-9][0-9]*)$/.test(text)
