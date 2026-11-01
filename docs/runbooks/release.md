@@ -177,7 +177,7 @@ and Codex 0.166.0 evidence above; this release establishes no Darwin acceptance.
 | Release commit (`REL`) | `ed0cb9573a3b147f68923b7ad6f5b152419c147d` |
 | Pushed | 2026-11-01, after user approval: main `7e2a625..ed0cb95`, then the tag. Remote main and the peeled tag both equalled `REL`. Present: main, v0.1.0, v0.1.1, v0.2.0, v0.2.1, v0.3.0, and the branch `chore/relay-df16ab-test-policy` (`8157a25`, an ancestor of main), kept as a recorded exception to steps 5 and 6. |
 | Consumer pin | `git+https://github.com/khughitt/relay.git#v0.3.0` |
-| Runtime adoption | Not part of this release: familiar's pin is `fam-55f1af`; agy hook routing is `hq-8af61d`; Codex connector activation is `relay-005b4f`. |
+| Runtime adoption | Not part of this release: familiar's pin is `fam-d08564` and its agy support `fam-55f1af`; agy hook routing is `hq-8af61d`; Codex connector activation is `relay-005b4f`. |
 
 - **Gates at `REL`.** `TT_FORCE=1 just gate` passed on Node 26.5.0 and on Node 22.23.2:
   1015 tests each, 998 passed, 17 skipped, none failed, with strict checking clean. The
