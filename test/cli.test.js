@@ -122,9 +122,15 @@ const agyEnv=(p)=>({PATH:process.env.PATH??'',HOME:p.stateDir,RELAY_STATE_DIR:p.
 test('hook accepts agy',async t=>{
   const base=await tempState(t),p=layout(base);
   await configure(p,[]);
-  const input=await fs.readFile(new URL('./fixtures/agy/SessionStart.json',import.meta.url),'utf8');
-  const r=spawnSync(process.execPath,[cli.pathname,'hook','--harness','agy','SessionStart'],{encoding:'utf8',input,env:agyEnv(p)});
-  assert.deepEqual([r.status,r.stdout],[0,''],r.stderr);
+  const input=JSON.stringify({...JSON.parse(await fs.readFile(new URL('./fixtures/agy/SessionStart.json',import.meta.url),'utf8')),workspacePaths:[process.cwd()]});
+  // The registry row needs an ancestor process named agy, so the hook runs under a symlink of sh with that name.
+  const agy=join(base.stateDir,'agy'),inputPath=join(base.stateDir,'agy-input.json'),outPath=join(base.stateDir,'agy-out'),errPath=join(base.stateDir,'agy-err');
+  await fs.symlink('/bin/sh',agy);await fs.writeFile(inputPath,input);
+  const outer=spawnSync(agy,['-c','"$NODE" "$CLI" hook --harness agy SessionStart <"$IN" >"$OUT" 2>"$ERR"; exit $?'],{encoding:'utf8',env:{...agyEnv(p),NODE:process.execPath,CLI:cli.pathname,IN:inputPath,OUT:outPath,ERR:errPath}});
+  assert.deepEqual([outer.status,await fs.readFile(outPath,'utf8'),await fs.readFile(errPath,'utf8')],[0,'',''],outer.stderr);
+  const listed=spawnSync(process.execPath,[cli.pathname,'list','--json'],{encoding:'utf8',env:agyEnv(p)});
+  assert.equal(listed.status,0,listed.stderr);
+  assert.ok(Object.hasOwn(JSON.parse(listed.stdout).snapshot.agents,'agy:b1b18d52-5ec4-4e3f-8f03-a900db97de5e'),listed.stdout);
 });
 test('install and ask refuse agy',async t=>{
   const base=await tempState(t),p=layout(base);
