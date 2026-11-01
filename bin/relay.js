@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { listAgents } from '../src/index.js';
 import { dispatchHook, reconcile } from '../src/dispatch.js';
 import { relayError } from '../src/protocol.js';
-import { HARNESSES, commandAt, commandFor, stripGlobals, resolveMode, helpText, rootHelp } from '../src/commands.js';
+import { HARNESSES, HOOK_HARNESSES, commandAt, commandFor, stripGlobals, resolveMode, helpText, rootHelp } from '../src/commands.js';
 import { paths } from '../src/bus/paths.js';
 import { runServe, servePaths } from '../src/serve/serve.js';
 import { runAsk } from '../src/routes/ask.js';
@@ -35,7 +35,7 @@ function parse(args, { harness }) {
   }
   const [flag, name, ...tail] = args, nativeEvent = tail.at(-1), options = tail.slice(0, -1);
   if (flag !== '--harness' || !name || name.startsWith('--')) throw usage('hook requires --harness NAME first');
-  if (!HARNESSES.includes(name)) throw usage(`--harness must be one of ${HARNESSES.join(', ')}, got ${JSON.stringify(name)}`);
+  if (!HOOK_HARNESSES.includes(name)) throw usage(`--harness must be one of ${HOOK_HARNESSES.join(', ')}, got ${JSON.stringify(name)}`);
   const order = () => usage('hook requires [--outer-ms N] [--subscribers FILE] then exactly one EVENT');
   if (!nativeEvent || nativeEvent.startsWith('--')) throw order();
   /** @type {{harness: string, nativeEvent: string, outerMs?: number, subscribersPath?: string}} */

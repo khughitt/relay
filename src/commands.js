@@ -2,13 +2,14 @@
 // The declared surface. bin/relay.js keeps its strict, order-sensitive hook parser (the
 // harness protocol depends on it) but takes option names, value sets, and help from here.
 export const HARNESSES = ['claude-code', 'codex', 'opencode'];
+export const HOOK_HARNESSES = [...HARNESSES, 'agy'];
 /** @type {import("./types.js").Command[]} */
 export const COMMANDS = [
   { path: ['list'], summary: 'The live-agent registry' },
   { path: ['reap'], summary: 'Reconcile the registry against live processes', options: [{ names: ['--outer-ms'], value: 'int' }] },
   { path: ['hook'], summary: 'Dispatch one harness hook event to the subscribers and guards', protocol: "harness hook: stdout is the reply, exit code is the guard's",
     args: [{ name: 'event', value: 'string', required: true }],
-    options: [{ names: ['--harness'], value: 'enum', values: HARNESSES, required: true }, { names: ['--outer-ms'], value: 'int' }, { names: ['--subscribers'], value: 'path' }] },
+    options: [{ names: ['--harness'], value: 'enum', values: HOOK_HARNESSES, required: true }, { names: ['--outer-ms'], value: 'int' }, { names: ['--subscribers'], value: 'path' }] },
   { path: ['install'], summary: "Plan, and with --apply write, a harness's hook installation", output: 'json',
     options: [{ names: ['--harness'], value: 'enum', values: HARNESSES, required: true }, { names: ['--subscribers'], value: 'path', required: true }, { names: ['--target'], value: 'path' }, { names: ['--config-dir'], value: 'path' }, { names: ['--evidence'], value: 'path' }, { names: ['--retire'], value: 'enum', values: ['familiar'] }, { names: ['--with'], value: 'enum', values: ['ask'] }, { names: ['--node'], value: 'path' }, { names: ['--artifact'], value: 'path' }, { names: ['--apply'], value: 'none' }] },
   { path: ['rollback'], summary: 'Undo an applied installation from its artifact', output: 'none', options: [{ names: ['--artifact'], value: 'path', required: true }] },

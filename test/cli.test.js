@@ -117,3 +117,20 @@ test('relay reap supersedes a schema-1 registry and names each dropped agent on 
   assert.match(r.stderr,/^REGISTRY_SUPERSEDED: dropped codex:old from a superseded schema-1 registry$/m);
   const listed=run(p,['list','--json']);assert.equal(listed.status,0);assert.equal(JSON.parse(listed.stdout).snapshot.schema,2);
 });
+
+const agyEnv=(p)=>({PATH:process.env.PATH??'',HOME:p.stateDir,RELAY_STATE_DIR:p.stateDir,XDG_STATE_HOME:join(p.stateDir,'xdg-state'),XDG_CONFIG_HOME:p.configHome});
+test('hook accepts agy',async t=>{
+  const base=await tempState(t),p=layout(base);
+  await configure(p,[]);
+  const input=await fs.readFile(new URL('./fixtures/agy/SessionStart.json',import.meta.url),'utf8');
+  const r=spawnSync(process.execPath,[cli.pathname,'hook','--harness','agy','SessionStart'],{encoding:'utf8',input,env:agyEnv(p)});
+  assert.deepEqual([r.status,r.stdout],[0,''],r.stderr);
+});
+test('install and ask refuse agy',async t=>{
+  const base=await tempState(t),p=layout(base);
+  const env=agyEnv(p);
+  for(const args of [['install','--harness','agy','--subscribers',join(p.configHome,'relay','subscribers.json')],['ask','--harness','agy','PreToolUse']]){
+    const r=spawnSync(process.execPath,[cli.pathname,...args],{encoding:'utf8',input:'{}',env});
+    assert.equal(r.status,2,r.stderr);assert.match(r.stderr,/claude-code/);assert.match(r.stderr,/codex/);
+  }
+});

@@ -30,7 +30,7 @@ grammar = "<n>d | <n>w"
 meaning = "a duration; 0d disables an age check"
 
 [vocabulary.values.harness]
-set = ["claude-code", "codex", "opencode"]
+set = ["claude-code", "codex", "opencode", "agy"]
 
 [vocabulary.values.color]
 set = ["auto", "always", "never"]
@@ -370,6 +370,8 @@ options = [
   { names = ["--size"], value = "enum", values = ["xs", "s", "m", "l", "xl"] },
   { names = ["--complexity"], value = "enum", values = ["low", "mid", "high"] },
   { names = ["--process"], value = "enum", values = ["direct", "planned"] },
+  { names = ["--origin"], value = "enum", values = ["user", "agent", "mixed"] },
+  { names = ["--origin-session"], value = "string" },
   { names = ["--parallel"], value = "none" },
   { names = ["--lane"], value = "none" },
   { names = ["--every"], value = "age", role = "set" },
@@ -408,6 +410,17 @@ options = [
 ]
 
 [[cli.tasks.commands]]
+path = ["docs"]
+summary = "Working documents under each project's records, with the tasks that link them"
+options = [
+  { names = ["--kind"], value = "enum", values = ["spec", "plan", "brief", "handoff", "note"], repeatable = true },
+  { names = ["--search"], value = "string" },
+  { shared = "project", role = "select", value = "string", repeatable = false },
+  { shared = "all_projects", value = "none" },
+  { names = ["--group"], value = "string" },
+]
+
+[[cli.tasks.commands]]
 path = ["list"]
 verb = "list"
 summary = "List tasks (open by default)"
@@ -417,6 +430,7 @@ options = [
   { names = ["--size"], value = "enum", values = ["xs", "s", "m", "l", "xl", "none"], repeatable = true },
   { names = ["--complexity"], value = "enum", values = ["low", "mid", "high", "none"], repeatable = true },
   { names = ["--process"], value = "enum", values = ["direct", "planned", "none"], repeatable = true },
+  { names = ["--origin"], value = "enum", values = ["user", "agent", "mixed", "none"], repeatable = true },
   { shared = "tag", role = "filter", value = "string", repeatable = true, exception = "repeats narrow: a task must carry every tag given (all-of), kept from before the vocabulary so existing callers keep their meaning; see tasks docs/specs/2026-09-30-task-filters-design.md" },
   { names = ["--need"], value = "string", repeatable = true },
   { names = ["--owner"], value = "string" },
@@ -448,6 +462,7 @@ options = [
   { names = ["--size"], value = "enum", values = ["xs", "s", "m", "l", "xl", "none"], repeatable = true },
   { names = ["--complexity"], value = "enum", values = ["low", "mid", "high", "none"], repeatable = true },
   { names = ["--process"], value = "enum", values = ["direct", "planned", "none"], repeatable = true },
+  { names = ["--origin"], value = "enum", values = ["user", "agent", "mixed", "none"], repeatable = true },
   { shared = "tag", role = "filter", value = "string", repeatable = true, exception = "repeats narrow: a task must carry every tag given (all-of), kept from before the vocabulary so existing callers keep their meaning; see tasks docs/specs/2026-09-30-task-filters-design.md" },
   { names = ["--need"], value = "string", repeatable = true },
   { names = ["--owner"], value = "string" },
@@ -477,6 +492,7 @@ options = [
   { names = ["--size"], value = "enum", values = ["xs", "s", "m", "l", "xl", "none"], repeatable = true },
   { names = ["--complexity"], value = "enum", values = ["low", "mid", "high", "none"], repeatable = true },
   { names = ["--process"], value = "enum", values = ["direct", "planned", "none"], repeatable = true },
+  { names = ["--origin"], value = "enum", values = ["user", "agent", "mixed", "none"], repeatable = true },
   { shared = "tag", role = "filter", value = "string", repeatable = true, exception = "repeats narrow: a task must carry every tag given (all-of), kept from before the vocabulary so existing callers keep their meaning; see tasks docs/specs/2026-09-30-task-filters-design.md" },
   { names = ["--need"], value = "string", repeatable = true },
   { names = ["--owner"], value = "string" },
@@ -543,6 +559,8 @@ options = [
   { names = ["--no-step"], value = "none" },
   { names = ["--no-complexity"], value = "none" },
   { names = ["--no-process"], value = "none" },
+  { names = ["--origin"], value = "enum", values = ["user", "agent", "mixed"] },
+  { names = ["--no-origin"], value = "none" },
   { names = ["--model"], value = "string" },
   { names = ["--no-model"], value = "none" },
   { names = ["--rm-tag"], value = "string", repeatable = true },
@@ -595,6 +613,17 @@ options = [
   { names = ["--clipboard"], value = "none" },
   { names = ["--name"], value = "string" },
 ]
+
+[[cli.tasks.commands]]
+path = ["archive-notes"]
+summary = "Read-only note archive preview; --expect applies the verified source hash"
+args = [{ name = "id", value = "ref", required = true }]
+options = [{ names = ["--expect"], value = "string" }]
+
+[[cli.tasks.commands]]
+path = ["attachments"]
+summary = "Report eligibility for exact local task attachment paths"
+args = [{ name = "paths", value = "path", required = true, variadic = true }]
 
 [[cli.tasks.commands]]
 path = ["detach"]
@@ -655,8 +684,12 @@ args = [{ name = "id", value = "ref", required = true }]
 
 [[cli.tasks.commands]]
 path = ["shelve"]
-summary = "Put a task out of active work: status=shelved, hidden from the default views, open for dependencies. The wake condition is required and becomes the note"
+summary = "Shelve open work with a required wake condition and review checkpoint, keeping it visible in lists"
 args = [{ name = "id", value = "ref", required = true }, { name = "wake", value = "string", required = true }]
+options = [
+  { names = ["--defer"], value = "when", role = "set", required = true },
+  { names = ["--wake-on"], value = "ref", repeatable = true },
+]
 
 [[cli.tasks.commands]]
 path = ["unshelve"]
@@ -681,9 +714,22 @@ options = [
 ]
 
 [[cli.tasks.commands]]
+path = ["blockers"]
+summary = "Rank unmet prerequisites by observed downstream impact"
+options = [
+  { shared = "limit", value = "int", default = "20" },
+  { shared = "project", role = "select", value = "string", repeatable = false },
+  { shared = "all_projects", value = "none" },
+  { names = ["--group"], value = "string" },
+]
+
+[[cli.tasks.commands]]
 path = ["check"]
 verb = "check"
 summary = "Validate every task file. Prints nothing when there is nothing to report"
+options = [
+  { names = ["--growth"], value = "none" },
+]
 
 [[cli.tasks.commands]]
 path = ["commit"]
@@ -700,6 +746,7 @@ options = [
   { shared = "all_projects", value = "none" },
   { names = ["--group"], value = "string" },
   { names = ["--closed"], value = "none" },
+  { names = ["--summary"], value = "none" },
   { names = ["--without"], value = "string", repeatable = true },
 ]
 
@@ -724,6 +771,8 @@ options = [
   { names = ["--body", "-b"], value = "string" },
   { names = ["--recur"], value = "ref" },
   { names = ["--new"], value = "none" },
+  { names = ["--origin"], value = "enum", values = ["user", "agent", "mixed"] },
+  { names = ["--origin-session"], value = "string" },
 ]
 
 [[cli.tasks.commands]]
@@ -923,6 +972,13 @@ protocol = "relay observer envelope on stdin"
 summary = "append one relay observer envelope from stdin"
 
 [[cli.obs.commands]]
+path = ["cleanup"]
+summary = "inventory worktrees and explain cleanup findings"
+options = [
+  { shared = "project", role = "select", value = "string", repeatable = false },
+]
+
+[[cli.obs.commands]]
 path = ["join"]
 output = "json"
 summary = "print one task's normalized session join"
@@ -948,14 +1004,23 @@ summary = "snapshot static harness context"
 
 [[cli.obs.commands]]
 path = ["report"]
-summary = "query context, growth, cache, calibration, skills, cost, quiet, hooks or tests"
-args = [{ name = "view", value = "enum", values = ["context", "growth", "cache", "calibration", "skills", "cost", "quiet", "hooks", "tests"], required = true }]
+summary = "query context, growth, cache, calibration, skills, cost, quiet, hooks, tests, recurrences, doc_findings or profile"
+args = [{ name = "view", value = "enum", values = ["context", "growth", "cache", "calibration", "skills", "cost", "quiet", "hooks", "tests", "recurrences", "doc_findings", "profile"], required = true }]
 options = [
   { shared = "project", role = "select", value = "string", repeatable = false },
   { shared = "harness", role = "filter", value = "enum", values = ["claude-code", "codex"], repeatable = false },
   { shared = "since", role = "bound", value = "when", repeatable = false },
   { shared = "until", role = "bound", value = "when", repeatable = false },
   { names = ["--task"], value = "string" },
+]
+
+[[cli.obs.commands]]
+path = ["postmortem"]
+summary = "compare task activity or file configured investigations independently per selected project"
+options = [
+  { names = ["--hours"], value = "string" },
+  { shared = "project", role = "select", value = "string", repeatable = true },
+  { names = ["--file"], value = "none" },
 ]
 
 [[cli.obs.commands]]
@@ -1615,6 +1680,16 @@ options = [
   { names = ["--continue"], value = "string" },
   { names = ["--dataset"], value = "string", required = true },
   { names = ["--source"], value = "string", required = true },
+]
+
+[[cli.science.commands]]
+path = ["recheck"]
+summary = "Re-check one store location and record what the store holds there, settling an unmatched holdings intent"
+options = [
+  { shared = "config", value = "path" },
+  { names = ["--invocation-id"], value = "string" },
+  { names = ["--continue"], value = "string" },
+  { names = ["--location"], value = "string", required = true },
 ]
 
 [[cli.science.commands]]
@@ -2715,6 +2790,36 @@ summary = "Project relay's registry into presentation state"
 path = ["reap"]
 summary = "Prune relay's registry and reconcile presentation"
 
+[[cli.familiar.commands]]
+path = ["attention"]
+summary = "Desktop attention: status, dismiss, popup"
+
+[[cli.familiar.commands]]
+path = ["attention", "status"]
+protocol = "attention view: stdout is one schema-1 attention view JSON document in any mode"
+summary = "Print the desktop attention view"
+
+[[cli.familiar.commands]]
+path = ["attention", "dismiss"]
+protocol = "attention dismissal: stdout is one JSON result naming dismissed and missing IDs in any mode"
+summary = "Dismiss attention episodes and diagnostics by ID"
+args = [{ name = "id", value = "string", required = true, variadic = true }]
+
+[[cli.familiar.commands]]
+path = ["attention", "popup"]
+protocol = "popup control: reads one JSON request on stdin and writes one JSON reply on stdout"
+summary = "Serve one familiar popup control request"
+
+[[cli.familiar.commands]]
+path = ["niri"]
+summary = "Niri desktop actions"
+
+[[cli.familiar.commands]]
+path = ["niri", "focus"]
+output = "none"
+summary = "Focus a Niri workspace by its stable ID"
+args = [{ name = "id", value = "string", required = true }]
+
 # ---- forge
 
 [[cli.forge.commands]]
@@ -2775,7 +2880,7 @@ protocol = "harness hook: stdout is the reply, exit code is the guard's"
 summary = "Dispatch one harness hook event to the subscribers and guards"
 args = [{ name = "event", value = "string", required = true }]
 options = [
-  { shared = "harness", role = "select", value = "enum", values = ["claude-code", "codex", "opencode"], required = true, repeatable = false },
+  { shared = "harness", role = "select", value = "enum", values = ["claude-code", "codex", "opencode", "agy"], required = true, repeatable = false },
   { names = ["--outer-ms"], value = "int" },
   { names = ["--subscribers"], value = "path" },
 ]
@@ -2903,3 +3008,78 @@ options = [
   {names = ["--name"], value = "string"},
   {names = ["--explain"], value = "none"},
 ]
+
+# Minimal adoption surface; existing doc-review options remain outside this inventory.
+[cli.doc-review]
+project = "ops"
+tier = "automation"
+default_output = "pretty"
+env = "DOC-REVIEW"
+
+[[cli.doc-review.commands]]
+path = []
+options = [
+  {names = ["--acknowledge-only"], value = "none"},
+]
+
+[cli.git-index-retention]
+project = "ops"
+tier = "automation"
+default_output = "pretty"
+env = "GIT-INDEX-RETENTION"
+protocol = "escaped decisions and summary; peer uses bounded length-prefixed JSON"
+
+[[cli.git-index-retention.commands]]
+path = []
+
+[[cli.git-index-retention.commands]]
+path = ["report"]
+summary = "Report verified recovery retention decisions"
+
+[[cli.git-index-retention.commands]]
+path = ["prune"]
+summary = "Prune verified expired recovery"
+options = [{names = ["--scheduled"], value = "none"}]
+
+[[cli.git-index-retention.commands]]
+path = ["protect"]
+summary = "Protect a local recovery record"
+args = [
+  {name = "repository", value = "string", required = true},
+  {name = "stamp", value = "string", required = true},
+]
+
+[[cli.git-index-retention.commands]]
+path = ["unprotect"]
+summary = "Remove the local recovery hold"
+args = [
+  {name = "repository", value = "string", required = true},
+  {name = "stamp", value = "string", required = true},
+]
+
+[[cli.git-index-retention.commands]]
+path = ["peer"]
+summary = "Serve a bounded internal retention session"
+
+[cli.worktree]
+project = "ops"
+tier = "automation"
+default_output = "pretty"
+env = "WORKTREE"
+protocol = "step progress and refusal diagnostics"
+
+[[cli.worktree.commands]]
+path = []
+
+[[cli.worktree.commands]]
+path = ["add"]
+summary = "Create, lock and set up a managed worktree"
+args = [
+  {name = "name", value = "string", required = true},
+  {name = "git-args", value = "string", required = false, variadic = true},
+]
+
+[[cli.worktree.commands]]
+path = ["rm"]
+summary = "Harvest, inspect, unlock and remove a managed worktree"
+args = [{name = "target", value = "path", required = true}]
