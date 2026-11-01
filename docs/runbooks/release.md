@@ -169,6 +169,66 @@ policy (routine broad local checks off after hosted Node 22/26 verification, wit
 status and capability evidence remain as recorded for v0.1.0 apart from the agy smoke
 and Codex 0.166.0 evidence above; this release establishes no Darwin acceptance.
 
+### Publication record
+
+| Item | Value |
+| --- | --- |
+| Tag | `v0.3.0`, annotated, tag object `271358b14774b90cb45e481376927a3cfe1f300d` |
+| Release commit (`REL`) | `ed0cb9573a3b147f68923b7ad6f5b152419c147d` |
+| Pushed | 2026-11-01, after user approval: main `7e2a625..ed0cb95`, then the tag. Remote main and the peeled tag both equalled `REL`. Present: main, v0.1.0, v0.1.1, v0.2.0, v0.2.1, v0.3.0, and the branch `chore/relay-df16ab-test-policy` (`8157a25`, an ancestor of main), kept as a recorded exception to steps 5 and 6. |
+| Consumer pin | `git+https://github.com/khughitt/relay.git#v0.3.0` |
+| Runtime adoption | Not part of this release: familiar's pin is `fam-55f1af`; agy hook routing is `hq-8af61d`; Codex connector activation is `relay-005b4f`. |
+
+- **Gates at `REL`.** `TT_FORCE=1 just gate` passed on Node 26.5.0 and on Node 22.23.2:
+  1015 tests each, 998 passed, 17 skipped, none failed, with strict checking clean. The
+  17 skips are the Codex source and executable re-proof tests, which run only with
+  `RELAY_CODEX_SOURCE_ROOT` or `RELAY_CODEX_TEST_BIN` set
+  (`docs/runbooks/codex-question-reproof.md`). Under the test policy the pre-push hooks
+  ran hygiene only. An earlier Node 22 gate, at the first candidate, hung in
+  `test/codex-composition.test.js` and did not reproduce; that is `relay-942c32`.
+- **Privacy review at `REL`** (`v0.2.1..REL`, 84 commits, including first-parent merge
+  diffs). Four real path patterns and two private terms passed the nonblank/non-root
+  and source-match controls. gitleaks scanned 84 commits and found no leaks. The state
+  and transcript filename check matched three Codex rollout test fixtures under
+  `test/fixtures/codex/`; they were read in full and hold only stripped or synthetic
+  payloads. One maintainer author address; machine paths 0; private identities 0;
+  published pre-images 0. No optional work-host file was used.
+- **Rehearsal at `REL`.** A local annotated rehearsal tag passed git installation,
+  manifest/lockfile, installed-package smoke and empty-cache `npm ci` on both
+  runtimes. The bare rehearsal clone was removed.
+- **Independent release review.** Three rounds, each by a fresh
+  claude-code/claude-opus-5-5 reviewer. Round 1 at `502f14f` asked for two Important
+  corrections: force the release gate, and state the mixed-version hazards. Round 2
+  at `3664857` asked for one: name every event v0.2.1 refuses. Round 3 at `REL`
+  accepted. Deferred minors and rulings are recorded on `relay-9bb31c`.
+- **Portability against the public tag.** Anonymous HTTPS installation and
+  empty-cache `npm ci` passed on both runtimes. The repository was already public, so
+  the private-refusal step did not apply. The verbatim outputs follow.
+
+Node 26.5.0 (npm 11.17.0):
+
+```text
+ok reach: 271358b14774b90cb45e481376927a3cfe1f300d	refs/tags/v0.3.0
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.3.0
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.3.0
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#ed0cb9573a3b147f68923b7ad6f5b152419c147d; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
+
+Node 22.23.2 (npm 10.9.8):
+
+```text
+ok reach: 271358b14774b90cb45e481376927a3cfe1f300d	refs/tags/v0.3.0
+ok install: npm install of git+https://github.com/khughitt/relay.git#v0.3.0
+ok manifest: dependency kept as git+https://github.com/khughitt/relay.git#v0.3.0
+ok lockfile: relay git+ssh://git@github.com/khughitt/relay.git#ed0cb9573a3b147f68923b7ad6f5b152419c147d; jsonc-parser https://registry.npmjs.org/jsonc-parser/-/jsonc-parser-3.3.1.tgz sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+ok smoke: installed package verified
+ok ci: npm ci from the lockfile with an empty cache; installed package verified
+portability: pass
+```
+
 ## v0.2.1
 
 Retires replaced Codex roots. A root Codex SessionStart now removes the other Codex
