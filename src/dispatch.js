@@ -87,7 +87,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   const clock = deps.clock ?? performance.now.bind(performance), start = clock();
   const { loadConfig = loadSubscribers, loadConfigFrom = loadSubscribersFrom, run = runChild, apply = applyEvent, readInput = readNativeInput, applyOptions = {} } = deps;
   /** @param {import("./types.js").Failure} error */
-  const failure = (error) => ({ stdout: '', stderr: `${describe(error)}\n`, exitCode: 1 });
+  const failure = (error) => ({ stdout: '', stderr: `${describe(error)}\n`, exitCode: adapter?.failureExitCode ?? 1 });
   let adapter, budget;
   try { adapter = adapterFor(harness); adapter.stateForEvent(nativeEvent); budget = budgetFor({ harness, nativeEvent, outerMs }); }
   catch (caught) { const error = /** @type {import('./types.js').Failure} */ (caught); return failure(error); }
@@ -128,7 +128,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   if (result === null) for (const observer of observers) diagnostics.push(`SUBSCRIBER_SKIPPED: ${observer.name} skipped after registry failure`);
   else await runObservers(observers, (observer) => envelope('event', observer, event, result), { clock, workDeadline, run }, diagnostics);
   const reply = adapter.encodeReply(nativeEvent, context ? { decision: 'allow', context } : { decision: 'allow' });
-  return { stdout: reply.stdout, stderr: lines(diagnostics), exitCode: result === null || event.background === null ? 1 : reply.exitCode };
+  return { stdout: reply.stdout, stderr: lines(diagnostics), exitCode: result === null || event.background === null ? (adapter.failureExitCode ?? 1) : reply.exitCode };
 }
 
 // relay reap: prune confirmed deaths, publish if changed, then tell reconcile observers to

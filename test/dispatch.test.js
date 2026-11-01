@@ -461,10 +461,21 @@ test('agy before-tool guards: deny and allow replies', async (t) => {
   await writeSubscribers(p, [strip(guard('g', 'allow', { harnesses: ['agy'] }))]);
   assert.deepEqual(await hook(p, { harness: 'agy', body }), { stdout: '', stderr: '', exitCode: 0 });
 });
-test('agy Stop failure never continues', async (t) => {
-  const p = await tempPaths(t);
-  const r = await hook(p, { harness: 'agy', nativeEvent: 'Stop', body: '{}' });
-  assert.equal(r.exitCode, 1); assert.equal(r.stdout, '');
+test('agy failures exit 0 with diagnostics', async (t) => {
+  const p = await tempPaths(t), body = await agyFixture('PreToolUse');
+  let r = await hook(p, { harness: 'agy', nativeEvent: 'Stop', body: '{}' });
+  assert.equal(r.exitCode, 0); assert.equal(r.stdout, ''); assert.match(r.stderr, /INVALID_INPUT/);
+  r = await hook(p, { harness: 'agy', nativeEvent: 'SessionStart', body: '{}' });
+  assert.equal(r.exitCode, 0); assert.equal(r.stdout, ''); assert.match(r.stderr, /INVALID_INPUT/);
+  await writeSubscribers(p, [strip(guard('g', 'allow', { harnesses: ['agy'] }))]);
+  const broken = { ...p, stateDir: p.subscribersPath, agentsPath: join(p.subscribersPath, 'agents.json'), lockPath: join(p.subscribersPath, 'agents.lock') };
+  r = await dispatchHook({ harness: 'agy', nativeEvent: 'PreToolUse', input: Readable.from([body]) }, { paths: broken, applyOptions: local });
+  assert.equal(r.exitCode, 0); assert.equal(r.stdout, ''); assert.match(r.stderr, /^registry: IO_ERROR/);
+  await writeSubscribers(p, [strip(guard('g', 'allow'))]);
+  r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'PreToolUse', input: Readable.from([payload()]) }, { paths: broken, applyOptions: local });
+  assert.equal(r.exitCode, 1); assert.match(r.stderr, /^registry: IO_ERROR/);
+  r = await hook(p, { nativeEvent: 'SessionStart', body: '{}' });
+  assert.equal(r.exitCode, 1); assert.match(r.stderr, /INVALID_INPUT/);
 });
 test('agy PreToolUse with an unloadable subscriber file denies with a relay refusal', async (t) => {
   const p = await tempPaths(t), body = await agyFixture('PreToolUse');

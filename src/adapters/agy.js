@@ -27,6 +27,9 @@ export const replies = Object.freeze({
 export const outerTimeouts = Object.freeze({ default: 30000, max: Object.freeze({}) });
 // Allow is empty stdout (agy's no-op, so its own permission flow stays in force); never {"decision":"allow"}.
 // Exit stays 0: agy reads the decision from JSON and ignored exit 2 in the probe.
+// agy fails a tool call when PreToolUse hooks exit 1 (Task 1 probe), so relay failures exit 0 and report on stderr.
+/** @type {0} */
+export const failureExitCode = 0;
 /** @param {string} nativeEvent @param {import("../types.js").Reply} reply */
 export function encodeReply(nativeEvent, reply) {
   if (reply.decision === 'deny') {
