@@ -131,10 +131,11 @@ A reader that predates agy rejects a whole registry snapshot holding an agy row:
 v0.2.1 and earlier, the tasks reader's closed harness list and familiar pinned at v0.1.1
 all do (`fam-55f1af` for familiar). relay v0.2.1 and earlier also reject a whole
 subscribers file in which any subscriber lists `agy` in `harnesses`, and then refuse
-every Claude Code and Codex PreToolUse and UserPromptSubmit they dispatch. So upgrade
-every relay, and every registry reader, that shares the registry or subscribers file
-before an agy hook publishes into it or a subscriber names agy; or give agy its own
-`--subscribers FILE`. The exported fixture `relay/fixtures/ancestry.json` gains two agy
+every Claude Code and Codex event that has a refusal channel: UserPromptSubmit,
+PreToolUse and Stop, plus Codex SubagentStop, so their agents cannot end a turn. So
+upgrade every relay, and every registry reader, that shares the registry or subscribers
+file before an agy hook publishes into it or a subscriber names agy. A separate
+`--subscribers FILE` for agy avoids only the subscribers hazard, not the registry one. The exported fixture `relay/fixtures/ancestry.json` gains two agy
 chains, which a consumer test with a closed harness map must accept.
 
 **Codex question connector.** `relay serve` can join Codex questions that wait on the
