@@ -483,3 +483,12 @@ test('agy PreToolUse with an unloadable subscriber file denies with a relay refu
   const r = await hook(p, { harness: 'agy', body });
   assert.equal(r.exitCode, 0); assert.match(r.stdout, /^\{"decision":"deny","reason":"relay refused: /);
 });
+test('a budget that cannot be planned refuses agy PreToolUse and leaves other harnesses unchanged', async (t) => {
+  const p = await tempPaths(t), body = await agyFixture('PreToolUse');
+  const r = await hook(p, { harness: 'agy', body, outerMs: 400 });
+  assert.equal(r.exitCode, 0); assert.match(r.stdout, /^\{"decision":"deny","reason":"relay refused: /);
+  const stop = await hook(p, { harness: 'agy', nativeEvent: 'Stop', body: await agyFixture('Stop'), outerMs: 400 });
+  assert.equal(stop.exitCode, 0); assert.equal(stop.stdout, ''); assert.match(stop.stderr, /\S/);
+  const claude = await hook(p, { outerMs: 400 });
+  assert.equal(claude.exitCode, 1); assert.equal(claude.stdout, ''); assert.match(claude.stderr, /\S/);
+});

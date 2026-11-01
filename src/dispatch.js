@@ -86,14 +86,20 @@ async function runGuards(guards, event, capability, { clock, workDeadline, run }
 export async function dispatchHook({ harness, nativeEvent, input, outerMs, subscribersPath = null }, deps = {}) {
   const clock = deps.clock ?? performance.now.bind(performance), start = clock();
   const { loadConfig = loadSubscribers, loadConfigFrom = loadSubscribersFrom, run = runChild, apply = applyEvent, readInput = readNativeInput, applyOptions = {} } = deps;
-  /** @param {import("./types.js").Failure} error */
-  const failure = (error) => ({ stdout: '', stderr: `${describe(error)}\n`, exitCode: adapter?.failureExitCode ?? 1 });
   /** @type {import("./types.js").Adapter|undefined} */
   let adapter;
-  /** @type {ReturnType<typeof budgetFor>|undefined} */
+  /** @param {import("./types.js").Failure} error */
+  const failure = (error) => ({ stdout: '', stderr: `${describe(error)}\n`, exitCode: adapter?.failureExitCode ?? 1 });
+  try { adapter = adapterFor(harness); adapter.stateForEvent(nativeEvent); }
+  catch (caught) { return failure(/** @type {import('./types.js').Failure} */ (caught)); }
+  /** @type {ReturnType<typeof budgetFor>} */
   let budget;
-  try { adapter = adapterFor(harness); adapter.stateForEvent(nativeEvent); budget = budgetFor({ harness, nativeEvent, outerMs }); }
-  catch (caught) { const error = /** @type {import('./types.js').Failure} */ (caught); return failure(error); }
+  try { budget = budgetFor({ harness, nativeEvent, outerMs }); }
+  catch (caught) {
+    const error = /** @type {import('./types.js').Failure} */ (caught);
+    // A harness whose failures exit 0 would run the tool unguarded, so where the event has a refusal channel the failure refuses.
+    return adapter.failureExitCode === 0 && adapter.replies[nativeEvent]?.refuse ? adapter.encodeReply(nativeEvent, { decision: 'deny', reason: refusalReason(error) }) : failure(error);
+  }
   const capability = adapter.replies[nativeEvent] ?? NONE;
   /** @param {string} reason */
   const refuse = (reason) => adapter.encodeReply(nativeEvent, { decision: 'deny', reason });
