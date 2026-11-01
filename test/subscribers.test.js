@@ -135,3 +135,13 @@ test('checkBudget sums the worst match ignoring tool filters', () => {
 test('a Codex turn-end guard still loads once SubagentStop shares the kind', () => {
   validateSubscribers({ schema: 1, subscribers: [guard({ kinds: ['turn-end'], harnesses: ['codex'], tools: null })] });
 });
+
+test('agy turn-end guard is rejected at load; a before-tool guard validates', () => {
+  assert.throws(() => validateSubscribers({ schema: 1, subscribers: [guard({ kinds: ['turn-end'], harnesses: ['agy'], tools: null })] }), (e) => e.code === 'INVALID_CONFIG' && e.message.includes('agy turn-end has no refusal channel'));
+  validateSubscribers({ schema: 1, subscribers: [guard({ kinds: ['before-tool'], harnesses: ['agy'] })] });
+});
+test('agy budget follows the 30 s outer timeout and an explicit outer timeout', () => {
+  const b = budgetFor({ harness: 'agy', nativeEvent: 'PreToolUse' });
+  assert.equal(b.outerMs, 30000); assert.equal(b.subscribersMs, 11000);
+  assert.equal(budgetFor({ harness: 'agy', nativeEvent: 'PreToolUse', outerMs: 60000 }).subscribersMs, 37000);
+});

@@ -6,7 +6,7 @@ import { adapterFor } from './adapters/index.js';
 import { checkPrivate } from './bus/store.js';
 
 export const RECONCILE = 'reconcile';
-const HARNESSES = ['claude-code', 'codex', 'opencode'];
+const HARNESSES = ['agy', 'claude-code', 'codex', 'opencode'];
 const FIELDS = ['name', 'role', 'kinds', 'harnesses', 'tools', 'argv', 'timeoutMs'];
 const CONFIG_FIELDS = ['schema', 'subscribers'];
 const MAX_TIMEOUT_MS = 60000, MAX_PLANNED_MS = 60000, MIN_OUTER_MS = 500, INPUT_MS = 5000, REGISTRY_MS = 12000;

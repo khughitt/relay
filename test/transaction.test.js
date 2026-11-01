@@ -397,3 +397,12 @@ test('a session row without a report has no background', async t => {
   const opts = localObservation(await tempState(t));
   assert.equal(Object.hasOwn(claudeRow(await applyEvent(claude('SessionStart'), opts)), 'background'), false);
 });
+test('agy PreToolUse publishes a session-scoped working row and Stop sets done',async t=>{
+  const p=await tempState(t),fx=n=>fs.readFile(new URL(`./fixtures/agy/${n}.json`,import.meta.url),'utf8');
+  const e=normalizeEvent('agy','PreToolUse',await fx('PreToolUse'));
+  const r=await applyEvent(e,localObservation(p));const row=r.snapshot.agents[e.agentId];
+  assert.ok(e.agentId.startsWith('agy:'));assert.equal(row.scope,'session');assert.equal(row.state,'working');
+  assert.equal('root' in row,false);assert.equal('background' in row,false);
+  const s=await applyEvent(normalizeEvent('agy','Stop',await fx('Stop')),localObservation(p));
+  assert.equal(s.snapshot.agents[e.agentId].state,'done');
+});

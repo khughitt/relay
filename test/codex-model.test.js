@@ -120,3 +120,8 @@ for (const [name, turn, uptimeMs, wall, expected] of cases) {
     assert.equal(answer.verified ? 'verified' : answer.reason, expected);
   });
 }
+test('a chain whose nearest harness is agy is not under codex', (t) => {
+  const { env } = storeWith(t);
+  const r = resolve(env, fakeOps({ chain: [row(30, 20, 'node'), row(20, 10, 'agy'), row(10, 5, 'codex')] }));
+  assert.equal(r.answer.reason, 'not-under-codex'); assert.match(r.detail ?? '', /agy/);
+});

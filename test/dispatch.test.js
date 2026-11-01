@@ -452,3 +452,23 @@ test('a readable empty background report still allows without diagnostics', asyn
   const p = await tempPaths(t);
   assert.deepEqual(await hook(p, { nativeEvent: 'Stop', body: stopBody([]) }), { stdout: '', stderr: '', exitCode: 0 });
 });
+
+const agyFixture = (name) => readFile(new URL(`./fixtures/agy/${name}.json`, import.meta.url), 'utf8');
+test('agy before-tool guards: deny and allow replies', async (t) => {
+  const p = await tempPaths(t), body = await agyFixture('PreToolUse');
+  await writeSubscribers(p, [strip(guard('g', 'deny', { harnesses: ['agy'] }))]);
+  assert.deepEqual(await hook(p, { harness: 'agy', body }), { stdout: '{"decision":"deny","reason":"denied by fixture"}\n', stderr: 'denied by fixture\n', exitCode: 0 });
+  await writeSubscribers(p, [strip(guard('g', 'allow', { harnesses: ['agy'] }))]);
+  assert.deepEqual(await hook(p, { harness: 'agy', body }), { stdout: '', stderr: '', exitCode: 0 });
+});
+test('agy Stop failure never continues', async (t) => {
+  const p = await tempPaths(t);
+  const r = await hook(p, { harness: 'agy', nativeEvent: 'Stop', body: '{}' });
+  assert.equal(r.exitCode, 1); assert.equal(r.stdout, '');
+});
+test('agy PreToolUse with an unloadable subscriber file denies with a relay refusal', async (t) => {
+  const p = await tempPaths(t), body = await agyFixture('PreToolUse');
+  await writeSubscribers(p, [], { text: 'not json' });
+  const r = await hook(p, { harness: 'agy', body });
+  assert.equal(r.exitCode, 0); assert.match(r.stdout, /^\{"decision":"deny","reason":"relay refused: /);
+});

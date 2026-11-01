@@ -6,7 +6,7 @@ import { createProcessOps } from '../src/bus/proc.js';
 const corpus = JSON.parse(readFileSync(new URL('./fixtures/ancestry.json', import.meta.url)));
 test('ancestry corpus is versioned and names every harness', () => {
   assert.equal(corpus.schema, 1);
-  assert.deepEqual([...new Set(corpus.chains.map(c => c.harness))].sort(), ['claude-code', 'codex', 'opencode']);
+  assert.deepEqual([...new Set(corpus.chains.map(c => c.harness))].sort(), ['agy', 'claude-code', 'codex', 'opencode']);
 });
 for (const chain of corpus.chains) {
   test(`ancestry corpus: ${chain.name}`, () => {
