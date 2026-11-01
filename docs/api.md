@@ -306,6 +306,13 @@ neither channel. agy refuses on PreToolUse only, with exit 0 and stdout
 timeout is 30 s (measured kill at 30 s) and a handler `timeout` raises it, so an install must
 raise the handler `timeout` and `--outer-ms` together.
 
+agy's payload reaches guards translated. `sessionId` is agy's `conversationId` (agentId
+`agy:<conversationId>`); `cwd` comes only from `workspacePaths[0]`; `stopHookActive` is
+`executionNum > 0`. agy's `run_command` reaches guards as tool `Bash` with
+`tool.input = {command: <CommandLine>}` and `tool.command` set. Every other agy tool keeps agy's
+own name and args (for example `view_file`), so a guard must match those names;
+`tools: ["Bash"]` covers shell only.
+
 Claude Code `Stop`'s optional `background_tasks` becomes `Event.background`.
 A readable report is an array of non-null, non-array objects with string `type` and
 `status`; no other entry fields are required. Entries with status `running` or `pending`
@@ -487,10 +494,18 @@ root SessionStart's retired rows) appear only as their absence from the snapshot
 
 For agy (`Adapter.failureExitCode: 0`) every failure that would exit 1 (an event without a
 refusal channel, or an allow whose registry publication failed) exits 0 with empty stdout and
-the diagnostic on stderr, because exit 1 fails agy's PreToolUse tool call (Task 1 probe). On agy
+the diagnostic on stderr, because exit 1 fails agy's PreToolUse tool call (measured on agy 1.4.12). On agy
 Stop and SessionStart a hook's exit 1 or timeout kill is only logged in agy's own log, never
 shown to the user. Other harnesses still exit 1. agy refusals (PreToolUse only) exit 0 with the
-JSON decision on stdout, not 2.
+JSON decision on stdout, not 2. On agy a budget failure on PreToolUse (for example an
+`--outer-ms` below the minimum) refuses with that native refusal rather than exiting 0 with no
+reply, which would run the tool unguarded; on agy Stop and SessionStart it stays exit 0 with the
+diagnostic.
+
+A malformed agy hook command is a relay usage error (exit 2, for example a relative
+`--subscribers` path or a relay without agy). agy ignores exit 2, so it fails open: the tool
+runs unguarded. An install must therefore verify one guard deny through each installed agy
+PreToolUse command.
 
 Observer failures never change the exit code; they are stderr diagnostics.
 `BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries`
