@@ -104,6 +104,58 @@ The acceptance criterion: no secrets, credentials, transcripts, registry or subs
 state, user paths outside `tasks/`, or private identities. Machine paths and host names
 in task notes are accepted, as in the public tasks and familiar repositories.
 
+## v0.3.0
+
+Adds the Antigravity CLI (agy) hook adapter and the opt-in Codex blocking question
+connector.
+
+**agy adapter.** `relay hook --harness agy` accepts agy's `SessionStart`, `PreToolUse`
+and `Stop` events, runs guards and observers, and publishes registry rows
+`agy:<conversationId>` with `scope: "session"`. The harness union becomes
+`claude-code | codex | opencode | agy`. agy's payload reaches guards translated: `cwd`
+comes only from `workspacePaths[0]`, and `run_command` becomes tool `Bash`; every other
+agy tool keeps its own name. Replies follow agy's own channels: an allow is empty stdout
+(never `{"decision":"allow"}`, which agy treats as auto-approval), a refusal is exit 0
+with `{"decision":"deny","reason":R}` on PreToolUse only, and relay failures that exit 1
+elsewhere exit 0 on agy with the diagnostic on stderr. A budget failure on PreToolUse
+refuses rather than letting the tool run unguarded. A malformed agy hook command is a
+usage error that agy ignores, so it fails open; an installation must verify one guard
+deny through each installed agy PreToolUse command. `relay install` does not accept agy.
+Verified by the suite and an isolated live smoke on agy 1.4.12 (`relay-7b8340`); no
+live hook is installed by this release.
+
+A consumer whose registry reader predates agy rejects a snapshot holding an agy row:
+the tasks reader's closed harness list and familiar pinned at v0.1.1 both do. Do not
+publish agy rows into a shared registry until those readers accept them (`fam-55f1af`
+for familiar).
+
+**Codex question connector.** `relay serve` can join Codex questions that wait on the
+user (loaded threads observed Active with WaitingOnUserInput, admitted by a live Codex
+registry row, away presence and Plan provenance), deliver an inbox answer, and confirm
+receipt only from the exact-call answer map and the observed protocol turn end. It is
+off unless all four of `RELAY_CODEX_BIN`, `RELAY_CODEX_HOME`, `RELAY_CODEX_SOCKET` and
+`RELAY_CODEX_EVIDENCE` are set; a partial or malformed set fails configuration. It is
+qualified only for codex-cli 0.166.0 on Linux, against
+`docs/evidence/codex-question-0.166.0.json`, now a packaged file. Codex 0.166.0 has no
+atomic loaded-only join, so an unload during resume is a detected, accepted residual
+(`CODEX_JOIN_RACED`) with no timing bound claimed. `docs/runbooks/inbox-service.md`
+states the contract and limits. Gate 7 proved a user-present phone answer with
+receipt and a native defer on 0.166.0 (`relay-a27e7c`); persistent activation is
+`relay-005b4f` and needs separate approval.
+
+**Store compatibility.** Hook-route question entries are unchanged. Connector-owned
+Codex entries carry a `connector`/`terminal` route and Codex's native answer shape,
+which v0.2.1 and earlier reject as an invalid route. Do not downgrade against an inbox
+store that holds connector entries. The registry schema is unchanged apart from the
+`agy` harness value above.
+
+Also includes the vendored tt version 9 and ops-check version 16, the test execution
+policy (routine broad local checks off after hosted Node 22/26 verification, with
+`TT_FORCE=1 just gate` as the deliberate full run), and test fixes for quoted
+`test-one` arguments, npm pack JSON shapes and lock-exhaustion isolation. Platform
+status and capability evidence remain as recorded for v0.1.0 apart from the agy smoke
+and Codex 0.166.0 evidence above; this release establishes no Darwin acceptance.
+
 ## v0.2.1
 
 Retires replaced Codex roots. A root Codex SessionStart now removes the other Codex
