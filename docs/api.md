@@ -795,7 +795,9 @@ threads and detects the accepted unload/resume residual. It is off when its four
 configuration paths are absent. Public routes also omit the private rollout path
 and terminal proof. `observations` retains native answer
 observations, including answers from the terminal after release or expiry. `observed`
-is the latest such map. The full saved entry and its histories are returned to clients.
+is the latest such map. Clients receive the saved entry and its histories, except that a
+connector-owned Codex entry's route is projected to `{handback: true, waiter: null}` and its
+`observed` and `observations[].answers` keep Codex's nested `{answers: {<id>: {answers: string[]}}}` shape.
 Raw harness payloads, transcripts and environment values are never persisted.
 
 ### Lifecycle

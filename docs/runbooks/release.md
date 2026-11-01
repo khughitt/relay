@@ -10,8 +10,10 @@ cutting a release and the record of each one.
 Run every step from the main checkout. Name the gh account on every gh command
 (`GH_TOKEN=$(gh auth token --user khughitt) gh …`). Never switch the global account.
 
-1. **Gate.** Run `just gate` on the development runtime and on the Node 22 floor
-   (`PATH="<node 22 bin>:$PATH" just gate`). Both must pass.
+1. **Gate.** Run `TT_FORCE=1 just gate` on the development runtime and on the Node 22
+   floor (`PATH="<node 22 bin>:$PATH" TT_FORCE=1 just gate`). Both must pass. Without
+   `TT_FORCE=1`, the committed `.tt.toml` skips the suite and the type check, and a skip
+   is not a gate count.
 2. **Fix the release commit.** Set `REL=$(git rev-parse HEAD)` and write it in a task note
    with both gate counts. Every later step uses `REL`, never a moving `main`.
 3. **Privacy review.** Run the commands below over `REL`'s history. Every result must
@@ -121,13 +123,19 @@ elsewhere exit 0 on agy with the diagnostic on stderr. A budget failure on PreTo
 refuses rather than letting the tool run unguarded. A malformed agy hook command is a
 usage error that agy ignores, so it fails open; an installation must verify one guard
 deny through each installed agy PreToolUse command. `relay install` does not accept agy.
-Verified by the suite and an isolated live smoke on agy 1.4.12 (`relay-7b8340`); no
-live hook is installed by this release.
+Verified by the suite and an isolated live smoke on agy 1.4.12 at `4000d3e`
+(`relay-7b8340`), which predates the PreToolUse budget refusal; no live hook is installed
+by this release.
 
-A consumer whose registry reader predates agy rejects a snapshot holding an agy row:
-the tasks reader's closed harness list and familiar pinned at v0.1.1 both do. Do not
-publish agy rows into a shared registry until those readers accept them (`fam-55f1af`
-for familiar).
+A reader that predates agy rejects a whole registry snapshot holding an agy row: relay
+v0.2.1 and earlier, the tasks reader's closed harness list and familiar pinned at v0.1.1
+all do (`fam-55f1af` for familiar). relay v0.2.1 and earlier also reject a whole
+subscribers file in which any subscriber lists `agy` in `harnesses`, and then refuse
+every Claude Code and Codex PreToolUse and UserPromptSubmit they dispatch. So upgrade
+every relay, and every registry reader, that shares the registry or subscribers file
+before an agy hook publishes into it or a subscriber names agy; or give agy its own
+`--subscribers FILE`. The exported fixture `relay/fixtures/ancestry.json` gains two agy
+chains, which a consumer test with a closed harness map must accept.
 
 **Codex question connector.** `relay serve` can join Codex questions that wait on the
 user (loaded threads observed Active with WaitingOnUserInput, admitted by a live Codex
@@ -135,8 +143,9 @@ registry row, away presence and Plan provenance), deliver an inbox answer, and c
 receipt only from the exact-call answer map and the observed protocol turn end. It is
 off unless all four of `RELAY_CODEX_BIN`, `RELAY_CODEX_HOME`, `RELAY_CODEX_SOCKET` and
 `RELAY_CODEX_EVIDENCE` are set; a partial or malformed set fails configuration. It is
-qualified only for codex-cli 0.166.0 on Linux, against
-`docs/evidence/codex-question-0.166.0.json`, now a packaged file. Codex 0.166.0 has no
+qualified only for the exact codex-cli 0.166.0 executable (sha256 and size) pinned by
+`docs/evidence/codex-question-0.166.0.json`, now a packaged file, on Linux. That evidence
+was pinned before Gate 7 ran, so it still records Gate 7 as unrun. Codex 0.166.0 has no
 atomic loaded-only join, so an unload during resume is a detected, accepted residual
 (`CODEX_JOIN_RACED`) with no timing bound claimed. `docs/runbooks/inbox-service.md`
 states the contract and limits. Gate 7 proved a user-present phone answer with
@@ -145,9 +154,12 @@ receipt and a native defer on 0.166.0 (`relay-a27e7c`); persistent activation is
 
 **Store compatibility.** Hook-route question entries are unchanged. Connector-owned
 Codex entries carry a `connector`/`terminal` route and Codex's native answer shape,
-which v0.2.1 and earlier reject as an invalid route. Do not downgrade against an inbox
-store that holds connector entries. The registry schema is unchanged apart from the
-`agy` harness value above.
+which v0.2.1 and earlier reject as an invalid route and quarantine; upgrading again does
+not restore a quarantined entry. Do not downgrade against an inbox store that holds
+connector entries. Public socket and HTTP responses project a connector entry's route to
+`{handback: true, waiter: null}`, and its observed answers keep the nested Codex shape;
+hook-route entries are unchanged on the wire. The registry schema is unchanged apart
+from the `agy` harness value above.
 
 Also includes the vendored tt version 9 and ops-check version 16, the test execution
 policy (routine broad local checks off after hosted Node 22/26 verification, with
