@@ -1,7 +1,9 @@
 # Answer route probes
 
+Type: operator guide; document types 1.
+
 Re-run when Claude Code changes version before installing or reinstalling the
-`relay ask` route (spec [typed interaction messages](../specs/2026-10-11-typed-interaction-messages.md) §2, §11).
+`relay ask` route (see [questions.md](../questions.md#claude-code-question-route)).
 
 Start with the smallest end-to-end pilot and read its hook log, terminal capture,
 summary and cleanup before running the longer cases:
@@ -54,13 +56,7 @@ session id `00000000-0000-4000-8000-000000000000`, transcript `/tmp/x.jsonl`, cw
 
 ## Codex connector: receipt and lifecycle probes
 
-The [current connector contract](../specs/2026-10-28-codex-question-connector.md)
-and [all-gates report](../notes/2026-10-28-codex-question-protocol-report.md)
-cover the disabled-by-default production route and preserved private controls.
-The original matrix is 0.165.0 evidence. The current 0.166.0 source/pilot overlay
-is produced by the [repeatable re-proof](codex-question-reproof.md); it does not
-claim to rerun the entire original matrix. The [Gate 7 runbook](codex-question-gate7.md)
-is prepared only and requires live host-use approval.
+See [questions.md](../questions.md#codex-question-route) for the disabled-by-default production route and preserved private controls. The original matrix is 0.165.0 evidence. The current 0.166.0 source/pilot overlay is produced by the [repeatable re-proof](codex-question-reproof.md); it does not claim to rerun the entire original matrix. Gate 7 live host validation requires separate user approval.
 0.166.0 has no atomic loaded-only join. The accepted detected residual selects
 only Active+WaitingOnUserInput through full admission; a qualifying first replay
 is required, and reconnect requires the stored exact tuple. No replay or changed

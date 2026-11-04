@@ -1,5 +1,7 @@
 # Codex connector version re-proof
 
+Type: operator guide; document types 1.
+
 The connector admits exactly codex-cli 0.166.0 on qualified Linux endpoints.
 The frozen 0.165.0 artifact is the comparison baseline, not another supported
 version. This check uses private homes and a local scripted Responses provider;
@@ -22,11 +24,11 @@ Use a fresh output directory each time, including after failures:
 
 ```sh
 node tools/codex-question/reprove.mjs \
-  --baseline-source "$WORK_ROOT/relay/relay-a27e7c/codex-rust-v0.165.0.tar.gz" \
-  --source "$WORK_ROOT/relay/relay-a27e7c/reproof-0.166.0/codex-rust-v0.166.0.tar.gz" \
+  --baseline-source "$WORK_ROOT/relay/<task-id>/codex-rust-v0.165.0.tar.gz" \
+  --source "$WORK_ROOT/relay/<task-id>/reproof-0.166.0/codex-rust-v0.166.0.tar.gz" \
   --bin "$HOME/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/bin/codex" \
   --binary-sha256 b8a11fedf24b2dfb59a70c9e52b030f9a508dcd49cd2dd0d41956f4c785156b8 \
-  --out "$WORK_ROOT/relay/relay-a27e7c/reproof-0.166.0/repeat-01"
+  --out "$WORK_ROOT/relay/<task-id>/reproof-0.166.0/repeat-01"
 ```
 
 The driver validates archive and executable bytes before execution, verifies the
@@ -81,4 +83,4 @@ test/codex-evidence.test.js` on Node 22 and the development runtime. Without the
 source input, archive-dependent source tests explicitly skip; a skip is not proof.
 Run mandatory hygiene and obey the invoking checkout's test policy for broad work.
 
-The [Gate 7 runbook](codex-question-gate7.md) is prepared for later live approval.
+See [questions.md](../questions.md#codex-question-route) and [answer-route-probes.md](answer-route-probes.md); Gate 7 live host validation requires separate user approval.

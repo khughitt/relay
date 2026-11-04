@@ -1,13 +1,12 @@
 # Test execution policy
 
-Type: reference.
+Type: guide; document types 1.
 
 Routine broad local verification is disabled by the committed .tt.toml after
 [accepted hosted verification](https://github.com/khughitt/relay/actions/runs/41063297144)
 on Node 22 and 26: each ran 784 tests, all passed, zero reported skips and zero
 excluded modules. Runtime tests and package exports are unchanged. The activation
-push is checked by the same forced workflow; exact run evidence is retained on
-relay-df16ab, with rollout state reported to ops-8bfa85.
+push is checked by the same forced workflow.
 
 Use `just test-one <file>` or `just test-one --test-name-pattern '<regex>' <file>`
 while implementing. Arguments pass intact to Node. Fast and full targets both

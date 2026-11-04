@@ -1,5 +1,7 @@
 # Repair an abandoned registry lock
 
+Type: operator guide; document types 1.
+
 Use this only for LOCK_REPAIR_REQUIRED or a diagnosed lock cleanup/ownership
 failure. Normal dead main writers recover automatically; age never proves death.
 This is an explicit operator procedure, never automatic hook-error recovery.
@@ -41,8 +43,9 @@ relay reap
    remains unknown; listing/reaping does not prove guards or terminal reconciliation
    work. Restore hook configuration and begin fresh sessions only after verification.
    Installation is explicit and evidence-gated: follow
-   [hook install and recovery](hook-install-rollback.md) before any cutover. The
-   [inbox service runbook](inbox-service.md#recovery) covers service-lock incidents.
+   `docs/runbooks/hook-install-rollback.md` before any cutover. See the
+   [registry lock protocol](../registry.md#lock-protocol-and-stale-lock-reclamation) and the
+   [inbox service runbook](inbox-service.md#recovery) for service-lock incidents.
 
 Temporary token names are not swept by pattern. If they need cleanup, inspect and
 remove them individually under the same quiescence condition. Never use a wildcard

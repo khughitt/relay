@@ -1,5 +1,7 @@
 # Hook install and recovery
 
+Type: operator guide; document types 1.
+
 Run a dry run first and inspect its JSON artifact. Apply only with an explicit artifact path and no live harness session. Claude targets are the checkout's named settings file; Codex targets the checkout's `hooks.json`, never `config.toml`.
 
 Every installed relay entry names its outer budget twice: `--outer-ms N` in the command, which relay plans its internal deadline from, and `timeout: N / 1000` on the same hook object, which is the harness's own outer timeout in seconds. Both harnesses default an unset timeout to 600 s, so the field is written even where it repeats the default; SessionEnd carries the short profile (Claude 60 s, Codex 3 s). A relay entry whose field drifted from its command is replaced as a whole.
@@ -12,7 +14,7 @@ After a Codex apply, re-trust the changed hooks in Codex. The installer never wr
 
 Rollback uses only the artifact: `relay rollback --artifact FILE`. For each change, `after` restores `before`, `before` is skipped, and any other bytes refuse. A partial cutover can therefore be completed with install or recovered with rollback. OpenCode modifies only its server plugin entry; it never touches `tui.json`.
 
-Guard/context bindings require the real evidence record produced by `ops-c8e4d1`; fixture artifacts are not live capability proof.
+Guard/context bindings require the real capability evidence record for the installed harness version; fixture artifacts are not live capability proof.
 
 ## Activating session handles (registry schema 2)
 
@@ -32,8 +34,8 @@ reappears with its own handle at its next hook event. No session restart is need
 
 ## Activating Codex worker rows
 
-Codex workers get their own registry rows (`scope: "worker"`, spec
-`docs/specs/2026-10-15-codex-worker-rows.md`). Before relay hooks run under Codex on a
+Codex workers get their own registry rows (`scope: "worker"`, see
+[adapters.md](../adapters.md#event-mappings)). Before relay hooks run under Codex on a
 host where tasks' relay identity is on:
 
 1. Every `tasks` binary each harness resolves on `PATH` carries the worker-scope and

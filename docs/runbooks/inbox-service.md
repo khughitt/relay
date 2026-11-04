@@ -1,10 +1,11 @@
 # Interaction inbox service
 
+Type: operator guide; document types 1.
+
 `relay serve` owns the durable inbox and private local socket. HTTP is optional and
 binds only `127.0.0.1`; relay ships no phone client. The Claude terminal route has
-passing capability evidence for 2.1.296, but Task 14's user-present tailnet end-to-end
-acceptance is still pending. This runbook describes operation; the package installs
-no unit, tailnet service or live hook.
+passing capability and user-present tailnet acceptance evidence for 2.1.296. This runbook
+describes operation; the package installs no unit, tailnet service or live hook.
 
 ## User unit
 
@@ -65,7 +66,7 @@ comparisons are exact, including case and port. Any `X-Forwarded-*` header or
 Tailscale identity/Funnel header marks a request as proxied; the configured Host
 and login must match and Funnel is refused. POST and PUT require a matching Origin,
 `application/json`, and at most 64 KiB of body bytes. See the
-[HTTP contract](../api.md#http-protocol-and-guard) for routes and errors.
+[HTTP contract](../questions.md#http-protocol-and-guard) for routes and errors.
 
 Set `RELAY_CLIENT_DIR` to an absolute static-client directory if a client is supplied
 separately; its files use the same guarded origin. Without it, the API still runs.
@@ -74,7 +75,7 @@ the same `answerId` after reconnecting; expiry runs before a queued answer is ap
 
 ## Installing the question route
 
-Run the [answer route probes](answer-route-probes.md) first, including after a Claude
+Run `docs/runbooks/answer-route-probes.md` first, including after a Claude
 Code upgrade. The recorded five passing rows are for 2.1.296; an unknown/new version
 requires fresh evidence. Terminal-answer and deny-stops gate PreToolUse, receipt gates
 PostToolUse, release enables handback, and under-denial records behavior only.
@@ -111,7 +112,7 @@ session after artifact inspection. The subscriber file must be a 0600 regular fi
 in a privately owned 0700 directory. The route is supported only for Claude's
 interactive terminal in v1. Installed hook commands use the installer's Node path;
 removing that runtime requires reinstalling the hooks. This route records and
-delivers decisions; it grants no authorization.
+delivers decisions; it grants no authorization. Because Claude Code keys answers by prompt text, a Claude `AskUserQuestion` form carrying duplicate question text is rejected by the route and passed through to the native terminal UI even while presence is away.
 
 Rollback uses the applied artifact, preserving unrelated settings:
 
@@ -121,7 +122,7 @@ relay rollback --artifact /path/to/ask-install-applied.json
 
 Rollback restores only bytes matching the artifact's `after`; an already restored
 `before` is skipped, and other bytes refuse. See the
-[hook install and recovery runbook](hook-install-rollback.md).
+`docs/runbooks/hook-install-rollback.md`.
 
 ## Presence and desk commands
 
@@ -251,13 +252,11 @@ generation, rollout path or question-id mapping metadata.
 `CODEX_CONNECTION` indicates unavailable qualified connection. Diagnostics carry
 no question/output content. Rollout bounds remain 1 MiB per line, 64 MiB per file,
 and 16 retained paths/64 MiB charged bytes service-wide; exhaustion stays unknown.
-See [answer-route probes](answer-route-probes.md) and the
-[connector contract](../specs/2026-10-28-codex-question-connector.md).
+See `docs/runbooks/answer-route-probes.md` and the
+[Codex question route](../questions.md#codex-question-route).
 Gate 7 real-model/phone/native-desktop acceptance and integration require separate
 approvals; this implementation does not authorize installation or activation.
 
 The current supported version is exactly 0.166.0. Its default unload delay is
-60 seconds; relay does not change it or infer a timing guarantee. See the
-[repeatable private re-proof](codex-question-reproof.md) and the
-[prepared Gate 7 runbook](codex-question-gate7.md). The latter requires separate
-user approval for live host use.
+60 seconds; relay does not change it or infer a timing guarantee. See
+`docs/runbooks/codex-question-reproof.md`; Gate 7 real-model/phone/native-desktop live host validation requires separate user approval.
