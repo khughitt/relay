@@ -403,7 +403,7 @@ test('reconcile rejects a reap that fulfills after its deadline without notifyin
 
 // Characterization, not a fix: relay fails closed on malformed Codex worker input with no
 // guard configured, and on SubagentStop the refusal is a continuation. Spec:
-// docs/specs/2026-10-15-codex-worker-rows.md ("Event routing").
+// docs/adapters.md ("Event mappings").
 test('a malformed Codex agent_id refuses even with no guard, and publishes nothing', async (t) => {
   const p = await tempPaths(t);
   await writeSubscribers(p, []);

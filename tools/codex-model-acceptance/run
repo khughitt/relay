@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Live acceptance for `relay model` (spec docs/specs/2026-10-17-codex-model-resolver.md, "Testing").
+# Live acceptance for `relay model` (see docs/adapters.md, "Codex model resolution").
 # Usage: run exec <outdir>  |  run tui start|say|keys|pane|stop <outdir> [text]
 # Every Codex here runs in a scratch work directory; the TUI runs in a private, detached tmux server.
 set -euo pipefail

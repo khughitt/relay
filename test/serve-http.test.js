@@ -152,7 +152,7 @@ function eventStream(t, port, { path = '/v1/events', headers = {} } = {}) {
   req.end();
   return { events, count: (n) => until(() => events.length >= n, { what: `${n} events on ${path}` }) };
 }
-// Spec §7.3 and acceptance 5: a resumed stream replays exactly the entries changed after its cursor,
+// docs/questions.md ("HTTP protocol and guard"): a resumed stream replays exactly the entries changed after its cursor,
 // in order, then streams live changes. The cursor must exclude a non-terminal entry (kept) and a
 // terminal one (closed), each last changed at or before it.
 for (const [how, cursor] of [['Last-Event-ID', (mark) => ({ headers: { 'last-event-id': String(mark) } })], ['?since=', (mark) => ({ path: `/v1/events?since=${mark}` })]]) {

@@ -10,7 +10,7 @@ import { lineReader } from './lines.js';
 import {publicView} from './public-entry.js';
 /** @typedef {import("node:net").Socket & {waiting: Map<string, Owner>, watching?: boolean, unwatch?: () => void}} ServiceSocket */
 /** @typedef {{socket: ServiceSocket, previous: Owner|null|undefined, accepted: boolean, refused: boolean}} Owner */
-// relay serve's local socket (spec §7.2, §9.1 step 5). A connection that asked a question is that
+// relay serve's local socket (docs/questions.md, "Local socket protocol"). A connection that asked a question is that
 // question's waiter: it receives a state line on every transition, and its close is the asker's
 // death unless the service itself is closing.
 /** @param {import("node:net").Socket} socket @param {unknown} value */

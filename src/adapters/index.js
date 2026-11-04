@@ -13,7 +13,7 @@ export function adapterFor(harness) {
   return adapters[harness];
 }
 // The nearest process any adapter recognises, skipping index zero (the caller itself).
-// Spec docs/specs/2026-10-17-codex-model-resolver.md, "Resolution" step 3.
+// See docs/adapters.md ("Codex model resolution", step 3).
 /** @param {import("../types.js").ProcessRow[]} chain @param {{executableOf: (pid: number) => string}} ops @returns {{harness: string, index: number}|null} */
 export function nearestHarness(chain, ops) {
   for (let index = 1; index < chain.length; index++) {

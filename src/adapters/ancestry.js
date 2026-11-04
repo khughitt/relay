@@ -3,7 +3,7 @@
 // The session process is the registry's identity handle: the harness process that fired the
 // hook, terminal or not. The terminal process is where a presentation layer paints: the
 // measured familiar predicate. They coincide for an interactive session and differ for every
-// session without a terminal of its own. Spec: docs/specs/2026-09-23-session-process-handle.md.
+// session without a terminal of its own. See docs/adapters.md ("Session process handle and ancestry").
 export const VERSION_COMM = /^[0-9]+(\.[0-9]+)+$/;
 // The walk never continues past the nearest harness process: a pid borrowed from an outer
 // session is worse than none.

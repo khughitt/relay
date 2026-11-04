@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { relayError } from '../protocol.js';
 import { ensurePrivateDir, checkPrivate } from '../bus/store.js';
 import { validateEntry, isTerminal, applySuperseded } from './lifecycle.js';
-// The inbox's durable store (spec §6). relay serve is its only writer. Each change allocates a
+// The inbox's durable store (docs/questions.md, "Messages and entries" and "Lifecycle"). relay serve is its only writer. Each change allocates a
 // sequence number, writes seq, then the entry; both writes are fsynced files renamed into place
 // followed by a directory fsync.
 export const RETENTION_MS = 30 * 24 * 3600 * 1000;
@@ -46,7 +46,7 @@ export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
   const p = inboxPaths(stateDir);
   for (const dir of [stateDir, p.root, p.entriesDir, p.rejectedDir]) await ensurePrivateDir(dir, { io });
   // Publish every directory link relay may have created, including links from service startup or a
-  // failed prior load (ruling F35, refined). Relay creates directories only as the current uid and only
+  // failed prior load (docs/questions.md, "Lifecycle"). Relay creates directories only as the current uid and only
   // where that uid can write, so an ancestor is synced exactly when its child on the chain is owned by
   // this uid and the ancestor is writable by it. Any other ancestor holds no relay link and is never
   // opened, so another user's 0711 directory cannot stop startup. The state and inbox dirs are relay's.
@@ -106,7 +106,7 @@ export async function loadStore(stateDir, { io = fs, now = Date.now() } = {}) {
   // Preserve recovery's high-water mark even if pruning removes every retained entry.
   if (start > persisted) await writeDurable(p.seqPath, `${start}\n`, { io });
   const store = makeStore(p, entries, start, io);
-  // Supersession reconciliation (spec §5.5): finish an interrupted replacement before any request.
+  // Supersession reconciliation (docs/questions.md, "Lifecycle"): finish an interrupted replacement before any request.
   for (const n of store.all()) {
     const x = n.kind === 'question' && !isTerminal(n) ? n.question.body.supersedes : null;
     if (x === null) continue;
@@ -141,7 +141,7 @@ function makeStore(p, entries, start, io) {
     all: () => [...entries.values()].sort((a, b) => a.seq - b.seq),
     seq: () => committed,
     put,
-    // Fixed order (spec §5.5): the replacement first, then the predecessor's withdrawal.
+    // Fixed order (docs/questions.md, "Lifecycle"): the replacement first, then the predecessor's withdrawal.
     /** @param {import("../types.js").QuestionEntry} replacement @param {import("../types.js").QuestionEntry} withdrawnPredecessor */
     async supersede(replacement, withdrawnPredecessor) { const n = await put(replacement); const x = await put(withdrawnPredecessor); return [n, x]; },
     /** @param {number} now */

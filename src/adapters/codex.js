@@ -38,7 +38,7 @@ export const outerTimeouts = Object.freeze({ default: 600000, SessionEnd: 1000, 
 /** @param {string} nativeEvent @param {import("../types.js").Reply} reply */
 export const encodeReply = (nativeEvent, reply) => encodeStandardReply(nativeEvent, reply, replies[nativeEvent]);
 // A worker's hooks carry the root's session_id and the worker's own agent_id (its thread id);
-// no root hook carries agent_id. Spec: docs/specs/2026-10-15-codex-worker-rows.md.
+// no root hook carries agent_id. See docs/adapters.md ("Event mappings").
 const SUBAGENT_EVENTS = Object.freeze(['SubagentStart', 'SubagentStop']);
 /** @param {Record<string, any>} data @param {string} nativeEvent @returns {string|null} */
 export function workerIdOf(data, nativeEvent) {

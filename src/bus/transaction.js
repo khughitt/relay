@@ -17,7 +17,7 @@ function options(given) {
 // Schema 1 published the terminal owner's pid; schema 2 publishes the session's own process.
 // A schema-1 row can hold a handle borrowed from another session, and which of two rows sharing
 // a handle is rightful cannot be told, so its rows are dropped rather than migrated. Spec:
-// docs/specs/2026-09-23-session-process-handle.md, "Rollout and recovery".
+// docs/registry.md, "Schema-1 supersession".
 const SUPERSEDED_MESSAGE = 'registry predates session handles; run relay reap or wait for any hook event';
 /** @param {any} value */
 const isSchemaOne = (value) => value !== null && typeof value === 'object' && !Array.isArray(value) && value.schema === 1;

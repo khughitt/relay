@@ -1,6 +1,6 @@
 // @ts-check
 // Codex's private rollout layout, read only. Observed on Codex 0.162.1 and 0.163.0; not a
-// documented contract. Spec: docs/specs/2026-10-17-codex-model-resolver.md, "Resolution" steps 4-8.
+// documented contract. See docs/adapters.md ("Codex model resolution", steps 4-8).
 import { readdirSync, openSync, readSync, fstatSync, closeSync } from 'node:fs';
 import { join, isAbsolute } from 'node:path';
 import { relayError } from '../protocol.js';

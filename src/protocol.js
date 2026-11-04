@@ -43,7 +43,7 @@ function identity(v, id) {
       || !absolute(v.cwd)) fail('invalid agent identity');
 }
 // A Codex worker names its root session's agent id; nothing else carries a root.
-// Spec: docs/specs/2026-10-15-codex-worker-rows.md.
+// See docs/adapters.md ("Event mappings").
 /** @param {unknown} root @param {string} id */
 const rootOf = (root, id) => text(root) && root.startsWith('codex:') && text(root.slice('codex:'.length)) && root !== id;
 /** @param {unknown} v @param {string} key @returns {import("./types.js").Agent} */

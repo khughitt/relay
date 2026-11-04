@@ -1,12 +1,12 @@
 // @ts-check
 // Which model a Codex tool call's turn runs, read from the thread's own rollout.
-// Spec: docs/specs/2026-10-17-codex-model-resolver.md ("Resolution" steps 1-10).
+// See docs/adapters.md ("Codex model resolution", steps 1-10).
 import { relayError } from '../protocol.js';
 import { createProcessOps } from '../bus/proc.js';
 import { nearestHarness } from './index.js';
 import { UUID_V7, SCAN_LIMIT, storeRoot, listDir, locateRollout, firstRecord, lastTurnContext, turnFields } from './codex-rollout.js';
 
-/** The wall clock may move this much against the boot clock (spec "Clock requirement"). */
+/** The wall clock may move this much against the boot clock (docs/registry.md, "Start-time interval"). */
 export const CLOCK_ALLOWANCE_MS = 1000;
 
 /** @typedef {{verified: boolean, agent: string, harness: 'codex', model: string|null, effort: string|null, thread: string|null, rollout: string|null, reason: string|null}} ModelAnswer */

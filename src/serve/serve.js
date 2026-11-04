@@ -14,7 +14,7 @@ import { serveHttp } from './http.js';
 import { readSnapshot } from '../bus/transaction.js';
 import {validateEvidence} from './codex/evidence.js';
 import {openCodexConnector} from './codex/connector.js';
-// relay serve (spec §7.1): holds the registry's lock primitive on serve.lock for its whole life,
+// relay serve (docs/questions.md, "Local socket protocol"): holds the registry's lock primitive on serve.lock for its whole life,
 // so a second instance fails and a dead holder's lock is reclaimed by the reviewed path.
 /** @param {string} stateDir */
 export function servePaths(stateDir) { return { socketPath: join(stateDir, 'serve.sock'), lockPath: join(stateDir, 'serve.lock') }; }

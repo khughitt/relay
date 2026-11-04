@@ -137,7 +137,7 @@ test('service startup publishes precreated nested ancestors and refuses a failed
   await assert.rejects(fs.access(join(stateDir, 'serve.lock')), { code: 'ENOENT' });
 });
 
-// Spec §5.3: expiry is checked on a timer. A running service, with no sweep() and no restart, must
+// docs/questions.md ("Lifecycle"): expiry is checked on a timer. A running service, with no sweep() and no restart, must
 // move each entry on at its deadline and send its waiter the state line. The service runs with an
 // injected clock; when an entry reaches a watched state, onCommit (which runs before the service
 // re-arms its timer) jumps the clock to LEAD ms before that entry's deadline, so the service's own

@@ -64,9 +64,9 @@ test('defer: release with handback, desktop presentation without', () => {
   const { q, a, e } = answered();
   assert.deepEqual(refused(L.applyDefer(e, deferMessage(q), T), 'ALREADY_ANSWERED').error.answer, a);
 });
-// Spec §5.2, one row per (state, event): the entry is unchanged and the sender gets the code, with
+// docs/questions.md ("Lifecycle"), one row per (state, event): the entry is unchanged and the sender gets the code, with
 // the winning answer wherever one is saved.
-test('§5.2: every answer-holding state refuses another answerId, a defer and a withdrawal, returning the winner', () => {
+test('lifecycle: every answer-holding state refuses another answerId, a defer and a withdrawal, returning the winner', () => {
   const { q, a, e } = answered(), h = step(L.applyHanded(e, HANDLE, T));
   const states = {
     answered: e,
@@ -90,7 +90,7 @@ test('§5.2: every answer-holding state refuses another answerId, a defer and a 
     }
   }
 });
-test('§5.2: released, withdrawn and expired refuse an answer and a defer, naming the closure', () => {
+test('lifecycle: released, withdrawn and expired refuse an answer and a defer, naming the closure', () => {
   const closures = {
     released: ({ q, e }) => step(L.applyDefer(e, deferMessage(q), T)),
     withdrawn: ({ q, e }) => step(L.applyWithdraw(e, withdrawalMessage(q), T)),

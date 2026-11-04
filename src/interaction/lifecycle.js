@@ -4,7 +4,7 @@ import {validateOwner} from '../serve/codex/owner.js';
 import {parseAnswers,nativeAnswers as codexAnswers} from '../routes/codex.js';
 import { relayError, validateHandle } from '../protocol.js';
 import { checkAnswer, isUuid, validateMessage, LOCAL_SURFACES, WITHDRAWAL_REASONS } from './message.js';
-// The question lifecycle as pure functions (spec §5). Each returns { entry, changed, error };
+// The question lifecycle as pure functions (docs/questions.md, "Lifecycle"). Each returns { entry, changed, error };
 // new log rows carry seq: null, which the store stamps when it persists the entry.
 export const CONFIRM_WINDOW_MS = 60000;
 export const QUESTION_STATES = Object.freeze(['pending', 'answered', 'handed', 'consumed', 'unconfirmed', 'undeliverable', 'released', 'withdrawn', 'expired']);

@@ -64,7 +64,7 @@ test('two pending permissions need two replies — permission ids are tracked in
 });
 
 // NO DEDUPLICATION. The window reports the level it is at, every time it is asked. It is not the
-// window's job to notice that the level has not changed -- see the spec, §5: a plugin that
+// window's job to notice that the level has not changed -- see docs/adapters.md ("Event mappings"): a plugin that
 // deduplicates leaves the window lying in `error` for a full TTL when opencode hits a context
 // overflow, publishes the error, and STAYS BUSY.
 test('the same level folded twice is the same level twice — the window never deduplicates', () => {

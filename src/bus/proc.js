@@ -202,8 +202,8 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     if (row.starttime !== handle.start) return verdict('dead', 'process replaced');
     return verdict('alive', 'qualified process matches');
   };
-  // Read for one process at a time, only when an adapter's rule needs it (spec: "Recognizing a
-  // harness process" and "Non-session roles"). The kernel suffixes the exe link of a binary
+  // Read for one process at a time, only when an adapter's rule needs it (docs/adapters.md,
+  // "Session process handle and ancestry"). The kernel suffixes the exe link of a binary
   // replaced on disk, which a Claude Code auto-update does to every running session.
   const DELETED = ' (deleted)';
   /** @param {number} pid @param {import("../types.js").Deadline} [options] */
@@ -242,8 +242,7 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
     const rest = line.slice(argv0.length).trim();
     return rest ? [argv0, ...rest.split(/\s+/)] : [argv0];
   };
-  // A start as a wall-clock interval (spec docs/specs/2026-10-17-codex-model-resolver.md,
-  // "Start-time interval"). Linux keeps a start only on the boot clock, in USER_HZ (100) ticks;
+  // A start as a wall-clock interval (docs/registry.md, "Start-time interval"). Linux keeps a start only on the boot clock, in USER_HZ (100) ticks;
   // one uptime sample bracketed by two wall-clock reads places it however long a pause lasts.
   // Darwin's lstart is the recorded wall-clock start, truncated to the second.
   /** @param {import("../types.js").ProcessRow} row @returns {{lo: number, hi: number}} */

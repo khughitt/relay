@@ -1,0 +1,30 @@
+# What this project is. `tools/ops-docs write` renders it into the identity region of
+# README.md and AGENTS.md; `tools/ops-docs check` refuses a commit while they differ.
+# Design: ops docs/specs/2026-09-22-project-guides-design.md §3.
+name = "relay"
+aliases = []
+# At most 80 characters: this line sits in every agent session in every project.
+purpose = "Harness adapters, hook dispatch, and a host-local live-agent registry"
+# One to three sentences, at most 400 characters: what it does and for whom.
+abstract = """
+Relay normalizes lifecycle and tool-hook events from Claude Code, Codex, OpenCode,
+and Antigravity into a host-local live-agent registry, dispatches synchronous guards
+and asynchronous observers, and serves a durable question inbox for away-from-desk
+decisions.
+"""
+# Documents that are the authority for what is built or decided; each must be tracked.
+authority = ["docs/api.md", "docs/registry.md", "docs/adapters.md", "docs/questions.md"]
+# Directories with their own identity.toml, README.md, and AGENTS.md.
+subsystems = []
+
+[documents]
+standard = 1
+references = [
+  "docs/runbooks/answer-route-probes.md",
+  "docs/runbooks/codex-question-reproof.md",
+  "docs/runbooks/darwin-probe.md",
+  "docs/runbooks/hook-install-rollback.md",
+  "docs/runbooks/inbox-service.md",
+  "docs/runbooks/registry-lock-repair.md",
+  "docs/runbooks/release.md",
+]

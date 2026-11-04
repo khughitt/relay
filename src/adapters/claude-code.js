@@ -20,7 +20,7 @@ export function stateForEvent(event) {
   if (!Object.hasOwn(events, event)) throw relayError('UNSUPPORTED_EVENT', 'unsupported harness event');
   return events[event].level;
 }
-// Spec docs/specs/2026-10-19-claude-background-work.md, Reduction: agents hand work
+// See docs/adapters.md ("Event mappings"): agents hand work
 // back to the session; a shell wait is idle rather than a request for user input.
 /** @type {import("../types.js").Adapter["reduceState"]} */
 export function reduceState(level, _previous, { background } = {}) {
@@ -28,7 +28,7 @@ export function reduceState(level, _previous, { background } = {}) {
   if (level === 'needs-input' && (background?.other ?? 0) > 0) return 'idle';
   return level;
 }
-// Spec docs/specs/2026-10-19-claude-background-work.md: Claude Code 2.1.302 label map.
+// See docs/adapters.md ("Event mappings"): Claude Code 2.1.302 label map.
 const AGENT_TYPES = new Set(['subagent', 'workflow', 'teammate', 'cloud session']);
 const IN_FLIGHT = new Set(['running', 'pending']);
 /** @param {Record<string, any>} data @param {string} nativeEvent @returns {import("../types.js").Background|null|undefined} */

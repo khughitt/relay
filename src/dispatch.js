@@ -19,7 +19,7 @@ const refusalReason = (error) => {
 /** @param {string[]} list */
 const lines = (list) => list.map((line) => `${line}\n`).join('');
 
-// R1's filesystem operations do not consult the deadline. This races a unit of work against
+// Filesystem operations (lock, read/write agents.json, rename) do not consult the deadline. This races a unit of work against
 // the remaining budget; the work itself is left to finish or fail on its own.
 /** @template T @param {() => Promise<T>} thunk @param {{clock: () => number, deadline: number}} timing @param {string} message @returns {Promise<T>} */
 export function bounded(thunk, { clock, deadline }, message) {

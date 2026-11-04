@@ -99,7 +99,7 @@ export async function withLock(lockPath, fn, { clock = performance.now.bind(perf
     try {
       // Probe, then confirm the token is unchanged: its holder may have released it, and a new
       // writer taken the lock, while the probe ran. Once the holder is dead, only a guard holder
-      // can change a file that still holds its token (docs/specs/2026-09-25-lock-reclamation-order.md).
+      // can change a file that still holds its token (docs/registry.md, "Lock protocol and stale-lock reclamation").
       const current = await readToken(lockPath,io);
       if (current && observe(current.holder) === 'dead'
           && isDeepStrictEqual(await readToken(lockPath,io),current)) await io.unlink(lockPath);

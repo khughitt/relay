@@ -18,7 +18,17 @@ assert.deepEqual(Object.keys(relay).sort(), EXPORTS);
 const packageRoot = new URL('../', import.meta.resolve('relay'));
 const messageSchema = JSON.parse(await readFile(new URL('schemas/interaction/message.schema.json', packageRoot), 'utf8'));
 assert.equal(messageSchema.$schema, 'https://json-schema.org/draft/2020-12/schema');
-assert.ok((await readFile(new URL('docs/runbooks/inbox-service.md', packageRoot), 'utf8')).length > 0);
+for (const docPath of [
+  'docs/api.md',
+  'docs/registry.md',
+  'docs/adapters.md',
+  'docs/questions.md',
+  'docs/runbooks/inbox-service.md',
+  'docs/runbooks/registry-lock-repair.md',
+  'docs/evidence/codex-question-0.166.0.json',
+]) {
+  assert.ok((await readFile(new URL(docPath, packageRoot), 'utf8')).length > 0, docPath);
+}
 assert.deepEqual(Object.keys(plugin), ['Relay']); assert.equal(plugin.Relay.constructor.name, 'AsyncFunction');
 const corpus = JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixtures/handles.json')), 'utf8'));
 assert.equal(corpus.schema, 1); assert.ok(corpus.starts.some(c => c.expected === '9007199254740993'));

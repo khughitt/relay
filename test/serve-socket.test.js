@@ -109,7 +109,7 @@ test('watch replays since a seq and then pushes changes and presence', async (t)
   await watcher.request('presence.get'); // its reply follows every push the service sent before it
   assert.deepEqual(pushes.map((m) => m.type), ['presence', 'entry']);
 });
-// Spec §7.2: a watch resumes after its cursor. The cursor must exclude a non-terminal entry (kept)
+// docs/questions.md ("Local socket protocol"): a watch resumes after its cursor. The cursor must exclude a non-terminal entry (kept)
 // and a terminal one (closed), each last changed at or before it; the replay is exactly the newer
 // entries in order, pushed before the watch reply, and live changes follow.
 test('watch resumes after its cursor, replaying exactly the newer entries before live ones', async (t) => {

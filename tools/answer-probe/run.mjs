@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Live probes for the Claude terminal question route (spec §2 P1-P3, §11). Usage:
+// Live probes for the Claude terminal question route (see docs/runbooks/answer-route-probes.md and docs/questions.md). Usage:
 //   node tools/answer-probe/run.mjs --out DIR [--only NAME]
 // Each scenario starts an interactive Claude session in a private tmux server with a scratch
 // --settings file, records hook events and pane captures under DIR/<scenario>/, and prints a

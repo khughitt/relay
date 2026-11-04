@@ -1,4 +1,4 @@
-// Pure verdicts over the results contract (docs/plans/2026-09-25-darwin-probe.md). Every rule
+// Pure verdicts over the results contract (docs/runbooks/darwin-probe.md). Every rule
 // reads recorded observations only; nothing here touches the filesystem or a process.
 export const RELEASE = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D8'];
 const SESSIONEND_BUDGET_MS = 3000;

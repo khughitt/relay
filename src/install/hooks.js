@@ -100,11 +100,11 @@ export function planHooks({ text, harness, relayBin, subscribersPath, nodeBin = 
   return output;
 }
 
-// The ask route (spec §9.1, §11): its own entries, gated on route evidence, not on the
+// The ask route (docs/questions.md, "Claude Code question route"): its own entries, gated on route evidence, not on the
 // event/reply probes the dispatch bindings use.
 export const ROUTE_EVIDENCE = Object.freeze(['answer-hook-terminal', 'answer-hook-deny-stops', 'answer-release-native', 'answer-receipt-observed', 'answer-hook-under-denial']);
 export const ROUTE_EVENTS = Object.freeze(['PreToolUse', 'PostToolUse']);
-// Route evidence holds only for the harness version it was probed on (spec §11): after an
+// Route evidence holds only for the harness version it was probed on (docs/questions.md, "Claude Code question route"): after an
 // upgrade the probes run again before the route is installed.
 /** @param {string} harness @param {import("../types.js").Evidence|null} evidence @param {string|undefined} installedVersion @returns {import("../types.js").Binding[]} */
 export function routeBindings(harness, evidence, installedVersion) {

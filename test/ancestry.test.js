@@ -66,7 +66,7 @@ test('the hook itself is never the session, even when it is a harness process', 
   }
 });
 
-// Spec docs/specs/2026-10-17-codex-model-resolver.md, "Resolution" step 3.
+// docs/adapters.md ("Codex model resolution", step 3).
 const hrow = (pid, comm) => ({ pid, ppid: pid - 1, comm, tty: null, starttime: '1', state: 'S' });
 const noExecutable = { executableOf: () => { throw new Error('executable must not be read'); } };
 test('nearestHarness finds the nearest harness of any kind and never the caller itself', () => {

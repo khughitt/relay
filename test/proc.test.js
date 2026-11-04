@@ -234,7 +234,7 @@ test('real local process exposes its own executable and arguments', () => {
   assert.equal(ops.argvOf(process.pid)[0], process.argv0);
 });
 
-// Spec docs/specs/2026-10-17-codex-model-resolver.md, "Start-time interval".
+// docs/registry.md ("Start-time interval").
 const BOOT = 1_800_000_000_000;
 const linuxClock = ({ uptimeMs, wall }) => {
   const reads = [...wall];

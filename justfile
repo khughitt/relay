@@ -26,9 +26,9 @@ tt := "python3 tools/tt"
 fast_cmd := "npm test"
 test_cmd := "npm test"
 one_cmd := "node --test"
-check_hygiene_cmd := "python3 tools/ops-check && tasks check"
+check_hygiene_cmd := "python3 tools/ops-check && python3 tools/ops-docs check && tasks check"
 check_code_cmd := "npx --no-install tsc --noEmit"
-ci_hygiene_cmd := "python3 tools/ops-check"
+ci_hygiene_cmd := "python3 tools/ops-check && python3 tools/ops-docs check"
 
 # The prepared workflow covers every branch, including names containing slashes.
 ci_remote := "origin"
@@ -72,6 +72,10 @@ check-hygiene:
 ci-check-hygiene:
     {{tt}} ci-check-hygiene -- sh -c '{{ci_hygiene_cmd}}'
 
+# Regenerate identity and family regions in README.md and AGENTS.md from identity.toml.
+docs:
+    {{tt}} docs -- python3 tools/ops-docs write
+
 check-code:
     {{tt}} check-code -- sh -c '{{check_code_cmd}}'
 
@@ -108,7 +112,7 @@ hook-pre-push-fast:
     just check-code
     just test-fast
 
-# Build the Darwin probe bundle from clean relay and ops checkouts (docs/specs/2026-09-25-darwin-probe.md).
+# Build the Darwin probe bundle from clean relay and ops checkouts (docs/runbooks/darwin-probe.md).
 darwin-bundle ops:
     node tools/darwin-probe/bundle.mjs --ops {{ops}}
 

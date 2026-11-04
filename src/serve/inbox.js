@@ -8,11 +8,11 @@ import { loadStore, writeDurable } from '../interaction/store.js';
 import * as L from '../interaction/lifecycle.js';
 import { expiryLimit } from '../routes/index.js';
 import {validateOwner} from './codex/owner.js';
-// The service's inbox (spec §5-§6, §8): every operation runs one at a time on a promise chain,
+// The service's inbox (docs/questions.md, "Lifecycle" and "HTTP protocol and guard"): every operation runs one at a time on a promise chain,
 // the clock is applied to an entry before any write to it, and listeners hear each persisted
 // change after the store has it.
 const MODES = ['here', 'away'];
-// Spec §5.4: an asker's own expiry is lowered to createdAt plus its route's maximum. The clamp
+// docs/questions.md ("Local socket protocol"): an asker's own expiry is lowered to createdAt plus its route's maximum. The clamp
 // depends on the message alone, so an identical resend clamps to the stored question and reattaches.
 /** @param {import("../types.js").QuestionMessage} message */
 function bounded(message) {
