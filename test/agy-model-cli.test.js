@@ -68,6 +68,15 @@ test('agy subagent model is verified while absent effort is explicit', { skip: L
   assert.equal(result.stderr, `relay: effort not recorded: generation 0 of conversation ${conversation} carries no effort label\n`);
 });
 
+test('agy refuses to stamp a BOM-prefixed recorded model through the CLI', { skip: LINUX }, (t) => {
+  const { env } = fixture(t, { model: '\uFEFFgemini-4-argon' });
+  const result = run(harnessParent(t, 'agy'), ['model', '--harness', 'agy', '--json'], env);
+  assert.equal(result.status, 0);
+  const answer = JSON.parse(result.stdout);
+  assert.deepEqual([answer.verified, answer.reason, answer.agent, answer.model], [false, 'unstampable', 'agy', null]);
+  assert.equal(result.stderr, '');
+});
+
 test('no agy conversation prints a bare stamp and an explicit unverified reason', (t) => {
   const env = cleanEnv(t);
   const result = spawnSync(process.execPath, [BIN, 'model', '--harness', 'agy', '--pretty'], { encoding: 'utf8', env });

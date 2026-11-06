@@ -139,6 +139,12 @@ test('missing model decides before a trajectory mismatch', async (t) => {
   assert.equal((await resolve(env)).answer.reason, 'no-model');
 });
 
+test('a BOM-prefixed recorded model is unstampable', async (t) => {
+  const { env } = fixture(t, [generation({ model: '\uFEFFgemini-4-argon' })]);
+  const { answer } = await resolve(env);
+  assert.deepEqual([answer.verified, answer.reason, answer.agent, answer.model], [false, 'unstampable', 'agy', null]);
+});
+
 test('unset trajectory does not compare the generation trajectory', async (t) => {
   const { appData } = fixture(t, [generation({ trajectory: 'different' })]);
   const result = await resolve({ ANTIGRAVITY_CONVERSATION_ID: conversation, ANTIGRAVITY_SOURCE_METADATA: metadata(), ANTIGRAVITY_APP_DATA_DIR: appData });

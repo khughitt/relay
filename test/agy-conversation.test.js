@@ -38,6 +38,24 @@ test('generationOf requires a message and a decimal last_step_index', () => {
   }
 });
 
+test('generationOf preserves leading BOM content in recorded strings', () => {
+  const record = generationOf(0, generation(1, { model: '\uFEFFgemini-4-argon', label: '\uFEFFGemini 4 Argon (High)',
+    cascade: `\uFEFF${conversation}`, trajectory: '\uFEFFtrajectory' }));
+  assert.deepEqual(record, { idx: 0, model: '\uFEFFgemini-4-argon', label: '\uFEFFGemini 4 Argon (High)',
+    lastStep: 1, cascade: `\uFEFF${conversation}`, trajectory: '\uFEFFtrajectory' });
+});
+
+test('generationOf does not normalize BOM-prefixed metadata keys or decimal values', () => {
+  const key = Buffer.from('\uFEFFlast_step_index');
+  const extra = Uint8Array.from([162, 1, key.length + 5, 10, key.length, ...key, 18, 1, 49]);
+  assert.throws(() => generationOf(0, generation(undefined, { extra })), { code: 'INVALID_RECORD' });
+  assert.throws(() => generationOf(0, generation('\uFEFF1')), { code: 'INVALID_RECORD' });
+});
+
+test('generationOf still rejects malformed UTF-8 in recorded strings', () => {
+  assert.throws(() => generationOf(0, generation(1, { extra: Uint8Array.of(154, 1, 1, 255) })), { code: 'INVALID_RECORD' });
+});
+
 test('issuingGeneration selects by step strictly below the call step', async (t) => {
   const { appData, database } = agyStore(t, { conversation, rows: [generation(1), generation(4), generation(6), generation(8, { model: undefined })] });
   assert.equal(conversationDatabase(appData, conversation), database);
@@ -48,6 +66,11 @@ test('issuingGeneration selects by step strictly below the call step', async (t)
 
 test('issuingGeneration rejects a decoded row belonging to another conversation', async (t) => {
   const { database } = agyStore(t, { conversation, rows: [generation(1), generation(4, { cascade: 'other' })] });
+  await assert.rejects(read(database, 3), { code: 'INVALID_RECORD' });
+});
+
+test('issuingGeneration rejects a BOM-prefixed cascade rather than comparing it equal', async (t) => {
+  const { database } = agyStore(t, { conversation, rows: [generation(1, { cascade: `\uFEFF${conversation}` })] });
   await assert.rejects(read(database, 3), { code: 'INVALID_RECORD' });
 });
 

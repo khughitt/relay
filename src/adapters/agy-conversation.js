@@ -45,7 +45,7 @@ export function generationOf(idx, blob) {
   const result = { idx, model: null, label: null, lastStep: 0, cascade: null, trajectory: null };
   /** @type {string|null} */
   let lastStep = null;
-  const decoder = new TextDecoder('utf-8', { fatal: true });
+  const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
   /** @param {Uint8Array} bytes */
   const text = (bytes) => {
     try { return decoder.decode(bytes); }
