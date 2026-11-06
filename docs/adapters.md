@@ -2,7 +2,7 @@
 
 Type: data model, protocol; document types 1.
 
-`relay` normalizes native hook payloads from Claude Code, Codex, OpenCode, and `agy` into a schema-1 transient `Event`, resolves the owning session process handle from the OS process tree, dispatches guards and observers within a bounded budget (`relay hook`), and resolves verified Codex turn models from rollout logs (`relay model --harness codex`). See [api.md](api.md) for package exports and [registry.md](registry.md) for `$STATE/agents.json` publication rules.
+`relay` normalizes native hook payloads from Claude Code, Codex, OpenCode, and `agy` into a schema-1 transient `Event`, resolves the owning session process handle from the OS process tree, dispatches guards and observers within a bounded budget (`relay hook`), and resolves verified Codex and agy call models and effort from harness records (`relay model --harness codex|agy`). See [api.md](api.md) for package exports and [registry.md](registry.md) for `$STATE/agents.json` publication rules.
 
 ## Transient event contract
 
@@ -101,14 +101,46 @@ Root retirement and worker lifecycle under shared process handles (`src/bus/tran
 - Ordinary root events (`UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `Stop`) always upsert, so a missing or handle-less `SessionStart` can recover proof on a later event, and a retired live root returns on its next event.
 - Retirement assumes **one active root at a time**, as in the captured TUI launches (where `/new`, `/resume`, and `/fork` keep the replaced root open in the same process). Daemon-hosted sessions sharing one process are unverified; if concurrent roots share a handle, each root `SessionStart` retires the others' rows while unfinished workers survive, a retired live root returns on its next event, and its workers' `SubagentStop` removes their rows meanwhile.
 
-## Codex model resolution
+## Model resolution
+
+Model stamps follow one whitespace-free grammar:
+
+```abnf
+stamp   = harness [ "/" model [ "@" effort ] ]
+harness = "claude-code" | "codex" | "agy" | "opencode"
+model   = 1*( %x21-3F / %x41-7E ) ; printable, no space, no "@"
+effort  = 1*( %x61-7A / DIGIT / "-" ) ; lowercase
+```
+
+The harness ends at the first `/`; model ids may contain `/` or `:`. An empty effort string counts as no effort. A model or effort outside the grammar produces an unverified answer with reason `unstampable`. agy's harness name is `agy`, never `antigravity`.
+
+| Harness | Model | Effort | Source | Binding to the call |
+| --- | --- | --- | --- | --- |
+| `codex` | verified | when the turn records it | rollout `turn_context` (`payload.model`, `payload.effort`) | call process start after the turn's record |
+| `agy` | verified | when the generation carries a label with an effort; absent for subagents (probed) | conversation database `gen_metadata` | the generation that issued the call's step |
+| `claude-code` | from ops's provenance hook (`hooks/claude-provenance`, `TASKS_AGENT`), not through relay | not stamped today | SessionStart and PostModelSwitch payloads | none; follow-up |
+| `opencode`, pi | not assessed | not assessed | none | none |
+
+`relay model --harness codex|agy` prints the stamp alone on stdout in pretty mode (the default). Capture with `$(relay model --harness agy --pretty)` (or `codex`) so `RELAY_FORMAT` cannot switch the format. `--json` prints one object with keys in this order:
+
+```json
+{"verified":true,"agent":"agy/gemini-4-argon@high","harness":"agy","model":"gemini-4-argon","effort":"high","effortReason":null,"reason":null,"source":{"conversation":"<id>","step":3,"generation":0,"database":"<path>","label":"Gemini 4 Argon (High)"}}
+{"verified":true,"agent":"agy/gemini-3.8-flash-tiered","harness":"agy","model":"gemini-3.8-flash-tiered","effort":null,"effortReason":"not-recorded","reason":null,"source":{"conversation":"<id>","step":3,"generation":0,"database":"<path>","label":null}}
+{"verified":false,"agent":"agy","harness":"agy","model":null,"effort":null,"effortReason":null,"reason":"no-conversation","source":{}}
+```
+
+`verified` means the model was read and bound to the call. An unverified answer has the bare harness as `agent`, null `model`, `effort` and `effortReason`, and a `reason`. A verified answer without recorded effort has `effortReason: "not-recorded"`; otherwise `effortReason` is null. `source` holds the harness's locators as far as resolution reached. Pretty mode emits `relay: model unverified (<reason>): <detail>` or, for a verified model without effort, `relay: effort not recorded: <detail>` on stderr. JSON mode includes the gap in the answer without a relay stderr line.
+
+Verified and unverified answers exit `0`; failures exit `1` with kind `model_failed`; usage errors exit `2`. OpenCode and pi model resolution are not supported. A caller that needs a model stamp treats exit `1` or a timeout beyond 2 s like an unverified answer.
+
+### Codex
 
 `relay model --harness codex` (`src/adapters/codex-model.js`, `src/adapters/codex-rollout.js`) reports which model a process running inside a Codex tool call is executing. It reads `CODEX_THREAD_ID`, locates `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*-<thread>.jsonl` (`$HOME/.codex` when `CODEX_HOME` is unset), verifies the opening `session_meta` line and the caller's nearest `codex` ancestor start-time interval, and reads the last `turn_context` within the final 64 MiB.
 
-`--pretty` (the default) prints `codex/<model>` when verified, else `codex` with `relay: model unverified (<reason>): <detail>` on stderr. Capture it with `$(relay model --harness codex --pretty)` so `RELAY_FORMAT` cannot switch the format. `--json` prints one object:
+The stamp includes `@<effort>` when `turn_context.payload.effort` is a nonempty string. Otherwise effort is absent with `effortReason: "not-recorded"`. The thread and rollout locators are under `source`:
 
 ```json
-{"verified":true,"agent":"codex/gpt-6.1-sol","harness":"codex","model":"gpt-6.1-sol","effort":"high","thread":"<id>","rollout":"<path>","reason":null}
+{"verified":true,"agent":"codex/gpt-6.1-sol@high","harness":"codex","model":"gpt-6.1-sol","effort":"high","effortReason":null,"reason":null,"source":{"thread":"<id>","rollout":"<path>"}}
 ```
 
 | `reason` | When unverified |
@@ -121,10 +153,34 @@ Root retirement and worker lifecycle under shared process handles (`src/bus/tran
 | `scan-limit` | No `turn_context` appears within the last 64 MiB of the rollout file. |
 | `earlier-turn` | The call process started before the latest turn's `turn_context` timestamp. |
 | `turn-boundary` | The call process start interval is within 1 s of the `turn_context` timestamp and cannot be ordered deterministically. |
+| `unstampable` | The recorded model or effort is outside the stamp grammar. |
 
-Every verified or unverified answer exits `0`. Hard failures exit `1` with kind `model_failed` and code `INVALID_INPUT` (thread ID not a lowercase UUIDv7), `INVALID_CONFIG` (relative `CODEX_HOME` or missing `HOME`), `IO_ERROR`, `PROCESS_UNREADABLE`, or `INVALID_ROLLOUT` (missing opening `session_meta`, corrupt JSON line in the scanned range, or malformed `turn_context`). A caller that needs a model stamp treats exit `1` or a timeout beyond 2 s like an unverified answer.
+Hard failures use code `INVALID_INPUT` (thread ID not a lowercase UUIDv7), `INVALID_CONFIG` (relative `CODEX_HOME` or missing `HOME`), `IO_ERROR`, `PROCESS_UNREADABLE`, or `INVALID_ROLLOUT` (missing opening `session_meta`, corrupt JSON line in the scanned range, or malformed `turn_context`).
 
 **Clock requirement:** A caller is verified only while its call process's start interval less 1 s lies after the latest `turn_context` timestamp. Between the call process's start and the `relay model` invocation, the wall clock must move by less than 1 s against the boot clock.
+
+### agy
+
+`relay model --harness agy` (`src/adapters/agy-model.js`, `src/adapters/agy-conversation.js`) reads `ANTIGRAVITY_CONVERSATION_ID` (a lowercase UUID), `ANTIGRAVITY_SOURCE_METADATA` (JSON whose `tool.conversationId` matches and whose `tool.stepIndex` is an integer ≥ 0), `ANTIGRAVITY_APP_DATA_DIR` (absolute), and optionally `ANTIGRAVITY_TRAJECTORY_ID`. The nearest recognised harness ancestor must be `agy`, including PID 1.
+
+The resolver opens `<app-data>/conversations/<conversationId>.db` read-only and reads `gen_metadata` newest first. It chooses the first generation whose `last_step_index` is strictly below the command's `stepIndex`, skipping later generations. This **issuing generation** binds the model to the command's step: a background command continues reporting the generation that started it after a later model switch. Each decoded row must have valid protobuf, a decimal `last_step_index`, and its own conversation as `cascade_id`; decoding stops at the issuing generation. A subagent uses its own conversation, even when its `root_cascade_id` names its parent.
+
+The model comes from the issuing generation's field 19; effort comes from its display label (field 21) ending in a single ` (<letters>)` suffix, lowercased. A matching trailing `-<effort>` is removed from the model id (`claude-sonnet-5-5-low` → `agy/claude-sonnet-5-5@low`). Subagents such as `gemini-3.8-flash-tiered` carry no effort label. The newest row's request variant is unused because older generations may no longer carry it. These fields are agy-private layout, observed with agy cli-1.5.2; layout drift can cause refusal or failure.
+
+| `reason` | When unverified |
+| --- | --- |
+| `no-conversation` | `ANTIGRAVITY_CONVERSATION_ID` is unset or empty (including hooks and processes outside agy). |
+| `not-under-agy` | The nearest recognised harness ancestor is not `agy`, or there is none. |
+| `no-step` | `ANTIGRAVITY_SOURCE_METADATA` is unset or empty. |
+| `no-conversation-record` | The conversation database is missing. |
+| `no-generation` | No generation has `last_step_index` below the call's step. |
+| `trajectory-mismatch` | A supplied trajectory differs from the issuing generation's trajectory. |
+| `no-model` | The issuing generation carries no model. |
+| `unstampable` | The recorded model or effort is outside the stamp grammar. |
+
+Hard failures use `INVALID_INPUT` (invalid conversation UUID or source metadata), `INVALID_CONFIG` (missing, empty or relative app-data directory), `IO_ERROR` (database open/query error), `PROCESS_UNREADABLE` (unreadable ancestry), `INVALID_RECORD` (invalid protobuf or row metadata), or `UNSUPPORTED_RUNTIME` (SQLite unavailable).
+
+relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Codex and other commands do not require it. Node 22.0–22.12 need SQLite support enabled where available (`--experimental-sqlite` from 22.5); without it, agy reports `UNSUPPORTED_RUNTIME`, naming the running version and the unflagged minimum, 22.13. Node 22 may emit its standard SQLite `ExperimentalWarning` on stderr, including in JSON mode; relay does not suppress runtime diagnostics.
 
 ## Hook dispatch
 

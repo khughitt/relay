@@ -113,7 +113,7 @@ Registry, hook dispatch, installation, and model commands:
 - `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT` (`NAME` may be `agy`; `install` does not accept `agy`)
 - `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--evidence FILE] [--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`
 - `relay rollback --artifact FILE`
-- `relay model --harness codex`
+- `relay model --harness codex|agy`
 - `relay --help`, `relay help [<command>]`, `relay <command> --help`, and `relay --version`
 
 Interaction commands (backed by `relay serve` over `$STATE/serve.sock`; see [questions.md](questions.md)):
@@ -159,7 +159,7 @@ Storage, process, lock, dispatch, install, and model error codes:
 - `IO_ERROR`, `GIT_ERROR`, `USAGE`
 - `INVALID_REPLY`, `UNSUPPORTED_REPLY`, `INVALID_CONFIG`, `INVALID_EVIDENCE`, `UNSUPPORTED_BINDING`, `GUARD_FAILED`
 - `BACKGROUND_UNREADABLE` (appears only as a diagnostic on Claude Code `Stop`, never as a thrown error)
-- `INVALID_ROLLOUT`
+- `INVALID_ROLLOUT`, `INVALID_RECORD`, `UNSUPPORTED_RUNTIME` (agy model resolution requires SQLite support in the running Node)
 
 Interaction error codes (`relay serve`, `relay ask`, `relay inbox`, `relay presence`; see [questions.md](questions.md#failure-modes)):
 

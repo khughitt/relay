@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# cli_surface 3: the conformance half of docs/specs/2026-09-20-cli-conventions-design.md.
+# cli_surface 3: the conformance half of docs/cli-conventions.md.
 """Build a CLI's parser surface and compare it with its rows in cli.toml.
 
 Vendored from ops as tools/cli_surface.py beside tools/cli.toml; never edited in a project.
 Vendored from https://github.com/khughitt/ops (bin/cli_surface.py); never edit the copy, see tools/README.md.
-Design: ops docs/specs/2026-09-20-cli-conventions-design.md.
+Reference: ops docs/cli-conventions.md.
 A surface is a set of rows, each a tuple, so two surfaces compare as sets:
 
     ("command", path, summary)

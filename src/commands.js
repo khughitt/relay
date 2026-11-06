@@ -29,8 +29,8 @@ export const COMMANDS = [
   { path: ['inbox', 'withdraw'], summary: 'Withdraw a pending question', args: [{ name: 'id', value: 'string', required: true }],
     options: [{ names: ['--reason'], value: 'enum', values: ['user', 'asker'] }] },
   { path: ['presence'], summary: 'Show or set whether questions go to the inbox', args: [{ name: 'mode', value: 'enum', values: ['here', 'away'], required: false }] },
-  { path: ['model'], summary: "The model a Codex tool call's turn runs, read from its rollout",
-    options: [{ names: ['--harness'], value: 'enum', values: ['codex'], required: true }] },
+  { path: ['model'], summary: "The model and effort of a Codex or agy tool call, read from the harness's own record",
+    options: [{ names: ['--harness'], value: 'enum', values: ['codex', 'agy'], required: true }] },
 ];
 
 /** The command whose path is the longest prefix of argv; rest is what follows it. */

@@ -252,8 +252,10 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     }
     if (cmd.path[0] === 'model') {
       const f = flags(rest, cmd);
-      if (f['--harness'] !== 'codex' || Object.keys(f).length !== 1) throw usage('model requires --harness codex');
-      const result = (await import('../src/adapters/codex-model.js')).resolveCodexModel();
+      if (!['codex', 'agy'].includes(f['--harness']) || Object.keys(f).length !== 1) throw usage('model requires --harness codex or agy');
+      const result = f['--harness'] === 'codex'
+        ? (await import('../src/adapters/codex-model.js')).resolveCodexModel()
+        : await (await import('../src/adapters/agy-model.js')).resolveAgyModel();
       const { renderAnswer } = await import('../src/model-identity.js');
       const rendered = renderAnswer(result, mode);
       await emit(stdout, rendered.stdout);

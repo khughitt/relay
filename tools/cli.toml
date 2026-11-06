@@ -1,7 +1,7 @@
 # The shared CLI vocabulary and the inventory of every in-scope CLI's commands.
 # Vendored from https://github.com/khughitt/ops (cli.toml); never edit the copy, see tools/README.md.
 #
-# Design: ops docs/specs/2026-09-20-cli-conventions-design.md. This file is the authority:
+# Reference: ops docs/cli-conventions.md. This file is the authority:
 # each project vendors it byte-identical as tools/cli.toml and has one conformance test
 # that builds its live parser surface and asserts set equality with its rows here. A new
 # option or command anywhere is an edit here first; then each project runs ops's
@@ -181,6 +181,37 @@ tier = "typed"
 default_output = "json"
 env = "TASKS"
 
+[[cli.tasks.commands]]
+path = ["retained"]
+summary = "Query retained state and execute verified lifecycle operations"
+
+[[cli.tasks.commands]]
+path = ["retained", "state"]
+summary = "Read retained intent and observations at an immutable records revision"
+args = [{ name = "id", value = "ref", required = true }]
+options = [
+  { names = ["--at"], value = "string" },
+  { names = ["--host"], value = "string" },
+]
+
+[[cli.tasks.commands]]
+path = ["retained", "checkpoint"]
+summary = "Verify and publish a resumable retained host checkpoint"
+args = [{ name = "id", value = "ref", required = true }]
+options = [{ names = ["--request"], value = "path", required = true }]
+
+[[cli.tasks.commands]]
+path = ["retained", "transfer"]
+summary = "Transfer retained custody after durable receiver publication"
+args = [{ name = "from", value = "ref", required = true }, { name = "to", value = "ref", required = true }]
+options = [{ names = ["--request"], value = "path", required = true }]
+
+[[cli.tasks.commands]]
+path = ["retained", "reconcile"]
+summary = "Reconcile pending lifecycle operations while preserving custody"
+args = [{ name = "coordinator", value = "ref", required = true }]
+options = [{ names = ["--request"], value = "path", required = true }]
+
 [cli.mindful]
 project = "mind6"
 tier = "typed"
@@ -264,6 +295,7 @@ path = []
 options = [
   { shared = "chdir", value = "path" },
   { names = ["--headers"], value = "none" },
+  { names = ["--no-headers"], value = "none" },
 ]
 
 [[cli.tasks.commands]]
@@ -282,6 +314,16 @@ summary = "Move one task to another registered project under a new id, leaving a
 args = [{ name = "id", value = "ref", required = true }]
 options = [
   { names = ["--to"], value = "string", required = true },
+  { names = ["--explain"], value = "none" },
+]
+
+[[cli.tasks.commands]]
+path = ["migrate"]
+summary = "Carry, drop or close every open task of a project into its successor from a reviewed decision list"
+args = [{ name = "list", value = "path", required = false }]
+options = [
+  { names = ["--to"], value = "string" },
+  { names = ["--draft"], value = "path" },
   { names = ["--explain"], value = "none" },
 ]
 
@@ -431,7 +473,7 @@ options = [
   { names = ["--complexity"], value = "enum", values = ["low", "mid", "high", "none"], repeatable = true },
   { names = ["--process"], value = "enum", values = ["direct", "planned", "none"], repeatable = true },
   { names = ["--origin"], value = "enum", values = ["user", "agent", "mixed", "none"], repeatable = true },
-  { shared = "tag", role = "filter", value = "string", repeatable = true, exception = "repeats narrow: a task must carry every tag given (all-of), kept from before the vocabulary so existing callers keep their meaning; see tasks docs/specs/2026-09-30-task-filters-design.md" },
+  { shared = "tag", role = "filter", value = "string", repeatable = true, exception = "repeats narrow: a task must carry every tag given (all-of), kept from before the vocabulary so existing callers keep their meaning; see tasks docs/user-guide.md (Select work without losing context)" },
   { names = ["--need"], value = "string", repeatable = true },
   { names = ["--owner"], value = "string" },
   { names = ["--source"], value = "string" },
@@ -463,7 +505,7 @@ options = [
   { names = ["--complexity"], value = "enum", values = ["low", "mid", "high", "none"], repeatable = true },
   { names = ["--process"], value = "enum", values = ["direct", "planned", "none"], repeatable = true },
   { names = ["--origin"], value = "enum", values = ["user", "agent", "mixed", "none"], repeatable = true },
-  { shared = "tag", role = "filter", value = "string", repeatable = true, exception = "repeats narrow: a task must carry every tag given (all-of), kept from before the vocabulary so existing callers keep their meaning; see tasks docs/specs/2026-09-30-task-filters-design.md" },
+  { shared = "tag", role = "filter", value = "string", repeatable = true, exception = "repeats narrow: a task must carry every tag given (all-of), kept from before the vocabulary so existing callers keep their meaning; see tasks docs/user-guide.md (Select work without losing context)" },
   { names = ["--need"], value = "string", repeatable = true },
   { names = ["--owner"], value = "string" },
   { names = ["--source"], value = "string" },
@@ -493,7 +535,7 @@ options = [
   { names = ["--complexity"], value = "enum", values = ["low", "mid", "high", "none"], repeatable = true },
   { names = ["--process"], value = "enum", values = ["direct", "planned", "none"], repeatable = true },
   { names = ["--origin"], value = "enum", values = ["user", "agent", "mixed", "none"], repeatable = true },
-  { shared = "tag", role = "filter", value = "string", repeatable = true, exception = "repeats narrow: a task must carry every tag given (all-of), kept from before the vocabulary so existing callers keep their meaning; see tasks docs/specs/2026-09-30-task-filters-design.md" },
+  { shared = "tag", role = "filter", value = "string", repeatable = true, exception = "repeats narrow: a task must carry every tag given (all-of), kept from before the vocabulary so existing callers keep their meaning; see tasks docs/user-guide.md (Select work without losing context)" },
   { names = ["--need"], value = "string", repeatable = true },
   { names = ["--owner"], value = "string" },
   { names = ["--source"], value = "string" },
@@ -542,7 +584,7 @@ args = [{ name = "id", value = "ref", required = true }]
 options = [
   { names = ["--editor"], value = "none" },
   { names = ["--title"], value = "string" },
-  { shared = "status", role = "set", value = "enum", values = ["idea", "todo", "doing", "blocked", "done", "dropped", "moved"], repeatable = false },
+  { shared = "status", role = "set", value = "enum", values = ["idea", "todo", "doing", "blocked", "done", "dropped"], repeatable = false },
   { shared = "force", value = "none" },
   { names = ["--reason"], value = "string" },
   { names = ["--no-parent"], value = "none" },
@@ -596,8 +638,9 @@ options = [
 [[cli.tasks.commands]]
 path = ["note"]
 summary = "Append a timestamped note"
-args = [{ name = "id", value = "ref", required = true }, { name = "text", value = "string", required = true }]
+args = [{ name = "id", value = "ref", required = true }, { name = "text", value = "string", required = false }]
 options = [
+  { names = ["--stdin"], value = "none" },
   { names = ["--stamp"], value = "none" },
   { names = ["--reviewed"], value = "none" },
   { names = ["--no-reviewed"], value = "none" },
@@ -606,12 +649,25 @@ options = [
 
 [[cli.tasks.commands]]
 path = ["attach"]
-summary = "Copy a file into the task's tasks/files/<id>/ and record it in a ledger note"
-args = [{ name = "id", value = "ref", required = true }, { name = "source", value = "string", required = false }]
+summary = "Copy a file into the task's tasks/files/<id>/ and record it in a ledger note; --multipart accepts exactly one source and conflicts with --clipboard"
+args = [{ name = "id", value = "ref", required = true }, { name = "source", value = "string", required = false, variadic = true }]
 options = [
   { names = ["--caption"], value = "string" },
   { names = ["--clipboard"], value = "none" },
   { names = ["--name"], value = "string" },
+  { names = ["--multipart"], value = "none" },
+]
+
+[[cli.tasks.commands]]
+path = ["export"]
+summary = "Export or verify a task attachment, optionally at a Git revision"
+protocol = "Exactly one of --output or --verify is required; they conflict. --output - writes raw attachment bytes to stdout"
+exception = "attachment export to stdout is raw even under JSON/pretty flags"
+args = [{ name = "id", value = "ref", required = true }, { name = "name", value = "string", required = true }]
+options = [
+  { names = ["--at"], value = "ref" },
+  { names = ["-o", "--output"], value = "path" },
+  { names = ["--verify"], value = "none" },
 ]
 
 [[cli.tasks.commands]]
@@ -804,6 +860,16 @@ options = [
   { shared = "project", role = "select", value = "string", repeatable = false },
   { shared = "all_projects", value = "none" },
   { names = ["--group"], value = "string" },
+]
+
+[[cli.tasks.commands]]
+path = ["goals"]
+summary = "The goals you asked for across projects: progress, recent activity, and what needs attention"
+options = [
+  { shared = "project", role = "select", value = "string", repeatable = false },
+  { shared = "all_projects", value = "none" },
+  { names = ["--group"], value = "string" },
+  { names = ["--closed"], value = "none" },
 ]
 
 [[cli.tasks.commands]]
@@ -1004,8 +1070,8 @@ summary = "snapshot static harness context"
 
 [[cli.obs.commands]]
 path = ["report"]
-summary = "query context, growth, cache, calibration, skills, cost, quiet, hooks, tests, recurrences, doc_findings or profile"
-args = [{ name = "view", value = "enum", values = ["context", "growth", "cache", "calibration", "skills", "cost", "quiet", "hooks", "tests", "recurrences", "doc_findings", "profile"], required = true }]
+summary = "query context, growth, cache, calibration, skills, cost, quiet, hooks, tests, recurrences, doc_findings, long_doing or profile"
+args = [{ name = "view", value = "enum", values = ["context", "growth", "cache", "calibration", "skills", "cost", "quiet", "hooks", "tests", "recurrences", "doc_findings", "long_doing", "profile"], required = true }]
 options = [
   { shared = "project", role = "select", value = "string", repeatable = false },
   { shared = "harness", role = "filter", value = "enum", values = ["claude-code", "codex"], repeatable = false },
@@ -1368,6 +1434,46 @@ options = [
   { names = ["--file"], value = "string", repeatable = true },
   { names = ["--acquisition"], value = "none" },
 ]
+
+[[cli.quarry.commands]]
+path = ["term"]
+summary = "Terms in vocabularies and ontologies"
+
+[[cli.quarry.commands]]
+path = ["term", "search"]
+summary = "Search terms by label and synonym"
+args = [
+  { name = "words", value = "string", required = true, variadic = true },
+]
+options = [
+  { names = ["--in"], value = "string", repeatable = true },
+  { names = ["--domain"], value = "string" },
+  { names = ["--exact"], value = "none" },
+  { shared = "limit", value = "int", default = "10" },
+]
+
+[[cli.quarry.commands]]
+path = ["term", "show"]
+verb = "show"
+summary = "Show one term"
+args = [
+  { name = "curie", value = "string", required = true },
+]
+
+[[cli.quarry.commands]]
+path = ["term", "ancestors"]
+summary = "List a term's is_a ancestors"
+args = [
+  { name = "curie", value = "string", required = true },
+]
+
+[[cli.quarry.commands]]
+path = ["skills"]
+summary = "The agent skills this checkout ships"
+
+[[cli.quarry.commands]]
+path = ["skills", "build"]
+summary = "Regenerate the skills' resource notes from the catalog"
 
 # ---- science
 
@@ -2672,7 +2778,7 @@ args = [{ name = "path", value = "path", required = false }]
 
 [[cli.familiar.commands]]
 path = ["projects"]
-summary = "Show every project's familiar, pinned or hashed"
+summary = "Show every project's familiar: family, theme and member"
 args = [{ name = "dir", value = "path", required = false, variadic = true }]
 options = [
   { names = ["--rows"], value = "int" },
@@ -2681,7 +2787,7 @@ options = [
 
 [[cli.familiar.commands]]
 path = ["theme"]
-summary = "Themes: list, add, validate, show, preview, sheet"
+summary = "Themes: list, add, remove, validate, show, preview, sheet"
 
 [[cli.familiar.commands]]
 path = ["theme", "list"]
@@ -2693,6 +2799,14 @@ path = ["theme", "add"]
 verb = "add"
 summary = "Install a theme from an HTTPS URL or local directory"
 args = [{ name = "source", value = "string", required = true }]
+options = [
+  { names = ["--replace"], value = "none" },
+]
+
+[[cli.familiar.commands]]
+path = ["theme", "remove"]
+summary = "Remove an installed theme and its receipt"
+args = [{ name = "id", value = "string", required = true }]
 
 [[cli.familiar.commands]]
 path = ["theme", "validate"]
@@ -2702,7 +2816,7 @@ args = [{ name = "dir", value = "path", required = true }]
 [[cli.familiar.commands]]
 path = ["theme", "show"]
 verb = "show"
-summary = "Show a theme's twelve members"
+summary = "Show a theme's members"
 args = [{ name = "id", value = "string", required = false }]
 options = [
   { names = ["--rows"], value = "int" },
@@ -2745,7 +2859,7 @@ summary = "Install the active theme into a harness"
 
 [[cli.familiar.commands]]
 path = ["install", "pets"]
-summary = "Install the active theme as Codex pets"
+summary = "Install every configured theme as Codex pets"
 options = [
   { names = ["--out"], value = "path" },
   { names = ["--sync-projects"], value = "none" },
@@ -2982,9 +3096,9 @@ args = [{ name = "mode", value = "enum", values = ["here", "away"], required = f
 
 [[cli.relay.commands]]
 path = ["model"]
-summary = "The model a Codex tool call's turn runs, read from its rollout"
+summary = "The model and effort of a Codex or agy tool call, read from the harness's own record"
 options = [
-  { shared = "harness", role = "select", value = "enum", values = ["codex"], required = true, repeatable = false },
+  { shared = "harness", role = "select", value = "enum", values = ["codex", "agy"], required = true, repeatable = false },
 ]
 
 # Minimal adoption surface; existing ops-projects commands remain outside this inventory.
@@ -3007,6 +3121,13 @@ options = [
   {names = ["--purpose"], value = "string", required = true},
   {names = ["--name"], value = "string"},
   {names = ["--explain"], value = "none"},
+]
+
+[[cli.ops-projects.commands]]
+path = ["atlas"]
+summary = "Render the cross-project document of purposes, abstracts, subsystems and goal status"
+options = [
+  {names = ["--out"], value = "path"},
 ]
 
 # Minimal adoption surface; existing doc-review options remain outside this inventory.
@@ -3083,3 +3204,15 @@ args = [
 path = ["rm"]
 summary = "Harvest, inspect, unlock and remove a managed worktree"
 args = [{name = "target", value = "path", required = true}]
+
+# Minimal sweep adoption; existing survey, repair and guard modes are outside this inventory.
+[cli.git-index-health]
+project = "ops"
+tier = "automation"
+default_output = "pretty"
+env = "GIT-INDEX-HEALTH"
+protocol = "one-shot textual sweep: non-ok results and complete coverage/count summary"
+
+[[cli.git-index-health.commands]]
+path = []
+options = [{names = ["--sweep"], value = "none"}]
