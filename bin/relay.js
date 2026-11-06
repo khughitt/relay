@@ -253,10 +253,11 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     if (cmd.path[0] === 'model') {
       const f = flags(rest, cmd);
       if (f['--harness'] !== 'codex' || Object.keys(f).length !== 1) throw usage('model requires --harness codex');
-      const { answer, detail } = (await import('../src/adapters/codex-model.js')).resolveCodexModel();
-      if (mode === 'json') { await emit(stdout, `${JSON.stringify(answer)}\n`); return 0; }
-      await emit(stdout, `${answer.agent}\n`);
-      if (!answer.verified) await emit(stderr, `relay: model unverified (${answer.reason}): ${detail}\n`);
+      const result = (await import('../src/adapters/codex-model.js')).resolveCodexModel();
+      const { renderAnswer } = await import('../src/model-identity.js');
+      const rendered = renderAnswer(result, mode);
+      await emit(stdout, rendered.stdout);
+      await emit(stderr, rendered.stderr);
       return 0;
     }
     throw usage(`unknown command "${cmd.path[0]}"`);

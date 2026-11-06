@@ -41,12 +41,12 @@ test('chainWithInit appends pid 1 only when the walk ends under it', () => {
 });
 test('verified: the last turn_context of the thread, for a call process started in that turn', (t) => {
   const { env, thread, rollout } = storeWith(t);
-  assert.deepEqual(resolve(env, fakeOps()), { answer: { verified: true, agent: 'codex/gpt-6-astra', harness: 'codex', model: 'gpt-6-astra', effort: 'high', thread, rollout, reason: null }, detail: null });
+  assert.deepEqual(resolve(env, fakeOps()), { answer: { verified: true, agent: 'codex/gpt-6-astra@high', harness: 'codex', model: 'gpt-6-astra', effort: 'high', effortReason: null, reason: null, source: { thread, rollout } }, detail: null });
 });
 test('the sandbox: a codex at pid 1 is the harness and the process below it is the call', (t) => {
   const { env } = storeWith(t);
   const ops = fakeOps({ chain: [row(3, 2, 'node'), row(2, 1, 'bash')], init: row(1, 0, 'codex') });
-  assert.equal(resolve(env, ops, { startPid: 3 }).answer.agent, 'codex/gpt-6-astra');
+  assert.equal(resolve(env, ops, { startPid: 3 }).answer.agent, 'codex/gpt-6-astra@high');
   const host = fakeOps({ chain: [row(3, 2, 'node'), row(2, 1, 'bash')], init: row(1, 0, 'systemd') });
   assert.equal(resolve(env, host, { startPid: 3 }).answer.reason, 'not-under-codex');
 });
@@ -58,9 +58,9 @@ test('unverified reasons, each with its detail', (t) => {
   const claude = reason(env, fakeOps({ chain: [row(30, 20, 'node'), row(20, 10, 'claude'), row(10, 5, 'codex')] }));
   assert.equal(claude.answer.reason, 'not-under-codex'); assert.match(claude.detail ?? '', /claude-code/);
   assert.equal(reason(env, fakeOps({ chain: [row(30, 20, 'node'), row(20, 2, 'bash')] })).answer.reason, 'not-under-codex');
-  assert.deepEqual(reason({ ...env, CODEX_THREAD_ID: threadAt(B - 1) }).answer, { verified: false, agent: 'codex', harness: 'codex', model: null, effort: null, thread: threadAt(B - 1), rollout: null, reason: 'no-rollout' });
+  assert.deepEqual(reason({ ...env, CODEX_THREAD_ID: threadAt(B - 1) }).answer, { verified: false, agent: 'codex', harness: 'codex', model: null, effort: null, effortReason: null, reason: 'no-rollout', source: { thread: threadAt(B - 1) } });
   const early = reason(env, fakeOps({ start: { lo: B - 3000, hi: B - 2000 } }));
-  assert.deepEqual([early.answer.reason, early.answer.rollout, early.answer.thread], ['earlier-turn', rollout, thread]);
+  assert.deepEqual([early.answer.reason, early.answer.source.rollout, early.answer.source.thread], ['earlier-turn', rollout, thread]);
   assert.equal(reason(env, fakeOps({ start: { lo: B - 500, hi: B - 400 } })).answer.reason, 'turn-boundary');
 });
 test('ambiguous, absent and out-of-range turn records', (t) => {
@@ -124,4 +124,20 @@ test('a chain whose nearest harness is agy is not under codex', (t) => {
   const { env } = storeWith(t);
   const r = resolve(env, fakeOps({ chain: [row(30, 20, 'node'), row(20, 10, 'agy'), row(10, 5, 'codex')] }));
   assert.equal(r.answer.reason, 'not-under-codex'); assert.match(r.detail ?? '', /agy/);
+});
+
+test('an empty effort verifies the model without stamping effort', (t) => {
+  const { env, thread } = storeWith(t, { lines: (id) => [sessionMeta(id), turnContext('gpt-6-astra', iso(B), '')] });
+  const r = resolve(env, fakeOps());
+  assert.equal(r.answer.agent, 'codex/gpt-6-astra');
+  assert.equal(r.answer.effort, null);
+  assert.equal(r.answer.effortReason, 'not-recorded');
+  assert.equal(r.detail, `turn_context of thread ${thread} carries no effort`);
+});
+test('a model with spaces is unstampable despite verified turn evidence', (t) => {
+  const { env } = storeWith(t, { lines: (id) => [sessionMeta(id), turnContext('gpt oss', iso(B))] });
+  const r = resolve(env, fakeOps());
+  assert.equal(r.answer.verified, false);
+  assert.equal(r.answer.reason, 'unstampable');
+  assert.match(r.detail, /gpt oss/);
 });
