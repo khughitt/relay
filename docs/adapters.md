@@ -117,9 +117,11 @@ The harness ends at the first `/`; model ids may contain `/` or `:`. An empty ef
 | Harness | Model | Effort | Source | Binding to the call |
 | --- | --- | --- | --- | --- |
 | `codex` | verified | when the turn records it | rollout `turn_context` (`payload.model`, `payload.effort`) | call process start after the turn's record |
-| `agy` | verified | when the generation carries a label with an effort; absent for subagents (probed) | conversation database `gen_metadata` | the generation that issued the call's step |
+| `agy` | verified with readable ancestry and database access; sandbox limit below | when the generation carries a label with an effort; absent for subagents (probed) | conversation database `gen_metadata` | the generation that issued the call's step |
 | `claude-code` | from ops's provenance hook (`hooks/claude-provenance`, `TASKS_AGENT`), not through relay | not stamped today | SessionStart and PostModelSwitch payloads | none; follow-up |
 | `opencode`, pi | not assessed | not assessed | none | none |
+
+agy model identity requires readable process ancestry and access to the conversation database. On Linux with agy 1.5.2, a `--sandbox` probe returned `verified: false`, reason `not-under-agy` (relay exit `0`); the independent observer could not open the conversation database (exit `1`). This probe did not verify sandboxed model stamps.
 
 `relay model --harness codex|agy` prints the stamp alone on stdout in pretty mode (the default). Capture with `$(relay model --harness agy --pretty)` (or `codex`) so `RELAY_FORMAT` cannot switch the format. `--json` prints one object with keys in this order:
 
