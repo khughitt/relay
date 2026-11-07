@@ -44,13 +44,16 @@ export function commandAt(...words) {
   return COMMANDS.find((c) => c.path.length === words.length && c.path.every((w, i) => w === words[i])) ?? null;
 }
 
+/** @typedef {'json'|'pretty'} OutputMode */
+
 /** Strip --json/--pretty from anywhere; returns { argv, mode } with mode null when unset. */
 /** @param {string[]} argv @param {(message: string) => Error} usage */
 export function stripGlobals(argv, usage) {
+  /** @type {OutputMode|null} */
   let mode = null;
   const rest = [];
   for (const a of argv) {
-    if (a === '--json' || a === '--pretty') { const m = a.slice(2); if (mode && mode !== m) throw usage('--json and --pretty are mutually exclusive'); mode = m; }
+    if (a === '--json' || a === '--pretty') { const m = a === '--json' ? 'json' : 'pretty'; if (mode && mode !== m) throw usage('--json and --pretty are mutually exclusive'); mode = m; }
     else rest.push(a);
   }
   return { argv: rest, mode };
@@ -58,10 +61,11 @@ export function stripGlobals(argv, usage) {
 
 /** The diagnostics format (errors, and results where the command has any) and, separately,
  *  whether a successful run prints anything: `output = "none"` silences success only. */
-/** @param {string|null} flagMode @param {NodeJS.ProcessEnv} env @param {import("./types.js").Command|null} cmd @param {(message: string) => Error} usage */
+/** @param {string|null} flagMode @param {NodeJS.ProcessEnv} env @param {import("./types.js").Command|null} cmd @param {(message: string) => Error} usage
+ *  @returns {{mode: OutputMode, silent: boolean}} */
 export function resolveMode(flagMode, env, cmd, usage) {
   const mode = flagMode ?? env.RELAY_FORMAT ?? (cmd?.output === 'json' ? 'json' : 'pretty');
-  if (!['json', 'pretty'].includes(mode)) throw usage(`RELAY_FORMAT must be json or pretty, got ${JSON.stringify(mode)}`);
+  if (mode !== 'json' && mode !== 'pretty') throw usage(`RELAY_FORMAT must be json or pretty, got ${JSON.stringify(mode)}`);
   return { mode, silent: cmd?.output === 'none' };
 }
 
