@@ -21,10 +21,16 @@ export async function noneMarked(marker, { timeoutMs = 2000 } = {}) {
   catch (error) { throw new Error(`${error.message}; survivors: ${markedPids(marker).join(', ')}`); }
 }
 
-// Kills every process still carrying marker, then waits until they are gone.
-export async function reapMarked(marker) {
-  for (const pid of markedPids(marker)) {
-    try { process.kill(pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-  }
-  await noneMarked(marker);
+// Kills every process carrying marker on each poll until none is left, so one that appears after
+// the first pass (a child still being spawned) is reaped too; fails naming the survivors.
+export async function reapMarked(marker, { timeoutMs = 2000 } = {}) {
+  const killAll = () => {
+    const pids = markedPids(marker);
+    for (const pid of pids) {
+      try { process.kill(pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+    }
+    return pids.length === 0;
+  };
+  try { await until(killAll, { timeoutMs, what: `processes carrying ${marker} to be reaped` }); }
+  catch (error) { throw new Error(`${error.message}; survivors: ${markedPids(marker).join(', ')}`); }
 }

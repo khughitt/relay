@@ -16,7 +16,7 @@ import { createProcessOps } from '../src/index.js';
 // (fixed width, so no needle is a prefix of another): a host-wide `ps` check then sees only
 // this test's children, never a concurrent run's or an orphan's.
 const uniqueSleeps = () => { const tag = String(randomInt(1e9)).padStart(9, '0'); return [`600.${tag}1`, `600.${tag}2`]; };
-const psArgs = () => execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' });
+const psArgs = () => execFileSync('/bin/ps', ['-ww', '-axo', 'args='], { encoding: 'utf8' });
 
 const root = (t) => { const d = mkdtempSync(join(tmpdir(), 'dp-')); t.after(() => rmSync(d, { recursive: true, force: true })); return d; };
 test('isolation sets every redirect and drops COLUMNS and session variables', (t) => {
@@ -123,7 +123,7 @@ test('a parent that runs its payload passes the check and leaves nothing behind'
   t.after(async () => { await tr.killAll(); rmSync(r, { recursive: true, force: true }); });
   await checkParent(tr, r, isolatedEnv(r));
   assert.deepEqual((await tr.killAll()).survivors, []);
-  assert.equal(execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' }).includes(join(r, 'pcheck/codex')), false);
+  assert.equal(execFileSync('/bin/ps', ['-ww', '-axo', 'args='], { encoding: 'utf8' }).includes(join(r, 'pcheck/codex')), false);
 });
 test('a parent that cannot run its payload is one error line within five seconds', async (t) => {
   const r = mkdtempSync(join(tmpdir(), 'dp-')); prepareRoot(r); const tr = tracker(r);

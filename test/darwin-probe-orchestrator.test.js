@@ -44,7 +44,7 @@ test('SIGINT after a normal D0 packs results, fills D0, and leaves no grandchild
   const hang = hangTag();
   const child = spawn(process.execPath, ['tools/darwin-probe/probe.mjs', ...hang.args, '--root', join(d, 'root'), '--bundle', d], { stdio: 'ignore' });
   const exited = new Promise((r) => child.once('exit', r)); // registered now, so an early exit is not missed
-  const ps = () => execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' });
+  const ps = () => execFileSync('/bin/ps', ['-ww', '-axo', 'args='], { encoding: 'utf8' });
   for (let i = 0; i < 100 && child.exitCode === null && !ps().includes(hang.sleeps[1]); i++) await new Promise((r) => setTimeout(r, 200));
   assert.equal(child.exitCode, null, 'the probe exited before the interrupt');
   child.kill('SIGINT');
@@ -68,7 +68,7 @@ test('SIGINT after a normal D0 packs results, fills D0, and leaves no grandchild
 });
 
 // Shared by the tests below: poll `ps` until `needle` appears in some process's arguments.
-const psArgs = () => execFileSync('/bin/ps', ['-axo', 'args='], { encoding: 'utf8' });
+const psArgs = () => execFileSync('/bin/ps', ['-ww', '-axo', 'args='], { encoding: 'utf8' });
 const waitFor = async (needle, child) => {
   for (let i = 0; i < 150 && (child === undefined || child.exitCode === null) && !psArgs().includes(needle); i++) await new Promise((r) => setTimeout(r, 200));
   return psArgs().includes(needle);

@@ -315,8 +315,11 @@ test('a slow observer never delays a denial and observers run only within their 
   await writeSubscribers(p, [strip(observer('hang', 'hang', { argv: argv('hang', marker), timeoutMs: 150 })), strip(observer('quick', 'slow', { argv: argv('slow', '10'), timeoutMs: 150 })), strip(observer('after', 'record', { file, timeoutMs: 2000 }))]);
   // after's budget must outlast a real Node startup under load; subscribersMs 2667 = 150 + 150 + 2000 + 367 scheduling slack
   started = performance.now(); r = await hook(p, { outerMs: 10000 });
+  const elapsed = performance.now() - started;
   assert.equal(r.exitCode, 0); assert.match(r.stderr, /SUBSCRIBER_FAILED: hang timeout/);
-  assert.ok(performance.now() - started < 10000);
+  // Each observer is held to its own budget (150 + 150 + 2000), so the run ends well inside outerMs;
+  // the 1500 ms slack covers registry publication and kill/reap under suite load.
+  assert.ok(elapsed < 150 + 150 + 2000 + 1500, `observers took ${Math.round(elapsed)} ms`);
   assert.equal(JSON.parse(await readFile(file, 'utf8')).subscriber, 'after', 'a later observer that fits still runs');
   await noneMarked(marker);
   // A publication that fulfills after its deadline is rejected and no observer runs.
