@@ -17,7 +17,7 @@
  * @typedef {ReturnType<typeof import('./bus/proc.js').createProcessOps>} ProcessOps
  * @typedef {ReturnType<typeof import('./bus/paths.js').paths>} Paths
  * @typedef {{io?: typeof import('node:fs/promises')}} IOOptions
- * @typedef {Deadline & IOOptions & {paths?: Paths, processOps?: ProcessOps, now?: () => number, uuid?: () => string, gitContext?: typeof import('./bus/identity.js').gitContext, resolveSessionPid?: (adapter: Adapter) => number|null}} RegistryOptions
+ * @typedef {Deadline & IOOptions & {paths?: Paths, processOps?: ProcessOps, now?: () => number, uuid?: () => string, gitContext?: typeof import('./bus/identity.js').gitContext, resolveSessionPid?: (adapter: Adapter) => number|null, agyAppDataDir?: string|null, env?: NodeJS.ProcessEnv, importSqlite?: () => Promise<typeof import('node:sqlite')>}} RegistryOptions
  * @typedef {{refuse: boolean, context: boolean}} Capability
  * @typedef {{decision: 'allow'|'deny', reason?: string, context?: string}} Reply
  * @typedef {{stdout: string, stderr: string, exitCode: number}} Output

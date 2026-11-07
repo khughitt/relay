@@ -1,18 +1,32 @@
 // @ts-check
 import { randomUUID } from 'node:crypto';
+import { isAbsolute, join } from 'node:path';
 import { relayError, validateEvent, validateSnapshot } from '../protocol.js';
 import { adapterFor } from '../adapters/index.js';
+import { classifyConversation, conversationDatabase } from '../adapters/agy-conversation.js';
 import { paths as defaultPaths } from './paths.js';
 import { createProcessOps } from './proc.js';
 import { gitContext as defaultGitContext, projectKeyFor, displayProject } from './identity.js';
 import { readJson, writeJsonAtomic } from './store.js';
 import { withLock } from './lock.js';
 import { pruneDead } from './prune.js';
+const FINISHED = new Set(['done', 'error']);
+const MAX_PEER_CLASSIFICATIONS = 4;
+/** @param {unknown} value */
+const isValidDir = (value) => typeof value === 'string' && value.length > 0 && isAbsolute(value) && !value.includes('\0');
+/** @param {ReturnType<typeof options>} opts */
+function resolveAgyAppDataDir(opts) {
+  if (opts.agyAppDataDir !== undefined) return isValidDir(opts.agyAppDataDir) ? opts.agyAppDataDir : null;
+  if (opts.env.ANTIGRAVITY_APP_DATA_DIR !== undefined) return isValidDir(opts.env.ANTIGRAVITY_APP_DATA_DIR) ? opts.env.ANTIGRAVITY_APP_DATA_DIR : null;
+  if (isValidDir(opts.env.HOME)) return join(/** @type {string} */ (opts.env.HOME), '.gemini', 'antigravity-cli');
+  return null;
+}
 /** @param {import("../types.js").RegistryOptions} given */
 function options(given) {
   const clock = given.clock ?? performance.now.bind(performance);
   return { ...given, clock, deadline:given.deadline ?? clock()+12000, paths:given.paths ?? defaultPaths(),
-    processOps:given.processOps ?? createProcessOps(), now:given.now ?? Date.now, uuid:given.uuid ?? randomUUID };
+    processOps:given.processOps ?? createProcessOps(), now:given.now ?? Date.now, uuid:given.uuid ?? randomUUID,
+    env:given.env ?? process.env };
 }
 // Schema 1 published the terminal owner's pid; schema 2 publishes the session's own process.
 // A schema-1 row can hold a handle borrowed from another session, and which of two rows sharing
@@ -75,22 +89,60 @@ async function mutate(opts, event, context, handle, diagnostics) {
         delete agents[event.agentId];
       }
       else {
+        let upsert = true;
         if (event.harness === 'codex' && event.nativeEvent === 'SessionStart' && event.root === undefined) {
           for (const [id,a] of Object.entries(agents)) {
             if (a.harness === 'codex' && sameProcess(a.process,handle)
               && ((a.scope === 'session' && id !== event.agentId) || (a.scope === 'worker' && a.root !== event.agentId && a.state === 'done'))) delete agents[id];
           }
         }
-        const previous = agents[event.agentId];
-        const background = event.background === undefined ? previous?.background : event.background === null ? undefined : event.background;
-        const state = adapter.reduceState(level,previous?.state ?? null,{background});
-        const {remote,repoRoot} = /** @type {{remote: string|null, repoRoot: string|null}} */ (context);
-        agents[event.agentId] = {id:event.agentId,harness:event.harness,sessionId:event.sessionId,
-          scope:event.harness === 'opencode' ? 'process' : event.root === undefined ? 'session' : 'worker',
-          ...(event.root === undefined ? {} : {root:event.root}),
-          ...(background === undefined ? {} : {background}),process:handle,cwd:event.cwd,repoRoot,remote,
-          projectKey:projectKeyFor({remote,repoRoot,cwd:event.cwd}),project:displayProject({remote,repoRoot,cwd:event.cwd}),state: /** @type {import("../types.js").State} */ (state),updatedAt:opts.now()};
-        changed = true;
+        else if (event.harness === 'agy') {
+          const peers = handle === null ? [] : Object.entries(agents).filter(([id,a]) => id !== event.agentId && a.harness === 'agy' && sameProcess(a.process,handle));
+          if (peers.length > 0 && (event.nativeEvent !== 'PreToolUse' || peers.some(([,a]) => FINISHED.has(a.state)))) {
+            const appData = resolveAgyAppDataDir(opts);
+            const self = await classifyConversation(appData === null ? null : conversationDatabase(appData,event.sessionId),
+              {conversation:event.sessionId,clock:opts.clock,deadline:opts.deadline,importSqlite:opts.importSqlite});
+            if (self.kind === 'unknown') diagnostics.push(self.diagnostic);
+            else if (self.kind === 'subagent') {
+              if (event.nativeEvent === 'Stop') {
+                changed ||= Object.hasOwn(agents,event.agentId);
+                delete agents[event.agentId];
+                upsert = false;
+              }
+            }
+            else if (event.nativeEvent === 'SessionStart') {
+              let classifiedPeers = 0;
+              for (const [peerId,peerRow] of peers) {
+                if (FINISHED.has(peerRow.state)) delete agents[peerId];
+                else if (classifiedPeers >= MAX_PEER_CLASSIFICATIONS) {
+                  diagnostics.push({code:'AGY_CLASSIFICATION_UNAVAILABLE',message:'peer classification cap (4) reached',agentId:peerId});
+                }
+                else {
+                  classifiedPeers++;
+                  const peerClass = await classifyConversation(appData === null ? null : conversationDatabase(appData,peerRow.sessionId),
+                    {conversation:peerRow.sessionId,clock:opts.clock,deadline:opts.deadline,importSqlite:opts.importSqlite});
+                  if (peerClass.kind === 'root') delete agents[peerId];
+                  else if (peerClass.kind === 'unknown') diagnostics.push(peerClass.diagnostic);
+                }
+              }
+            }
+            else {
+              for (const [peerId,peerRow] of peers) if (FINISHED.has(peerRow.state)) delete agents[peerId];
+            }
+          }
+        }
+        if (upsert) {
+          const previous = agents[event.agentId];
+          const background = event.background === undefined ? previous?.background : event.background === null ? undefined : event.background;
+          const state = adapter.reduceState(level,previous?.state ?? null,{background});
+          const {remote,repoRoot} = /** @type {{remote: string|null, repoRoot: string|null}} */ (context);
+          agents[event.agentId] = {id:event.agentId,harness:event.harness,sessionId:event.sessionId,
+            scope:event.harness === 'opencode' ? 'process' : event.root === undefined ? 'session' : 'worker',
+            ...(event.root === undefined ? {} : {root:event.root}),
+            ...(background === undefined ? {} : {background}),process:handle,cwd:event.cwd,repoRoot,remote,
+            projectKey:projectKeyFor({remote,repoRoot,cwd:event.cwd}),project:displayProject({remote,repoRoot,cwd:event.cwd}),state: /** @type {import("../types.js").State} */ (state),updatedAt:opts.now()};
+          changed = true;
+        }
       }
     }
     if (!changed) return {snapshot:before,changed:false,reaped,diagnostics};

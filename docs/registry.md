@@ -116,7 +116,8 @@ Upsert and removal publication rules (`applyEvent` in `src/bus/transaction.js`):
 - Git and session process resolution occur before acquiring the writer lock; latest-state reduction, dead-process pruning across existing rows, and one atomic `agents.json` publication occur under the lock.
 - An upsert publishes `revision: 1` with a fresh `generation` UUID if no snapshot exists, and increments `revision` on every observed upsert even when `state` is unchanged.
 - `SessionEnd` (`kind: 'session-end'`) skips Git and process enrichment and removes its exact `agentId` and, for a Codex root, every row whose `root` is that `agentId`, in the same publication.
-- Removal (`session-end`, or a Codex worker `SubagentStop` whose root is absent on a process proven by another Codex root) and `reapRegistry` publish only when keys change (except schema-1 supersession); when `agents.json` is absent and no keys exist, the result remains `{ snapshot: null, changed: false, reaped: [], diagnostics: [] }`.
+- On a shared proven process `Handle`, a Codex root `SessionStart` retires other Codex session rows and `done` foreign workers, and an `agy` root event retires finished (`'done'` / `'error'`) `agy` peers (plus proven `'root'` peers on `SessionStart`).
+- Removal (`session-end`, a Codex worker `SubagentStop` whose root is absent on a process proven by another Codex root, or an `agy` subagent `Stop` on a process shared with another live `agy` row) and `reapRegistry` publish only when keys change (except schema-1 supersession); when `agents.json` is absent and no keys exist, the result remains `{ snapshot: null, changed: false, reaped: [], diagnostics: [] }`.
 
 ## Failure modes
 

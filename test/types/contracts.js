@@ -87,3 +87,15 @@ const askHarness = 'codex';
 /** @type {NonNullable<import('../../src/types.js').Question['native']>['harness']} */
 // @ts-expect-error agy has no interaction route.
 const noAgyAsk = 'agy';
+
+/** @type {import('../../src/types.js').RegistryOptions} */
+const agyRegistryOpts = {
+  agyAppDataDir: '/tmp/agy',
+  env: { ANTIGRAVITY_APP_DATA_DIR: '/tmp/agy' },
+  importSqlite: () => import('node:sqlite'),
+};
+/** @type {import('../../src/types.js').RegistryOptions} */
+const badAgyRegistryOpts = {
+  // @ts-expect-error agyAppDataDir must be string, null, or undefined.
+  agyAppDataDir: 123,
+};

@@ -101,6 +101,23 @@ Root retirement and worker lifecycle under shared process handles (`src/bus/tran
 - Ordinary root events (`UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `Stop`) always upsert, so a missing or handle-less `SessionStart` can recover proof on a later event, and a retired live root returns on its next event.
 - Retirement assumes **one active root at a time**, as in the captured TUI launches (where `/new`, `/resume`, and `/fork` keep the replaced root open in the same process). Daemon-hosted sessions sharing one process are unverified; if concurrent roots share a handle, each root `SessionStart` retires the others' rows while unfinished workers survive, a retired live root returns on its next event, and its workers' `SubagentStop` removes their rows meanwhile.
 
+### `agy` conversation retirement and subagent rows
+
+All `agy` registry rows carry `scope: 'session'` with no `root` field, because `agy` hook payloads carry no parent identifier (`src/adapters/agy.js`, `src/adapters/agy-conversation.js`, `src/bus/transaction.js`). When a long-lived `agy` process switches root conversations (`/new` or `/chat resume`) or spawns `invoke_subagent` children, all conversations on that process share the same proven `Handle`.
+
+To distinguish root conversations from subagents without changing the schema-2 `Agent` contract, `classifyConversation` inspects `<app-data>/conversations/<conversationId>.db` read-only:
+
+- `<app-data>` resolves from `options.agyAppDataDir` (which `dispatchHook` extracts from `<appDataDir>/brain/<conversationId>` in `artifactDirectoryPath` or `transcriptPath`), else `ANTIGRAVITY_APP_DATA_DIR`, else `$HOME/.gemini/antigravity-cli`.
+- It reads the newest `gen_metadata` row (`rowid DESC LIMIT 1`), verifies field 1 (`cascade_id`) equals `<conversationId>`, and checks field 8 (`root_cascade_id`): absent or equal to `<conversationId>` proves `'root'`; a different valid UUID proves `'subagent'`.
+- When `gen_metadata` is empty (for example on `SessionStart` before the first generation completes), it falls back to `trajectory_summaries.value` field 1 (`CascadeTrajectorySummary` base64 protobuf) and checks field 15 (`root_cascade_id`) under the same rule.
+- Any missing database, empty table set, expired deadline, unavailable `node:sqlite`, I/O error, or malformed protobuf returns `{ kind: 'unknown', reason, diagnostic }` with diagnostic code `AGY_CLASSIFICATION_UNAVAILABLE` rather than throwing.
+
+Peer retirement runs under the registry lock only when at least one other `agy` row in `agents` shares the incoming event's non-null proven `Handle`, and on `PreToolUse` only when at least one such peer is in `'done'` or `'error'`:
+
+- **`self.kind === 'subagent'`:** On `Stop`, the subagent removes its own row (`delete agents[event.agentId]`) instead of leaving a lingering `'done'` row alongside the live parent; if the row was already absent, `changed` stays `false`. On `SessionStart` and `PreToolUse`, no peers are retired and the subagent row upserts normally.
+- **`self.kind === 'root'`:** On `SessionStart`, every same-process `agy` peer in `'done'` or `'error'` is retired immediately without opening its database, and up to `MAX_PEER_CLASSIFICATIONS = 4` unfinished peers (`'idle'`, `'working'`, `'needs-input'`, `'needs-approval'`) are classified: proven `'root'` peers are retired, while `'subagent'` and `'unknown'` peers (and any unfinished peers past the cap, which emit `AGY_CLASSIFICATION_UNAVAILABLE`) are kept. On `PreToolUse` and `Stop`, every same-process `agy` peer in `'done'` or `'error'` is retired without opening peer databases, and unfinished peers are kept.
+- **`self.kind === 'unknown'`:** Pushes `self.diagnostic` (`AGY_CLASSIFICATION_UNAVAILABLE`), retires no peers, and upserts `event.agentId` normally (failing closed against premature deletion).
+
 ## Model resolution
 
 Model stamps follow one whitespace-free grammar:
@@ -253,7 +270,7 @@ Each matching observer receives an `ObserverEnvelope` on stdin (stdout is discar
 
 `event.tool` is reduced to `{ name }` (or `null`), `event.background` carries counts or `null` when reported by Claude Code `Stop`, and `type: "reconcile"` carries `event: null`. Observers run only after a successful registry publication or reap; after a registry failure they are skipped with a diagnostic and healed by reconciliation.
 
-`reaped` lists only rows pruned for dead processes. Rows an event removes (a `SessionEnd`'s root and workers, a Codex root `SessionStart`'s retired rows, or a worker `SubagentStop` removal when its root row is absent) and rows dropped by schema-1 supersession appear only as their absence from the snapshot. The envelope carries no snapshot; observers read `$STATE/agents.json` at or after `registry.revision`.
+`reaped` lists only rows pruned for dead processes. Rows an event removes (a `SessionEnd`'s root and workers, a Codex root `SessionStart`'s retired rows, a Codex worker `SubagentStop` removal when its root row is absent, an `agy` root event's retired same-process peers, or an `agy` subagent `Stop` removal alongside a live peer) and rows dropped by schema-1 supersession appear only as their absence from the snapshot. The envelope carries no snapshot; observers read `$STATE/agents.json` at or after `registry.revision`.
 
 ## Failure modes
 

@@ -8,6 +8,8 @@ import { createProcessOps } from '../src/bus/proc.js';
 import { paths } from '../src/bus/paths.js';
 import { withLock } from '../src/bus/lock.js';
 import { tempState,localObservation } from './helpers/fixture.js';
+import { agyStore, encodeTrajectoryMetadata } from './helpers/agy-store.js';
+import { DatabaseSync } from 'node:sqlite';
 const event=(h='codex',native='SessionStart',session='test')=>normalizeEvent(h,native,JSON.stringify({session_id:session,cwd:'/repo',tool_name:'Bash',tool_input:{command:'echo PRIVATE_MARKER'}}));
 test('registry stores identity/state, never the command payload',async t=>{
   const p=await tempState(t),e=event('claude-code','PreToolUse');const result=await applyEvent(e,localObservation(p));
@@ -405,4 +407,284 @@ test('agy PreToolUse publishes a session-scoped working row and Stop sets done',
   assert.equal('root' in row,false);assert.equal('background' in row,false);
   const s=await applyEvent(normalizeEvent('agy','Stop',await fx('Stop')),localObservation(p));
   assert.equal(s.snapshot.agents[e.agentId].state,'done');
+});
+
+const AR1 = '0199f000-0000-7000-8000-000000000101';
+const AR2 = '0199f000-0000-7000-8000-000000000102';
+const AS1 = '0199f000-0000-7000-8000-000000000201';
+const AS2 = '0199f000-0000-7000-8000-000000000202';
+const agyEv = (native, conversationId = AR1) => normalizeEvent('agy', native, JSON.stringify({
+  conversationId,
+  workspacePaths: ['/repo'],
+  ...(native === 'PreToolUse' ? { toolCall: { name: 'run_command', args: { CommandLine: 'true' } } } : {}),
+  ...(native === 'Stop' ? { executionNum: 0, fullyIdle: false } : {}),
+}));
+const writeAgyMeta = (appData, conversationId, rootConversationId = conversationId, parentConversationId = undefined) => {
+  const dbPath = join(appData, 'conversations', `${conversationId}.db`);
+  const db = new DatabaseSync(dbPath);
+  try {
+    db.exec('pragma journal_mode = WAL; create table if not exists trajectory_metadata_blob (id text DEFAULT "main", data blob)');
+    db.prepare('insert or replace into trajectory_metadata_blob (id, data) values (?, ?)').run(
+      'main',
+      encodeTrajectoryMetadata({ rootConversationId, parentConversationId }),
+    );
+  } finally {
+    db.close();
+  }
+};
+
+test('agy uncontended turns and active-peer PreToolUse never import sqlite', async t => {
+  const p = await tempState(t);
+  const noSqlite = () => { throw new Error('unexpected sqlite import'); };
+  const o = { ...codexOptions(p), importSqlite: noSqlite };
+  for (const native of ['SessionStart', 'PreToolUse', 'Stop']) {
+    await applyEvent(agyEv(native, AR1), o);
+  }
+  assert.equal((await readSnapshot({ paths: p })).agents[`agy:${AR1}`].state, 'done');
+
+  // When a peer on the same handle is 'idle' or 'working' (none in 'done'/'error'), PreToolUse skips sqlite too
+  const p2 = await tempState(t);
+  const { appData } = agyStore(t, {
+    conversation: AR1,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: AR1 }),
+  });
+  writeAgyMeta(appData, AS1, AR1, AR1);
+  await applyEvent(agyEv('PreToolUse', AR1), { ...codexOptions(p2), agyAppDataDir: appData });
+  await applyEvent(agyEv('SessionStart', AS1), { ...codexOptions(p2), agyAppDataDir: appData });
+  // Now AR1 is 'working' and AS1 is 'idle'; PreToolUse on either must not touch sqlite
+  await applyEvent(agyEv('PreToolUse', AS1), { ...codexOptions(p2), agyAppDataDir: appData, importSqlite: noSqlite });
+  await applyEvent(agyEv('PreToolUse', AR1), { ...codexOptions(p2), agyAppDataDir: appData, importSqlite: noSqlite });
+  const snap = await readSnapshot({ paths: p2 });
+  assert.equal(snap.agents[`agy:${AR1}`].state, 'working');
+  assert.equal(snap.agents[`agy:${AS1}`].state, 'working');
+});
+
+test('agy root SessionStart retires superseded root on the same handle whether done or interrupted mid-turn', async t => {
+  for (const priorState of ['Stop', 'PreToolUse', 'SessionStart']) {
+    const p = await tempState(t);
+    const { appData } = agyStore(t, {
+      conversation: AR1,
+      trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: AR1 }),
+    });
+    writeAgyMeta(appData, AR2, AR2);
+    const o = { ...codexOptions(p), agyAppDataDir: appData };
+    await applyEvent(agyEv(priorState, AR1), o);
+    // Another agy process and a claude-code row must survive
+    const otherHandle = { ...proof, pid: 202, start: '2' };
+    await applyEvent(agyEv('SessionStart', '0199f000-0000-7000-8000-000000000999'), { ...codexOptions(p, otherHandle), agyAppDataDir: appData });
+    await applyEvent(claudeEvent(C), o);
+
+    const after = (await applyEvent(agyEv('SessionStart', AR2), o)).snapshot;
+    assert.equal(after.agents[`agy:${AR1}`], undefined, priorState);
+    assert.equal(after.agents[`agy:${AR2}`].state, 'idle', priorState);
+    assert.ok(after.agents['agy:0199f000-0000-7000-8000-000000000999'], priorState);
+    assert.ok(after.agents[`claude-code:${C}`], priorState);
+  }
+});
+
+test('agy subagent lifecycle, turn 2+ start, parallel subagents, and send_message resumption', async t => {
+  const p = await tempState(t);
+  const { appData } = agyStore(t, {
+    conversation: AR1,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: AR1 }),
+  });
+  writeAgyMeta(appData, AS1, AR1, AR1);
+  writeAgyMeta(appData, AS2, AR1, AR1);
+  const o = { ...codexOptions(p), agyAppDataDir: appData };
+
+  // Turn 1 finishes: AR1 is 'done'. Turn 2+ starts with subagent AS1 while AR1 is 'done' (or after Stop(fullyIdle: false))
+  await applyEvent(agyEv('SessionStart', AR1), o);
+  await applyEvent(agyEv('Stop', AR1), o);
+  assert.equal((await readSnapshot({ paths: p })).agents[`agy:${AR1}`].state, 'done');
+
+  // Subagent AS1 starts and works while AR1 is 'done': AR1 is NOT retired
+  await applyEvent(agyEv('SessionStart', AS1), o);
+  let snap = (await applyEvent(agyEv('PreToolUse', AS1), o)).snapshot;
+  assert.equal(snap.agents[`agy:${AR1}`].state, 'done');
+  assert.equal(snap.agents[`agy:${AS1}`].state, 'working');
+
+  // Parallel subagent AS2 starts and works concurrently; AR1 also works and fires Stop(fullyIdle: false)
+  await applyEvent(agyEv('PreToolUse', AR1), o);
+  await applyEvent(agyEv('SessionStart', AS2), o);
+  await applyEvent(agyEv('PreToolUse', AS2), o);
+  snap = (await applyEvent(agyEv('Stop', AR1), o)).snapshot;
+  assert.equal(snap.agents[`agy:${AR1}`].state, 'done');
+  assert.equal(snap.agents[`agy:${AS1}`].state, 'working');
+  assert.equal(snap.agents[`agy:${AS2}`].state, 'working');
+
+  // AS1 finishes (Stop): AS1 is removed immediately while AR1 and AS2 remain
+  const s1Stopped = await applyEvent(agyEv('Stop', AS1), o);
+  assert.equal(s1Stopped.changed, true);
+  assert.equal(s1Stopped.snapshot.agents[`agy:${AS1}`], undefined);
+  assert.ok(s1Stopped.snapshot.agents[`agy:${AR1}`]);
+  assert.equal(s1Stopped.snapshot.agents[`agy:${AS2}`].state, 'working');
+
+  // Duplicate Stop on already-removed AS1 is a no-op
+  const dupStop = await applyEvent(agyEv('Stop', AS1), o);
+  assert.equal(dupStop.changed, false);
+
+  // AS2 finishes (Stop): AS2 is removed while AR1 remains
+  snap = (await applyEvent(agyEv('Stop', AS2), o)).snapshot;
+  assert.deepEqual(Object.keys(snap.agents), [`agy:${AR1}`]);
+
+  // Resumed subagent AS1 via send_message (PreToolUse): re-upserts as 'working' without retiring AR1, then Stop removes it again
+  snap = (await applyEvent(agyEv('PreToolUse', AS1), o)).snapshot;
+  assert.equal(snap.agents[`agy:${AR1}`].state, 'done');
+  assert.equal(snap.agents[`agy:${AS1}`].state, 'working');
+  snap = (await applyEvent(agyEv('Stop', AS1), o)).snapshot;
+  assert.deepEqual(Object.keys(snap.agents), [`agy:${AR1}`]);
+});
+
+test('agy non-waking child and overlapping roots', async t => {
+  const p = await tempState(t);
+  const { appData } = agyStore(t, {
+    conversation: AR1,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: AR1 }),
+  });
+  writeAgyMeta(appData, AR2, AR2);
+  writeAgyMeta(appData, AS1, AR1, AR1);
+  const o = { ...codexOptions(p), agyAppDataDir: appData };
+
+  // Non-waking child: AR1 is 'done', AS1 runs PreToolUse then Stop -> AR1 stays 'done', AS1 removed
+  await applyEvent(agyEv('Stop', AR1), o);
+  await applyEvent(agyEv('PreToolUse', AS1), o);
+  let snap = (await applyEvent(agyEv('Stop', AS1), o)).snapshot;
+  assert.deepEqual(Object.keys(snap.agents), [`agy:${AR1}`]);
+  assert.equal(snap.agents[`agy:${AR1}`].state, 'done');
+
+  // Overlapping roots: AR1 and AR2 both 'working' -> PreToolUse on AR1 keeps 'working' AR2
+  await applyEvent(agyEv('PreToolUse', AR1), o);
+  await applyEvent(agyEv('PreToolUse', AR2), o);
+  snap = (await applyEvent(agyEv('PreToolUse', AR1), o)).snapshot;
+  assert.equal(snap.agents[`agy:${AR1}`].state, 'working');
+  assert.equal(snap.agents[`agy:${AR2}`].state, 'working');
+
+  // Once AR1 is 'done', AR2's PreToolUse retires 'done' AR1
+  await applyEvent(agyEv('Stop', AR1), o);
+  snap = (await applyEvent(agyEv('PreToolUse', AR2), o)).snapshot;
+  assert.deepEqual(Object.keys(snap.agents), [`agy:${AR2}`]);
+});
+
+test('agy root SessionStart enforces MAX_PEER_CLASSIFICATIONS = 4 on active peers and deletes finished peers without opening their DBs', async t => {
+  const p = await tempState(t);
+  const { appData } = agyStore(t, {
+    conversation: AR1,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: AR1 }),
+  });
+  const done1 = '0199f000-0000-7000-8000-000000000301';
+  const done2 = '0199f000-0000-7000-8000-000000000302';
+  const workRoot1 = '0199f000-0000-7000-8000-000000000401';
+  const workSub1 = '0199f000-0000-7000-8000-000000000402';
+  const workRoot2 = '0199f000-0000-7000-8000-000000000403';
+  const workSub2 = '0199f000-0000-7000-8000-000000000404';
+  const workRoot3 = '0199f000-0000-7000-8000-000000000405';
+
+  // Do NOT create DBs for done1, done2, or workRoot3 (5th active peer) — they must never be opened!
+  writeAgyMeta(appData, workRoot1, workRoot1);
+  writeAgyMeta(appData, workSub1, AR1, AR1);
+  writeAgyMeta(appData, workRoot2, workRoot2);
+  writeAgyMeta(appData, workSub2, AR1, AR1);
+
+  const makeRow = (id, state) => ({
+    id: `agy:${id}`, harness: 'agy', sessionId: id, scope: 'session',
+    process: proof, cwd: '/repo', repoRoot: null, remote: null,
+    projectKey: '/repo', project: 'repo', state, updatedAt: 1,
+  });
+  await fs.writeFile(p.agentsPath, JSON.stringify({
+    schema: 2,
+    generation: '12345678-1234-4234-8234-123456789abc',
+    revision: 1,
+    agents: {
+      [`agy:${done1}`]: makeRow(done1, 'done'),
+      [`agy:${done2}`]: makeRow(done2, 'error'),
+      [`agy:${workRoot1}`]: makeRow(workRoot1, 'working'),
+      [`agy:${workSub1}`]: makeRow(workSub1, 'working'),
+      [`agy:${workRoot2}`]: makeRow(workRoot2, 'idle'),
+      [`agy:${workSub2}`]: makeRow(workSub2, 'idle'),
+      [`agy:${workRoot3}`]: makeRow(workRoot3, 'working'),
+    },
+  }), { mode: 0o600 });
+
+  let opened = 0;
+  const importSqlite = async () => ({
+    DatabaseSync: class extends DatabaseSync {
+      constructor(file, options) {
+        opened++;
+        super(file, options);
+      }
+    },
+  });
+
+  const res = await applyEvent(agyEv('SessionStart', AR1), {
+    ...codexOptions(p),
+    agyAppDataDir: appData,
+    importSqlite,
+  });
+  // 1 (self AR1) + 4 (first 4 active peers) = 5 DB opens
+  assert.equal(opened, 5);
+  assert.deepEqual(Object.keys(res.snapshot.agents).sort(), [
+    `agy:${AR1}`,
+    `agy:${workSub1}`,
+    `agy:${workSub2}`,
+    `agy:${workRoot3}`,
+  ].sort());
+  assert.deepEqual(res.diagnostics.filter(d => d.code === 'AGY_CLASSIFICATION_UNAVAILABLE'), [{
+    code: 'AGY_CLASSIFICATION_UNAVAILABLE',
+    message: 'peer classification cap (4) reached',
+    agentId: `agy:${workRoot3}`,
+  }]);
+});
+
+test('agy unknown classification emits diagnostic, retires nothing, and upserts normally', async t => {
+  const p = await tempState(t);
+  const { appData } = agyStore(t, {
+    conversation: AR1,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: AR1 }),
+  });
+  const o = { ...codexOptions(p), agyAppDataDir: appData };
+  await applyEvent(agyEv('Stop', AR1), o);
+
+  // AS1 has no DB file -> unknown classification on SessionStart and Stop; retires nothing and Stop upserts 'done' instead of deleting
+  const sStart = await applyEvent(agyEv('SessionStart', AS1), o);
+  assert.ok(sStart.diagnostics.some(d => d.code === 'AGY_CLASSIFICATION_UNAVAILABLE' && d.agentId === `agy:${AS1}`));
+  assert.ok(sStart.snapshot.agents[`agy:${AR1}`]);
+  assert.equal(sStart.snapshot.agents[`agy:${AS1}`].state, 'idle');
+
+  const sStop = await applyEvent(agyEv('Stop', AS1), o);
+  assert.ok(sStop.diagnostics.some(d => d.code === 'AGY_CLASSIFICATION_UNAVAILABLE' && d.agentId === `agy:${AS1}`));
+  assert.ok(sStop.snapshot.agents[`agy:${AR1}`]);
+  assert.equal(sStop.snapshot.agents[`agy:${AS1}`].state, 'done');
+
+  // Now AR1 (known root) fires PreToolUse and retires 'done' AS1
+  const afterRoot = await applyEvent(agyEv('PreToolUse', AR1), o);
+  assert.deepEqual(Object.keys(afterRoot.snapshot.agents), [`agy:${AR1}`]);
+});
+
+test('resolveAgyAppDataDir follows agyAppDataDir -> ANTIGRAVITY_APP_DATA_DIR -> HOME fallback order', async t => {
+  const p = await tempState(t);
+  const { appData } = agyStore(t, {
+    conversation: AR1,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: AR1 }),
+  });
+  writeAgyMeta(appData, AR2, AR2);
+
+  // 1. env.ANTIGRAVITY_APP_DATA_DIR fallback
+  await applyEvent(agyEv('Stop', AR1), codexOptions(p));
+  let res = await applyEvent(agyEv('SessionStart', AR2), {
+    ...codexOptions(p),
+    env: { ANTIGRAVITY_APP_DATA_DIR: appData },
+  });
+  assert.deepEqual(Object.keys(res.snapshot.agents), [`agy:${AR2}`]);
+
+  // 2. env.HOME fallback (<HOME>/.gemini/antigravity-cli)
+  const fakeHome = join(p.stateDir, '..', 'fake-home');
+  const homeAppData = join(fakeHome, '.gemini', 'antigravity-cli');
+  await fs.mkdir(join(homeAppData, 'conversations'), { recursive: true });
+  writeAgyMeta(homeAppData, AR1, AR1);
+  writeAgyMeta(homeAppData, AR2, AR2);
+  res = await applyEvent(agyEv('SessionStart', AR1), {
+    ...codexOptions(p),
+    env: { HOME: fakeHome },
+  });
+  assert.deepEqual(Object.keys(res.snapshot.agents), [`agy:${AR1}`]);
 });

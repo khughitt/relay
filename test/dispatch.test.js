@@ -16,6 +16,7 @@ import { relayError } from '../src/protocol.js';
 import { CONTEXT_LIMIT } from '../src/adapters/reply.js';
 import { RECONCILE } from '../src/subscribers.js';
 import { tempPaths, writeSubscribers } from './helpers/fixture.js';
+import { agyStore, encodeTrajectoryMetadata } from './helpers/agy-store.js';
 import { processMarker, noneMarked, reapMarked } from './helpers/survivors.js';
 
 const fixture = new URL('./fixtures/subscriber.js', import.meta.url).pathname;
@@ -497,4 +498,77 @@ test('a budget that cannot be planned refuses agy PreToolUse and leaves other ha
   assert.equal(stop.exitCode, 0); assert.equal(stop.stdout, ''); assert.match(stop.stderr, /\S/);
   const claude = await hook(p, { outerMs: 400 });
   assert.equal(claude.exitCode, 1); assert.equal(claude.stdout, ''); assert.match(claude.stderr, /\S/);
+});
+
+test('dispatchHook forwards agyAppDataDir from artifactDirectoryPath and falls back to deps.env', async (t) => {
+  const p = await tempPaths(t);
+  const r1 = '0199f000-0000-7000-8000-000000000501';
+  const r2 = '0199f000-0000-7000-8000-000000000502';
+  const r3 = '0199f000-0000-7000-8000-000000000503';
+  const { appData } = agyStore(t, {
+    conversation: r1,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: r1 }),
+  });
+  const { DatabaseSync } = await import('node:sqlite');
+  for (const id of [r2, r3]) {
+    const db = new DatabaseSync(join(appData, 'conversations', `${id}.db`));
+    try {
+      db.exec('pragma journal_mode = WAL; create table trajectory_metadata_blob (id text DEFAULT "main", data blob)');
+      db.prepare('insert into trajectory_metadata_blob (id, data) values (?, ?)').run('main', encodeTrajectoryMetadata({ rootConversationId: id }));
+    } finally {
+      db.close();
+    }
+  }
+
+  // R1 finishes with valid artifactDirectoryPath
+  await hook(p, {
+    harness: 'agy',
+    nativeEvent: 'Stop',
+    body: JSON.stringify({
+      conversationId: r1,
+      artifactDirectoryPath: `${appData}/brain/${r1}`,
+      workspacePaths: ['/repo'],
+      executionNum: 0,
+    }),
+  });
+  assert.deepEqual(Object.keys((await readSnapshot({ paths: p })).agents), [`agy:${r1}`]);
+
+  // R2 starts with valid artifactDirectoryPath -> retires R1 via payload-derived agyAppDataDir
+  const res2 = await hook(p, {
+    harness: 'agy',
+    nativeEvent: 'SessionStart',
+    body: JSON.stringify({
+      conversationId: r2,
+      artifactDirectoryPath: `${appData}/brain/${r2}`,
+      workspacePaths: ['/repo'],
+    }),
+    deps: { env: { HOME: '/nonexistent' } },
+  });
+  assert.deepEqual(res2, { stdout: '', stderr: '', exitCode: 0 });
+  assert.deepEqual(Object.keys((await readSnapshot({ paths: p })).agents), [`agy:${r2}`]);
+
+  // R2 finishes, then R3 starts with relative artifactDirectoryPath -> falls back to deps.env.ANTIGRAVITY_APP_DATA_DIR
+  await hook(p, {
+    harness: 'agy',
+    nativeEvent: 'Stop',
+    body: JSON.stringify({
+      conversationId: r2,
+      artifactDirectoryPath: 'relative/brain/' + r2,
+      workspacePaths: ['/repo'],
+      executionNum: 0,
+    }),
+    deps: { env: { ANTIGRAVITY_APP_DATA_DIR: appData } },
+  });
+  const res3 = await hook(p, {
+    harness: 'agy',
+    nativeEvent: 'SessionStart',
+    body: JSON.stringify({
+      conversationId: r3,
+      artifactDirectoryPath: 'relative/brain/' + r3,
+      workspacePaths: ['/repo'],
+    }),
+    deps: { env: { ANTIGRAVITY_APP_DATA_DIR: appData } },
+  });
+  assert.deepEqual(res3, { stdout: '', stderr: '', exitCode: 0 });
+  assert.deepEqual(Object.keys((await readSnapshot({ paths: p })).agents), [`agy:${r3}`]);
 });

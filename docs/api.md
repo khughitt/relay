@@ -16,7 +16,7 @@ Package `"relay"` exports (`package.json`):
 Companion reference documents:
 
 - [Live-Agent Registry and Lock Protocol](registry.md): `$STATE/agents.json` schema 2, `$STATE/agents.lock` and `$STATE/agents.lock.reclaim` tokens, start-time intervals, liveness sweeps, and `reapRegistry`.
-- [Harness Adapters, Hook Dispatch, and Model Resolution](adapters.md): `Event` contract, session and terminal process ancestry, per-harness event mappings, Codex worker rows and root retirement, Codex model resolution, and `relay hook` budgets, guard protocol, and observer protocol.
+- [Harness Adapters, Hook Dispatch, and Model Resolution](adapters.md): `Event` contract, session and terminal process ancestry, per-harness event mappings, Codex worker rows and root retirement, `agy` conversation retirement and subagent rows, Codex and `agy` model resolution, and `relay hook` budgets, guard protocol, and observer protocol.
 - [Interaction Messages, Inbox Service, and Question Routes](questions.md): interaction message and entry schemas, 9-state lifecycle, `$STATE/serve.sock` NDJSON protocol, loopback/Tailscale HTTP guard, and the Claude Code and Codex question routes.
 
 ## Public interfaces
@@ -62,6 +62,9 @@ type MutationOptions = ReadOptions & {
     repoRoot: string | null; remote: string | null;
   }>;
   resolveSessionPid?: (adapter: Adapter) => number | null;
+  agyAppDataDir?: string | null;
+  env?: NodeJS.ProcessEnv;
+  importSqlite?: () => Promise<typeof import('node:sqlite')>;
 };
 type MutationResult = {
   snapshot: Snapshot | null; changed: boolean; reaped: string[];
@@ -160,6 +163,7 @@ Storage, process, lock, dispatch, install, and model error codes:
 - `INVALID_ARTIFACT` (an install artifact fails validation, or a rollback artifact file is not valid JSON; the message names the file), `TARGET_DRIFT` (an install or rollback target holds neither the artifact's before nor after image, or is absent where the operation expected an image; the message names the path, says which, and names the image the operation expected), `UNSAFE_TARGET` (a target is a symlink or not a regular file)
 - `INVALID_REPLY`, `UNSUPPORTED_REPLY`, `INVALID_CONFIG`, `INVALID_EVIDENCE`, `UNSUPPORTED_BINDING`, `GUARD_FAILED`
 - `BACKGROUND_UNREADABLE` (appears only as a diagnostic on Claude Code `Stop`, never as a thrown error)
+- `AGY_CLASSIFICATION_UNAVAILABLE` (appears only as a diagnostic on `agy` registry mutations when conversation classification is unavailable or capped, never as a thrown error)
 - `INVALID_ROLLOUT`, `INVALID_RECORD`, `UNSUPPORTED_RUNTIME` (agy model resolution requires SQLite support in the running Node)
 
 Interaction error codes (`relay serve`, `relay ask`, `relay inbox`, `relay presence`; see [questions.md](questions.md#failure-modes)):

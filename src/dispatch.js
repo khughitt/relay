@@ -1,5 +1,6 @@
 // @ts-check
 import { adapterFor, normalizeEvent } from './adapters/index.js';
+import { appDataDirFromPayload } from './adapters/agy.js';
 import { readNativeInput } from './adapters/payload.js';
 import { parseReply, CONTEXT_LIMIT } from './adapters/reply.js';
 import { paths as defaultPaths } from './bus/paths.js';
@@ -111,7 +112,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   // An installed entry names its file, so the hook environment decides nothing about
   // policy. State paths are only needed for publication, where failure is diagnostic.
   const statePaths = () => deps.paths ?? defaultPaths(deps.env ?? process.env);
-  let paths = /** @type {import("./types.js").Paths|null} */ (null), event, guards, observers;
+  let paths = /** @type {import("./types.js").Paths|null} */ (null), event, guards, observers, agyAppDataDir = /** @type {string|null|undefined} */ (undefined);
   try {
     if (subscribersPath === null) paths = statePaths();
     const load = subscribersPath === null ? () => loadConfig(/** @type {import("./types.js").Paths} */ (paths)) : () => loadConfigFrom(subscribersPath);
@@ -119,6 +120,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
     checkBudget(config, budget, { harness, kind: adapter.events[nativeEvent].kind });
     const raw = await readInput(input, { clock, deadline: Math.min(workDeadline, start + budget.inputMs) });
     event = normalizeEvent(harness, nativeEvent, raw);
+    if (harness === 'agy') agyAppDataDir = applyOptions.agyAppDataDir === undefined ? appDataDirFromPayload(raw, event.sessionId) : applyOptions.agyAppDataDir;
     if (event.background === null) diagnostics.push('BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries');
     const matching = matchSubscribers(config, event);
     guards = matching.filter((subscriber) => subscriber.role === 'guard');
@@ -131,7 +133,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   try {
     paths ??= statePaths();
     const deadline = Math.min(workDeadline, clock() + budget.registryMs);
-    result = await bounded(() => apply(event, { ...applyOptions, paths: /** @type {import("./types.js").Paths} */ (paths), clock, deadline }), { clock, deadline }, 'registry publication did not finish before the deadline');
+    result = await bounded(() => apply(event, { ...applyOptions, ...(agyAppDataDir === undefined ? {} : { agyAppDataDir }), ...(applyOptions.env === undefined ? { env: deps.env ?? process.env } : {}), paths: /** @type {import("./types.js").Paths} */ (paths), clock, deadline }), { clock, deadline }, 'registry publication did not finish before the deadline');
     for (const diagnostic of result.diagnostics) diagnostics.push(`${diagnostic.code}: ${diagnostic.message}${diagnostic.agentId ? ` (${diagnostic.agentId})` : ''}`);
   } catch (caught) { const cause = /** @type {import('./types.js').Failure} */ (caught); diagnostics.push(`registry: ${describe(cause)}`); }
   if (result === null) for (const observer of observers) diagnostics.push(`SUBSCRIBER_SKIPPED: ${observer.name} skipped after registry failure`);
