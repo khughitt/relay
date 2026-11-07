@@ -2,10 +2,11 @@
 import { isAbsolute } from 'node:path';
 import { bindingsFor, planHooks, planRouteHooks, routeBindings } from './hooks.js';
 import { validateCapabilities } from './capabilities.js';
+import { relayError } from '../protocol.js';
 
 /** @param {import("../types.js").InstallPlan} options @returns {import("../types.js").Artifact} */
 export function planClaudeCode({ target, text, relayBin, nodeBin = process.execPath, subscribersPath, subscribers, evidence = null, retireFamiliar = false, withAsk = false, installedVersion }) {
-  if (!isAbsolute(target) || !isAbsolute(relayBin) || !isAbsolute(nodeBin ?? '') || !isAbsolute(subscribersPath ?? '') || typeof text !== 'string') throw new Error('Claude target, relay path, node path, subscriber path, and text must be explicit');
+  if (!isAbsolute(target) || !isAbsolute(relayBin) || !isAbsolute(nodeBin ?? '') || !isAbsolute(subscribersPath ?? '') || typeof text !== 'string') throw relayError('INVALID_CONFIG', 'Claude target, relay path, node path, subscriber path, and text must be explicit');
   const capability = validateCapabilities({ harness: 'claude-code', subscribers, bindings: bindingsFor('claude-code'), evidence });
   let after = planHooks({ text, harness: 'claude-code', relayBin, nodeBin, subscribersPath, retireFamiliar });
   // The route is reconciled on every install: without --with ask it declares no rows, so a

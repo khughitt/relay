@@ -7,5 +7,5 @@ test('Claude planner creates one explicit settings artifact', () => {
   assert.equal(result.changes[0].path, '/checkout/ai/claude/settings.work.json');
   assert.match(result.changes[0].after, /Notification/);
   assert.match(result.changes[0].after, /--subscribers '\/home\/me\/\.config\/relay\/subscribers\.json'/);
-  assert.throws(() => planClaudeCode({ target: '/checkout/ai/claude/settings.work.json', text: '{"hooks":{}}', relayBin: '/relay/bin/relay', subscribers: { subscribers: [] } }), /subscriber/);
+  assert.throws(() => planClaudeCode({ target: '/checkout/ai/claude/settings.work.json', text: '{"hooks":{}}', relayBin: '/relay/bin/relay', subscribers: { subscribers: [] } }), { code: 'INVALID_CONFIG', message: /subscriber/ });
 });
