@@ -59,14 +59,15 @@ export function writeAtomicSync(path, text, { io = fs, suffix = randomUUID } = {
   }
 }
 
-// A target holding neither image refuses, naming the image the operation expected to find there.
+// A target holding neither image (or absent where an image was expected) refuses, naming the image the operation expected to find there.
 /** @param {import("../types.js").Change} change @param {typeof fs} io @param {'apply'|'rollback'} operation */
 const targetState = (change, io, operation) => {
   const current = inspect(change.path, io);
   if (current === change.after) return 'after';
   if (current === change.before) return 'before';
   const expected = operation === 'rollback' ? 'its after image' : change.before === null ? 'it absent' : 'its before image';
-  throw relayError('TARGET_DRIFT', `target drift: ${change.path} matches neither image; ${operation} expected ${expected}`);
+  const found = current === null ? 'is absent' : 'matches neither image';
+  throw relayError('TARGET_DRIFT', `target drift: ${change.path} ${found}; ${operation} expected ${expected}`);
 };
 
 /** @param {string} path @param {unknown} value */

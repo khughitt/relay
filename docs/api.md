@@ -157,7 +157,7 @@ Storage, process, lock, dispatch, install, and model error codes:
 - `PROCESS_UNREADABLE`, `PROCESS_UNAVAILABLE`, `DEADLINE_EXCEEDED`
 - `LOCK_TIMEOUT`, `LOCK_IDENTITY_UNKNOWN`, `LOCK_REPAIR_REQUIRED`, `LOCK_CLEANUP_FAILED`, `LOCK_OWNERSHIP_LOST` (see [`registry-lock-repair.md`](runbooks/registry-lock-repair.md))
 - `IO_ERROR`, `GIT_ERROR`, `USAGE`
-- `INVALID_ARTIFACT` (an install artifact fails validation), `TARGET_DRIFT` (an install or rollback target holds neither the artifact's before nor after image; the message names the path and the image the operation expected), `UNSAFE_TARGET` (a target is a symlink or not a regular file)
+- `INVALID_ARTIFACT` (an install artifact fails validation, or a rollback artifact file is not valid JSON; the message names the file), `TARGET_DRIFT` (an install or rollback target holds neither the artifact's before nor after image, or is absent where the operation expected an image; the message names the path, says which, and names the image the operation expected), `UNSAFE_TARGET` (a target is a symlink or not a regular file)
 - `INVALID_REPLY`, `UNSUPPORTED_REPLY`, `INVALID_CONFIG`, `INVALID_EVIDENCE`, `UNSUPPORTED_BINDING`, `GUARD_FAILED`
 - `BACKGROUND_UNREADABLE` (appears only as a diagnostic on Claude Code `Stop`, never as a thrown error)
 - `INVALID_ROLLOUT`, `INVALID_RECORD`, `UNSUPPORTED_RUNTIME` (agy model resolution requires SQLite support in the running Node)

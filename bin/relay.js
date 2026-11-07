@@ -249,7 +249,11 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     }
     if (cmd.path[0] === 'rollback') {
       const f = flags(rest, cmd); if (!f['--artifact'] || Object.keys(f).length !== 1) throw usage('rollback requires only --artifact FILE');
-      (await import('../src/install/atomic.js')).rollbackArtifact(JSON.parse(readFileSync(f['--artifact'], 'utf8')));
+      const text = readFileSync(f['--artifact'], 'utf8');
+      let artifact;
+      try { artifact = JSON.parse(text); }
+      catch (cause) { throw relayError('INVALID_ARTIFACT', `invalid artifact: ${f['--artifact']} is not valid JSON`, cause); }
+      (await import('../src/install/atomic.js')).rollbackArtifact(artifact);
       return 0; // output = "none": nothing on success in any mode
     }
     if (cmd.path[0] === 'model') {
