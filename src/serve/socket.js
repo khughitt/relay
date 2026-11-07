@@ -8,6 +8,7 @@ import { relayError, validateHandle } from '../protocol.js';
 import { isUuid, validateMessage } from '../interaction/message.js';
 import { lineReader } from './lines.js';
 import {publicView} from './public-entry.js';
+import { checkSocketPath } from './socket-path.js';
 /** @typedef {import("node:net").Socket & {waiting: Map<string, Owner>, watching?: boolean, unwatch?: () => void}} ServiceSocket */
 /** @typedef {{socket: ServiceSocket, previous: Owner|null|undefined, accepted: boolean, refused: boolean}} Owner */
 // relay serve's local socket (docs/questions.md, "Local socket protocol"). A connection that asked a question is that
@@ -19,6 +20,7 @@ const send = (socket, value) => { if (!socket.destroyed) socket.write(`${JSON.st
 const kind = (message, expected) => { if (message.kind !== expected) throw relayError('INVALID_MESSAGE', `expected a ${expected} message`); return /** @type {Extract<import("../types.js").Message, {kind: K}>} */ (message); };
 /** @param {{inbox: import("../types.js").Inbox, socketPath: string, processOps: import("../types.js").ProcessOps, reattachMs?: number, log: (line: string) => void}} options */
 export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 10000, log }) {
+  checkSocketPath(socketPath);
   await ensurePrivateDir(dirname(socketPath));
   let existing;
   try { existing = await fs.lstat(socketPath); } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught); if (error.code !== 'ENOENT') throw error; }

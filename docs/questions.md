@@ -122,7 +122,7 @@ Detached questions (`native: null`, `from: { kind: 'agent', ... }`, `to: { kind:
 
 ## Local socket protocol
 
-`$STATE/serve.sock` (`src/serve/socket.js`) is privately owned with mode `0600`. Each newline-delimited JSON request is `{reqId, op, ...fields}` (capped at 1 MiB in UTF-8 bytes per line); responses are `{reqId, ok: true, ...result}` or `{reqId, ok: false, error: {code, message}, entry?, ...detail}`.
+`$STATE/serve.sock` (`src/serve/socket.js`) is privately owned with mode `0600`. Its path must fit the platform's `sun_path` less the terminating NUL (107 UTF-8 bytes on Linux, 103 on Darwin): serve and clients refuse a longer one with `INVALID_CONFIG` before binding or connecting (`src/serve/socket-path.js`), since Node either fails it with a bare `EINVAL` or, on Node 22, silently truncates it to another file. Each newline-delimited JSON request is `{reqId, op, ...fields}` (capped at 1 MiB in UTF-8 bytes per line); responses are `{reqId, ok: true, ...result}` or `{reqId, ok: false, error: {code, message}, entry?, ...detail}`.
 
 | `op` | Fields | Result / pushes / errors |
 | --- | --- | --- |
