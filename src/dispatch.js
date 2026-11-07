@@ -103,8 +103,8 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   const capability = adapter.replies[nativeEvent] ?? NONE;
   /** @param {string} reason */
   const refuse = (reason) => adapter.encodeReply(nativeEvent, { decision: 'deny', reason });
-  // Fail closed for configured guards: any failure relay survives becomes a native refusal
-  // where one exists; elsewhere it is reported because no refusal channel can be manufactured.
+  // Fail closed whether or not guards are configured: any failure relay survives becomes a native
+  // refusal where one exists; elsewhere it is reported because no refusal channel can be manufactured.
   /** @param {import("./types.js").Failure} error */
   const abort = (error) => capability.refuse ? refuse(refusalReason(error)) : failure(error);
   const workDeadline = start + budget.totalMs - budget.reserveMs, diagnostics = /** @type {string[]} */ ([]);

@@ -370,7 +370,7 @@ test('a replaced worker stop still reaches guards and observers; a refusal prese
     assert.equal(seen[0].event.agentId,'codex:worker');assert.equal(seen[0].event.root,'codex:old');
     if(deny){assert.equal(seen.length,1);assert.equal(await readFile(p.agentsPath,'utf8'),bytes);}
     else{const after=await readSnapshot({paths:p});assert.equal(after.agents['codex:worker'],undefined);
-      assert.equal(seen[1].event.agentId,'codex:worker');assert.equal(seen[1].registry.revision,before.revision+1);
+      assert.equal(seen[1].event.agentId,'codex:worker');assert.equal(seen[1].event.root,'codex:old');assert.equal(seen[1].registry.revision,before.revision+1);
       assert.equal(seen[1].changed,true);assert.deepEqual(after.agents['codex:next'],before.agents['codex:next']);}
   }
 });
@@ -405,7 +405,7 @@ test('reconcile rejects a reap that fulfills after its deadline without notifyin
 });
 
 // Characterization, not a fix: relay fails closed on malformed Codex worker input with no
-// guard configured, and on SubagentStop the refusal is a continuation. Spec:
+// guard configured, and on root Stop and SubagentStop the refusal is a continuation. Spec:
 // docs/adapters.md ("Event mappings").
 test('a malformed Codex agent_id refuses even with no guard, and publishes nothing', async (t) => {
   const p = await tempPaths(t);
@@ -414,6 +414,9 @@ test('a malformed Codex agent_id refuses even with no guard, and publishes nothi
   let r = await codex('PreToolUse', { agent_id: null });
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /"permissionDecision":"deny".*relay refused: INVALID_INPUT: invalid worker agent_id/);
   r = await codex('SubagentStop', { agent_id: null, stop_hook_active: true });
+  assert.deepEqual(r, { stdout: '{"decision":"block","reason":"relay refused: INVALID_INPUT: invalid worker agent_id"}\n',
+    stderr: 'relay refused: INVALID_INPUT: invalid worker agent_id\n', exitCode: 2 });
+  r = await codex('Stop', { agent_id: null, stop_hook_active: true });
   assert.deepEqual(r, { stdout: '{"decision":"block","reason":"relay refused: INVALID_INPUT: invalid worker agent_id"}\n',
     stderr: 'relay refused: INVALID_INPUT: invalid worker agent_id\n', exitCode: 2 });
   r = await codex('SubagentStart', {});

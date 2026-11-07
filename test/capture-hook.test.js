@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -6,6 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const lib = new URL('../tools/codex-subagent-capture/lib.sh', import.meta.url).pathname;
+// lib.sh builds every record with jq; without it the hook fails with an unrelated-looking error.
+before(() => {
+  const jq = spawnSync('jq', ['--version'], { env: { PATH: process.env.PATH ?? '' }, encoding: 'utf8' });
+  if (jq.error || jq.status !== 0) throw new Error(`capture-hook tests need jq on PATH (tools/codex-subagent-capture/lib.sh runs it): ${jq.error?.message ?? jq.stderr}`);
+});
 test('the capture hook records CODEX_* names but only the id values, never a credential', async t => {
   const out = await mkdtemp(join(tmpdir(), 'relay-capture-hook-'));
   t.after(() => rm(out, { recursive: true, force: true }));

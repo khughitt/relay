@@ -39,6 +39,11 @@ test('a worker identity is refused rather than guessed', () => {
   for (const agent_id of ['', ' ', null, 7, R]) {
     assert.throws(() => normalizeEvent('codex', 'PreToolUse', payload({ ...tool, agent_id })), { code: 'INVALID_INPUT' }, String(agent_id));
   }
+  for (const [native, fields] of [['SubagentStart', {}], ['SubagentStop', { stop_hook_active: false }]]) {
+    for (const agent_id of ['', R]) {
+      assert.throws(() => normalizeEvent('codex', native, payload({ ...fields, agent_id })), { code: 'INVALID_INPUT' }, `${native} ${JSON.stringify(agent_id)}`);
+    }
+  }
 });
 test('a Claude Code payload carrying agent_id is not routed', () => {
   const event = normalizeEvent('claude-code', 'PreToolUse', payload({ ...tool, agent_id: W }));
