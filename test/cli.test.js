@@ -140,3 +140,10 @@ test('install and ask refuse agy',async t=>{
     assert.equal(r.status,2,r.stderr);assert.match(r.stderr,/claude-code/);assert.match(r.stderr,/codex/);
   }
 });
+
+test('list text names each row\'s scope, and a worker\'s root',async()=>{
+  const row=(id,scope,extra={})=>({id,harness:'codex',scope,state:'working',...extra});
+  const snapshot={agents:{'codex:r1':row('codex:r1','session'),'codex:w1':row('codex:w1','worker',{root:'codex:r1'})}};
+  let out='';const code=await main(['list','--pretty'],{stdout:{write:(s,cb)=>{out+=s;cb?.();}},stderr:{write:(s,cb)=>cb?.()},list:async()=>({snapshot,liveness:{}})});
+  assert.equal(code,0);assert.equal(out,'codex:r1 codex working session\ncodex:w1 codex working worker root=codex:r1\n');
+});

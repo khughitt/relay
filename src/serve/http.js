@@ -132,7 +132,7 @@ export async function serveHttp({ inbox, http: cfg, readAgents, clock = Date.now
     if (req.method === 'GET' && pathname === '/v1/presence') return json(res, 200, { presence: inbox.presence() });
     if (req.method === 'GET' && pathname === '/v1/agents') {
       const snapshot = await readAgents();
-      return json(res, 200, { agents: Object.values(snapshot?.agents ?? {}).map((a) => ({ id: a.id, harness: a.harness, project: a.project, state: a.state })) });
+      return json(res, 200, { agents: Object.values(snapshot?.agents ?? {}).map((a) => ({ id: a.id, harness: a.harness, project: a.project, state: a.state, scope: a.scope, ...(a.root ? { root: a.root } : {}) })) });
     }
     if (req.method === 'PUT' && pathname === '/v1/presence') return json(res, 200, { presence: await inbox.setPresence((await readBody(req)).mode) });
     if (req.method === 'POST' && match?.[2]) {

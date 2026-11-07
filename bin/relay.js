@@ -143,7 +143,7 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
       if (mode === 'json') await emit(stdout, `${JSON.stringify(r)}\n`);
       else {
         const agents = Object.values(r.snapshot?.agents ?? {});
-        await emit(stdout, agents.map((a) => `${a.id} ${a.harness} ${a.state}\n`).join(''));
+        await emit(stdout, agents.map((a) => `${a.id} ${a.harness} ${a.state} ${a.scope}${a.root ? ` root=${a.root}` : ''}\n`).join(''));
       }
       return 0;
     }

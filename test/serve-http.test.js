@@ -114,6 +114,16 @@ test('inbox listing, one entry, defer, presence, agents', async (t) => {
   assert.equal((await call(port, { path: '/v1/presence', headers: h })).json.presence.mode, 'here');
   assert.deepEqual((await call(port, { path: '/v1/agents', headers: h })).json, { agents: [] });
 });
+test('agents carry scope, and root for a worker row, so a worker does not read as a top-level agent', async (t) => {
+  const row = (id, scope, extra = {}) => ({ id, harness: 'codex', sessionId: id.slice(6), scope, process: null, cwd: '/project', repoRoot: null, remote: null,
+    projectKey: 'project', project: 'project', state: 'working', updatedAt: 1, ...extra });
+  const agents = { 'codex:r1': row('codex:r1', 'session'), 'codex:w1': row('codex:w1', 'worker', { root: 'codex:r1' }) };
+  const { port } = await setup(t, { readAgents: async () => ({ agents }) });
+  assert.deepEqual((await call(port, { path: '/v1/agents', headers: local(port) })).json, { agents: [
+    { id: 'codex:r1', harness: 'codex', project: 'project', state: 'working', scope: 'session' },
+    { id: 'codex:w1', harness: 'codex', project: 'project', state: 'working', scope: 'worker', root: 'codex:r1' },
+  ] });
+});
 test('an event stream closed while its registration is queued leaves no listener', { timeout: 10000 }, async (t) => {
   const paused = pauseWrites(); t.after(() => paused.release());
   const { port, q, inbox } = await setup(t, { io: paused.io }), baseline = inbox.subscribers();
@@ -350,7 +360,7 @@ test('agent display is filtered from the actual registry without mutating or pru
   t.after(async () => { abort.abort(); await run; });
   assert.equal((await started).httpPort, port);
   const r = await call(port, { path: '/v1/agents', headers: local(port) });
-  assert.deepEqual(r.json, { agents: [{ id: 'claude-code:s1', harness: 'claude-code', project: 'project', state: 'idle' }] });
+  assert.deepEqual(r.json, { agents: [{ id: 'claude-code:s1', harness: 'claude-code', project: 'project', state: 'idle', scope: 'session' }] });
   assert.deepEqual(await fs.readFile(p.agentsPath), before);
   const client = await connectSocket(servePaths(p.stateDir).socketPath); t.after(() => client.close());
   assert.equal((await client.request('presence.get')).presence.mode, 'here');
