@@ -1,8 +1,9 @@
 // @ts-check
 import { relayError } from '../protocol.js';
-// A Unix socket path must fit sockaddr_un's sun_path with its terminating NUL: 108 bytes on Linux, 104 on Darwin.
-// Past that, newer Node fails bind and connect with a bare EINVAL and Node 22 silently truncates the path, so serve
-// would bind (and clients reach) a different file. Both the bind and the connect site refuse first.
+// sockaddr_un's sun_path is 108 bytes on Linux and 104 on Darwin. Linux accepts an unterminated full-length path, but
+// relay reserves the terminating NUL so one limit rule holds on both platforms. Past the full length, newer Node fails
+// bind and connect with a bare EINVAL and Node 22 silently truncates the path, so serve would bind (and clients reach)
+// a different file. relay serve, the bind site and the connect site all refuse first. Only Linux and Darwin are known.
 /** @type {Readonly<Record<'linux'|'darwin', number>>} */
 export const SOCKET_PATH_LIMITS = Object.freeze({ linux: 107, darwin: 103 });
 /** @param {string} socketPath @param {NodeJS.Platform} [platform] @returns {string} */

@@ -8,7 +8,7 @@ import { openInbox } from '../src/serve/inbox.js';
 import { serveSocket } from '../src/serve/socket.js';
 import { connectSocket } from '../src/serve/client.js';
 import { checkSocketPath, SOCKET_PATH_LIMITS } from '../src/serve/socket-path.js';
-import { servePaths } from '../src/serve/serve.js';
+import { runServe, servePaths } from '../src/serve/serve.js';
 import { expectAnswers } from '../src/routes/index.js';
 import { createProcessOps } from '../src/bus/proc.js';
 import { runAsk } from '../src/routes/ask.js';
@@ -53,13 +53,21 @@ test('serve binds and a client connects at the limit', async (t) => {
   assert.equal((await client.request('presence.get')).ok, true);
 });
 
-test('serve refuses one byte over the limit before binding anything', async (t) => {
+test('serveSocket refuses a path over the limit before binding anything', async (t) => {
+  // Two bytes over is where Node 22 used to bind a truncated path; check that file never appears.
+  for (const over of [1, 2]) {
+    const stateDir = await stateDirFor(t, LIMIT + over), { socketPath } = servePaths(stateDir);
+    const inbox = await inboxFor(stateDir), before = await fs.readdir(stateDir);
+    await assert.rejects(serveSocket({ inbox, socketPath, processOps: createProcessOps(), reattachMs: 60000, log: () => {} }), tooLong(socketPath));
+    assert.deepEqual(await fs.readdir(stateDir), before);
+    await assert.rejects(fs.lstat(socketPath.slice(0, LIMIT + 1)), { code: 'ENOENT' });
+  }
+});
+
+test('relay serve refuses an over-long socket path before taking its lock or opening the inbox', async (t) => {
   const stateDir = await stateDirFor(t, LIMIT + 1), { socketPath } = servePaths(stateDir);
-  const inbox = await inboxFor(stateDir), before = await fs.readdir(stateDir);
-  await assert.rejects(serveSocket({ inbox, socketPath, processOps: createProcessOps(), reattachMs: 60000, log: () => {} }), tooLong(socketPath));
-  assert.deepEqual(await fs.readdir(stateDir), before);
-  // Node 22 would have bound the 107-byte truncation instead.
-  await assert.rejects(fs.lstat(socketPath.slice(0, -1)), { code: 'ENOENT' });
+  await assert.rejects(runServe({ env: { HOME: stateDir, RELAY_STATE_DIR: stateDir }, log: () => {} }), tooLong(socketPath));
+  assert.deepEqual(await fs.readdir(stateDir), []);
 });
 
 test('clients refuse one byte over the limit instead of reporting serve as down', async (t) => {

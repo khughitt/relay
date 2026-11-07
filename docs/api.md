@@ -120,7 +120,7 @@ Interaction commands (backed by `relay serve` over `$STATE/serve.sock`; see [que
 
 | Command | Contract |
 | --- | --- |
-| `relay serve` | Foreground service; `SIGTERM`/`SIGINT` drains active work and exits. `serve.sock` must fit the platform's Unix socket path limit (107 UTF-8 bytes on Linux, 103 on Darwin); serve and every client refuse a longer path with `INVALID_CONFIG` before binding or connecting, naming the path, its length, and the remedy (a shorter `RELAY_STATE_DIR` or `XDG_STATE_HOME`). |
+| `relay serve` | Foreground service; `SIGTERM`/`SIGINT` drains active work and exits. `serve.sock` must fit the platform's Unix socket path limit (107 UTF-8 bytes on Linux, 103 on Darwin); serve (before its lock or inbox) and every client (before connecting) refuse a longer path with `INVALID_CONFIG`, naming the path, its length, and the remedy (a shorter `RELAY_STATE_DIR` or `XDG_STATE_HOME`). Other platforms refuse with `INVALID_CONFIG`, since no limit is known for them. |
 | `relay ask --harness claude-code [--handback] PreToolUse\|PostToolUse` | Hook route; strict option order; exits `0` on runtime failures (stdout is the hook reply; runtime errors diagnose on stderr and pass through) and exits `2` on argv usage errors. |
 | `relay inbox list [--since SEQ]` | List current entries plus terminal entries changed after the sequence. |
 | `relay inbox ask --file PATH` | Validate and post one detached question envelope from a UTF-8 JSON file, print the saved entry, and exit without waiting. |

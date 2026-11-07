@@ -122,7 +122,7 @@ Detached questions (`native: null`, `from: { kind: 'agent', ... }`, `to: { kind:
 
 ## Local socket protocol
 
-`$STATE/serve.sock` (`src/serve/socket.js`) is privately owned with mode `0600`. Its path must fit the platform's `sun_path` less the terminating NUL (107 UTF-8 bytes on Linux, 103 on Darwin): serve and clients refuse a longer one with `INVALID_CONFIG` before binding or connecting (`src/serve/socket-path.js`), since Node either fails it with a bare `EINVAL` or, on Node 22, silently truncates it to another file. Each newline-delimited JSON request is `{reqId, op, ...fields}` (capped at 1 MiB in UTF-8 bytes per line); responses are `{reqId, ok: true, ...result}` or `{reqId, ok: false, error: {code, message}, entry?, ...detail}`.
+`$STATE/serve.sock` (`src/serve/socket.js`) is privately owned with mode `0600`. Its path must fit the platform's `sun_path` less a terminating NUL (107 UTF-8 bytes on Linux, 103 on Darwin): serve refuses a longer one with `INVALID_CONFIG` before taking its lock or opening the inbox, and clients before connecting (`src/serve/socket-path.js`). Linux itself accepts a 108-byte path; relay reserves the NUL so one rule holds on both platforms, and past the full `sun_path` Node either fails with a bare `EINVAL` or, on Node 22, silently truncates the path to another file. On any other platform the check refuses with `INVALID_CONFIG`. Each newline-delimited JSON request is `{reqId, op, ...fields}` (capped at 1 MiB in UTF-8 bytes per line); responses are `{reqId, ok: true, ...result}` or `{reqId, ok: false, error: {code, message}, entry?, ...detail}`.
 
 | `op` | Fields | Result / pushes / errors |
 | --- | --- | --- |
