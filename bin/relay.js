@@ -98,7 +98,9 @@ function explicitNode(path, harness) {
 }
 /** @param {string[]} rawArgs */
 export async function main(rawArgs, { list = listAgents, reap = reconcile, hook = dispatchHook, stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {
-  let mode = 'pretty', cmdName = null;
+  /** @type {import('../src/commands.js').OutputMode} */
+  let mode = 'pretty';
+  let cmdName = null;
   try {
     const { argv, mode: flagMode } = stripGlobals(rawArgs, usage);
 
@@ -130,7 +132,7 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
 
     // Protocol rows (hook, ask) print only the harness reply, so RELAY_FORMAT does not apply:
     // reading it would turn a bad value into an exit-2 usage error, which blocks the tool.
-    const resolved = cmd.protocol ? { mode: flagMode ?? 'pretty', silent: false } : resolveMode(flagMode, process.env, cmd, usage);
+    const resolved = cmd.protocol ? { mode: flagMode ?? /** @type {const} */ ('pretty'), silent: false } : resolveMode(flagMode, process.env, cmd, usage);
     mode = resolved.mode;
     const { silent } = resolved;
 

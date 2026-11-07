@@ -5,7 +5,7 @@ import { relayError } from '../protocol.js';
 
 /** @typedef {{idx: number, model: string|null, label: string|null, lastStep: number, cascade: string|null, trajectory: string|null}} Generation */
 /** @param {string} message @returns {never} */
-const invalid = (message) => { throw relayError('INVALID_RECORD', message); };
+function invalid(message) { throw relayError('INVALID_RECORD', message); }
 
 /** @param {Uint8Array} buf @returns {Array<{field: number, wire: 0|1|2|5, value: bigint|Uint8Array}>} */
 export function decodeFields(buf) {
