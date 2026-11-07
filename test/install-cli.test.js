@@ -242,3 +242,14 @@ test('rollback on a drifted target names the code and path in both output modes'
   assert.deepEqual([pretty.code, pretty.out, pretty.err], [1, '', `relay: ${expected}\n`]);
   assert.equal(await readFile(s.target, 'utf8'), '{"hooks":{},"edited":true}\n');
 });
+
+test('rollback of a malformed artifact file names INVALID_ARTIFACT and the file', async (t) => {
+  const s = await scratch(t), file = join(s.root, 'artifact.json');
+  await writeFile(file, '{"schema": 1,');
+  const json = await install(['--json', 'rollback', '--artifact', file]);
+  assert.deepEqual([json.code, json.out], [1, '']);
+  const error = JSON.parse(json.err).error;
+  assert.equal(error.kind, 'rollback_failed');
+  assert.match(error.detail, /^INVALID_ARTIFACT: invalid artifact: /);
+  assert.ok(error.detail.includes(file), error.detail);
+});

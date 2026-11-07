@@ -46,6 +46,23 @@ test('apply refuses preimage drift and a present before-null target', async t =>
   assert.equal(await readFile(p.target, 'utf8'), 'third-party');
 });
 
+test('apply and rollback name an absent target that the operation expected to hold an image', async t => {
+  const p = await setup(t);
+  assert.throws(() => applyArtifact(p.artifact, artifact([change(p.target, 'before', 'after')])),
+    { code: 'TARGET_DRIFT', message: `target drift: ${p.target} is absent; apply expected its before image` });
+  assert.throws(() => rollbackArtifact(artifact([change(p.target, 'before', 'after')])),
+    { code: 'TARGET_DRIFT', message: `target drift: ${p.target} is absent; rollback expected its after image` });
+  assert.equal(fs.existsSync(p.target), false);
+});
+
+test('rollback refuses a before-null target that holds other bytes', async t => {
+  const p = await setup(t);
+  await writeFile(p.target, 'third-party');
+  assert.throws(() => rollbackArtifact(artifact([change(p.target, null, 'after')])),
+    { code: 'TARGET_DRIFT', message: `target drift: ${p.target} matches neither image; rollback expected its after image` });
+  assert.equal(await readFile(p.target, 'utf8'), 'third-party');
+});
+
 test('atomic writer cleans its sibling temporary file after a rename failure', async t => {
   const p = await setup(t), temp = `${p.target}.tmp.fixed`;
   const io = { ...fs, renameSync() { throw new Error('rename blocked'); } };
