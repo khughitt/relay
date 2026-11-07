@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Scripted subscriber for dispatch tests. argv[2] selects the behavior; argv[3] is an optional file path. It reads stdin to EOF first, as a real subscriber must.
+// Scripted subscriber for dispatch tests. argv[2] selects the behavior; argv[3] is an optional file path (for hang, the required test marker). It reads stdin to EOF first, as a real subscriber must.
 import { writeFileSync } from 'node:fs';
 
 const chunks = [];
@@ -19,7 +19,8 @@ switch (mode) {
   case 'extra-field': out({ decision: 'allow', extra: 1 }); break;
   case 'unreasoned': out({ decision: 'deny' }); break;
   case 'crash': process.stderr.write('fixture crashed\n'); process.exit(3); break;
-  case 'hang': setInterval(() => {}, 60000); break;
+  // A hang must carry a survivors.js marker (argv[3]) so the test that spawned it can find and reap it.
+  case 'hang': if (!file?.startsWith('relay-test-')) process.exit(9); setInterval(() => {}, 60000); break;
   case 'slow': await new Promise((resolve) => setTimeout(resolve, Number(file))); out({ decision: 'allow' }); break;
   case 'record': writeFileSync(file, input); out({ decision: 'allow' }); break;
   case 'env': writeFileSync(file, process.env.RELAY_TEST_MARKER ?? ''); out({ decision: 'allow' }); break;
