@@ -1,12 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { accessSync, constants, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { shellQuote } from '../src/install/hooks.js';
 
 const source = fileURLToPath(new URL('..', import.meta.url));
+// The first executable `name` on an explicitly constructed PATH, never the parent's.
+function onPath(name, path) {
+  for (const dir of path.split(':')) {
+    const file = join(dir, name);
+    try { accessSync(file, constants.X_OK); if (statSync(file).isFile()) return file; } catch { /* not here */ }
+  }
+  throw new Error(`${name} is not on ${path}`);
+}
 const policy = 'automatic_broad = false\nbroad_targets = ["test", "test-fast", "check-code"]\n';
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'relay-policy-'));
@@ -42,6 +51,12 @@ if(process.env.FAIL_AT===label) process.exit(7);
     off: () => writeFileSync(join(root, '.tt.toml'), policy),
     markers: () => existsSync(join(root, 'markers.jsonl')) ? readFileSync(join(root, 'markers.jsonl'), 'utf8').trim().split('\n').map(JSON.parse) : [],
     rows: () => readFileSync(env.TT_LOG, 'utf8').trim().split('\n').map(JSON.parse) };
+}
+// A just stand-in for the push hook: it records the recipe and refs it was handed, and delegates
+// --evaluate to the real just, resolved from the fixture's PATH before the stand-in's directory is
+// prepended. The delegate inherits only the fixture environment the hook runs under.
+function fakeJust(bin, path) {
+  writeFileSync(join(bin, 'just'), `#!/bin/sh\nif [ "$1" = --evaluate ]; then exec ${shellQuote(onPath('just', path))} "$@"; fi\nprintf "%s" "$1" > recipe\ncat > refs\nenv > child-env\n`, { mode: 0o755 });
 }
 for (const enabled of [undefined, true, false]) test(`hook preserves hygiene with policy ${enabled}`, (t) => {
   const f = fixture(t);
@@ -91,7 +106,7 @@ test('invalid policy is an error before running a child', (t) => {
 });
 test('push hook routes refs intact, warns when uncovered, and preserves keepalive refusal', (t) => {
   const f = fixture(t), bin = join(f.root, 'bin'); mkdirSync(bin);
-  writeFileSync(join(bin, 'just'), '#!/bin/sh\nif [ "$1" = --evaluate ]; then exec /usr/bin/just "$@"; fi\nprintf "%s" "$1" > recipe\ncat > refs\nenv > child-env\n', { mode: 0o755 });
+  fakeJust(bin, f.env.PATH);
   writeFileSync(join(bin, 'ssh'), '#!/bin/sh\nprintf "serveraliveinterval %s\\n" "${KEEPALIVE:-60}"\n', { mode: 0o755 });
   const line = (ref) => `refs/heads/local ${'1'.repeat(40)} ${ref} ${'0'.repeat(40)}\n`;
   const covered = line('refs/heads/feature/x');
@@ -107,4 +122,14 @@ test('push hook routes refs intact, warns when uncovered, and preserves keepaliv
   assert.doesNotMatch(readFileSync(join(f.root, 'child-env'), 'utf8'), /^GIT_INDEX_FILE=/m);
   assert.deepEqual(f.markers(), []);
   assert.notEqual(f.run('sh', ['.githooks/pre-push', 'origin', 'git@example.invalid:repo'], { PATH: `${bin}:${f.env.PATH}`, KEEPALIVE: '0' }, covered).status, 0);
+});
+test('the fake just delegates --evaluate to the just its fixture PATH resolves', (t) => {
+  const f = fixture(t), alt = join(f.root, 'alt'), bin = join(f.root, 'bin'); mkdirSync(alt); mkdirSync(bin);
+  // A just installed only in a directory other than /usr/bin, standing in for /usr/local/bin.
+  writeFileSync(join(alt, 'just'), `#!/bin/sh\nprintf alt > delegated\nexec ${shellQuote(onPath('just', f.env.PATH))} "$@"\n`, { mode: 0o755 });
+  const path = `${alt}:/usr/bin:/bin`;
+  fakeJust(bin, path);
+  const r = f.run('just', ['--evaluate', 'ci_remote'], { PATH: `${bin}:${path}` });
+  assert.equal(r.status, 0, r.stderr); assert.equal(r.stdout, 'origin');
+  assert.equal(readFileSync(join(f.root, 'delegated'), 'utf8'), 'alt');
 });
