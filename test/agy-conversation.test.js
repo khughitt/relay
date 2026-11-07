@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { decodeFields, generationOf, conversationDatabase, issuingGeneration } from '../src/adapters/agy-conversation.js';
-import { encodeGeneration, agyStore } from './helpers/agy-store.js';
+import { decodeFields, generationOf, conversationDatabase, issuingGeneration, trajectoryRootOf, classifyConversation } from '../src/adapters/agy-conversation.js';
+import { encodeGeneration, encodeTrajectoryMetadata, agyStore } from './helpers/agy-store.js';
 
 const conversation = '45d5430e-0906-4123-8123-0123456789ab';
+const rootOther = '11111111-2222-4333-8444-555555555555';
+const parentOther = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 const generation = (lastStep, extra = {}) => encodeGeneration({ model: 'gemini-4-argon', label: 'Gemini 4 Argon (High)', lastStep, cascade: conversation, ...extra });
 const read = (database, step, extra = {}) => issuingGeneration(database, { conversation, step, ...extra });
 
@@ -27,9 +29,10 @@ test('decodeFields rejects unsupported wires, invalid tags and truncated fields'
 test('generationOf reads metadata and ignores unknown fields', () => {
   const blob = generation(1, { trajectory: 'trajectory', extra: Uint8Array.of(40, 7) });
   assert.deepEqual(generationOf(2, Uint8Array.from([...blob, 26, 2, 8, 9])), {
-    idx: 2, model: 'gemini-4-argon', label: 'Gemini 4 Argon (High)', lastStep: 1, cascade: conversation, trajectory: 'trajectory',
+    idx: 2, model: 'gemini-4-argon', label: 'Gemini 4 Argon (High)', lastStep: 1, cascade: conversation, trajectory: 'trajectory', rootCascade: null,
   });
   assert.equal(generationOf(0, generation(1, { model: undefined })).model, null);
+  assert.equal(generationOf(0, generation(1, { rootCascade: rootOther })).rootCascade, rootOther);
 });
 
 test('generationOf requires a message and a decimal last_step_index', () => {
@@ -42,7 +45,7 @@ test('generationOf preserves leading BOM content in recorded strings', () => {
   const record = generationOf(0, generation(1, { model: '\uFEFFgemini-4-argon', label: '\uFEFFGemini 4 Argon (High)',
     cascade: `\uFEFF${conversation}`, trajectory: '\uFEFFtrajectory' }));
   assert.deepEqual(record, { idx: 0, model: '\uFEFFgemini-4-argon', label: '\uFEFFGemini 4 Argon (High)',
-    lastStep: 1, cascade: `\uFEFF${conversation}`, trajectory: '\uFEFFtrajectory' });
+    lastStep: 1, cascade: `\uFEFF${conversation}`, trajectory: '\uFEFFtrajectory', rootCascade: null });
 });
 
 test('generationOf does not normalize BOM-prefixed metadata keys or decimal values', () => {
@@ -137,4 +140,194 @@ test('wraps open/query errors and closes on malformed rows', async (t) => {
   await assert.rejects(read(database, 3), { code: 'IO_ERROR' });
   fs.writeFileSync(database, 'not SQLite');
   await assert.rejects(read(database, 3), { code: 'IO_ERROR' });
+});
+
+test('trajectoryRootOf classifies root and subagent and rejects malformed or contradictory blobs', () => {
+  assert.deepEqual(trajectoryRootOf(conversation, encodeTrajectoryMetadata({ rootConversationId: conversation })), {
+    kind: 'root', rootConversationId: conversation,
+  });
+  assert.deepEqual(trajectoryRootOf(conversation, encodeTrajectoryMetadata({ rootConversationId: conversation, parentConversationId: '' })), {
+    kind: 'root', rootConversationId: conversation,
+  });
+  assert.deepEqual(trajectoryRootOf(conversation, encodeTrajectoryMetadata({ rootConversationId: rootOther, parentConversationId: parentOther })), {
+    kind: 'subagent', rootConversationId: rootOther,
+  });
+  assert.deepEqual(trajectoryRootOf(conversation, encodeTrajectoryMetadata({ rootConversationId: rootOther })), {
+    kind: 'subagent', rootConversationId: rootOther,
+  });
+  // Contradictory or invalid fields
+  assert.throws(() => trajectoryRootOf('not-a-uuid', encodeTrajectoryMetadata({ rootConversationId: conversation })), { code: 'INVALID_RECORD' });
+  assert.throws(() => trajectoryRootOf(conversation.toUpperCase(), encodeTrajectoryMetadata({ rootConversationId: conversation })), { code: 'INVALID_RECORD' });
+  for (const blob of [
+    encodeTrajectoryMetadata({}),
+    encodeTrajectoryMetadata({ rootConversationId: 'not-a-uuid' }),
+    encodeTrajectoryMetadata({ rootConversationId: conversation, parentConversationId: parentOther }),
+    encodeTrajectoryMetadata({ rootConversationId: rootOther, parentConversationId: conversation }),
+    encodeTrajectoryMetadata({ rootConversationId: rootOther, parentConversationId: 'not-a-uuid' }),
+    // Field 6 as varint (tag 48 = 6 * 8 + 0)
+    Uint8Array.of(48, 1),
+    // Field 5 as varint (tag 40 = 5 * 8 + 0) before valid field 6
+    encodeTrajectoryMetadata({ rootConversationId: conversation, extra: Uint8Array.of(40, 1) }),
+    // Invalid UTF-8 in field 6 (tag 50 = 6 * 8 + 2, length 1, 0xff)
+    Uint8Array.of(50, 1, 255),
+    // Invalid UTF-8 in field 5 (tag 42 = 5 * 8 + 2, length 1, 0xff)
+    Uint8Array.of(42, 1, 255),
+  ]) {
+    assert.throws(() => trajectoryRootOf(conversation, blob), { code: 'INVALID_RECORD' });
+  }
+});
+
+test('classifyConversation classifies from trajectory_metadata_blob and falls back to gen_metadata', async (t) => {
+  // Primary: trajectory_metadata_blob with empty or absent gen_metadata
+  const { database: rootDb } = agyStore(t, {
+    conversation,
+    rows: [],
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: conversation }),
+    createGenMetadataTable: false,
+  });
+  assert.deepEqual(await classifyConversation(rootDb, { conversation }), {
+    kind: 'root', rootConversationId: conversation,
+  });
+
+  const { database: subDb } = agyStore(t, {
+    conversation,
+    rows: [],
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: rootOther, parentConversationId: rootOther }),
+  });
+  assert.deepEqual(await classifyConversation(subDb, { conversation }), {
+    kind: 'subagent', rootConversationId: rootOther,
+  });
+
+  // Fallback: trajectory_metadata_blob table absent
+  const { database: fallbackRootDb } = agyStore(t, {
+    conversation,
+    rows: [generation(1, { rootCascade: conversation }), generation(4, { rootCascade: conversation })],
+    createTrajectoryTable: false,
+  });
+  assert.deepEqual(await classifyConversation(fallbackRootDb, { conversation }), {
+    kind: 'root', rootConversationId: conversation,
+  });
+
+  // Fallback: trajectory_metadata_blob table present but has no 'main' row
+  const { database: fallbackSubDb } = agyStore(t, {
+    conversation,
+    rows: [generation(1, { rootCascade: rootOther })],
+    trajectoryMetadata: null,
+    createTrajectoryTable: true,
+  });
+  assert.deepEqual(await classifyConversation(fallbackSubDb, { conversation }), {
+    kind: 'subagent', rootConversationId: rootOther,
+  });
+});
+
+test('classifyConversation returns uniform unknown diagnostic on missing, invalid or unreadable inputs', async (t) => {
+  const noSqlite = () => { throw new Error('unexpected importSqlite'); };
+  const assertUnknown = (res, id = `agy:${conversation}`) => {
+    assert.equal(res.kind, 'unknown');
+    assert.equal(res.diagnostic.code, 'AGY_CLASSIFICATION_UNAVAILABLE');
+    assert.equal(res.diagnostic.agentId, id);
+    assert.equal(typeof res.diagnostic.message, 'string');
+    assert.ok(res.diagnostic.message.length > 0);
+  };
+
+  assertUnknown(await classifyConversation(null, { conversation, importSqlite: noSqlite }));
+  assertUnknown(await classifyConversation('/tmp/does-not-matter.db', { conversation: 'NOT-A-UUID', importSqlite: noSqlite }), 'agy:NOT-A-UUID');
+
+  const { database: missingDb } = agyStore(t, { conversation, rows: [] });
+  fs.unlinkSync(missingDb);
+  assertUnknown(await classifyConversation(missingDb, { conversation, importSqlite: noSqlite }));
+
+  const { database: emptyDb } = agyStore(t, { conversation, rows: [], createTrajectoryTable: true, trajectoryMetadata: null });
+  assertUnknown(await classifyConversation(emptyDb, { conversation }));
+
+  const { database: wrongCascadeDb } = agyStore(t, { conversation, rows: [generation(1, { cascade: rootOther, rootCascade: conversation })] });
+  assertUnknown(await classifyConversation(wrongCascadeDb, { conversation }));
+
+  const { database: badRootCascadeDb } = agyStore(t, { conversation, rows: [generation(1, { rootCascade: 'not-a-uuid' })] });
+  assertUnknown(await classifyConversation(badRootCascadeDb, { conversation }));
+
+  const { database: badTrajDb } = agyStore(t, {
+    conversation,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: conversation, parentConversationId: parentOther }),
+  });
+  assertUnknown(await classifyConversation(badTrajDb, { conversation }));
+
+  const { database: corruptDb } = agyStore(t, { conversation, rows: [] });
+  fs.writeFileSync(corruptDb, 'corrupt sqlite bytes');
+  assertUnknown(await classifyConversation(corruptDb, { conversation }));
+
+  const { database: validDb } = agyStore(t, {
+    conversation,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: conversation }),
+  });
+  assertUnknown(await classifyConversation(validDb, {
+    conversation,
+    importSqlite: async () => { throw Object.assign(new Error('no sqlite'), { code: 'ERR_UNKNOWN_BUILTIN_MODULE' }); },
+  }));
+  assertUnknown(await classifyConversation(validDb, {
+    conversation,
+    importSqlite: async () => { throw Object.assign(new Error('permission denied'), { code: 'EACCES' }); },
+  }));
+});
+
+test('classifyConversation reads committed trajectory_metadata_blob while a writer holds BEGIN IMMEDIATE and bounds timeout', async (t) => {
+  const { database } = agyStore(t, {
+    conversation,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: rootOther, parentConversationId: rootOther }),
+  });
+  const writer = new DatabaseSync(database);
+  let observedOptions = null;
+  const importSqlite = async () => ({ DatabaseSync: class extends DatabaseSync {
+    constructor(file, options) {
+      observedOptions = options;
+      super(file, options);
+    }
+  } });
+  try {
+    writer.exec('BEGIN IMMEDIATE');
+    writer.prepare('insert into gen_metadata values (?, ?, ?)').run(0, generation(1, { rootCascade: conversation }), 10);
+    const res = await classifyConversation(database, {
+      conversation,
+      clock: () => 1000,
+      deadline: 5000,
+      importSqlite,
+    });
+    assert.deepEqual(res, { kind: 'subagent', rootConversationId: rootOther });
+    assert.deepEqual(observedOptions, { readOnly: true, timeout: 250 });
+  } finally {
+    writer.exec('ROLLBACK');
+    writer.close();
+  }
+});
+
+test('classifyConversation propagates DEADLINE_EXCEEDED before stat, importSqlite and DatabaseSync', async (t) => {
+  const { database } = agyStore(t, {
+    conversation,
+    trajectoryMetadata: encodeTrajectoryMetadata({ rootConversationId: conversation }),
+  });
+  // Expired before stat
+  await assert.rejects(classifyConversation(database, {
+    conversation,
+    clock: () => 100,
+    deadline: 100,
+    importSqlite: () => { throw new Error('unexpected'); },
+  }), { code: 'DEADLINE_EXCEEDED' });
+
+  // Expired after stat, before importSqlite
+  let calls = 0;
+  await assert.rejects(classifyConversation(database, {
+    conversation,
+    clock: () => (++calls === 1 ? 50 : 100),
+    deadline: 100,
+    importSqlite: () => { throw new Error('unexpected'); },
+  }), { code: 'DEADLINE_EXCEEDED' });
+
+  // Expired after importSqlite, before DatabaseSync
+  calls = 0;
+  await assert.rejects(classifyConversation(database, {
+    conversation,
+    clock: () => (++calls <= 2 ? 50 : 100),
+    deadline: 100,
+    importSqlite: async () => ({ DatabaseSync: class { constructor() { throw new Error('unexpected open'); } } }),
+  }), { code: 'DEADLINE_EXCEEDED' });
 });

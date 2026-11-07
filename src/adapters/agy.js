@@ -1,5 +1,5 @@
 // @ts-check
-import { isAbsolute } from 'node:path';
+import { basename, dirname, isAbsolute } from 'node:path';
 import { createProcessOps } from '../bus/proc.js';
 import { relayError } from '../protocol.js';
 import { nearestSessionPid, nearestTerminalPid } from './ancestry.js';
@@ -41,6 +41,29 @@ export function encodeReply(nativeEvent, reply) {
 }
 /** @param {unknown} v @returns {v is Record<string, any>} */
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+/**
+ * Extracts `<app-data>` from `<app-data>/brain/<sessionId>` in an agy hook payload.
+ * @param {Buffer|string} raw
+ * @param {string} sessionId
+ * @returns {string|undefined}
+ */
+export function appDataDirFromPayload(raw, sessionId) {
+  if (typeof sessionId !== 'string' || sessionId.length === 0) return undefined;
+  let data;
+  try {
+    data = JSON.parse(typeof raw === 'string' ? raw : raw.toString('utf8'));
+  } catch {
+    return undefined;
+  }
+  if (!object(data) || typeof data.artifactDirectoryPath !== 'string') return undefined;
+  const artifactDir = data.artifactDirectoryPath;
+  if (artifactDir.length === 0 || artifactDir.includes('\0') || !isAbsolute(artifactDir)) return undefined;
+  if (basename(artifactDir) !== sessionId) return undefined;
+  const brainDir = dirname(artifactDir);
+  if (basename(brainDir) !== 'brain') return undefined;
+  const appData = dirname(brainDir);
+  return appData.length > 0 && isAbsolute(appData) ? appData : undefined;
+}
 /** Translates agy's camelCase payload into the fields parsePayload checks; returns a new object.
  * @type {NonNullable<import("../types.js").Adapter["nativeFields"]>} */
 export function nativeFields(data, nativeEvent) {

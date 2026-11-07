@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { adapterFor, normalizeEvent } from '../src/adapters/index.js';
+import { appDataDirFromPayload } from '../src/adapters/agy.js';
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`./fixtures/agy/${name}.json`, import.meta.url), 'utf8'));
 const run = (event, body) => normalizeEvent('agy', event, JSON.stringify(body));
@@ -79,4 +80,21 @@ test('agy process identity uses the agy comm', () => {
   const agy = adapterFor('agy');
   assert.equal(agy.isHarness({ pid: 1, comm: 'agy', tty: null }, { executableOf: () => '' }), true);
   assert.equal(agy.isHarness({ pid: 1, comm: 'codex', tty: null }, { executableOf: () => '' }), false);
+});
+
+test('appDataDirFromPayload extracts app-data dir from valid artifactDirectoryPath and rejects invalid paths', () => {
+  const f = { ...fixture('SessionStart'), artifactDirectoryPath: `/home/user/.gemini/antigravity-cli/brain/${fixture('SessionStart').conversationId}` };
+  assert.equal(appDataDirFromPayload(JSON.stringify(f), f.conversationId), '/home/user/.gemini/antigravity-cli');
+  assert.equal(appDataDirFromPayload(Buffer.from(JSON.stringify(f)), f.conversationId), '/home/user/.gemini/antigravity-cli');
+
+  // Missing, relative, NUL byte, parent !== 'brain', basename !== sessionId, invalid JSON
+  const withoutArtifact = { ...f };
+  delete withoutArtifact.artifactDirectoryPath;
+  assert.equal(appDataDirFromPayload(JSON.stringify(withoutArtifact), f.conversationId), undefined);
+  assert.equal(appDataDirFromPayload(JSON.stringify({ ...f, artifactDirectoryPath: `relative/brain/${f.conversationId}` }), f.conversationId), undefined);
+  assert.equal(appDataDirFromPayload(JSON.stringify({ ...f, artifactDirectoryPath: `/home/user\0/.gemini/brain/${f.conversationId}` }), f.conversationId), undefined);
+  assert.equal(appDataDirFromPayload(JSON.stringify({ ...f, artifactDirectoryPath: `/home/user/.gemini/other/${f.conversationId}` }), f.conversationId), undefined);
+  assert.equal(appDataDirFromPayload(JSON.stringify(f), '00000000-0000-4000-8000-000000000000'), undefined);
+  assert.equal(appDataDirFromPayload('not-json', f.conversationId), undefined);
+  assert.equal(appDataDirFromPayload('null', f.conversationId), undefined);
 });
