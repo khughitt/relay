@@ -214,3 +214,31 @@ test('a failed apply leaves its one error envelope on stderr, without the versio
   assert.equal(r.code, 1, r.err); assert.equal(r.out, '');
   assert.equal(JSON.parse(r.err).error.kind, 'install_failed');
 });
+
+test('a Codex target not named hooks.json refuses with INVALID_CONFIG naming the requirement', async (t) => {
+  const s = await scratch(t), target = join(s.root, 'hooks2.json');
+  await writeFile(target, '{"hooks":{}}\n');
+  const args = ['install', '--harness', 'codex', '--subscribers', s.file, '--target', target];
+  const json = await install(args);
+  assert.deepEqual([json.code, json.out], [1, '']);
+  const error = JSON.parse(json.err).error;
+  assert.equal(error.kind, 'install_failed');
+  assert.match(error.detail, /^INVALID_CONFIG: Codex --target must be an absolute path ending in \/hooks\.json/);
+  assert.ok(error.detail.includes(target), error.detail);
+  const pretty = await install(['--pretty', ...args]);
+  assert.deepEqual([pretty.code, pretty.out], [1, '']);
+  assert.match(pretty.err, /^relay: INVALID_CONFIG: Codex --target must be an absolute path ending in \/hooks\.json/);
+});
+
+test('rollback on a drifted target names the code and path in both output modes', async (t) => {
+  const s = await scratch(t), file = join(s.root, 'artifact.json');
+  const applied = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--apply', '--artifact', file]);
+  assert.equal(applied.code, 0, applied.err);
+  await writeFile(s.target, '{"hooks":{},"edited":true}\n');
+  const expected = `TARGET_DRIFT: target drift: ${s.target} matches neither image; rollback expected its after image`;
+  const json = await install(['--json', 'rollback', '--artifact', file]);
+  assert.deepEqual([json.code, json.out, JSON.parse(json.err)], [1, '', { error: { kind: 'rollback_failed', detail: expected } }]);
+  const pretty = await install(['rollback', '--artifact', file]);
+  assert.deepEqual([pretty.code, pretty.out, pretty.err], [1, '', `relay: ${expected}\n`]);
+  assert.equal(await readFile(s.target, 'utf8'), '{"hooks":{},"edited":true}\n');
+});

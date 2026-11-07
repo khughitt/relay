@@ -12,7 +12,7 @@ Every installed entry also names the node that runs relay.js: the installer's ow
 
 After a Codex apply, re-trust the changed hooks in Codex. The installer never writes trust hashes.
 
-Rollback uses only the artifact: `relay rollback --artifact FILE`. For each change, `after` restores `before`, `before` is skipped, and any other bytes refuse. A partial cutover can therefore be completed with install or recovered with rollback. OpenCode modifies only its server plugin entry; it never touches `tui.json`.
+Rollback uses only the artifact: `relay rollback --artifact FILE`. For each change, `after` restores `before`, `before` is skipped, and any other bytes refuse with `TARGET_DRIFT` naming the path (a symlink or non-file target refuses with `UNSAFE_TARGET`), exit `1`, before that file is touched. A partial cutover can therefore be completed with install or recovered with rollback. OpenCode modifies only its server plugin entry; it never touches `tui.json`.
 
 Guard/context bindings require the real capability evidence record for the installed harness version; fixture artifacts are not live capability proof.
 

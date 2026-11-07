@@ -2,12 +2,13 @@
 import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
+import { relayError } from '../protocol.js';
 
 const harnesses = new Set(['claude-code', 'codex', 'opencode']);
 /** @param {unknown} value @returns {value is Record<string, any>} */
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 /** @type {(message: string) => never} */
-const fail = message => { throw new Error(`invalid artifact: ${message}`); };
+const fail = message => { throw relayError('INVALID_ARTIFACT', `invalid artifact: ${message}`); };
 
 /** @param {unknown} value @returns {import("../types.js").Artifact} */
 export function validateArtifact(value) {
@@ -33,7 +34,7 @@ export function validateArtifact(value) {
 const inspect = (path, io) => {
   try {
     const stat = io.lstatSync(path);
-    if (stat.isSymbolicLink() || !stat.isFile()) throw new Error(`unsafe target: ${path}`);
+    if (stat.isSymbolicLink() || !stat.isFile()) throw relayError('UNSAFE_TARGET', `unsafe target: ${path} is a symlink or not a regular file`);
     return io.readFileSync(path, 'utf8');
   } catch (caught) { const error = /** @type {import('../types.js').Failure} */ (caught);
     if (error.code === 'ENOENT') return null;
@@ -58,17 +59,14 @@ export function writeAtomicSync(path, text, { io = fs, suffix = randomUUID } = {
   }
 }
 
-/** @param {import("../types.js").Change} change @param {typeof fs} io */
-const targetState = (change, io) => {
+// A target holding neither image refuses, naming the image the operation expected to find there.
+/** @param {import("../types.js").Change} change @param {typeof fs} io @param {'apply'|'rollback'} operation */
+const targetState = (change, io, operation) => {
   const current = inspect(change.path, io);
-  if (change.before === null) {
-    if (current === null) return 'before';
-    if (current === change.after) return 'after';
-    throw new Error(`target must be absent: ${change.path}`);
-  }
   if (current === change.after) return 'after';
   if (current === change.before) return 'before';
-  throw new Error(`preimage drift: ${change.path}`);
+  const expected = operation === 'rollback' ? 'its after image' : change.before === null ? 'it absent' : 'its before image';
+  throw relayError('TARGET_DRIFT', `target drift: ${change.path} matches neither image; ${operation} expected ${expected}`);
 };
 
 /** @param {string} path @param {unknown} value */
@@ -76,7 +74,7 @@ export function applyArtifact(path, value, { io = fs } = {}) {
   const artifact = validateArtifact(value);
   writeAtomicSync(path, `${JSON.stringify(artifact)}\n`, { io });
   for (const change of artifact.changes) {
-    if (targetState(change, io) === 'before') writeAtomicSync(change.path, change.after, { io });
+    if (targetState(change, io, 'apply') === 'before') writeAtomicSync(change.path, change.after, { io });
   }
 }
 
@@ -84,7 +82,7 @@ export function applyArtifact(path, value, { io = fs } = {}) {
 export function rollbackArtifact(value, { io = fs } = {}) {
   const artifact = validateArtifact(value);
   for (const change of artifact.changes) {
-    if (targetState(change, io) !== 'after') continue;
+    if (targetState(change, io, 'rollback') !== 'after') continue;
     if (change.before === null) io.unlinkSync(change.path);
     else writeAtomicSync(change.path, change.before, { io });
   }

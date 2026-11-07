@@ -15,6 +15,12 @@ test('OpenCode plans only the server plugin and preserves JSONC', () => {
 
 test('OpenCode accepts a jsonc-only target and refuses ambiguous or duplicate relay writers', () => {
   assert.equal(planOpenCode(args({ json: null, jsonc: '{"plugin":[]}' })).changes[0].path, '/cfg/opencode.jsonc');
-  assert.throws(() => planOpenCode(args({ jsonc: '{}' })), /ambiguous/);
-  assert.throws(() => planOpenCode(args({ json: '{"plugin":["/relay/integrations/opencode/plugin.js","/relay/integrations/opencode/plugin.js"]}' })), /duplicate relay/);
+  assert.throws(() => planOpenCode(args({ jsonc: '{}' })), { code: 'INVALID_CONFIG', message: /ambiguous/ });
+  assert.throws(() => planOpenCode(args({ json: '{"plugin":["/relay/integrations/opencode/plugin.js","/relay/integrations/opencode/plugin.js"]}' })), { code: 'INVALID_CONFIG', message: /duplicate relay/ });
+});
+
+test('OpenCode refuses implicit inputs and malformed config with INVALID_CONFIG', () => {
+  assert.throws(() => planOpenCode(args({ configDir: 'cfg' })), { code: 'INVALID_CONFIG', message: /explicit paths/ });
+  assert.throws(() => planOpenCode(args({ json: '{"plugin":' })), { code: 'INVALID_CONFIG', message: /malformed OpenCode JSONC/ });
+  assert.throws(() => planOpenCode(args({ json: '{"plugin":"one"}' })), { code: 'INVALID_CONFIG', message: /malformed OpenCode JSONC/ });
 });

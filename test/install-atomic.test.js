@@ -16,9 +16,9 @@ const setup = async t => {
 
 test('artifact validation rejects non-deterministic and invalid changes', () => {
   assert.deepEqual(validateArtifact(artifact([])), artifact([]));
-  assert.throws(() => validateArtifact(artifact([{ path: '/tmp/x', before: 'a', after: 'a' }])), /change must differ/);
-  assert.throws(() => validateArtifact(artifact([{ path: 'relative', before: null, after: 'a' }])), /absolute/);
-  assert.throws(() => validateArtifact({ ...artifact([]), unknown: true }), /unexpected field/);
+  assert.throws(() => validateArtifact(artifact([{ path: '/tmp/x', before: 'a', after: 'a' }])), { code: 'INVALID_ARTIFACT', message: /change must differ/ });
+  assert.throws(() => validateArtifact(artifact([{ path: 'relative', before: null, after: 'a' }])), { code: 'INVALID_ARTIFACT', message: /absolute/ });
+  assert.throws(() => validateArtifact({ ...artifact([]), unknown: true }), { code: 'INVALID_ARTIFACT', message: /unexpected field/ });
 });
 
 test('apply writes and fsyncs the artifact before the first target rename', async t => {
@@ -39,8 +39,10 @@ test('apply writes and fsyncs the artifact before the first target rename', asyn
 test('apply refuses preimage drift and a present before-null target', async t => {
   const p = await setup(t);
   await writeFile(p.target, 'third-party');
-  assert.throws(() => applyArtifact(p.artifact, artifact([change(p.target, 'before', 'after')])), /preimage/);
-  assert.throws(() => applyArtifact(p.artifact, artifact([change(p.target, null, 'after')])), /must be absent/);
+  assert.throws(() => applyArtifact(p.artifact, artifact([change(p.target, 'before', 'after')])),
+    { code: 'TARGET_DRIFT', message: `target drift: ${p.target} matches neither image; apply expected its before image` });
+  assert.throws(() => applyArtifact(p.artifact, artifact([change(p.target, null, 'after')])),
+    { code: 'TARGET_DRIFT', message: `target drift: ${p.target} matches neither image; apply expected it absent` });
   assert.equal(await readFile(p.target, 'utf8'), 'third-party');
 });
 
@@ -57,7 +59,7 @@ test('rollback restores after, skips before, and refuses drift per file', async 
   await writeFile(second, 'before');
   await writeFile(third, 'drift');
   const a = artifact([change(p.target, 'before', 'after'), change(second, 'before', 'after'), change(third, 'before', 'after')]);
-  assert.throws(() => rollbackArtifact(a), /drift/);
+  assert.throws(() => rollbackArtifact(a), { code: 'TARGET_DRIFT', message: `target drift: ${third} matches neither image; rollback expected its after image` });
   assert.equal(await readFile(p.target, 'utf8'), 'before');
   assert.equal(await readFile(second, 'utf8'), 'before');
   assert.equal(await readFile(third, 'utf8'), 'drift');
@@ -68,4 +70,16 @@ test('rollback removes only a matching before-null target', async t => {
   await writeFile(p.target, 'after');
   rollbackArtifact(artifact([change(p.target, null, 'after')]));
   assert.equal(fs.existsSync(p.target), false);
+});
+
+test('apply and rollback refuse a symlink or non-file target as unsafe', async t => {
+  const p = await setup(t), real = join(p.dir, 'real.json');
+  await writeFile(real, 'before'); fs.symlinkSync(real, p.target);
+  for (const run of [() => applyArtifact(p.artifact, artifact([change(p.target, 'before', 'after')])),
+    () => rollbackArtifact(artifact([change(p.target, 'before', 'after')]))]) {
+    assert.throws(run, { code: 'UNSAFE_TARGET', message: `unsafe target: ${p.target} is a symlink or not a regular file` });
+  }
+  const dir = join(p.dir, 'dir.json'); fs.mkdirSync(dir);
+  assert.throws(() => rollbackArtifact(artifact([change(dir, 'before', 'after')])), { code: 'UNSAFE_TARGET' });
+  assert.equal(await readFile(real, 'utf8'), 'before');
 });
