@@ -9,6 +9,7 @@ import { relayError } from '../protocol.js';
 import { expectAnswers } from '../routes/index.js';
 import { openInbox } from './inbox.js';
 import { serveSocket } from './socket.js';
+import { checkSocketPath } from './socket-path.js';
 import { serveConfig } from './config.js';
 import { serveHttp } from './http.js';
 import { readSnapshot } from '../bus/transaction.js';
@@ -24,6 +25,7 @@ export async function runServe({ env = process.env, signal, io = fs, clock = Dat
   log = (line) => process.stderr.write(`relay serve: ${line}\n`), onCommit = () => {}, reattachMs = 10000, ready = () => {} } = {}) {
   const config = serveConfig(env);
   const registryPaths = paths(env), { stateDir } = registryPaths, sp = servePaths(stateDir);
+  checkSocketPath(sp.socketPath); // before the lock, the inbox, or a Codex connection
   await ensurePrivateDir(stateDir, { io });
   /** @param {import("../types.js").Failure} error */
   const report = (error) => log(`${error.code ?? 'ERROR'}: ${error.message}`);

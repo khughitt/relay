@@ -120,7 +120,7 @@ Interaction commands (backed by `relay serve` over `$STATE/serve.sock`; see [que
 
 | Command | Contract |
 | --- | --- |
-| `relay serve` | Foreground service; `SIGTERM`/`SIGINT` drains active work and exits. |
+| `relay serve` | Foreground service; `SIGTERM`/`SIGINT` drains active work and exits. `serve.sock` must fit the platform's Unix socket path limit (107 UTF-8 bytes on Linux, 103 on Darwin); serve (before its lock or inbox) and every client (before connecting) refuse a longer path with `INVALID_CONFIG`, naming the path, its length, and the remedy (a shorter `RELAY_STATE_DIR` or `XDG_STATE_HOME`). Other platforms refuse with `INVALID_CONFIG`, since no limit is known for them. |
 | `relay ask --harness claude-code [--handback] PreToolUse\|PostToolUse` | Hook route; strict option order; exits `0` on runtime failures (stdout is the hook reply; runtime errors diagnose on stderr and pass through) and exits `2` on argv usage errors. |
 | `relay inbox list [--since SEQ]` | List current entries plus terminal entries changed after the sequence. |
 | `relay inbox ask --file PATH` | Validate and post one detached question envelope from a UTF-8 JSON file, print the saved entry, and exit without waiting. |
@@ -172,5 +172,5 @@ Interaction error codes (`relay serve`, `relay ask`, `relay inbox`, `relay prese
 | `ID_CONFLICT`, `NOT_FOUND`, `NOT_A_QUESTION` | Conflicting message identity, missing entry/native call, or wrong entry kind. |
 | `INVALID_MESSAGE`, `INVALID_INPUT`, `INVALID_REQUEST`, `UNKNOWN_OP` | Invalid message, native input/presence/cursor, socket frame, or operation. |
 | `SERVE_RUNNING`, `SERVE_UNAVAILABLE`, `STORE_FAILED` | Existing live service, unavailable socket, or failed durable write requiring restart. |
-| `INVALID_CONFIG`, `INVALID_ENTRY`, `HARNESS_UNAVAILABLE`, `UNSUPPORTED_ROUTE`, `UNEXPECTED_STATE` | Invalid configuration/durable entry, failed harness version probe, or unsupported route/state. |
+| `INVALID_CONFIG`, `INVALID_ENTRY`, `HARNESS_UNAVAILABLE`, `UNSUPPORTED_ROUTE`, `UNEXPECTED_STATE` | Invalid configuration (including a `serve.sock` path over the platform limit) or durable entry, failed harness version probe, or unsupported route/state. |
 | `FORBIDDEN`, `UNSUPPORTED_MEDIA`, `TOO_LARGE`, `INTERNAL`, `UNAVAILABLE` | HTTP guard, media/body limit, internal failure, or shutdown. |
