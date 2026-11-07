@@ -25,7 +25,10 @@ tt := "python3 tools/tt"
 # so here; the target must always exist and the report shows the gap as equal durations.
 fast_cmd := "npm test"
 test_cmd := "npm test"
-one_cmd := "node --test"
+# one_cmd writes a JUnit file into tt's per-run TT_JUNIT_DIR so the timing log names the slowest tests
+# (tt version 6). Node reads reporter options only before the file arguments, which npm test cannot
+# append to, so fast_cmd and test_cmd stay unmeasured. The guard stops a run outside tt.
+one_cmd := "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=\"${TT_JUNIT_DIR:?run through tt}/node.xml\""
 check_hygiene_cmd := "python3 tools/ops-check && python3 tools/ops-docs check && tasks check"
 check_code_cmd := "npx --no-install tsc --noEmit"
 ci_hygiene_cmd := "python3 tools/ops-check && python3 tools/ops-docs check"
