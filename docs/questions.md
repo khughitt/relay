@@ -160,7 +160,7 @@ Every path, including static assets, is guarded:
 | `GET /v1/events` | SSE stream; `entry` events carry full entries with `id: <seq>` (resumed via `Last-Event-ID` or `?since=`, defaulting to `0`), and `presence` events carry no `id`. |
 | `GET /v1/presence` | `{presence}`. |
 | `PUT /v1/presence` | `{mode: "here" \| "away"}` -> `{presence}`. |
-| `GET /v1/agents` | `{agents: [{id, harness, project, state}]}` for display. |
+| `GET /v1/agents` | `{agents: [{id, harness, project, state, scope, root?}]}` for display; `root` is present only on a row that records one (a Codex worker). |
 | `GET /...` | Read-only static files from `RELAY_CLIENT_DIR` when configured. |
 
 ## Claude Code question route
