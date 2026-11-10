@@ -104,22 +104,29 @@ test('ancestry.rs: an_agy_tool_shell_resolves_its_agy_ancestor_without_reading_e
     assert.deepEqual(walk([row(9, 'bash', 8), row(8, 'agy', 7), row(7, outer)]), boundary('agy', 8, 7));
   }
 });
+const nullSessionExpected = {
+  'daemon-nearest': boundary('claude-code', 300, 200, 'daemon'),
+  'pty-host-nearest': boundary('claude-code', 400, 300, 'bg-pty-host'),
+  'claude-ancestor-under-codex': { code: 'PROCESS_UNREADABLE' },
+};
+test('ancestry.rs: every_null_session_expectation_names_a_chain_in_the_corpus', () => {
+  const corpus = JSON.parse(readFileSync(new URL('./fixtures/ancestry.json', import.meta.url)));
+  const names = corpus.chains.filter(chain => chain.session === null).map(chain => chain.name);
+  for (const name of Object.keys(nullSessionExpected)) assert.ok(names.includes(name), `${name}: expected a null-session chain in the corpus`);
+});
 test('ancestry.rs: every_relay_ancestry_chain_resolves_as_tasks_expects', () => {
   const corpus = JSON.parse(readFileSync(new URL('./fixtures/ancestry.json', import.meta.url)));
-  const expected = {
-    'daemon-nearest': boundary('claude-code', 300, 200, 'daemon'),
-    'pty-host-nearest': boundary('claude-code', 400, 300, 'bg-pty-host'),
-  };
   for (const chain of corpus.chains) {
     const fake = table(chain.rows.map(r => row(r.pid, r.comm, r.ppid)), {
       exe: Object.fromEntries(chain.rows.filter(r => r.exe !== null).map(r => [r.pid, r.exe])),
       argv: Object.fromEntries(chain.rows.filter(r => r.argv !== null).map(r => [r.pid, r.argv])),
     });
-    if (chain.name === 'claude-ancestor-under-codex') {
-      assert.throws(() => harnessWalk({ startPid: chain.rows[0].pid, processOps: fake.processOps }), { code: 'PROCESS_UNREADABLE' });
+    const expected = nullSessionExpected[chain.name];
+    if (expected && 'code' in expected) {
+      assert.throws(() => harnessWalk({ startPid: chain.rows[0].pid, processOps: fake.processOps }), expected);
     } else {
       const session = chain.rows.find(r => r.pid === chain.session);
-      assert.deepEqual(harnessWalk({ startPid: chain.rows[0].pid, processOps: fake.processOps }), expected[chain.name] ?? boundary(chain.harness, session.pid, session.ppid), chain.name);
+      assert.deepEqual(harnessWalk({ startPid: chain.rows[0].pid, processOps: fake.processOps }), expected ?? boundary(chain.harness, session.pid, session.ppid), chain.name);
     }
   }
 });
