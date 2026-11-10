@@ -8,6 +8,9 @@
  * @typedef {{agents: number, other: number}} Background
  * @typedef {{id: string, harness: Harness, sessionId: string, scope: 'process'|'session'|'worker', root?: string, process: Handle|null, cwd: string, repoRoot: string|null, remote: string|null, projectKey: string, project: string, state: State, updatedAt: number, background?: Background}} Agent
  * @typedef {{schema: 2, generation: string, revision: number, agents: Record<string, Agent>}} Snapshot
+ * @typedef {{native: Record<string,NativeEntry>, nativeSource:'raw'|'decoded', nativeSession:boolean}} NativeEvidence
+ * @typedef {{harness:Harness, role:'session'|'daemon'|'bg-pty-host', process:Handle}} HarnessBoundary
+ * @typedef {NativeEvidence & {schema:1} & ({status:'outside'}|({harness:Harness,boundary:HarnessBoundary,hint:string|null} & ({status:'resolved',agent:Agent,rootSession:string|null}|{status:'unresolved',code:string,message:string})))} WhoamiResult
  * @typedef {{name: string, input: Record<string, unknown>, command: string|null}} Tool
  * @typedef {{schema: 1, kind: Kind, harness: Harness, nativeEvent: string, agentId: string, sessionId: string, root?: string, cwd: string, stopHookActive?: boolean, background?: Background|null, tool: Tool|null}} Event
  * @typedef {{code: string, message: string, agentId?: string}} Diagnostic
