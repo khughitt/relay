@@ -44,10 +44,10 @@ function hintMismatch(harness, root, candidates) {
 }
 
 /**
- * @param {{startPid?: number, processOps?: import('../types.js').ProcessOps, paths?: import('../types.js').Paths, readRegistry?: () => Promise<import('../types.js').Snapshot|null>, platform?: string, readRaw?: () => Buffer, env?: Record<string,string|undefined>}} [options]
+ * @param {import('../types.js').Deadline & {startPid?: number, processOps?: import('../types.js').ProcessOps, paths?: import('../types.js').Paths, readRegistry?: () => Promise<import('../types.js').Snapshot|null>, platform?: string, readRaw?: () => Buffer, env?: Record<string,string|undefined>}} [options]
  * @returns {Promise<import('../types.js').WhoamiResult>}
  */
-export async function whoami({ startPid, processOps, paths, readRegistry, platform = process.platform, readRaw, env } = {}) {
+export async function whoami({ startPid, processOps, paths, readRegistry, platform = process.platform, readRaw, env, clock, deadline } = {}) {
   const { native, nativeSource, nativeSession, rawError } = readNative({ platform, readRaw, env });
   const evidence = { native, nativeSource, nativeSession };
   try {
@@ -74,7 +74,7 @@ export async function whoami({ startPid, processOps, paths, readRegistry, platfo
     if (effective.invalid !== null) return unresolved('INVALID_NATIVE_VALUE', `${effective.invalid} is invalid or unverified`);
     if (effective.missing) return unresolved('MISSING_HINT', 'ANTIGRAVITY_CONVERSATION_ID is missing, and conversations sharing the agy process cannot be told apart without it');
     let snapshot;
-    try { snapshot = await (readRegistry ?? (() => readSnapshot({ paths, processOps: ops })))(); }
+    try { snapshot = await (readRegistry ?? (() => readSnapshot({ paths, processOps: ops, clock, deadline })))(); }
     catch (cause) {
       const code = cause !== null && typeof cause === 'object' && 'code' in cause && typeof cause.code === 'string' ? cause.code : 'UNKNOWN';
       return unresolved('REGISTRY_UNREADABLE', `cannot read registry: ${printable(code)}`);

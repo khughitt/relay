@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { paths } from '../src/bus/paths.js';
 import { readFileSync } from 'node:fs';
 import { whoami, printable } from '../src/identity/whoami.js';
 import { whoamiCase } from './helpers/whoami-cases.js';
@@ -79,4 +83,20 @@ test('a no-match diagnostic uses the established boundary without another proces
     return recordOf(pid);
   };
   assert.deepEqual(await whoami(options), item.expect);
+});
+
+
+test('default registry reads honor the caller clock and absolute deadline', async t => {
+  const temp = await mkdtemp(join(tmpdir(), 'relay-whoami-clock-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const { options } = whoamiCase(cases.find(item => item.name === 'empty registry').inputs);
+  delete options.readRegistry;
+  options.paths = paths({ HOME: temp, RELAY_STATE_DIR: join(temp, 'state') });
+  let calls = 0;
+  options.clock = () => { calls++; return 100; };
+  assert.equal((await whoami(options)).code, 'NOT_REGISTERED');
+  assert.equal(calls, 1, 'registry derives its default deadline from the caller clock');
+  options.deadline = 200;
+  assert.equal((await whoami(options)).code, 'NOT_REGISTERED');
+  assert.equal(calls, 1, 'an absolute caller deadline needs no new default');
 });

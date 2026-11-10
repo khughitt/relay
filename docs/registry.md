@@ -77,7 +77,7 @@ type LockToken = {
 
 Each lock token is published atomically by writing a complete private (`0600`) temporary file and hard-linking it to the lock path, then unlinking the temporary path.
 
-Contention and reclamation rules (`withLock` in `src/bus/lock.js`):
+`withLock` is a public root export (see [API](api.md#public-interfaces)); it serializes holders, not store transactions. Its implementation is `src/bus/lock.js`. Contention and reclamation rules:
 
 1. When `agents.lock` exists, the waiter reads and validates its `LockToken` and probes `holder` through `processOps.probe(token.holder)`.
 2. **Live or unknown holders are never expired by age.** If `probe` returns `status: 'alive'`, the waiter sleeps with bounded backoff until the lock is released or `deadline` expires. If `deadline` expires while the last completed probe was `'alive'` (even when the deadline cut short a subsequent probe), `withLock` fails with `LOCK_TIMEOUT`. If `deadline` expires while `probe` is `'unknown'`, `withLock` fails with `LOCK_IDENTITY_UNKNOWN`.

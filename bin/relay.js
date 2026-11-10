@@ -285,7 +285,7 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
     throw usage(`unknown command "${cmd.path[0]}"`);
   } catch (caught) { const error = /** @type {import('../src/types.js').Failure} */ (caught);
     if (error.code === 'USAGE') { await emit(stderr, `relay: ${error.message}\n`); return 2; }
-    const human = cmdName === 'whoami' ? (await import('../src/identity/whoami.js')).printable : (/** @param {string} text */ text) => text;
+    const human = cmdName === 'whoami' ? (await import('../src/identity/whoami.js')).printable : (/** @type {(text: string) => string} */ (text => text));
     const kind = `${cmdName ?? 'relay'}_failed`, detail = error.code ? `${human(String(error.code))}: ${human(error.message)}` : 'relay operation failed';
     if (cmdName === 'whoami' && mode === 'json') {
       const failure = /** @type {Error & import('../src/types.js').NativeEvidence & {code:string}} */ (error);

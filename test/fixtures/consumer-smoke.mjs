@@ -13,7 +13,7 @@ import * as plugin from 'relay/opencode';
 
 const EXPORTS = ['STATES', 'paths', 'adapterFor', 'normalizeEvent', 'readNativeInput', 'createProcessOps', 'readSnapshot', 'listAgents',
   'applyEvent', 'reapRegistry', 'CONTEXT_LIMIT', 'parseReply', 'validateSubscribers', 'loadSubscribers', 'matchSubscribers', 'budgetFor',
-  'checkBudget', 'dispatchHook', 'reconcile'].sort();
+  'checkBudget', 'dispatchHook', 'reconcile', 'withLock', 'validateHandle', 'parsePayload', 'whoami'].sort();
 assert.deepEqual(Object.keys(relay).sort(), EXPORTS);
 const packageRoot = new URL('../', import.meta.resolve('relay'));
 const messageSchema = JSON.parse(await readFile(new URL('schemas/interaction/message.schema.json', packageRoot), 'utf8'));
@@ -34,10 +34,14 @@ const corpus = JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixt
 assert.equal(corpus.schema, 1); assert.ok(corpus.starts.some(c => c.expected === '9007199254740993'));
 const chains = JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixtures/ancestry.json')), 'utf8'));
 assert.equal(chains.schema, 1); assert.ok(chains.chains.some(c => c.name === 'background-under-systemd'));
+const identities = JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixtures/whoami.json')), 'utf8'));
+assert.ok(Array.isArray(identities)); assert.ok(identities.some(item => item.expect?.status === 'resolved'));
 assert.deepEqual(await relay.listAgents(), { snapshot: null, liveness: {} });
 
 const bin = fileURLToPath(new URL('node_modules/.bin/relay', import.meta.url));
-const cli = (args) => execFileSync(bin, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+const cliEnv = { PATH: process.env.PATH, HOME: process.env.HOME, RELAY_STATE_DIR: process.env.RELAY_STATE_DIR,
+  XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
+const cli = (args) => execFileSync(bin, args, { env: cliEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 assert.equal(cli(['list', '--json']), '{"snapshot":null,"liveness":{}}\n');
 assert.match(cli(['--help']), /^Usage: relay /);
 

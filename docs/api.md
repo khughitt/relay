@@ -12,6 +12,7 @@ Package `"relay"` exports (`package.json`):
 - `./opencode` (`./integrations/opencode/plugin.js`): the async OpenCode plugin function (`Relay`).
 - `./fixtures/handles.json` (`./test/fixtures/handles.json`): portable process-handle schema fixtures.
 - `./fixtures/ancestry.json` (`./test/fixtures/ancestry.json`): portable process-ancestry fixtures.
+- `./fixtures/whoami.json` (`./test/fixtures/whoami.json`): portable calling-session conformance cases.
 
 Companion reference documents:
 
@@ -75,6 +76,13 @@ type Listing = {
   liveness: Record<string, Liveness>;
 };
 
+type WhoamiOptions = ClockOptions & {
+  env?: Record<string, string | undefined>; processOps?: ProcessOps; paths?: Paths;
+  startPid?: number; platform?: string; readRaw?: () => Buffer;
+  readRegistry?: () => Promise<Snapshot | null>;
+};
+// WhoamiResult is the schema-1 calling-session result described below.
+
 // R1 named root exports (src/index.js):
 STATES: readonly State[];
 paths(env?: Record<string, string | undefined>): Paths;
@@ -103,9 +111,47 @@ budgetFor(options: { harness?: Harness; nativeEvent?: string; outerMs?: number }
 checkBudget(config: SubscriberConfig, budget: Budget, scope: { harness?: Harness; kind: string }): Subscriber[];
 dispatchHook(request: { harness: Harness; nativeEvent: string; input: NodeJS.ReadableStream; outerMs?: number }, deps?): Promise<HookResult>;
 reconcile(request?: { outerMs?: number }, deps?): Promise<{ result: MutationResult; diagnostics: string[] }>;
+
+// R3 named root exports (src/index.js):
+withLock<T>(lockPath: string, fn: () => Promise<T>, options?: ClockOptions & {
+  processOps?: ProcessOps; sleep?: (ms: number) => Promise<void>; io?: typeof import('node:fs/promises');
+}): Promise<{ value: T; cleanupError: (Error & { code: string | number | undefined }) | null }>;
+validateHandle(value: unknown): Handle;
+parsePayload(raw: string | Buffer, nativeEvent: string): Record<string, any>;
+whoami(options?: WhoamiOptions): Promise<WhoamiResult>;
 ```
 
 Defaults resolve once at operation entry: `paths` from environment, fresh process provider, `clock = performance.now`, `now = Date.now`, `uuid = randomUUID`. Registry operations use `deadline = clock() + 12000`. `deadline` is monotonic absolute time, not Unix milliseconds; nested work shares it. Process and Git subprocesses use at most two seconds and remaining deadline, bounded output, and `SIGKILL` on timeout. `readNativeInput` accepts at most 4 MiB and requires EOF within `min(caller deadline, clock() + 5000)`, with fatal UTF-8 decoding, rejecting partial input on errors or expiry. OS stalls can exceed userspace bounds; no timeout releases another live writer's lock or interrupts an active transaction callback.
+
+`withLock` serializes holders; not a store transaction. It neither reads nor
+publishes store state. Each holder is identified by its qualified process handle;
+confirmed-dead holders are reclaimed using the [lock protocol](registry.md#lock-protocol-and-stale-lock-reclamation).
+The lock path's parent directory must be private, like the registry directory.
+It returns the callback's `value` and a `cleanupError` (`null` on clean release).
+A callback failure is thrown; simultaneous callback and cleanup failures are
+preserved in an `AggregateError`. Acquisition throws `LOCK_TIMEOUT` at the
+deadline for a live holder and `LOCK_IDENTITY_UNKNOWN` if the caller's own handle
+cannot be established or the contending holder remains unknown at the deadline.
+Malformed lock tokens and abandoned reclaim guards require operator repair
+(`LOCK_REPAIR_REQUIRED`); cleanup and ownership failures retain their lock codes.
+
+`validateHandle` returns a frozen valid [process handle](registry.md#state-layout-and-agentsjson),
+or throws `INVALID_INPUT`. This public input boundary freezes the normalized
+handle and translates internal schema validation failures; relay's internal
+registry validator retains its `INVALID_SCHEMA` contract. `parsePayload` validates a native hook payload's common
+fields: fatal UTF-8 JSON object decoding, nonempty `session_id`, absolute `cwd`,
+matching event name when supplied, and `tool_name`/`tool_input` for `PreToolUse`.
+It shares `readNativeInput`'s 4 MiB limit (`INPUT_TOO_LARGE`) and rejects malformed
+input with `INVALID_INPUT`.
+
+`whoami()` resolves to the same schema-1 result as the CLI for `resolved`,
+`outside` and `unresolved`. Where the CLI returns `failed` and exits 1, the API
+throws an error with `code`, `message`, `native`, `nativeSource` and `nativeSession`;
+its codes and evidence fields follow the [calling-session contract](#calling-session-relay-whoami).
+`env`, `processOps`, `paths`, `clock` and `deadline` support callers and tests;
+the clock and absolute deadline pass to the default registry read. `startPid`,
+`platform`, `readRaw` and a zero-argument `readRegistry` provide identity test seams.
+An injected `readRegistry` owns its own read options.
 
 ## CLI
 
@@ -145,6 +191,16 @@ Interaction commands (backed by `relay serve` over `$STATE/serve.sock`; see [que
 ```
 
 or, outside `--json`, `relay: <detail>` on stderr. A CLI usage error (an unknown command, `relay inbox` alone without a subcommand, or a missing or invalid argument) exits `2` with one line on stderr naming the problem. The CLI exits explicitly once its reply is flushed so a filesystem operation past the deadline is abandoned.
+
+### Registry consumers: `relay list --json`
+
+`relay list --json` emits one `Listing`, with `snapshot: null` when no registry
+exists. `liveness` is keyed by agent id; each value describes that agent's process
+status. Consumers check a non-null `snapshot.schema` before reading its fields and
+refuse unknown versions, as relay's validators do. Within schema 2, changes are
+additive only: new optional fields, which consumers ignore. Any other change bumps
+the schema. The [registry reference](registry.md#state-layout-and-agentsjson)
+describes the current snapshot and agent fields.
 
 ### Calling session: `relay whoami`
 
