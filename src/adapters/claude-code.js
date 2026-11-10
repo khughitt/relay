@@ -60,7 +60,7 @@ export const encodeReply = (nativeEvent, reply) => encodeStandardReply(nativeEve
 // The native installer runs every version as …/claude/versions/<version>, so a background
 // session's own process is named after its version. The daemon and the pty host share that
 // executable and never fire a hook; landing on one means an unmeasured shape, so null.
-const ROLES = Object.freeze(['daemon', 'bg-pty-host']);
+export const ROLES = Object.freeze(['daemon', 'bg-pty-host']);
 const ops = () => createProcessOps();
 /** A Claude Code process: `claude`, or a versioned binary under claude/versions/. */
 /** @type {import("../types.js").Adapter["isHarness"]} */
