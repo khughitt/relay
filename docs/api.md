@@ -112,6 +112,7 @@ Defaults resolve once at operation entry: `paths` from environment, fresh proces
 Registry, hook dispatch, installation, and model commands:
 
 - `relay list`
+- `relay whoami`
 - `relay reap [--outer-ms N]`
 - `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT` (`NAME` may be `agy`; `install` does not accept `agy`)
 - `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--evidence FILE] [--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`
@@ -144,6 +145,98 @@ Interaction commands (backed by `relay serve` over `$STATE/serve.sock`; see [que
 ```
 
 or, outside `--json`, `relay: <detail>` on stderr. A CLI usage error (an unknown command, `relay inbox` alone without a subcommand, or a missing or invalid argument) exits `2` with one line on stderr naming the problem. The CLI exits explicitly once its reply is flushed so a filesystem operation past the deadline is abandoned.
+
+### Calling session: `relay whoami`
+
+`whoami` takes no arguments. It follows `list`'s output mode: pretty by default,
+with `RELAY_FORMAT`, `--json` and `--pretty` selecting the format. Consumers must
+pass `--json`. JSON stdout is one schema-1 result line:
+
+- `resolved`: `agent` is the exact registered Agent row, including its process
+  handle; `rootSession` is `codex:<CODEX_SESSION_ID>` when present for Codex,
+  otherwise `null`.
+- `outside`: the complete ancestry contains no harness process. The registry is
+  not read, so even a corrupt registry does not fail this answer.
+- `unresolved`: a harness boundary exists, but no single session can be named.
+  `code` and `message` explain why.
+- `failed`: identity could not be determined. This exits `1`; the other three
+  statuses exit `0`. Invalid arguments exit `2`.
+
+Every result includes `schema: 1`, `native`, `nativeSource` and `nativeSession`.
+Whenever a harness is found, the successful result also has `harness`, `boundary`
+(`harness`, `role`, full `process` Handle), and `hint` (the effective native hint
+or `null`). Roles are `session`, `daemon` and `bg-pty-host`. Ancestry determines
+registered identity; native values only select or check a row of that harness.
+Nested harnesses never resolve using an outer harness's variables.
+
+`native` always reports all four keys separately: `CLAUDE_CODE_SESSION_ID`,
+`CODEX_THREAD_ID`, `CODEX_SESSION_ID` and `ANTIGRAVITY_CONVERSATION_ID`. Entries
+are `{"state":"absent"}`, `{"state":"empty"}`,
+`{"state":"present","value":"..."}`, or invalid with `reason` equal to
+`not-unicode` (no value) or `control-characters` (JSON-escaped value).
+For example, this is machine data, not human text:
+
+```json
+{"CLAUDE_CODE_SESSION_ID":{"state":"absent"},"CODEX_THREAD_ID":{"state":"present","value":"t1"},"CODEX_SESSION_ID":{"state":"invalid","reason":"control-characters","value":"r1\u0009x"},"ANTIGRAVITY_CONVERSATION_ID":{"state":"empty"}}
+```
+
+`nativeSource: "raw"` means Linux's raw `/proc/self/environ` bytes.
+`nativeSource: "decoded"` means Node's decoded environment. Darwin always uses
+decoded evidence: invalid UTF-8 cannot be distinguished from U+FFFD, so a nonempty
+value containing U+FFFD is `{"state":"unverified","value":"..."}` instead of
+`present` or `not-unicode`. On Linux, inability to read the raw environment is a
+failure carrying the decoded evidence.
+
+`nativeSession` is true exactly when any eligible variable is `present`, `invalid`
+or `unverified`; absent and empty variables do not count. Eligible variables are
+Claude's session id, Codex's **thread** id and agy's conversation id.
+`CODEX_SESSION_ID` is root metadata and never substitutes for a thread. This
+boolean is independent of `status`, including on failures.
+
+Claude uses a nonempty Unicode session id as `hint`, including control characters;
+invalid Unicode, unverified and empty values give no hint. Codex uses a present
+thread id, otherwise a present root id; either invalid or unverified value refuses
+resolution. agy requires its present conversation id. Other harnesses use no hint.
+
+| Unresolved code | Meaning |
+| --- | --- |
+| `NOT_REGISTERED` | No row matches the boundary's handle; the message diagnoses near misses. |
+| `AMBIGUOUS` | Several rows qualify without a selecting hint. |
+| `HINT_MISMATCH` | The hint names a different session. |
+| `WORKER_NEEDS_THREAD` | A Codex worker cannot be selected without its own thread id. |
+| `MISSING_HINT` | agy's conversation id is absent or empty. |
+| `HOSTING_PROCESS` | The nearest Claude process is a daemon or pty host. |
+| `HIDDEN_ANCESTRY` | A harness at pid 1 with ppid 0 hides the actual session. |
+| `INVALID_NATIVE_VALUE` | Codex or agy has an invalid or unverified native value; Claude never returns this code. |
+| `REGISTRY_UNREADABLE` | The registry cannot be read or validated; the message names the cause. |
+
+Failures use `ENVIRONMENT_UNREADABLE`, `PROCESS_UNREADABLE`, `BOOT_ID_UNREADABLE`
+or `UNSUPPORTED_PLATFORM`. An unreadable, vanished or cyclic ancestor, or a boundary
+whose start changes after the walk, fails rather than returning `outside`.
+Linux and Darwin are supported; tasks retains its own Linux-only claim policy.
+
+`whoami --json` is the **one runtime-failure stdout exception**: it writes the
+failed result to stdout as well as the usual `whoami_failed` envelope to stderr:
+
+```json
+{"schema":1,"status":"failed","code":"ENVIRONMENT_UNREADABLE","message":"cannot read raw process environment","native":{"CLAUDE_CODE_SESSION_ID":{"state":"absent"},"CODEX_THREAD_ID":{"state":"present","value":"t1"},"CODEX_SESSION_ID":{"state":"absent"},"ANTIGRAVITY_CONVERSATION_ID":{"state":"absent"}},"nativeSource":"decoded","nativeSession":true}
+```
+
+Pretty success is one line: `resolved <agent.id> (<harness>, <agent.project>)`,
+`outside`, or `unresolved <harness> <code>: <message>`. Pretty failure writes only
+`relay: <code>: <message>` to stderr. Human fields containing any control character
+are replaced entirely by `[control characters]`, including registry ids and
+projects; ordinary ids print normally. JSON machine values retain escaped data.
+
+Within `schema: 1`, relay may add codes and optional fields. Any other change
+requires a new schema number. Consumers handle unknown codes by status with the
+message, and treat unknown statuses or schemas as failures.
+
+| Consumer | Reads and applies |
+| --- | --- |
+| tasks claims | Accepts `resolved` only; refuses `unresolved` with its message and existing `TASKS_SESSION` advice (namespace advice for `HIDDEN_ANCESTRY`). Its Linux-only rule applies to `agent.process`. Proof-only ownership requires `boundary.process` to match the claim's pid, start, host and boot. Codex also requires a present `CODEX_THREAD_ID` naming the claim and refuses an invalid `CODEX_SESSION_ID`; the root never substitutes for the thread. agy requires a present conversation id naming the claim. Claude checks a non-null `hint` against the claim, verbatim including controls; a null hint passes. These remain tasks' policies. |
+| kit hooks | Uses only `nativeSession` on every status, including `failed`, to decide whether this is an agent session; the kit decides the action. |
+| transponder | Needs no identity call: `ask` already supplies `session_id`, looked up through `readSnapshot`. |
 
 The extracted OpenCode plugin (`relay/opencode`) is installed by `relay install --harness opencode --config-dir DIR`; it has no direct-store bypass or fallback. Its child path is relay's own CLI with `shell: false`, inherited environment, 64 KiB stderr cap, and 5 s lifetime, preserving permission output and awaiting `dispose` last.
 

@@ -97,7 +97,7 @@ function explicitNode(path, harness) {
   return path;
 }
 /** @param {string[]} rawArgs */
-export async function main(rawArgs, { list = listAgents, reap = reconcile, hook = dispatchHook, stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {
+export async function main(rawArgs, { list = listAgents, whoami = async () => (await import('../src/identity/whoami.js')).whoami(), reap = reconcile, hook = dispatchHook, stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {
   /** @type {import('../src/commands.js').OutputMode} */
   let mode = 'pretty';
   let cmdName = null;
@@ -136,6 +136,20 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     mode = resolved.mode;
     const { silent } = resolved;
 
+    if (cmdName === 'whoami') {
+      if (rest.length !== 0) throw usage('whoami takes no arguments');
+      const result = await whoami();
+      if (mode === 'json') await emit(stdout, `${JSON.stringify(result)}\n`);
+      else {
+        const { printable } = await import('../src/identity/whoami.js');
+        const line = result.status === 'resolved'
+          ? `resolved ${printable(result.agent.id)} (${printable(result.harness)}, ${printable(result.agent.project)})`
+          : result.status === 'outside' ? 'outside'
+            : `unresolved ${printable(result.harness)} ${printable(result.code)}: ${printable(result.message)}`;
+        await emit(stdout, `${line}\n`);
+      }
+      return 0;
+    }
     if (cmd.path[0] === 'list') {
       if (rest.length !== 0) throw usage('list takes no arguments');
       const r = await list();
@@ -271,7 +285,13 @@ export async function main(rawArgs, { list = listAgents, reap = reconcile, hook 
     throw usage(`unknown command "${cmd.path[0]}"`);
   } catch (caught) { const error = /** @type {import('../src/types.js').Failure} */ (caught);
     if (error.code === 'USAGE') { await emit(stderr, `relay: ${error.message}\n`); return 2; }
-    const kind = `${cmdName ?? 'relay'}_failed`, detail = error.code ? `${error.code}: ${error.message}` : 'relay operation failed';
+    const human = cmdName === 'whoami' ? (await import('../src/identity/whoami.js')).printable : (/** @param {string} text */ text) => text;
+    const kind = `${cmdName ?? 'relay'}_failed`, detail = error.code ? `${human(String(error.code))}: ${human(error.message)}` : 'relay operation failed';
+    if (cmdName === 'whoami' && mode === 'json') {
+      const failure = /** @type {Error & import('../src/types.js').NativeEvidence & {code:string}} */ (error);
+      await emit(stdout, `${JSON.stringify({ schema: 1, status: 'failed', code: failure.code, message: human(failure.message),
+        native: failure.native, nativeSource: failure.nativeSource, nativeSession: failure.nativeSession })}\n`);
+    }
     const entry = (/** @type {unknown[]} */ (['ALREADY_ANSWERED', 'ANSWERED'])).includes(error.code) && error.entry?.answer ? error.entry : null;
     if (mode === 'json') await emit(stderr, `${JSON.stringify({ error: { kind, detail, ...(entry ? { entry } : {}) } })}\n`);
     else {

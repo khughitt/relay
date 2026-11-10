@@ -6,6 +6,7 @@ export const HOOK_HARNESSES = [...HARNESSES, 'agy'];
 /** @type {import("./types.js").Command[]} */
 export const COMMANDS = [
   { path: ['list'], summary: 'The live-agent registry' },
+  { path: ['whoami'], summary: 'The agent session this process belongs to' },
   { path: ['reap'], summary: 'Reconcile the registry against live processes', options: [{ names: ['--outer-ms'], value: 'int' }] },
   { path: ['hook'], summary: 'Dispatch one harness hook event to the subscribers and guards', protocol: "harness hook: stdout is the reply, exit code is the guard's",
     args: [{ name: 'event', value: 'string', required: true }],

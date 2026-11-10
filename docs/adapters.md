@@ -37,6 +37,18 @@ Process inspection (`src/bus/proc.js` and `src/adapters/ancestry.js`) separates 
 - `executableOf` is read only for a version-shaped `comm`, and `argvOf` only for the nearest Claude Code process and, in the terminal walk, the parent of a version-binary process that owns a terminal; an unreadable one throws `PROCESS_UNREADABLE`.
 - A hook PID or shell session ID is never substituted for a missing harness process. The shared cross-harness ancestry test corpus is exported at `relay/fixtures/ancestry.json`.
 
+`relay whoami` uses the same harness recognition in a separate strict walk
+(`src/identity/walk.js`). It skips the caller, visits every ancestor including pid 1,
+and stops at the nearest harness boundary. It keeps Claude's hosting role visible
+instead of looking through a daemon or pty host for another session. A harness at
+pid 1 with ppid 0 gives `HIDDEN_ANCESTRY`; a fully visible non-harness chain gives
+`outside`. Vanished or unreadable ancestors, cycles, and the 64-level walk limit
+fail with `PROCESS_UNREADABLE`. The boundary handle is read after the walk and its
+start must still agree. Linux requires a readable boot id. Outside, hosting, hidden
+and malformed-hint answers are settled before reading the registry. See the
+[`whoami` contract](api.md#calling-session-relay-whoami) for native evidence,
+consumer rules, failure stdout and Darwin's decoded-environment qualification.
+
 ## Event mappings
 
 | Harness | Native event | Kind | Level | Refuse | Context |
