@@ -1,6 +1,7 @@
 // @ts-check
+import { validateHandle } from '../../index.js';
+import { relayError } from '../../interaction/support.js';
 import {isDeepStrictEqual} from 'node:util';
-import {validateHandle,relayError} from '../../protocol.js';
 import {callId} from '../../routes/codex.js';
 import {isAbsolute} from 'node:path';
 /** @param {unknown} v @returns {v is Record<string,any>} */

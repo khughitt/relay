@@ -1,5 +1,5 @@
 // @ts-check
-import { relayError } from '../protocol.js';
+import { relayError } from '../interaction/support.js';
 // sockaddr_un's sun_path is 108 bytes on Linux and 104 on Darwin. Linux accepts an unterminated full-length path, but
 // relay reserves the terminating NUL so one limit rule holds on both platforms. Past the full length, newer Node fails
 // bind and connect with a bare EINVAL and Node 22 silently truncates the path, so serve would bind (and clients reach)

@@ -1,3 +1,4 @@
+import { createProcessOps } from '../src/index.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
@@ -6,7 +7,6 @@ import {spawn,execFileSync} from 'node:child_process';
 import {once} from 'node:events';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {createProcessOps} from '../src/bus/proc.js';
 import promises from 'node:fs/promises';
 import {syncBuiltinESMExports} from 'node:module';
 const mod=await import('../src/serve/codex/identity.js').catch(e=>{if(e.code==='ERR_MODULE_NOT_FOUND')return {};throw e});

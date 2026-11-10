@@ -1,9 +1,9 @@
 // @ts-check
+import { relayError } from '../interaction/support.js';
 import http from 'node:http';
 import * as fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { extname, resolve, sep } from 'node:path';
-import { relayError } from '../protocol.js';
 import { validateMessage } from '../interaction/message.js';
 import { classify } from './guard.js';
 import {publicEntry,publicView} from './public-entry.js';

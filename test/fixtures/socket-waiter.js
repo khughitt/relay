@@ -1,11 +1,10 @@
+import { createProcessOps, validateHandle } from '../../src/index.js';
 // A stand-in for a hook: asks one question and echoes every line it receives. stdin commands:
 // "handed" sends handed for its own entry; "reattach" reconnects and asks again with the same id;
 // "ask <file>" asks the question in file on the current connection too (reply op "ask-more").
 import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { connectSocket } from '../../src/serve/client.js';
-import { createProcessOps } from '../../src/bus/proc.js';
-import { validateHandle } from '../../src/protocol.js';
 const [socketPath, messagePath, handback = 'false'] = process.argv.slice(2);
 const message = JSON.parse(readFileSync(messagePath, 'utf8'));
 const waiter = validateHandle(createProcessOps().handleOf(process.pid));

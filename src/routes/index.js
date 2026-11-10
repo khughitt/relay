@@ -1,5 +1,5 @@
 // @ts-check
-import { relayError } from '../protocol.js';
+import { relayError } from '../interaction/support.js';
 import * as claudeCode from './claude-code.js';
 import * as codex from './codex.js';
 

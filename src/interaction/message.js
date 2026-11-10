@@ -1,5 +1,5 @@
 // @ts-check
-import { relayError } from '../protocol.js';
+import { relayError } from './support.js';
 
 // The JSON Schema is the public contract; this module also checks its cross-field rules.
 export const MESSAGE_KINDS = Object.freeze(['question', 'answer', 'defer', 'withdrawal', 'notice']);

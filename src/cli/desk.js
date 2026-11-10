@@ -1,8 +1,8 @@
 // @ts-check
+import { relayError } from '../interaction/support.js';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
-import { relayError } from '../protocol.js';
 import { connectSocket } from '../serve/client.js';
 import { validateMessage } from '../interaction/message.js';
 

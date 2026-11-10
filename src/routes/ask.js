@@ -1,11 +1,7 @@
 // @ts-check
+import { relayError } from '../interaction/support.js';
+import { validateHandle, createProcessOps, paths, readSnapshot, parsePayload, readNativeInput } from '../index.js';
 import { randomUUID } from 'node:crypto';
-import { dirname } from 'node:path';
-import { relayError, validateHandle } from '../protocol.js';
-import { createProcessOps } from '../bus/proc.js';
-import { paths } from '../bus/paths.js';
-import { readSnapshot } from '../bus/transaction.js';
-import { parsePayload, readNativeInput } from '../adapters/payload.js';
 import { connectSocket } from '../serve/client.js';
 import { toQuestion, allowReply, denyReply, observedAnswers } from './claude-code.js';
 
@@ -20,15 +16,15 @@ const EXPIRED = 'question expired before an answer arrived; do not wait for an a
 const UNDELIVERABLE = 'saved answer could not be delivered before the question expired; do not wait for an answer';
 
 // Failures leave the native question available; a saved handoff is acknowledged before stdout.
-/** @param {{nativeEvent: string, handback?: boolean, stdin: import("node:stream").Readable, socketPath: string, connect?: typeof connectSocket, processOps?: import("../types.js").ProcessOps, clock?: () => number, sleep?: (ms: number) => Promise<void>, newId?: () => string}} options @returns {Promise<import("../types.js").Output>} */
-export async function runAsk({ nativeEvent, handback = false, stdin, socketPath, connect = connectSocket, processOps,
+/** @param {{nativeEvent: string, handback?: boolean, stdin: import("node:stream").Readable, socketPath: string, env?: NodeJS.ProcessEnv, connect?: typeof connectSocket, processOps?: import("../types.js").ProcessOps, clock?: () => number, sleep?: (ms: number) => Promise<void>, newId?: () => string}} options @returns {Promise<import("../types.js").Output>} */
+export async function runAsk({ nativeEvent, handback = false, stdin, socketPath, env = process.env, connect = connectSocket, processOps,
   clock = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), newId = randomUUID } = /** @type {NonNullable<Parameters<typeof runAsk>[0]>} */ ({})) {
   try {
     if (!['PreToolUse', 'PostToolUse'].includes(nativeEvent)) throw relayError('INVALID_INPUT', 'unsupported ask hook event');
     const payload = parsePayload(await readNativeInput(stdin), nativeEvent);
     if (nativeEvent === 'PostToolUse') return await confirm({ payload, socketPath, connect });
     processOps ??= createProcessOps();
-    const registry = await readSnapshot({ paths: paths({ RELAY_STATE_DIR: dirname(socketPath) }), processOps });
+    const registry = await readSnapshot({ paths: paths(env), processOps });
     const project = registry?.agents[`claude-code:${payload.session_id}`]?.projectKey ?? null;
     const question = toQuestion(payload, { now: clock(), id: newId(), project });
     const waiter = validateHandle(processOps.handleOf(process.pid));

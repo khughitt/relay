@@ -1,6 +1,6 @@
 // @ts-check
+import { relayError } from '../interaction/support.js';
 import { isAbsolute } from 'node:path';
-import { relayError } from '../protocol.js';
 /** @type {(message: string) => never} */
 const invalid = (message) => { throw relayError('INVALID_CONFIG', message); };
 /** @param {NodeJS.ProcessEnv} env */

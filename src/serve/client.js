@@ -1,6 +1,6 @@
 // @ts-check
+import { relayError } from '../interaction/support.js';
 import net from 'node:net';
-import { relayError } from '../protocol.js';
 import { lineReader } from './lines.js';
 import { checkSocketPath } from './socket-path.js';
 // A client of relay serve's local socket: request/response by reqId, everything else a push.

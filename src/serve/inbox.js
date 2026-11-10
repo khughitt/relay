@@ -1,9 +1,8 @@
 // @ts-check
+import { relayError, readJson } from '../interaction/support.js';
 import * as fs from 'node:fs/promises';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { relayError } from '../protocol.js';
-import { readJson } from '../bus/store.js';
 import { loadStore, writeDurable } from '../interaction/store.js';
 import * as L from '../interaction/lifecycle.js';
 import { expiryLimit } from '../routes/index.js';

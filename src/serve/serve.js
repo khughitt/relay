@@ -1,18 +1,14 @@
 // @ts-check
+import { paths, withLock, createProcessOps, readSnapshot } from '../index.js';
+import { ensurePrivateDir, relayError } from '../interaction/support.js';
 import * as fs from 'node:fs/promises';
 import { join } from 'node:path';
-import { paths } from '../bus/paths.js';
-import { withLock } from '../bus/lock.js';
-import { ensurePrivateDir } from '../bus/store.js';
-import { createProcessOps } from '../bus/proc.js';
-import { relayError } from '../protocol.js';
 import { expectAnswers } from '../routes/index.js';
 import { openInbox } from './inbox.js';
 import { serveSocket } from './socket.js';
 import { checkSocketPath } from './socket-path.js';
 import { serveConfig } from './config.js';
 import { serveHttp } from './http.js';
-import { readSnapshot } from '../bus/transaction.js';
 import {validateEvidence} from './codex/evidence.js';
 import {openCodexConnector} from './codex/connector.js';
 // relay serve (docs/questions.md, "Local socket protocol"): holds the registry's lock primitive on serve.lock for its whole life,

@@ -1,3 +1,4 @@
+import { createProcessOps } from '../src/index.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
@@ -8,7 +9,6 @@ import { connectSocket } from '../src/serve/client.js';
 import { openInbox } from '../src/serve/inbox.js';
 import { serveSocket } from '../src/serve/socket.js';
 import { expectAnswers } from '../src/routes/index.js';
-import { createProcessOps } from '../src/bus/proc.js';
 import { parseValues, runInbox, runPresence } from '../src/cli/desk.js';
 import { runCli } from './helpers/cli-interaction.js';
 import { HANDLE, NOW, questionMessage, answerMessage } from './helpers/interaction.js';

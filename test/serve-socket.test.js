@@ -1,3 +1,4 @@
+import { createProcessOps } from '../src/index.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
@@ -9,7 +10,6 @@ import { openInbox } from '../src/serve/inbox.js';
 import { serveSocket } from '../src/serve/socket.js';
 import { connectSocket } from '../src/serve/client.js';
 import { expectAnswers } from '../src/routes/index.js';
-import { createProcessOps } from '../src/bus/proc.js';
 import { questionMessage, answerMessage, deferMessage, withdrawalMessage, noticeMessage, HANDLE, OTHER_HANDLE } from './helpers/interaction.js';
 import { EXPIRY_MS } from '../src/routes/claude-code.js';
 import { until, nextCall, settledYet, turn } from './helpers/wait.js';

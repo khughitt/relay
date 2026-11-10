@@ -1,7 +1,7 @@
+import { paths } from '../../src/index.js';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { paths } from '../../src/bus/paths.js';
 export async function tempState(t) {
   const stateDir = await mkdtemp(join(tmpdir(), 'relay-test-'));
   t.after(() => rm(stateDir, { recursive: true, force: true }));

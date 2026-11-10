@@ -1,9 +1,9 @@
+import { applyEvent } from '../src/index.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import net from 'node:net';
 import { runServe, servePaths } from '../src/serve/serve.js';
-import { applyEvent } from '../src/bus/transaction.js';
 import { connectSocket } from '../src/serve/client.js';
 import * as fs from 'node:fs/promises';
 import { join } from 'node:path';

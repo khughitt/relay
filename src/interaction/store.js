@@ -1,9 +1,8 @@
 // @ts-check
+import { relayError, ensurePrivateDir, checkPrivate } from './support.js';
 import * as fs from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { relayError } from '../protocol.js';
-import { ensurePrivateDir, checkPrivate } from '../bus/store.js';
 import { validateEntry, isTerminal, applySuperseded } from './lifecycle.js';
 // The inbox's durable store (docs/questions.md, "Messages and entries" and "Lifecycle"). relay serve is its only writer. Each change allocates a
 // sequence number, writes seq, then the entry; both writes are fsynced files renamed into place

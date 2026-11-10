@@ -1,3 +1,4 @@
+import { createProcessOps } from '../src/index.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
@@ -10,7 +11,6 @@ import { connectSocket } from '../src/serve/client.js';
 import { checkSocketPath, SOCKET_PATH_LIMITS } from '../src/serve/socket-path.js';
 import { runServe, servePaths } from '../src/serve/serve.js';
 import { expectAnswers } from '../src/routes/index.js';
-import { createProcessOps } from '../src/bus/proc.js';
 import { runAsk } from '../src/routes/ask.js';
 import { runPresence } from '../src/cli/desk.js';
 

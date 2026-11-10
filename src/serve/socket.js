@@ -1,10 +1,10 @@
 // @ts-check
+import { ensurePrivateDir, relayError } from '../interaction/support.js';
+import { validateHandle } from '../index.js';
 import net from 'node:net';
 import * as fs from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { ensurePrivateDir } from '../bus/store.js';
-import { relayError, validateHandle } from '../protocol.js';
 import { isUuid, validateMessage } from '../interaction/message.js';
 import { lineReader } from './lines.js';
 import {publicView} from './public-entry.js';

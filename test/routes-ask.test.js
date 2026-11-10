@@ -1,10 +1,10 @@
+import { createProcessOps } from '../src/index.js';
 import test from 'node:test';
 import * as fs from 'node:fs/promises';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { openInbox } from '../src/serve/inbox.js';
 import { serveSocket } from '../src/serve/socket.js';
-import { createProcessOps } from '../src/bus/proc.js';
 import { expectAnswers } from '../src/routes/index.js';
 import { Readable } from 'node:stream';
 import { runAsk } from '../src/routes/ask.js';
@@ -145,7 +145,7 @@ for (const handback of [true, false]) {
         } };
       };
       const result = await runAsk({ nativeEvent: 'PreToolUse', handback, stdin: Readable.from([pre()]),
-        socketPath, connect, processOps, clock: () => createdAt, newId: () => id });
+        socketPath, env: { RELAY_STATE_DIR: p.stateDir }, connect, processOps, clock: () => createdAt, newId: () => id });
       if (replay) assert.equal(handedResult, undefined);
       else assert.equal(handedResult.error.code, 'UNDELIVERABLE');
       assert.equal(result.exitCode, 0);
@@ -280,11 +280,29 @@ test('the hook cannot return stdout before the handed acknowledgement', { timeou
   t.after(() => server.close());
   const client = await connectSocket(socketPath); t.after(() => client.close());
   let finished = false;
-  const running = runAsk({ nativeEvent: 'PreToolUse', stdin: Readable.from([pre()]), socketPath }).then((r) => { finished = true; return r; });
+  const running = runAsk({ nativeEvent: 'PreToolUse', stdin: Readable.from([pre()]), socketPath, env: { RELAY_STATE_DIR: p.stateDir } }).then((r) => { finished = true; return r; });
   const e = await entryFor(client);
   await client.request('answer', { message: answer(e) });
   await hit;
   try { await new Promise((resolve) => setTimeout(resolve, 50)); assert.equal(finished, false); }
   finally { release(); }
   assert.equal(JSON.parse((await running).stdout).hookSpecificOutput.permissionDecision, 'allow');
+});
+
+
+test('ask reads the registry from env when the socket lives elsewhere', async (t) => {
+  const registry = await tempState(t), socket = await tempState(t);
+  await writeFile(registry.agentsPath, JSON.stringify({ schema: 2, generation: uuid(), revision: 1, agents: {
+    'claude-code:s-test': { id: 'claude-code:s-test', harness: 'claude-code', sessionId: 's-test', scope: 'session', process: null,
+      cwd: '/tmp', repoRoot: null, remote: null, projectKey: 'registry-project', project: 'Project', state: 'working', updatedAt: Date.now() }
+  } }), { mode: 0o600 });
+  let question;
+  const closed = new Promise(() => {});
+  const result = await runAsk({ nativeEvent: 'PreToolUse', stdin: Readable.from([pre()]),
+    env: { RELAY_STATE_DIR: registry.stateDir }, socketPath: join(socket.stateDir, 'serve.sock'),
+    connect: async () => ({ closed, close() {}, onPush: () => () => {}, request: async (op, fields) => {
+      assert.equal(op, 'ask'); question = fields.message; return { passthrough: true };
+    } }) });
+  assert.equal(result.stderr, '');
+  assert.equal(question.context.project, 'registry-project');
 });

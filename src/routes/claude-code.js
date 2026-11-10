@@ -1,5 +1,5 @@
 // @ts-check
-import { relayError } from '../protocol.js';
+import { relayError } from '../interaction/support.js';
 import { validateMessage } from '../interaction/message.js';
 
 export const EXPIRY_MS = 23 * 3600 * 1000;

@@ -1,8 +1,9 @@
 // @ts-check
+import { relayError } from './support.js';
+import { validateHandle } from '../index.js';
 import { isDeepStrictEqual } from 'node:util';
 import {validateOwner} from '../serve/codex/owner.js';
 import {parseAnswers,nativeAnswers as codexAnswers} from '../routes/codex.js';
-import { relayError, validateHandle } from '../protocol.js';
 import { checkAnswer, isUuid, validateMessage, LOCAL_SURFACES, WITHDRAWAL_REASONS } from './message.js';
 // The question lifecycle as pure functions (docs/questions.md, "Lifecycle"). Each returns { entry, changed, error };
 // new log rows carry seq: null, which the store stamps when it persists the entry.
