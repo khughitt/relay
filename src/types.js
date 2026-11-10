@@ -1,6 +1,7 @@
 // Shared contracts for checked JavaScript; this module has no runtime exports.
 /**
  * @typedef {'claude-code'|'codex'|'opencode'|'agy'} Harness
+ * @typedef {{state:'absent'}|{state:'empty'}|{state:'present',value:string}|{state:'invalid',reason:'not-unicode'}|{state:'invalid',reason:'control-characters',value:string}|{state:'unverified',value:string}} NativeEntry
  * @typedef {'idle'|'working'|'needs-input'|'needs-approval'|'done'|'error'} State
  * @typedef {'session-start'|'prompt'|'before-tool'|'activity'|'idle'|'needs-input'|'needs-approval'|'turn-end'|'turn-error'|'session-end'} Kind
  * @typedef {{platform: 'linux'|'darwin', host: string, bootId: string|null, pid: number, start: string}} Handle
