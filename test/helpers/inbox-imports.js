@@ -26,8 +26,11 @@ try {
   const program = snapshot.getProject(config).program;
   result = files.map((file) => {
     assert.deepEqual(program.getSyntacticDiagnostics(file), [], `cannot parse ${file}`);
-    const imports = [];
+    const imports = [], visited = new Set();
     function visit(node) {
+      const key = `${node.kind}:${node.pos}:${node.end}`;
+      if (visited.has(key)) return;
+      visited.add(key);
       let literal;
       if ([K.ImportDeclaration, K.ExportDeclaration, K.JSDocImportTag].includes(node.kind)) literal = node.moduleSpecifier;
       if (node.kind === K.CallExpression && node.expression.kind === K.ImportKeyword) literal = node.arguments[0];
@@ -38,6 +41,8 @@ try {
         imports.push({ specifier: literal.text, typeOnly });
       }
       node.forEachChild(visit);
+      // RemoteNode.forEachChild omits JSDoc nodes, including @import tags.
+      for (const doc of node.jsDoc ?? []) visit(doc);
     }
     visit(program.getSourceFile(file));
     return imports;
