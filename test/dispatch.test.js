@@ -22,7 +22,7 @@ import { processMarker, noneMarked, reapMarked } from './helpers/survivors.js';
 const fixture = new URL('./fixtures/subscriber.js', import.meta.url).pathname;
 const argv = (mode, ...rest) => [process.execPath, fixture, mode, ...rest];
 const guard = (name, mode, over = {}) => ({ name, role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], argv: argv(mode, ...(over.file ? [over.file] : [])), timeoutMs: 3000, ...over, file: undefined });
-const observer = (name, mode, over = {}) => ({ name, role: 'observer', kinds: ['before-tool'], argv: argv(mode, ...(over.file ? [over.file] : [])), timeoutMs: 3000, ...over, file: undefined });
+const observer = (name, mode, over = {}) => ({ name, role: 'observer', registry: 'snapshot', kinds: ['before-tool'], argv: argv(mode, ...(over.file ? [over.file] : [])), timeoutMs: 3000, ...over, file: undefined });
 const strip = (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined));
 const payload = (over = {}) => JSON.stringify({ session_id: 'sess', cwd: '/repo', tool_name: 'Bash', tool_input: { command: 'echo PRIVATE_COMMAND' }, ...over });
 const local = { resolveSessionPid: () => process.pid, gitContext: async () => ({ remote: null, repoRoot: null }) };
@@ -51,9 +51,11 @@ test('guards run in order before any registry work and the first denial wins', a
   assert.ok(await absent(p.agentsPath), 'a denial never touches the registry');
   assert.ok(await absent(p.lockPath));
   const seen = JSON.parse(await readFile(files[0], 'utf8'));
-  assert.deepEqual(Object.keys(seen).sort(), ['event', 'schema', 'subscriber', 'type']);
-  assert.equal(seen.subscriber, 'a'); assert.equal(seen.type, 'event');
-  assert.deepEqual(seen.event.tool, { name: 'Bash', input: { command: 'echo PRIVATE_COMMAND' }, command: 'echo PRIVATE_COMMAND' });
+  assert.deepEqual(Object.keys(seen).sort(), ['event', 'registry', 'schema', 'subscriber', 'type']);
+  assert.equal(seen.schema, 2); assert.equal(seen.subscriber, 'a'); assert.equal(seen.type, 'event');
+  assert.deepEqual(seen.registry, { status: 'not-requested' });
+  assert.deepEqual(seen.event.tool, { name: { status: 'valid', value: 'Bash' }, id: { status: 'missing' } });
+  assert.deepEqual(seen.event.private, { toolInput: { status: 'valid', value: { command: 'echo PRIVATE_COMMAND' } }, command: { status: 'valid', value: 'echo PRIVATE_COMMAND' } });
   assert.equal((await readFile(files[2], 'utf8')).length > 0, true, 'guards after a denial still run');
   assert.ok(performance.now() - started < 3000);
 });
@@ -114,14 +116,14 @@ test('mixed allow and deny with an erroring guard still refuses with the denial 
   assert.match((await hook(p)).stdout, /relay refused: GUARD_FAILED: guard b exited 3/);
 });
 
-test('guard envelope serialization failures refuse without invoking the guard', async (t) => {
+test('tool input beyond its structural bound refuses without invoking the guard', async (t) => {
   const p = await tempPaths(t), file = join(p.stateDir, '..', 'guard-ran');
   await writeSubscribers(p, [strip(guard('deep', 'record', { file }))]);
   const nested = `${'['.repeat(10000)}0${']'.repeat(10000)}`;
   const body = `{"session_id":"sess","cwd":"/repo","tool_name":"Bash","tool_input":{"nested":${nested}}}`;
   const r = await hook(p, { body });
   assert.equal(r.exitCode, 2);
-  assert.match(r.stdout, /relay refused: GUARD_FAILED: guard deep input serialization failed/);
+  assert.match(r.stdout, /relay refused: INVALID_INPUT/);
   assert.ok(await absent(file));
   assert.ok(await absent(p.agentsPath));
 });
@@ -158,7 +160,7 @@ test('Stop denial continues the turn and guards see stopHookActive', async (t) =
   await writeSubscribers(p, [strip(guard('see', 'record', { kinds: ['turn-end'], file })), strip(guard('stop', 'deny', { kinds: ['turn-end'] }))]);
   const r = await hook(p, { harness: 'codex', nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: '/repo', stop_hook_active: true }) });
   assert.deepEqual(r, { stdout: '{"decision":"block","reason":"denied by fixture"}\n', stderr: 'denied by fixture\n', exitCode: 2 });
-  assert.equal(JSON.parse(await readFile(file, 'utf8')).event.stopHookActive, true);
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).event.facts.stopHookActive, { status: 'valid', value: true });
   await writeSubscribers(p, [strip(guard('stop', 'deny-context', { kinds: ['turn-end'] }))]);
   const kept = await hook(p, { harness: 'claude-code', nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: '/repo' }) });
   assert.deepEqual(kept, { stdout: '{"decision":"block","reason":"denied by fixture"}\n', stderr: 'denied by fixture\n', exitCode: 2 });
@@ -253,7 +255,7 @@ test('an unusable environment cannot reach the policy phase when the path is exp
 });
 
 test('slow configuration loading and publication end at the deadline', async (t) => {
-  const p = await tempPaths(t), empty = { schema: 1, subscribers: [] };
+  const p = await tempPaths(t), empty = { schema: 2, subscribers: [] };
   let started = performance.now();
   let r = await hook(p, { outerMs: 500, deps: { loadConfig: slow(empty, 650) } });
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /relay refused: DEADLINE_EXCEEDED: subscriber configuration did not load before the deadline/);
@@ -287,7 +289,7 @@ test('tool filters select guards and the tool input never leaks into stderr or s
   await writeSubscribers(p, [strip(guard('bash', 'deny', { tools: ['Bash'] })), strip(guard('edit', 'record', { tools: ['Edit'], file }))]);
   const r = await hook(p, { body: payload({ tool_name: 'Edit', tool_input: { file_path: '/x', secret: 'PRIVATE_INPUT' } }) });
   assert.equal(r.exitCode, 0); assert.equal((r.stdout + r.stderr).includes('PRIVATE_INPUT'), false);
-  assert.equal(JSON.parse(await readFile(file, 'utf8')).event.tool.input.secret, 'PRIVATE_INPUT');
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).event.private.toolInput.value.secret, 'PRIVATE_INPUT');
   assert.equal((await readFile(p.agentsPath, 'utf8')).includes('PRIVATE_INPUT'), false);
 });
 
@@ -299,9 +301,11 @@ test('observers get sanitized metadata after publication and cannot touch the re
   assert.equal(r.stdout, ''); assert.equal(r.exitCode, 0);
   assert.equal(r.stderr, 'noisy: observer noise\n');
   const seen = JSON.parse(await readFile(file, 'utf8')), snapshot = await readSnapshot({ paths: p });
-  assert.deepEqual(seen, { schema: 1, type: 'event', subscriber: 'rec',
-    event: { schema: 1, kind: 'before-tool', harness: 'claude-code', nativeEvent: 'PreToolUse', agentId: 'claude-code:sess', sessionId: 'sess', cwd: '/repo', tool: { name: 'Bash' } },
-    registry: { generation: snapshot.generation, revision: 1 }, changed: true, reaped: [] });
+  assert.deepEqual(seen, { schema: 2, type: 'event', subscriber: 'rec',
+    event: { schema: 2, kind: 'before-tool', harness: 'claude-code', nativeEvent: 'PreToolUse', cwd: '/repo',
+      identity: { status: 'valid', value: { agentId: 'claude-code:sess', sessionId: 'sess' } }, facts: {},
+      tool: { name: { status: 'valid', value: 'Bash' }, id: { status: 'missing' } }, private: {} },
+    registry: { status: 'ready', generation: snapshot.generation, revision: 1 } });
   assert.equal(JSON.stringify(seen).includes('PRIVATE_COMMAND'), false);
   assert.equal(JSON.stringify(seen).includes('hook-environment'), false);
   assert.equal(await readFile(join(p.stateDir, '..', 'env'), 'utf8'), 'hook-environment');
@@ -347,7 +351,7 @@ test('Codex SessionEnd fits its one-second default and OpenCode events observe o
   await applyEvent(normalizeEvent('codex', 'SessionStart', JSON.stringify({ session_id: 'sess', cwd: '/repo' })), { paths: p, ...local });
   const started = performance.now(), r = await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: JSON.stringify({ session_id: 'sess', cwd: '/repo' }) });
   assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 }); assert.ok(performance.now() - started < 1000);
-  assert.equal(JSON.parse(await readFile(file, 'utf8')).changed, true);
+  assert.equal(JSON.parse(await readFile(file, 'utf8')).registry.status, 'ready');
   await writeSubscribers(p, [strip(observer('end', 'allow', { kinds: ['session-end'], timeoutMs: 300 }))]);
   assert.match((await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: '{"session_id":"sess","cwd":"/repo"}' })).stderr, /^INVALID_CONFIG: subscribers for codex session-end need 300 ms but 267 ms fit inside 1000 ms/);
   const oc = await hook(p, { harness: 'opencode', nativeEvent: 'session.busy', body: '{"session_id":"opencode:42","cwd":"/repo"}' });
@@ -363,16 +367,16 @@ test('a replaced worker stop still reaches guards and observers; a refusal prese
     await applyEvent(native('SubagentStart',{agent_id:'worker'}),{paths:p,...local});
     await applyEvent(native('SessionStart',{session_id:'next'}),{paths:p,...local});
     const before=await readSnapshot({paths:p}),bytes=await readFile(p.agentsPath,'utf8');
-    await writeSubscribers(p,[strip(guard('g','allow',{kinds:['turn-end']})),strip(observer('o','allow',{kinds:['turn-end']}))]);
+    await writeSubscribers(p,[strip(guard('g','allow',{kinds:['child-stop'],harnesses:['codex']})),strip(observer('o','allow',{kinds:['child-stop']}))]);
     const result=await hook(p,{harness:'codex',nativeEvent:'SubagentStop',body:payload({session_id:'old',agent_id:'worker',stop_hook_active:false}),
       deps:{run:async(_argv,input)=>{const message=JSON.parse(input);seen.push(message);
         return{status:'exited',exitCode:0,stderr:'',stdout:JSON.stringify(deny?{decision:'deny',reason:'continue'}:{decision:'allow'})};}}});
     assert.equal(result.exitCode,deny?2:0);
-    assert.equal(seen[0].event.agentId,'codex:worker');assert.equal(seen[0].event.root,'codex:old');
+    assert.deepEqual(seen[0].event.identity,{status:'valid',value:{agentId:'codex:worker',sessionId:'worker',root:'codex:old'}});
     if(deny){assert.equal(seen.length,1);assert.equal(await readFile(p.agentsPath,'utf8'),bytes);}
     else{const after=await readSnapshot({paths:p});assert.equal(after.agents['codex:worker'],undefined);
-      assert.equal(seen[1].event.agentId,'codex:worker');assert.equal(seen[1].event.root,'codex:old');assert.equal(seen[1].registry.revision,before.revision+1);
-      assert.equal(seen[1].changed,true);assert.deepEqual(after.agents['codex:next'],before.agents['codex:next']);}
+      assert.deepEqual(seen[1].event.identity,seen[0].event.identity);assert.equal(seen[1].registry.revision,before.revision+1);
+      assert.equal(seen[1].registry.status,'ready');assert.deepEqual(after.agents['codex:next'],before.agents['codex:next']);}
   }
 });
 
@@ -381,18 +385,18 @@ test('reconcile prunes, then notifies reconcile observers even when nothing chan
   await writeSubscribers(p, [strip(observer('r', 'record', { kinds: [RECONCILE], file, timeoutMs: 500 })), strip(observer('never', 'record', { kinds: ['session-end'], file: join(p.stateDir, '..', 'never') }))]);
   let { result, diagnostics } = await reconcile({}, { paths: p });
   assert.equal(result.snapshot, null); assert.deepEqual(diagnostics, []);
-  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), { schema: 1, type: 'reconcile', subscriber: 'r', event: null, registry: { generation: null, revision: null }, changed: false, reaped: [] });
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), { schema: 2, type: 'reconcile', subscriber: 'r', registry: { status: 'unavailable', code: 'NO_SNAPSHOT' }, reaped: [] });
   await hook(p);
   ({ result } = await reconcile({ outerMs: 2000 }, { paths: p }));
   assert.equal(result.changed, false);
-  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).registry, { generation: result.snapshot.generation, revision: 1 });
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).registry, { status: 'ready', generation: result.snapshot.generation, revision: 1 });
   assert.ok(await absent(join(p.stateDir, '..', 'never')));
   await writeSubscribers(p, [strip(observer('r', 'allow', { kinds: [RECONCILE], timeoutMs: 60000 }))]);
   await assert.rejects(reconcile({}, { paths: p }), { code: 'INVALID_CONFIG' });
   await writeSubscribers(p, [], { text: 'nope' });
   await assert.rejects(reconcile({}, { paths: p }), { code: 'INVALID_CONFIG' });
   await writeSubscribers(p, []); // valid again, so the injected slow reap is actually reached
-  await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, loadConfig: slow({ schema: 1, subscribers: [] }, 650) }), { code: 'DEADLINE_EXCEEDED' });
+  await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, loadConfig: slow({ schema: 2, subscribers: [] }, 650) }), { code: 'DEADLINE_EXCEEDED' });
   await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, reap: slow(published, 650) }), { code: 'DEADLINE_EXCEEDED' });
   await new Promise((resolve) => setTimeout(resolve, 700));
 });
@@ -445,15 +449,19 @@ test('a refusing Stop guard still wins over an unreadable report', async t => {
 });
 test('observers see the counts, or null when unreadable', async t => {
   const p = await tempPaths(t), file = join(p.stateDir, '..', 'background-observer.json');
-  await writeSubscribers(p, [strip(observer('seen', 'record', { kinds: ['turn-end'], file }))]);
+  const plain = join(p.stateDir, '..', 'plain-observer.json');
+  await writeSubscribers(p, [strip(observer('seen', 'record', { kinds: ['turn-end'], harnesses: ['claude-code'], file, privateFields: [{ nativeEvent: 'Stop', fields: ['backgroundTasks'] }] })),
+    strip(observer('plain', 'record', { kinds: ['turn-end'], file: plain }))]);
   const readable = await hook(p, { nativeEvent: 'Stop', body: stopBody([{ id: 'a', type: 'subagent', status: 'running', description: 'PRIVATE_DESCRIPTION' }]) });
   assert.equal(readable.exitCode, 0);
   const text = await readFile(file, 'utf8');
-  assert.deepEqual(JSON.parse(text).event.background, { agents: 1, other: 0 });
+  assert.deepEqual(JSON.parse(text).event.private.backgroundTasks, { status: 'valid', value: [{ type: 'subagent', status: 'running' }] });
   assert.equal(text.includes('PRIVATE_DESCRIPTION'), false);
+  assert.deepEqual(JSON.parse(await readFile(plain, 'utf8')).event.private, {});
+  assert.deepEqual((await readSnapshot({ paths: p })).agents['claude-code:sess'].background, { agents: 1, other: 0 });
   const unreadable = await hook(p, { nativeEvent: 'Stop', body: stopBody('x') });
   assert.equal(unreadable.exitCode, 1);
-  assert.equal(JSON.parse(await readFile(file, 'utf8')).event.background, null);
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).event.private.backgroundTasks, { status: 'invalid' });
 });
 test('a readable empty background report still allows without diagnostics', async t => {
   const p = await tempPaths(t);

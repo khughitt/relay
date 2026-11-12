@@ -1,0 +1,57 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "tool-error",
+    "harness": "claude-code",
+    "nativeEvent": "PostToolUseFailure",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "claude-code:sess",
+        "sessionId": "sess"
+      }
+    },
+    "facts": {},
+    "tool": {
+      "name": {
+        "status": "valid",
+        "value": "Bash"
+      },
+      "id": {
+        "status": "valid",
+        "value": "toolu_3"
+      }
+    },
+    "private": {
+      "toolInput": {
+        "status": "valid",
+        "value": {
+          "command": "just test-one test/child.test.js"
+        }
+      },
+      "command": {
+        "status": "valid",
+        "value": "just test-one test/child.test.js"
+      },
+      "durationMs": {
+        "status": "valid",
+        "value": 4200
+      },
+      "failure": {
+        "status": "valid",
+        "value": {
+          "error": {
+            "status": "valid",
+            "value": "exit status 1"
+          },
+          "isInterrupt": {
+            "status": "valid",
+            "value": false
+          }
+        }
+      }
+    }
+  },
+  "registry": null
+}

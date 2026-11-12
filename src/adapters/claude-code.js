@@ -15,6 +15,26 @@ export const events = Object.freeze({
   'Notification:permission_prompt': Object.freeze({ kind: 'needs-approval', level: 'needs-approval' }),
   'StopFailure': Object.freeze({ kind: 'turn-error', level: 'error' }),
 });
+// Hook kinds for subscribers. registry marks events that publish through the table above;
+// the others are policy metadata with no registry effect. See docs/adapters.md ("Hook events").
+/** @type {import("../types.js").Adapter["hookEvents"]} */
+export const hookEvents = Object.freeze({
+  'SessionStart': Object.freeze({ kind: 'session-start', registry: true }),
+  'UserPromptSubmit': Object.freeze({ kind: 'prompt', registry: true }),
+  'PreToolUse': Object.freeze({ kind: 'before-tool', registry: true }),
+  'Stop': Object.freeze({ kind: 'turn-end', registry: true }),
+  'SessionEnd': Object.freeze({ kind: 'session-end', registry: true }),
+  'Notification:idle_prompt': Object.freeze({ kind: 'needs-input', registry: true }),
+  'Notification:permission_prompt': Object.freeze({ kind: 'needs-approval', registry: true }),
+  'StopFailure': Object.freeze({ kind: 'turn-error', registry: true }),
+  'PostToolUse': Object.freeze({ kind: 'after-tool', registry: false }),
+  'PostToolUseFailure': Object.freeze({ kind: 'tool-error', registry: false }),
+  'SubagentStart': Object.freeze({ kind: 'child-start', registry: false }),
+  'SubagentStop': Object.freeze({ kind: 'child-stop', registry: false }),
+  'PostModelSwitch': Object.freeze({ kind: 'model-change', registry: false }),
+  'PreCompact': Object.freeze({ kind: 'compact-start', registry: false }),
+  'PostCompact': Object.freeze({ kind: 'compact-end', registry: false }),
+});
 /** @param {string} event */
 export function stateForEvent(event) {
   if (!Object.hasOwn(events, event)) throw relayError('UNSUPPORTED_EVENT', 'unsupported harness event');

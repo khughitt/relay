@@ -92,7 +92,7 @@ test('a constructed codex parent publishes its own qualified handle and stays al
   // ordered hooks (node:test runs t.after in registration order, not kill-then-remove order).
   const r = mkdtempSync(join(tmpdir(), 'dp-')); prepareRoot(r); const tr = tracker(r);
   t.after(async () => { await tr.killAll(); rmSync(r, { recursive: true, force: true }); });
-  const env = isolatedEnv(r); writeFileSync(join(r, 'xdg/relay/subscribers.json'), '{"schema":1,"subscribers":[]}\n', { mode: 0o600 });
+  const env = isolatedEnv(r); writeFileSync(join(r, 'xdg/relay/subscribers.json'), '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
   const repo = join(r, 'repo'); mkdirSync(repo); execFileSync('git', ['init', '-q', repo]);
   const installed = installParent(r, join(r, 'p'), 'codex');
   const parent = startParent(tr, { parent: installed, clone: process.cwd(), workdir: join(r, 'w0'), env, plan: { harness: 'codex',

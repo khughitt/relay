@@ -10,6 +10,13 @@ export const events = Object.freeze({
   'PreToolUse': Object.freeze({ kind: 'before-tool', level: 'working' }),
   'Stop': Object.freeze({ kind: 'turn-end', level: 'done' }),
 });
+// Hook kinds for subscribers. PreInvocation stays absent until a native field fixture exists.
+/** @type {import("../types.js").Adapter["hookEvents"]} */
+export const hookEvents = Object.freeze({
+  'SessionStart': Object.freeze({ kind: 'session-start', registry: true }),
+  'PreToolUse': Object.freeze({ kind: 'before-tool', registry: true }),
+  'Stop': Object.freeze({ kind: 'turn-end', registry: true }),
+});
 /** @param {string} event */
 export function stateForEvent(event) {
   if (!Object.hasOwn(events, event)) throw relayError('UNSUPPORTED_EVENT', 'unsupported harness event');
@@ -77,13 +84,19 @@ export function nativeFields(data, nativeEvent) {
     if (!Number.isSafeInteger(n) || n < 0) throw relayError('INVALID_INPUT', 'invalid executionNum');
     out.stop_hook_active = n > 0;
   }
-  if (nativeEvent === 'PreToolUse' && object(data.toolCall) && typeof data.toolCall.name === 'string') {
-    const { name, args } = data.toolCall;
-    out.tool_name = name === 'run_command' ? 'Bash' : name;
-    out.tool_input = name === 'run_command' && object(args) && typeof args.CommandLine === 'string' ? { command: args.CommandLine }
-      : object(args) ? args : {};
-  }
+  const tool = nativeEvent === 'PreToolUse' ? projectToolCall(data.toolCall) : null;
+  if (tool !== null) { out.tool_name = tool.name; out.tool_input = tool.input; }
   return out;
+}
+// agy's toolCall as relay's tool: run_command becomes Bash with { command: CommandLine };
+// every other tool keeps its own name and argument object ({} when absent). null when
+// toolCall carries no string name.
+/** @param {unknown} toolCall @returns {{name: string, input: Record<string, any>}|null} */
+export function projectToolCall(toolCall) {
+  if (!object(toolCall) || typeof toolCall.name !== 'string') return null;
+  const { name, args } = toolCall;
+  return { name: name === 'run_command' ? 'Bash' : name,
+    input: name === 'run_command' && object(args) && typeof args.CommandLine === 'string' ? { command: args.CommandLine } : object(args) ? args : {} };
 }
 const ops = () => createProcessOps();
 /** @type {import("../types.js").Adapter["isHarness"]} */

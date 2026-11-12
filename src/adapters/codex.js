@@ -15,6 +15,19 @@ export const events = Object.freeze({
   'SubagentStart': Object.freeze({ kind: 'session-start', level: 'working' }),
   'SubagentStop': Object.freeze({ kind: 'turn-end', level: 'done' }),
 });
+// Hook kinds for subscribers. Codex child events keep their registry worker projection above.
+/** @type {import("../types.js").Adapter["hookEvents"]} */
+export const hookEvents = Object.freeze({
+  'SessionStart': Object.freeze({ kind: 'session-start', registry: true }),
+  'UserPromptSubmit': Object.freeze({ kind: 'prompt', registry: true }),
+  'PreToolUse': Object.freeze({ kind: 'before-tool', registry: true }),
+  'Stop': Object.freeze({ kind: 'turn-end', registry: true }),
+  'SessionEnd': Object.freeze({ kind: 'session-end', registry: true }),
+  'PermissionRequest': Object.freeze({ kind: 'needs-approval', registry: true }),
+  'SubagentStart': Object.freeze({ kind: 'child-start', registry: true }),
+  'SubagentStop': Object.freeze({ kind: 'child-stop', registry: true }),
+  'PostToolUse': Object.freeze({ kind: 'after-tool', registry: false }),
+});
 /** @param {string} event */
 export function stateForEvent(event) {
   if (!Object.hasOwn(events, event)) throw relayError('UNSUPPORTED_EVENT', 'unsupported harness event');

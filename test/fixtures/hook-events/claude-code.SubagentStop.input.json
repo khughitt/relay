@@ -1,0 +1,8 @@
+{
+  "session_id": "sess",
+  "cwd": "/repo",
+  "hook_event_name": "SubagentStop",
+  "agent_id": "agent-2",
+  "agent_type": "",
+  "stop_hook_active": false
+}

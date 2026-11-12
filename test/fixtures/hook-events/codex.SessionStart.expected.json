@@ -1,0 +1,39 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "session-start",
+    "harness": "codex",
+    "nativeEvent": "SessionStart",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "codex:thread-1",
+        "sessionId": "thread-1"
+      }
+    },
+    "facts": {
+      "model": {
+        "status": "valid",
+        "value": "gpt-6"
+      }
+    },
+    "tool": null,
+    "private": {
+      "transcriptPath": {
+        "status": "valid",
+        "value": "/home/u/.codex/sessions/rollout.jsonl"
+      }
+    }
+  },
+  "registry": {
+    "schema": 1,
+    "kind": "session-start",
+    "harness": "codex",
+    "nativeEvent": "SessionStart",
+    "agentId": "codex:thread-1",
+    "sessionId": "thread-1",
+    "cwd": "/repo",
+    "tool": null
+  }
+}

@@ -13,6 +13,9 @@ export const events = Object.freeze({
   'session.idle': Object.freeze({ kind: 'idle', level: 'idle' }),
   'dispose': Object.freeze({ kind: 'session-end', level: null }),
 });
+// OpenCode keeps its existing observation mapping: every event publishes.
+/** @type {import("../types.js").Adapter["hookEvents"]} */
+export const hookEvents = Object.freeze(Object.fromEntries(Object.entries(events).map(([name, { kind }]) => [name, Object.freeze({ kind, registry: true })])));
 /** @param {string} event */
 export function stateForEvent(event) {
   if (!Object.hasOwn(events, event)) throw relayError('UNSUPPORTED_EVENT', 'unsupported harness event');

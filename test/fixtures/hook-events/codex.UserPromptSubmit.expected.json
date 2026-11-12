@@ -1,0 +1,34 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "prompt",
+    "harness": "codex",
+    "nativeEvent": "UserPromptSubmit",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "codex:thread-1",
+        "sessionId": "thread-1"
+      }
+    },
+    "facts": {},
+    "tool": null,
+    "private": {
+      "prompt": {
+        "status": "valid",
+        "value": "continue"
+      }
+    }
+  },
+  "registry": {
+    "schema": 1,
+    "kind": "prompt",
+    "harness": "codex",
+    "nativeEvent": "UserPromptSubmit",
+    "agentId": "codex:thread-1",
+    "sessionId": "thread-1",
+    "cwd": "/repo",
+    "tool": null
+  }
+}

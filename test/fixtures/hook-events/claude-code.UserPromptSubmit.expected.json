@@ -1,0 +1,34 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "prompt",
+    "harness": "claude-code",
+    "nativeEvent": "UserPromptSubmit",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "claude-code:sess",
+        "sessionId": "sess"
+      }
+    },
+    "facts": {},
+    "tool": null,
+    "private": {
+      "prompt": {
+        "status": "valid",
+        "value": "fix the failing test"
+      }
+    }
+  },
+  "registry": {
+    "schema": 1,
+    "kind": "prompt",
+    "harness": "claude-code",
+    "nativeEvent": "UserPromptSubmit",
+    "agentId": "claude-code:sess",
+    "sessionId": "sess",
+    "cwd": "/repo",
+    "tool": null
+  }
+}

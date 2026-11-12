@@ -12,6 +12,12 @@ export function adapterFor(harness) {
   if (!Object.hasOwn(adapters, harness)) throw relayError('UNSUPPORTED_HARNESS', 'unsupported harness');
   return adapters[harness];
 }
+// The subscriber-facing hook mapping for one native event; UNSUPPORTED_EVENT when the adapter has no decoder for it.
+/** @param {import("../types.js").Adapter} adapter @param {string} nativeEvent */
+export function hookEventOf(adapter, nativeEvent) {
+  if (!Object.hasOwn(adapter.hookEvents, nativeEvent)) throw relayError('UNSUPPORTED_EVENT', 'unsupported harness event');
+  return adapter.hookEvents[nativeEvent];
+}
 // The nearest process any adapter recognises, skipping index zero (the caller itself).
 // See docs/adapters.md ("Codex model resolution", step 3).
 /** @param {import("../types.js").ProcessRow[]} chain @param {{executableOf: (pid: number) => string}} ops @returns {{harness: string, index: number}|null} */

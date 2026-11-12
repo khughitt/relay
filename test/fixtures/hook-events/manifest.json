@@ -1,0 +1,652 @@
+{
+  "schema": 1,
+  "invokingCwd": "/invoking",
+  "note": "Synthetic payloads derived from the cited consumer revisions; no real payload copied. registry is the expected registryEventFor result: an Event, null (no registry effect), or an error code.",
+  "fixtures": [
+    {
+      "harness": "claude-code",
+      "nativeEvent": "SessionStart",
+      "kind": "session-start",
+      "variant": null,
+      "input": "claude-code.SessionStart.input.json",
+      "expected": "claude-code.SessionStart.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claude-provenance"
+        },
+        {
+          "repo": "lore",
+          "revision": "7f77e1505051123454357ddb0e4a2df189d0e522",
+          "path": "hooks/claude-profile"
+        },
+        {
+          "repo": "relay",
+          "revision": "09d754111daa57248a8b75423b26a94d994f8a7f",
+          "path": "src/adapters/claude-code.js"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "UserPromptSubmit",
+      "kind": "prompt",
+      "variant": null,
+      "input": "claude-code.UserPromptSubmit.input.json",
+      "expected": "claude-code.UserPromptSubmit.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "PreToolUse",
+      "kind": "before-tool",
+      "variant": null,
+      "input": "claude-code.PreToolUse.input.json",
+      "expected": "claude-code.PreToolUse.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/adapters.py"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "Stop",
+      "kind": "turn-end",
+      "variant": null,
+      "input": "claude-code.Stop.input.json",
+      "expected": "claude-code.Stop.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claim-guard"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "StopFailure",
+      "kind": "turn-error",
+      "variant": null,
+      "input": "claude-code.StopFailure.input.json",
+      "expected": "claude-code.StopFailure.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "relay",
+          "revision": "09d754111daa57248a8b75423b26a94d994f8a7f",
+          "path": "src/adapters/claude-code.js"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "SessionEnd",
+      "kind": "session-end",
+      "variant": null,
+      "input": "claude-code.SessionEnd.input.json",
+      "expected": "claude-code.SessionEnd.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "Notification:idle_prompt",
+      "kind": "needs-input",
+      "variant": null,
+      "input": "claude-code.Notification.idle_prompt.input.json",
+      "expected": "claude-code.Notification.idle_prompt.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "relay",
+          "revision": "09d754111daa57248a8b75423b26a94d994f8a7f",
+          "path": "src/adapters/claude-code.js"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "Notification:permission_prompt",
+      "kind": "needs-approval",
+      "variant": null,
+      "input": "claude-code.Notification.permission_prompt.input.json",
+      "expected": "claude-code.Notification.permission_prompt.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "relay",
+          "revision": "09d754111daa57248a8b75423b26a94d994f8a7f",
+          "path": "src/adapters/claude-code.js"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "PostToolUse",
+      "kind": "after-tool",
+      "variant": null,
+      "input": "claude-code.PostToolUse.input.json",
+      "expected": "claude-code.PostToolUse.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "PostToolUseFailure",
+      "kind": "tool-error",
+      "variant": null,
+      "input": "claude-code.PostToolUseFailure.input.json",
+      "expected": "claude-code.PostToolUseFailure.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claude-posttooluse"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "SubagentStart",
+      "kind": "child-start",
+      "variant": null,
+      "input": "claude-code.SubagentStart.input.json",
+      "expected": "claude-code.SubagentStart.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/adapters.py"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "SubagentStop",
+      "kind": "child-stop",
+      "variant": null,
+      "input": "claude-code.SubagentStop.input.json",
+      "expected": "claude-code.SubagentStop.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/adapters.py"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "PostModelSwitch",
+      "kind": "model-change",
+      "variant": null,
+      "input": "claude-code.PostModelSwitch.input.json",
+      "expected": "claude-code.PostModelSwitch.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claude-provenance"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "PreCompact",
+      "kind": "compact-start",
+      "variant": null,
+      "input": "claude-code.PreCompact.input.json",
+      "expected": "claude-code.PreCompact.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/adapters.py"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "PostCompact",
+      "kind": "compact-end",
+      "variant": null,
+      "input": "claude-code.PostCompact.input.json",
+      "expected": "claude-code.PostCompact.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/adapters.py"
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "nativeEvent": "SessionStart",
+      "kind": "session-start",
+      "variant": null,
+      "input": "codex.SessionStart.input.json",
+      "expected": "codex.SessionStart.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/codex/hooks.json"
+        },
+        {
+          "repo": "lore",
+          "revision": "7f77e1505051123454357ddb0e4a2df189d0e522",
+          "path": "hooks/claude-profile"
+        },
+        {
+          "repo": "relay",
+          "revision": "09d754111daa57248a8b75423b26a94d994f8a7f",
+          "path": "src/adapters/codex.js"
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "nativeEvent": "UserPromptSubmit",
+      "kind": "prompt",
+      "variant": null,
+      "input": "codex.UserPromptSubmit.input.json",
+      "expected": "codex.UserPromptSubmit.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/codex/hooks.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "nativeEvent": "PreToolUse",
+      "kind": "before-tool",
+      "variant": null,
+      "input": "codex.PreToolUse.input.json",
+      "expected": "codex.PreToolUse.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/codex/hooks.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "nativeEvent": "Stop",
+      "kind": "turn-end",
+      "variant": null,
+      "input": "codex.Stop.input.json",
+      "expected": "codex.Stop.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/codex/hooks.json"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claim-guard"
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "nativeEvent": "SessionEnd",
+      "kind": "session-end",
+      "variant": null,
+      "input": "codex.SessionEnd.input.json",
+      "expected": "codex.SessionEnd.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/codex/hooks.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "nativeEvent": "PermissionRequest",
+      "kind": "needs-approval",
+      "variant": null,
+      "input": "codex.PermissionRequest.input.json",
+      "expected": "codex.PermissionRequest.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/codex/hooks.json"
+        },
+        {
+          "repo": "relay",
+          "revision": "09d754111daa57248a8b75423b26a94d994f8a7f",
+          "path": "src/adapters/codex.js"
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "nativeEvent": "SubagentStart",
+      "kind": "child-start",
+      "variant": null,
+      "input": "codex.SubagentStart.input.json",
+      "expected": "codex.SubagentStart.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/codex/hooks.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/adapters.py"
+        },
+        {
+          "repo": "relay",
+          "revision": "09d754111daa57248a8b75423b26a94d994f8a7f",
+          "path": "src/adapters/codex.js"
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "nativeEvent": "SubagentStop",
+      "kind": "child-stop",
+      "variant": null,
+      "input": "codex.SubagentStop.input.json",
+      "expected": "codex.SubagentStop.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/codex/hooks.json"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claim-guard"
+        }
+      ]
+    },
+    {
+      "harness": "codex",
+      "nativeEvent": "PostToolUse",
+      "kind": "after-tool",
+      "variant": null,
+      "input": "codex.PostToolUse.input.json",
+      "expected": "codex.PostToolUse.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/codex/hooks.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "tools/turn_pause/hook.py"
+        }
+      ]
+    },
+    {
+      "harness": "agy",
+      "nativeEvent": "SessionStart",
+      "kind": "session-start",
+      "variant": null,
+      "input": "agy.SessionStart.input.json",
+      "expected": "agy.SessionStart.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/agy/hooks.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/agy/hook"
+        }
+      ]
+    },
+    {
+      "harness": "agy",
+      "nativeEvent": "PreToolUse",
+      "kind": "before-tool",
+      "variant": null,
+      "input": "agy.PreToolUse.input.json",
+      "expected": "agy.PreToolUse.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/agy/hooks.json"
+        },
+        {
+          "repo": "relay",
+          "revision": "09d754111daa57248a8b75423b26a94d994f8a7f",
+          "path": "src/adapters/agy.js"
+        }
+      ]
+    },
+    {
+      "harness": "agy",
+      "nativeEvent": "Stop",
+      "kind": "turn-end",
+      "variant": null,
+      "input": "agy.Stop.input.json",
+      "expected": "agy.Stop.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/agy/hooks.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/agy/hook"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claim-guard"
+        }
+      ]
+    },
+    {
+      "harness": "claude-code",
+      "nativeEvent": "PostToolUse",
+      "kind": "after-tool",
+      "variant": "bash-counter",
+      "input": "claude-code.PostToolUse.bash-counter.input.json",
+      "expected": "claude-code.PostToolUse.bash-counter.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/claude/settings.json"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claude-posttooluse"
+        }
+      ]
+    },
+    {
+      "harness": "agy",
+      "nativeEvent": "Stop",
+      "kind": "turn-end",
+      "variant": "canceled-invalid-identity",
+      "input": "agy.Stop.canceled-invalid-identity.input.json",
+      "expected": "agy.Stop.canceled-invalid-identity.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/agy/hooks.json"
+        },
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/agy/hook"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claim-guard"
+        }
+      ]
+    },
+    {
+      "harness": "agy",
+      "nativeEvent": "Stop",
+      "kind": "turn-end",
+      "variant": "double-stop-not-idle",
+      "input": "agy.Stop.double-stop-not-idle.input.json",
+      "expected": "agy.Stop.double-stop-not-idle.expected.json",
+      "sources": [
+        {
+          "repo": "hq",
+          "revision": "e44ac67a0e3002f054b1a776c0e2354c8f8ae21c",
+          "path": "harnesses/agy/hook"
+        },
+        {
+          "repo": "ops",
+          "revision": "d38fe5b8446b4468d4088dd48d8eeab22f0ccfab",
+          "path": "hooks/claim-guard"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "before-tool",
+    "harness": "agy",
+    "nativeEvent": "PreToolUse",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "agy:conv-1",
+        "sessionId": "conv-1"
+      }
+    },
+    "facts": {},
+    "tool": {
+      "name": {
+        "status": "valid",
+        "value": "Bash"
+      },
+      "id": {
+        "status": "missing"
+      }
+    },
+    "private": {
+      "toolInput": {
+        "status": "valid",
+        "value": {
+          "command": "ls -la"
+        }
+      },
+      "command": {
+        "status": "valid",
+        "value": "ls -la"
+      }
+    }
+  },
+  "registry": {
+    "schema": 1,
+    "kind": "before-tool",
+    "harness": "agy",
+    "nativeEvent": "PreToolUse",
+    "agentId": "agy:conv-1",
+    "sessionId": "conv-1",
+    "cwd": "/repo",
+    "tool": {
+      "name": "Bash",
+      "input": {
+        "command": "ls -la"
+      },
+      "command": "ls -la"
+    }
+  }
+}

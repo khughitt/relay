@@ -1,0 +1,7 @@
+{
+  "session_id": "sess",
+  "cwd": "/repo",
+  "hook_event_name": "PreCompact",
+  "trigger": "auto",
+  "custom_instructions": ""
+}

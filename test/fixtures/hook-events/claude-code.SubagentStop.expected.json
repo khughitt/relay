@@ -1,0 +1,33 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "child-stop",
+    "harness": "claude-code",
+    "nativeEvent": "SubagentStop",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "claude-code:sess",
+        "sessionId": "sess"
+      }
+    },
+    "facts": {
+      "stopHookActive": {
+        "status": "valid",
+        "value": false
+      },
+      "childId": {
+        "status": "valid",
+        "value": "agent-2"
+      },
+      "agentType": {
+        "status": "valid",
+        "value": ""
+      }
+    },
+    "tool": null,
+    "private": {}
+  },
+  "registry": null
+}

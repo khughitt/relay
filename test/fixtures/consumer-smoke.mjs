@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import * as relay from 'relay';
 import * as plugin from 'relay/opencode';
 
-const EXPORTS = ['STATES', 'paths', 'adapterFor', 'normalizeEvent', 'readNativeInput', 'createProcessOps', 'readSnapshot', 'listAgents',
+const EXPORTS = ['STATES', 'paths', 'adapterFor', 'normalizeEvent', 'normalizeHookEvent', 'registryEventFor', 'projectEnvelope', 'readNativeInput', 'createProcessOps', 'readSnapshot', 'listAgents',
   'applyEvent', 'reapRegistry', 'CONTEXT_LIMIT', 'parseReply', 'validateSubscribers', 'loadSubscribers', 'matchSubscribers', 'budgetFor',
   'checkBudget', 'dispatchHook', 'reconcile', 'withLock', 'validateHandle', 'parsePayload', 'whoami'].sort();
 assert.deepEqual(Object.keys(relay).sort(), EXPORTS);
@@ -49,7 +49,7 @@ assert.match(cli(['--help']), /^Usage: relay /);
 const scratch = mkdtempSync(join(tmpdir(), 'relay-smoke-'));
 try {
   const subscribers = join(scratch, 'subscribers.json'), hooks = join(scratch, 'hooks.json');
-  writeFileSync(subscribers, '{"schema":1,"subscribers":[]}\n', { mode: 0o600 });
+  writeFileSync(subscribers, '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
   writeFileSync(hooks, '{"hooks":{}}\n');
   const plan = cli(['install', '--harness', 'codex', '--subscribers', subscribers, '--target', hooks]);
   assert.equal(typeof JSON.parse(plan), 'object');

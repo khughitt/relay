@@ -2,7 +2,7 @@
 
 Type: data model, protocol; document types 1.
 
-`relay` normalizes native hook payloads from Claude Code, Codex, OpenCode, and `agy` into a schema-1 transient `Event`, resolves the owning session process handle from the OS process tree, dispatches guards and observers within a bounded budget (`relay hook`), and resolves verified Codex and agy call models and effort from harness records (`relay model --harness codex|agy`). See [api.md](api.md) for package exports and [registry.md](registry.md) for `$STATE/agents.json` publication rules.
+`relay` normalizes native hook payloads from Claude Code, Codex, OpenCode, and `agy` into a schema-1 transient `Event` for the registry and a schema-2 `HookEvent` for subscribers, resolves the owning session process handle from the OS process tree, dispatches guards and observers within a bounded budget (`relay hook`), and resolves verified Codex and agy call models and effort from harness records (`relay model --harness codex|agy`). See [api.md](api.md) for package exports and [registry.md](registry.md) for `$STATE/agents.json` publication rules.
 
 ## Transient event contract
 
@@ -25,6 +25,86 @@ type Event = {
 ```
 
 All fields on `Event` are required except `stopHookActive`, `root` (present only on Codex worker events), and `background` (present only on Claude Code `Stop` events when `background_tasks` is present; `null` when present but unreadable). Native input (`normalizeEvent` in `src/protocol.js`) must supply a nonempty `session_id`, an absolute `cwd`, and an optional boolean `stop_hook_active`. A supplied `hook_event_name` must match the `nativeEvent` argument (`Notification` subtypes match base `Notification`). `PreToolUse` requires a nonempty `tool_name` and object `tool_input`; other events carry `tool: null`. Only canonical `Bash` with a string `command` extracts shell source into `tool.command` for Claude Code and Codex (`apply_patch.command` is patch text and yields `command: null`; `agy` translates `run_command` as described below).
+
+## Hook events
+
+Subscribers receive a schema-2 `HookEvent` (`src/adapters/hook-event.js`), separate from the registry `Event` above:
+
+```ts
+type Fact<T> = { status: 'valid'; value: T } | { status: 'missing' } | { status: 'invalid' };
+type HookKind = 'session-start' | 'prompt' | 'before-tool' | 'after-tool' | 'tool-error' | 'activity' | 'idle'
+  | 'needs-input' | 'needs-approval' | 'turn-end' | 'turn-error' | 'session-end'
+  | 'child-start' | 'child-stop' | 'model-change' | 'compact-start' | 'compact-end';
+type HookEvent = {
+  schema: 2; kind: HookKind; harness: Harness; nativeEvent: string;
+  cwd: string;                       // absolute; the native cwd, or the invoking cwd for agy Stop only
+  identity: Fact<{ agentId: string; sessionId: string; root?: string }>;
+  facts: Record<string, Fact<unknown>>;   // only the members applicable to this event (below)
+  tool: null | { name: Fact<string>; id: Fact<string> };   // tool events only
+  private: Record<string, Fact<unknown>>; // applicable private fields (below)
+};
+type RegistryAccess = { status: 'ready'; generation: string; revision: number }
+  | { status: 'unavailable'; code: string } | { status: 'not-requested' };
+type SubscriberEnvelope = { schema: 2; type: 'event'; subscriber: string; event: HookEvent; registry: RegistryAccess };
+type ReconcileEnvelope = { schema: 2; type: 'reconcile'; subscriber: string; registry: RegistryAccess; reaped: string[] };
+```
+
+`missing` means the native payload has no such own property; a wrong type, invalid content or a value over its bound is `invalid`, and the rejected value is never copied. Nothing is truncated or coerced. The outer input stays at most 4 MiB of strict UTF-8 JSON whose top level is an object. Text bounds are UTF-8 bytes. An unsupported native event is `UNSUPPORTED_EVENT`; a missing or unusable session id or cwd, a mismatched `hook_event_name`, or an invalid before-tool name or input is `INVALID_INPUT`. The one exception is `agy` `Stop`, whose policy must run even when cancellation arrives with unusable metadata: its identity may be `missing` or `invalid` and its cwd falls back to the invoking directory. `registryEventFor` then refuses (`INVALID_INPUT`), so no invented identity or wrong cwd reaches the registry.
+
+| Native event | Harness | Hook kind | Registry effect |
+| --- | --- | --- | --- |
+| `SessionStart` | Claude, Codex, agy | `session-start` | the registry mapping above |
+| `UserPromptSubmit` | Claude, Codex | `prompt` | the registry mapping above |
+| `PreToolUse` | Claude, Codex, agy | `before-tool` | the registry mapping above |
+| `Stop` | Claude, Codex, agy | `turn-end` | the registry mapping above, only with usable identity |
+| `SessionEnd` | Claude, Codex | `session-end` | the registry mapping above |
+| `StopFailure` | Claude | `turn-error` | the registry mapping above |
+| `Notification:idle_prompt` / `:permission_prompt` | Claude | `needs-input` / `needs-approval` | the registry mapping above |
+| `PermissionRequest` | Codex | `needs-approval` | the registry mapping above; no refusal channel |
+| `PostToolUse` | Claude, Codex | `after-tool` | none |
+| `PostToolUseFailure` | Claude | `tool-error` | none |
+| `SubagentStart` / `SubagentStop` | Claude | `child-start` / `child-stop` | none; the parent session keeps its identity |
+| `SubagentStart` / `SubagentStop` | Codex | `child-start` / `child-stop` | the existing worker `session-start` / `turn-end` projection |
+| `PostModelSwitch` | Claude | `model-change` | none |
+| `PreCompact` / `PostCompact` | Claude | `compact-start` / `compact-end` | none |
+| OpenCode events | OpenCode | the registry kind above | the registry mapping above |
+
+`agy` `PreInvocation` has no decoder until a native field fixture exists, and other Codex or `agy` equivalents have none until native evidence names their fields. Each adapter's `hookEvents` table holds this mapping; `events`, `stateForEvent` and `validateEvent` keep their registry meaning.
+
+Facts, by member (`small` text is at most 4096 bytes, ids 1024, paths 8192 and absolute):
+
+| Fact | Native field | Events | Value |
+| --- | --- | --- | --- |
+| `stopHookActive` | `stop_hook_active` | Claude, Codex `Stop`, `SubagentStop` | boolean |
+| `terminationReason` | `terminationReason` | agy `Stop` | small text |
+| `executionNum` | `executionNum` | agy `Stop` | safe nonnegative integer |
+| `fullyIdle` | `fullyIdle` | agy `Stop` | boolean |
+| `childId` | `agent_id` | Claude `SubagentStart`, `SubagentStop` | id |
+| `agentType` | `agent_type` | Claude, Codex `SubagentStart`, `SubagentStop` | small text; Claude's empty summarizer type is valid |
+| `model` | `model` | Claude, Codex `SessionStart` | small text |
+| `fromModel`, `toModel` | `from_model`, `to_model` | Claude `PostModelSwitch` | small text |
+| `compactionTrigger` | `trigger` | Claude `PreCompact`, `PostCompact` | small text |
+
+Relay interprets none of the `agy` facts: the claim policy decides own-termination (`ERROR`, `USER_CANCELED`, `MAX_INVOCATIONS`, `MAX_FORCED_INVOCATIONS`, `MAX_TOKEN_BUDGET_EXCEEDED`, `TERMINAL_CUSTOM_HOOK`) and retry exemptions. `tool` comes from `tool_name` (nonempty, at most 256 bytes) and `tool_use_id`; on `agy`, from `toolCall.name` with `run_command` as `Bash`, and `id` is always `missing`.
+
+Private fields, delivered to guards and notices and to an observer only when it selects them:
+
+| Private key | Native field | Events | Bound |
+| --- | --- | --- | --- |
+| `toolInput` | `tool_input`; agy `toolCall.args` (`{ command: CommandLine }` for `run_command`, `{}` when absent) | tool events | object; 1 MiB serialized, depth 64, 65,536 JSON values, measured before projection |
+| `command` | `tool_input.command`; agy `run_command` `CommandLine` | tool events | text, 256 KiB; never interpreted as shell |
+| `durationMs` | `duration_ms` | Claude, Codex post-tool events | finite number, 0 to the safe-integer maximum |
+| `toolResult` | `tool_response`, an object or (Codex) JSON text of at most 1 MiB | Claude, Codex `PostToolUse` | `{ taskName: Fact<id>, scheduledForMs: Fact<number>, id: Fact<id> }` from `task_name`, `scheduledFor` (epoch milliseconds) and `id`; no other result text |
+| `failure` | `error`, `is_interrupt` | Claude `PostToolUseFailure` | `{ error: Fact<text 16 KiB>, isInterrupt: Fact<boolean> }` |
+| `prompt` | `prompt` | Claude, Codex `UserPromptSubmit` | text, 1 MiB |
+| `backgroundTasks` | `background_tasks` | Claude `Stop` | at most 1024 `{ type, status }`, each at most 256 bytes; unknown strings preserved |
+| `sessionCrons` | `session_crons` | Claude `Stop` | at most 128 `{ id, prompt }` (id 1024, prompt 8192 bytes), 1 MiB in total |
+| `transcriptPath` | `transcript_path`; agy `transcriptPath` | `SessionStart` | path |
+| `scratchpadDir` | `scratchpad_dir` | Claude `SessionStart`, `PostModelSwitch` | path |
+
+A before-tool event whose tool name or input is invalid fails as infrastructure (`INVALID_INPUT`); on post-tool events the same fields stay explicit Facts so an occurrence observer can count or diagnose without a false value. Private fields never enter registry state or another subscriber's envelope.
+
+The synthetic fixture pairs in `test/fixtures/hook-events/` (with `manifest.json` naming the consumer revisions each payload was derived from) cover every native event in these tables. Fixture coverage is decoding evidence only: live delivery on a given harness version and session mode is qualified separately.
 
 ## Session process handle and ancestry
 
@@ -231,30 +311,36 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 
 ### Subscriber configuration
 
-`$XDG_CONFIG_HOME/relay/subscribers.json` (mode `0700` dir, `0600` file, owned by the current user; an absent default file means no subscribers, while an absent `--subscribers FILE` argument is `INVALID_CONFIG`):
+`$XDG_CONFIG_HOME/relay/subscribers.json` (mode `0700` dir, `0600` file, owned by the current user; an absent default file means no subscribers, while an absent `--subscribers FILE` argument is `INVALID_CONFIG`). The schema is 2; a schema-1 file is `INVALID_CONFIG` (migration: [api.md](api.md#public-interfaces)).
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "subscribers": [
     { "name": "ops-guard", "role": "guard", "kinds": ["before-tool"],
       "harnesses": ["claude-code", "codex"], "tools": ["Bash"],
       "argv": ["/usr/bin/python3", "/abs/path/hooks/relay-guard"], "timeoutMs": 4000 },
-    { "name": "familiar", "role": "observer", "harnesses": ["claude-code", "codex"],
+    { "name": "familiar", "role": "observer", "registry": "snapshot", "harnesses": ["claude-code", "codex"],
       "kinds": ["session-start", "prompt", "before-tool", "idle", "needs-input",
-                "needs-approval", "turn-end", "turn-error", "reconcile"],
+                "needs-approval", "turn-end", "turn-error", "child-start", "child-stop", "reconcile"],
       "argv": ["/abs/path/familiar/bin/familiar", "observe"], "timeoutMs": 2000 },
-    { "name": "familiar-opencode", "role": "observer", "harnesses": ["opencode"],
-      "kinds": ["session-start", "activity", "idle", "needs-approval", "turn-error", "session-end"],
-      "argv": ["/abs/path/familiar/bin/familiar", "observe"], "timeoutMs": 1000 },
-    { "name": "familiar-teardown", "role": "observer", "harnesses": ["claude-code", "codex"],
-      "kinds": ["session-end"],
-      "argv": ["/abs/path/familiar/bin/familiar", "observe"], "timeoutMs": 200 }
+    { "name": "test-counter", "role": "observer", "registry": "occurrence", "harnesses": ["claude-code"],
+      "kinds": ["after-tool", "tool-error"], "tools": ["Bash"],
+      "privateFields": [{ "nativeEvent": "PostToolUse", "fields": ["command", "durationMs"] },
+                        { "nativeEvent": "PostToolUseFailure", "fields": ["command", "durationMs"] }],
+      "argv": ["/abs/path/hooks/test-counter"], "timeoutMs": 1000 }
   ]
 }
 ```
 
-`name` matches `^[a-z0-9][a-z0-9-]{0,63}$` and is unique. `kinds` is a nonempty unique subset of the 10 `EventKind` values; observers may add `'reconcile'`. `harnesses` is optional for observers and required for guards; every guard `(kind, harness)` pair must map to native events that all have a refusal channel. `tools` is allowed only when `kinds` is `["before-tool"]`. `argv[0]` must be absolute; `timeoutMs` is an integer in `1..60000`.
+- `name` matches `^[a-z0-9][a-z0-9-]{0,63}$` and is unique.
+- `role` is `guard`, `notice` or `observer`. Guards and notices must name `harnesses`. Every guard `(harness, kind)` pair must select native events that all have a refusal channel; every notice pair, events that all have a context channel. This build validates notices but refuses to dispatch one (`UNSUPPORTED_ROLE`) rather than ignore it.
+- `kinds` is a nonempty unique subset of the hook kinds; observers may add `reconcile`.
+- `nativeEvents` (optional) is a nonempty unique list of native events those kinds and harnesses select, and narrows matching to them.
+- `tools` is allowed only when every kind is a tool kind (`before-tool`, `after-tool`, `tool-error`).
+- Observers must declare `registry`: `snapshot` for one that reads `$STATE/agents.json`, `occurrence` for one that counts events. The field is rejected on other roles.
+- `privateFields` (observers only) lists `{ nativeEvent, fields }` entries: each native event at most once and one this subscriber selects, each field an exact private key applicable to that event. There is no wildcard. An ordinary observer receives `private: {}`.
+- `argv[0]` must be absolute; `timeoutMs` is an integer in `1..60000`. There is no detach option.
 
 ### Budget
 
@@ -271,17 +357,17 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 
 ### Guard protocol
 
-Each matching guard receives `{"schema":1,"type":"event","subscriber":"<name>","event":<Event>}` on stdin (with full `tool.input`) and writes one JSON object `{"decision":"allow"|"deny","reason"?,"context"?}` on stdout with exit code `0`. `deny` requires `reason`. Present `reason` and `context` strings and combined `allow` context across guards are each capped at `CONTEXT_LIMIT` (`10000` characters); oversize output is `INVALID_REPLY` (a refusal on refusal-capable events). All matching guards run in configuration order even after a denial; the first denial's `reason` wins and drops any `context`. Any guard error or timeout produces a refusal with reason `relay refused: <CODE>: <message>`.
+Each matching guard receives a `SubscriberEnvelope` on stdin with `registry: {"status":"not-requested"}` (guards run before publication) and every applicable private field, and writes one JSON object `{"decision":"allow"|"deny","reason"?,"context"?}` on stdout with exit code `0`. `deny` requires `reason`. Present `reason` and `context` strings and combined `allow` context across guards are each capped at `CONTEXT_LIMIT` (`10000` characters); oversize output is `INVALID_REPLY` (a refusal on refusal-capable events). All matching guards run in configuration order even after a denial; the first denial's `reason` wins and drops any `context`. Any guard error or timeout produces a refusal with reason `relay refused: <CODE>: <message>`.
 
 ### Observer and reconciliation protocol
 
-Each matching observer receives an `ObserverEnvelope` on stdin (stdout is discarded):
+Each matching observer receives a `SubscriberEnvelope` on stdin (stdout is discarded), with only the private fields it selected:
 
 ```json
-{"schema":1,"type":"event","subscriber":"<name>","event":{"schema":1,"kind":"before-tool","tool":{"name":"Bash"}},"registry":{"generation":"<uuid>","revision":4},"changed":true,"reaped":[]}
+{"schema":2,"type":"event","subscriber":"<name>","event":{"schema":2,"kind":"before-tool","harness":"claude-code","nativeEvent":"PreToolUse","cwd":"/repo","identity":{"status":"valid","value":{"agentId":"claude-code:s","sessionId":"s"}},"facts":{},"tool":{"name":{"status":"valid","value":"Bash"},"id":{"status":"missing"}},"private":{}},"registry":{"status":"ready","generation":"<uuid>","revision":4}}
 ```
 
-`event.tool` is reduced to `{ name }` (or `null`), `event.background` carries counts or `null` when reported by Claude Code `Stop`, and `type: "reconcile"` carries `event: null`. Observers run only after a successful registry publication or reap; after a registry failure they are skipped with a diagnostic and healed by reconciliation.
+`registry` is `ready` with the published generation and revision, `unavailable` with a code (`NO_SNAPSHOT` when no snapshot exists), or `not-requested` for an event with no registry effect. Reconciliation sends a `ReconcileEnvelope`. Observers run after a successful registry publication or reap, or directly for an event with no registry effect; after a registry failure they are skipped with a diagnostic and healed by reconciliation. Background counts from Claude Code `Stop` reach observers through the published row (`Agent.background`), or as the selected `backgroundTasks` field.
 
 `reaped` lists only rows pruned for dead processes. Rows an event removes (a `SessionEnd`'s root and workers, a Codex root `SessionStart`'s retired rows, a Codex worker `SubagentStop` removal when its root row is absent, an `agy` root event's retired same-process peers, or an `agy` subagent `Stop` removal alongside a live peer) and rows dropped by schema-1 supersession appear only as their absence from the snapshot. The envelope carries no snapshot; observers read `$STATE/agents.json` at or after `registry.revision`.
 

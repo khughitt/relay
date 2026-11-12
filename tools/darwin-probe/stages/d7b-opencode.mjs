@@ -23,7 +23,7 @@ const FETCH_MS = 5000;
 export async function run(ctx) {
   if ((await ctx.t.run('/usr/bin/which', ['opencode'])).exit !== 0) return { status: 'absent', reason: 'opencode not installed', observations: {} };
   const version = /(\d+\.\d+\.\d+)/.exec((await ctx.t.run('opencode', ['--version'], { env: ctx.env })).stdout)?.[1] ?? null;
-  const subs = join(ctx.root, 'xdg/relay/subscribers.json'); writeFileSync(subs, '{"schema":1,"subscribers":[]}\n', { mode: 0o600 });
+  const subs = join(ctx.root, 'xdg/relay/subscribers.json'); writeFileSync(subs, '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
   const configDir = join(ctx.root, 'xdg/opencode'); mkdirSync(configDir, { recursive: true });
   const install = await ctx.t.run(process.execPath, [join(ctx.clone, 'bin/relay.js'), 'install', '--harness', 'opencode', '--subscribers', subs,
     '--config-dir', configDir, '--artifact', join(ctx.root, 'd7b-artifact.json'), '--apply'], { env: ctx.env });

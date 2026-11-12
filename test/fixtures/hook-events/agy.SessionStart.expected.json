@@ -1,0 +1,34 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "session-start",
+    "harness": "agy",
+    "nativeEvent": "SessionStart",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "agy:conv-1",
+        "sessionId": "conv-1"
+      }
+    },
+    "facts": {},
+    "tool": null,
+    "private": {
+      "transcriptPath": {
+        "status": "valid",
+        "value": "/home/u/.gemini/antigravity/brain/conv-1/transcript.jsonl"
+      }
+    }
+  },
+  "registry": {
+    "schema": 1,
+    "kind": "session-start",
+    "harness": "agy",
+    "nativeEvent": "SessionStart",
+    "agentId": "agy:conv-1",
+    "sessionId": "conv-1",
+    "cwd": "/repo",
+    "tool": null
+  }
+}

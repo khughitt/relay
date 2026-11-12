@@ -1,0 +1,35 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "turn-end",
+    "harness": "codex",
+    "nativeEvent": "Stop",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "codex:thread-1",
+        "sessionId": "thread-1"
+      }
+    },
+    "facts": {
+      "stopHookActive": {
+        "status": "valid",
+        "value": true
+      }
+    },
+    "tool": null,
+    "private": {}
+  },
+  "registry": {
+    "schema": 1,
+    "kind": "turn-end",
+    "harness": "codex",
+    "nativeEvent": "Stop",
+    "agentId": "codex:thread-1",
+    "sessionId": "thread-1",
+    "cwd": "/repo",
+    "tool": null,
+    "stopHookActive": true
+  }
+}

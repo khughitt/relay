@@ -1,0 +1,8 @@
+{
+  "conversationId": "conv-1",
+  "workspacePaths": [
+    "/repo",
+    "/other"
+  ],
+  "transcriptPath": "/home/u/.gemini/antigravity/brain/conv-1/transcript.jsonl"
+}

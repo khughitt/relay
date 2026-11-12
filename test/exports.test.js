@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import * as relay from '../src/index.js';
 
-for (const name of ['withLock', 'validateHandle', 'parsePayload', 'whoami']) {
+for (const name of ['withLock', 'validateHandle', 'parsePayload', 'whoami', 'normalizeHookEvent', 'registryEventFor', 'projectEnvelope']) {
   test(`root exports ${name}`, () => assert.equal(typeof relay[name], 'function'));
 }
 

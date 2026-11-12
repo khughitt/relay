@@ -24,7 +24,7 @@ export async function replay(ctx) {
   const rows = [];
   for (const harness of ['claude-code', 'codex']) for (const [guard, argv] of Object.entries(GUARDS)) {
     const subs = join(ctx.root, 'xdg/relay', `d6-${harness}-${guard}.json`);
-    writeFileSync(subs, JSON.stringify({ schema: 1, subscribers: [{ name: `d6-${guard}`, role: 'guard', kinds: ['before-tool'], harnesses: [harness], argv: argv(dir), timeoutMs: 2000 }] }), { mode: 0o600 });
+    writeFileSync(subs, JSON.stringify({ schema: 2, subscribers: [{ name: `d6-${guard}`, role: 'guard', kinds: ['before-tool'], harnesses: [harness], argv: argv(dir), timeoutMs: 2000 }] }), { mode: 0o600 });
     const payload = JSON.stringify({ session_id: `d6-${harness}-${guard}`, cwd: repo, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'true' } });
     const r = await ctx.t.run(process.execPath, [join(ctx.clone, 'bin/relay.js'), 'hook', '--harness', harness, '--subscribers', subs, 'PreToolUse'], { env: ctx.env, input: payload });
     const survivors = guard === 'hang' ? await pollSurvivors() : [];

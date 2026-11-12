@@ -1,0 +1,43 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "turn-end",
+    "harness": "agy",
+    "nativeEvent": "Stop",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "agy:conv-1",
+        "sessionId": "conv-1"
+      }
+    },
+    "facts": {
+      "terminationReason": {
+        "status": "valid",
+        "value": "NO_TOOL_CALL"
+      },
+      "executionNum": {
+        "status": "valid",
+        "value": 0
+      },
+      "fullyIdle": {
+        "status": "valid",
+        "value": true
+      }
+    },
+    "tool": null,
+    "private": {}
+  },
+  "registry": {
+    "schema": 1,
+    "kind": "turn-end",
+    "harness": "agy",
+    "nativeEvent": "Stop",
+    "agentId": "agy:conv-1",
+    "sessionId": "conv-1",
+    "cwd": "/repo",
+    "tool": null,
+    "stopHookActive": false
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "session_id": "sess",
+  "cwd": "/repo",
+  "hook_event_name": "SessionEnd",
+  "reason": "exit"
+}

@@ -1,5 +1,6 @@
 // Checked by just check, never executed: these errors must remain compiler errors.
 import { validateHandle, validateEvent } from '../../src/protocol.js';
+import { normalizeHookEvent, registryEventFor } from '../../src/adapters/hook-event.js';
 import { validateMessage, checkAnswer } from '../../src/interaction/message.js';
 import { createEntry } from '../../src/interaction/lifecycle.js';
 import { nativeAnswers } from '../../src/routes/claude-code.js';
@@ -18,6 +19,22 @@ event.background = { agents: '1', other: 0 };
 event.kind = 'PreToolUse';
 // @ts-expect-error Registry tools have a name.
 event.tool = { command: 'true', input: {} };
+
+const hookEvent = normalizeHookEvent('agy', 'Stop', '{}', { invokingCwd: '/' });
+// @ts-expect-error A valid identity Fact carries the identity value.
+hookEvent.identity = { status: 'valid' };
+// @ts-expect-error Hook kinds use the hook vocabulary.
+hookEvent.kind = 'Stop';
+// @ts-expect-error The hook event schema is 2.
+hookEvent.schema = 1;
+/** @type {import('../../src/types.js').Event|null} */
+const registryEvent = registryEventFor(hookEvent);
+/** @type {import('../../src/types.js').RegistryAccess} */
+// @ts-expect-error A ready registry position carries its generation and revision.
+const access = { status: 'ready' };
+/** @type {import('../../src/types.js').Subscriber} */
+// @ts-expect-error A subscriber role is guard, notice or observer.
+const watcher = { name: 'w', role: 'watcher', kinds: ['prompt'], harnesses: null, tools: null, nativeEvents: null, argv: ['/bin/true'], timeoutMs: 1 };
 
 const message = validateMessage({});
 if (message.kind === 'question') {

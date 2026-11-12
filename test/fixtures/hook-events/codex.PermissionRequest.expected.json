@@ -1,0 +1,29 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "needs-approval",
+    "harness": "codex",
+    "nativeEvent": "PermissionRequest",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "codex:thread-1",
+        "sessionId": "thread-1"
+      }
+    },
+    "facts": {},
+    "tool": null,
+    "private": {}
+  },
+  "registry": {
+    "schema": 1,
+    "kind": "needs-approval",
+    "harness": "codex",
+    "nativeEvent": "PermissionRequest",
+    "agentId": "codex:thread-1",
+    "sessionId": "thread-1",
+    "cwd": "/repo",
+    "tool": null
+  }
+}

@@ -79,7 +79,7 @@ plain_hooks() {
 install_relay() {
   local out=$1 relay=$2
   mkdir -p "$out/relay-config" "$out/relay-state" && chmod 700 "$out/relay-config" "$out/relay-state"
-  printf '{"schema":1,"subscribers":[]}\n' >"$out/relay-config/subscribers.json"
+  printf '{"schema":2,"subscribers":[]}\n' >"$out/relay-config/subscribers.json"
   chmod 600 "$out/relay-config/subscribers.json"
   printf '{"hooks":{}}\n' >"$out/home/hooks.json"
   node "$relay" install --harness codex --subscribers "$out/relay-config/subscribers.json" \

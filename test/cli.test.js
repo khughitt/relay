@@ -48,7 +48,7 @@ test('usage: help, list [--json], reap [--outer-ms N], hook --harness NAME [--ou
 });
 const fixture=new URL('./fixtures/subscriber.js',import.meta.url).pathname;
 const hookRun=(p,args,input,opts={})=>spawnSync(process.execPath,[cli.pathname,'hook',...args],{encoding:'utf8',input,env:{...process.env,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome},...opts});
-async function configure(p,subscribers){const dir=join(p.configHome,'relay');await fs.mkdir(dir,{recursive:true,mode:0o700});await fs.writeFile(join(dir,'subscribers.json'),JSON.stringify({schema:1,subscribers}),{mode:0o600});}
+async function configure(p,subscribers){const dir=join(p.configHome,'relay');await fs.mkdir(dir,{recursive:true,mode:0o700});await fs.writeFile(join(dir,'subscribers.json'),JSON.stringify({schema: 2, subscribers}),{mode:0o600});}
 // State and config live beside each other under the temp root; relay creates the 0700 state directory itself.
 const layout=(base)=>({stateDir:join(base.stateDir,'state'),configHome:join(base.stateDir,'config')});
 const body=JSON.stringify({session_id:'sess',cwd:process.cwd(),tool_name:'Bash',tool_input:{command:'ls'}});

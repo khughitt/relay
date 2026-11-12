@@ -1,0 +1,10 @@
+{
+  "conversationId": "conv-1",
+  "workspacePaths": [
+    "/repo",
+    "/other"
+  ],
+  "executionNum": 0,
+  "terminationReason": "NO_TOOL_CALL",
+  "fullyIdle": true
+}

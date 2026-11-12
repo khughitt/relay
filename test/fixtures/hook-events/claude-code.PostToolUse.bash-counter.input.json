@@ -1,0 +1,15 @@
+{
+  "session_id": "sess",
+  "cwd": "/repo",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_use_id": "toolu_4",
+  "tool_input": {
+    "command": "just test-one test/child.test.js"
+  },
+  "tool_response": {
+    "stdout": "not copied",
+    "stderr": ""
+  },
+  "duration_ms": 4200
+}

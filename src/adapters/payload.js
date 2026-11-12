@@ -2,14 +2,21 @@
 import { isAbsolute } from 'node:path';
 import { relayError } from '../protocol.js';
 const MAX_BYTES = 4 * 1024 * 1024;
-/** @param {unknown} raw @param {string} nativeEvent @param {import("../types.js").Adapter['nativeFields']} [nativeFields] @returns {Record<string, any>} */
-export function parsePayload(raw, nativeEvent, nativeFields) {
+// The bounded outer read shared by registry and hook normalization: at most 4 MiB of strict
+// UTF-8 JSON whose top level is an object. Field validation belongs to each caller.
+/** @param {unknown} raw @returns {Record<string, any>} */
+export function parseNativeObject(raw) {
   if (!(typeof raw === 'string' || Buffer.isBuffer(raw))) throw relayError('INVALID_INPUT', 'native input must be bytes or text');
   if (Buffer.byteLength(raw) > MAX_BYTES) throw relayError('INPUT_TOO_LARGE', 'native input exceeds byte limit');
   let data;
   try { data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.isBuffer(raw) ? raw : Buffer.from(raw))); }
   catch (cause) { throw relayError('INVALID_INPUT', 'native input is not valid UTF-8 JSON', cause); }
-  if (!data || typeof data !== 'object' || Array.isArray(data)) throw relayError('INVALID_INPUT', 'native input requires session and absolute cwd');
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw relayError('INVALID_INPUT', 'native input must be a JSON object');
+  return data;
+}
+/** @param {unknown} raw @param {string} nativeEvent @param {import("../types.js").Adapter['nativeFields']} [nativeFields] @returns {Record<string, any>} */
+export function parsePayload(raw, nativeEvent, nativeFields) {
+  let data = parseNativeObject(raw);
   if (nativeFields) data = nativeFields(data, nativeEvent);
   if (typeof data.session_id !== 'string' || !data.session_id.trim()
       || typeof data.cwd !== 'string' || !isAbsolute(data.cwd)) throw relayError('INVALID_INPUT', 'native input requires session and absolute cwd');

@@ -1,5 +1,5 @@
 // @ts-check
-import { adapterFor } from '../adapters/index.js';
+import { adapterFor, hookEventOf } from '../adapters/index.js';
 import { budgetFor, checkBudget } from '../subscribers.js';
 import { relayError } from '../protocol.js';
 import { ROUTE_EVIDENCE } from './hooks.js';
@@ -60,9 +60,9 @@ export function validateCapabilities({ harness, subscribers, bindings, evidence 
   for (const binding of bindings) {
     if (!object(binding) || typeof binding.event !== 'string' || !Number.isInteger(binding.outerMs)
       || binding.outerMs < 1000 || binding.outerMs % 1000 !== 0) throw relayError('INVALID_CONFIG', 'invalid installer binding');
-    adapter.stateForEvent(binding.event);
+    const { kind } = hookEventOf(adapter, binding.event);
     const budget = budgetFor({ harness, nativeEvent: binding.event, outerMs: binding.outerMs });
-    const matching = checkBudget(subscribers, budget, { harness, kind: adapter.events[binding.event].kind });
+    const matching = checkBudget(subscribers, budget, { harness, kind, nativeEvent: binding.event });
     if (harness === 'opencode' && matching.some(subscriber => subscriber.role === 'guard')) {
       throw relayError('UNSUPPORTED_BINDING', 'OpenCode is observation-only');
     }

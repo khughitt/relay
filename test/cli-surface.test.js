@@ -43,7 +43,7 @@ const run = (args, env = {}, input) => spawnSync(process.execPath, [BIN, ...args
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-cli-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const subscribers = path.join(dir, 'subscribers.json'); fs.writeFileSync(subscribers, '{"schema":1,"subscribers":[]}\n', { mode: 0o600 });
+  const subscribers = path.join(dir, 'subscribers.json'); fs.writeFileSync(subscribers, '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
   const target = path.join(dir, 'hooks.json'); fs.writeFileSync(target, '{"hooks":{}}\n');
   const bin = path.join(dir, 'bin'); fs.mkdirSync(bin);
   fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\nprintf "%s\\n" "2.1.296 (Claude Code)"\n', { mode: 0o700 });

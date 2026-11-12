@@ -98,3 +98,12 @@ test('appDataDirFromPayload extracts app-data dir from valid artifactDirectoryPa
   assert.equal(appDataDirFromPayload('not-json', f.conversationId), undefined);
   assert.equal(appDataDirFromPayload('null', f.conversationId), undefined);
 });
+
+test('agy hook events stay the three qualified decoders; PreInvocation has no guessed decoder', async () => {
+  const { normalizeHookEvent } = await import('../src/adapters/hook-event.js');
+  assert.deepEqual(Object.keys(adapterFor('agy').hookEvents).sort(), ['PreToolUse', 'SessionStart', 'Stop']);
+  assert.throws(() => normalizeHookEvent('agy', 'PreInvocation', JSON.stringify({ conversationId: 'c', workspacePaths: ['/repo'] }), { invokingCwd: '/invoking' }), { code: 'UNSUPPORTED_EVENT' });
+  const stop = normalizeHookEvent('agy', 'Stop', JSON.stringify({ conversationId: 'c', workspacePaths: ['/repo'], executionNum: -1, terminationReason: 'USER_CANCELED' }), { invokingCwd: '/invoking' });
+  assert.deepEqual(stop.facts.executionNum, { status: 'invalid' });
+  assert.throws(() => normalizeEvent('agy', 'Stop', JSON.stringify({ conversationId: 'c', workspacePaths: ['/repo'], executionNum: -1 })), { code: 'INVALID_INPUT' }, 'released registry normalization is unchanged');
+});

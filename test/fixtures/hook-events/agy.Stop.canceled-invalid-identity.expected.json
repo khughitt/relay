@@ -1,0 +1,27 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "turn-end",
+    "harness": "agy",
+    "nativeEvent": "Stop",
+    "cwd": "/invoking",
+    "identity": {
+      "status": "invalid"
+    },
+    "facts": {
+      "terminationReason": {
+        "status": "valid",
+        "value": "USER_CANCELED"
+      },
+      "executionNum": {
+        "status": "invalid"
+      },
+      "fullyIdle": {
+        "status": "missing"
+      }
+    },
+    "tool": null,
+    "private": {}
+  },
+  "registry": "INVALID_INPUT"
+}

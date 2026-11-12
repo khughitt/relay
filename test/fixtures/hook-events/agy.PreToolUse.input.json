@@ -1,0 +1,14 @@
+{
+  "conversationId": "conv-1",
+  "workspacePaths": [
+    "/repo",
+    "/other"
+  ],
+  "toolCall": {
+    "name": "run_command",
+    "args": {
+      "CommandLine": "ls -la",
+      "Cwd": "/repo"
+    }
+  }
+}

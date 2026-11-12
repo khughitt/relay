@@ -1,0 +1,7 @@
+{
+  "session_id": "sess",
+  "cwd": "/repo",
+  "hook_event_name": "SubagentStart",
+  "agent_id": "agent-1",
+  "agent_type": "Explore"
+}

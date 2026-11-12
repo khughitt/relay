@@ -1,0 +1,7 @@
+{
+  "session_id": "sess",
+  "cwd": "/repo",
+  "hook_event_name": "Notification",
+  "notification_type": "idle_prompt",
+  "message": "waiting"
+}

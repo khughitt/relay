@@ -23,7 +23,7 @@ export async function run(ctx) {
     const deny = join(ctx.root, 'd8-deny.sh');
     writeFileSync(deny, '#!/bin/sh\nprintf \'{"decision":"deny","reason":"d8 probe"}\'\n', { mode: 0o755 });
     const subs = join(ctx.root, 'xdg/relay/d8-subscribers.json');
-    writeFileSync(subs, JSON.stringify({ schema: 1, subscribers: [{ name: 'd8-deny', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: [deny], timeoutMs: 5000 }] }), { mode: 0o600 });
+    writeFileSync(subs, JSON.stringify({ schema: 2, subscribers: [{ name: 'd8-deny', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: [deny], timeoutMs: 5000 }] }), { mode: 0o600 });
     const { planHooks } = await import(pathToFileURL(join(ctx.clone, 'src/install/hooks.js')).href);
     const rendered = JSON.parse(planHooks({ text: '{}', harness: 'claude-code', relayBin: realpathSync(join(ctx.clone, 'bin/relay.js')), subscribersPath: subs }));
     const command = rendered.hooks.PreToolUse.flatMap((e) => e.hooks).find((h) => / hook /.test(h.command))?.command;

@@ -1,0 +1,11 @@
+{
+  "session_id": "thread-1",
+  "cwd": "/repo",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "collaborationspawn_agent",
+  "tool_use_id": "call_2",
+  "tool_input": {
+    "task_name": "review"
+  },
+  "tool_response": "{\"task_name\":\"review\",\"detail\":\"not copied\"}"
+}

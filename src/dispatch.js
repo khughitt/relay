@@ -1,5 +1,6 @@
 // @ts-check
-import { adapterFor, normalizeEvent } from './adapters/index.js';
+import { adapterFor, hookEventOf } from './adapters/index.js';
+import { normalizeHookEvent, registryEventFor, projectEnvelope } from './adapters/hook-event.js';
 import { appDataDirFromPayload } from './adapters/agy.js';
 import { readNativeInput } from './adapters/payload.js';
 import { parseReply, CONTEXT_LIMIT } from './adapters/reply.js';
@@ -33,15 +34,14 @@ export function bounded(thunk, { clock, deadline }, message) {
   });
 }
 
-// Observers see identity and event metadata plus the published generation/revision; the
-// tool is reduced to its name. Reconciliation carries no event at all.
-/** @param {string} type @param {import("./types.js").Subscriber} subscriber @param {import("./types.js").Event|null} event @param {import("./types.js").RegistryResult} result */
-export function envelope(type, subscriber, event, result) {
-  return { schema: 1, type, subscriber: subscriber.name,
-    event: event === null ? null : { ...event, tool: event.tool === null ? null : { name: event.tool.name } },
-    registry: { generation: result.snapshot?.generation ?? null, revision: result.snapshot?.revision ?? null },
-    changed: result.changed, reaped: result.reaped };
-}
+// The registry position an observer is told about: the published generation/revision, or why there is none.
+/** @param {import("./types.js").RegistryResult} result @returns {import("./types.js").RegistryAccess} */
+export const accessFor = (result) => result.snapshot === null ? { status: 'unavailable', code: 'NO_SNAPSHOT' }
+  : { status: 'ready', generation: result.snapshot.generation, revision: result.snapshot.revision };
+// Reconciliation carries no event: the registry position and the rows pruned for dead processes.
+/** @param {import("./types.js").Subscriber} subscriber @param {import("./types.js").RegistryResult} result @returns {import("./types.js").ReconcileEnvelope} */
+export const reconcileEnvelope = (subscriber, result) => ({ schema: 2, type: 'reconcile', subscriber: subscriber.name, registry: accessFor(result), reaped: result.reaped });
+const NOT_REQUESTED = Object.freeze({ status: /** @type {'not-requested'} */ ('not-requested') });
 
 /** @param {import("./types.js").Subscriber[]} observers @param {(observer: import("./types.js").Subscriber) => unknown} inputFor @param {{clock: () => number, workDeadline: number, run: typeof runChild}} deps @param {string[]} diagnostics */
 export async function runObservers(observers, inputFor, { clock, workDeadline, run }, diagnostics) {
@@ -53,13 +53,13 @@ export async function runObservers(observers, inputFor, { clock, workDeadline, r
   }
 }
 
-/** @param {import("./types.js").Subscriber[]} guards @param {import("./types.js").Event} event @param {import("./types.js").Capability} capability @param {{clock: () => number, workDeadline: number, run: typeof runChild}} deps @param {string[]} diagnostics */
+/** @param {import("./types.js").Subscriber[]} guards @param {import("./types.js").HookEvent} event @param {import("./types.js").Capability} capability @param {{clock: () => number, workDeadline: number, run: typeof runChild}} deps @param {string[]} diagnostics */
 async function runGuards(guards, event, capability, { clock, workDeadline, run }, diagnostics) {
   const contexts = []; let denial = null, error = null;
   for (const guard of guards) {
     if (clock() >= workDeadline) { error ??= relayError('DEADLINE_EXCEEDED', `guard ${guard.name} did not start before the deadline`); break; }
     let input, result;
-    try { input = JSON.stringify({ schema: 1, type: 'event', subscriber: guard.name, event }); }
+    try { input = JSON.stringify(projectEnvelope(event, guard, NOT_REQUESTED)); }
     catch (cause) { error ??= relayError('GUARD_FAILED', `guard ${guard.name} input serialization failed`, cause); continue; }
     try { result = await run(guard.argv, input, { clock, deadline: workDeadline, timeoutMs: guard.timeoutMs }); }
     catch (cause) { error ??= relayError('GUARD_FAILED', `guard ${guard.name} invocation failed`, cause); continue; }
@@ -83,7 +83,7 @@ async function runGuards(guards, event, capability, { clock, workDeadline, run }
   return { denial, error, context };
 }
 
-/** @param {{harness: string, nativeEvent: string, input: import("node:stream").Readable, outerMs?: number, subscribersPath?: string|null}} request @param {{clock?: () => number, loadConfig?: typeof loadSubscribers, loadConfigFrom?: typeof loadSubscribersFrom, run?: typeof runChild, apply?: typeof applyEvent, readInput?: typeof readNativeInput, applyOptions?: import("./types.js").RegistryOptions, paths?: import("./types.js").Paths, env?: NodeJS.ProcessEnv}} [deps] */
+/** @param {{harness: string, nativeEvent: string, input: import("node:stream").Readable, outerMs?: number, subscribersPath?: string|null}} request @param {{clock?: () => number, loadConfig?: typeof loadSubscribers, loadConfigFrom?: typeof loadSubscribersFrom, run?: typeof runChild, apply?: typeof applyEvent, readInput?: typeof readNativeInput, applyOptions?: import("./types.js").RegistryOptions, paths?: import("./types.js").Paths, env?: NodeJS.ProcessEnv, invokingCwd?: string}} [deps] */
 export async function dispatchHook({ harness, nativeEvent, input, outerMs, subscribersPath = null }, deps = {}) {
   const clock = deps.clock ?? performance.now.bind(performance), start = clock();
   const { loadConfig = loadSubscribers, loadConfigFrom = loadSubscribersFrom, run = runChild, apply = applyEvent, readInput = readNativeInput, applyOptions = {} } = deps;
@@ -91,7 +91,9 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   let adapter;
   /** @param {import("./types.js").Failure} error */
   const failure = (error) => ({ stdout: '', stderr: `${describe(error)}\n`, exitCode: adapter?.failureExitCode ?? 1 });
-  try { adapter = adapterFor(harness); adapter.stateForEvent(nativeEvent); }
+  /** @type {import("./types.js").HookEventEntry} */
+  let hookEvent;
+  try { adapter = adapterFor(harness); hookEvent = hookEventOf(adapter, nativeEvent); }
   catch (caught) { return failure(/** @type {import('./types.js').Failure} */ (caught)); }
   /** @type {ReturnType<typeof budgetFor>} */
   let budget;
@@ -113,33 +115,47 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   // policy. State paths are only needed for publication, where failure is diagnostic.
   const statePaths = () => deps.paths ?? defaultPaths(deps.env ?? process.env);
   let paths = /** @type {import("./types.js").Paths|null} */ (null), event, guards, observers, agyAppDataDir = /** @type {string|null|undefined} */ (undefined);
+  /** @type {import("./types.js").Event|null} */
+  let registryEvent = null;
+  /** @type {import("./types.js").Failure|null} */
+  let registryError = null;
   try {
     if (subscribersPath === null) paths = statePaths();
     const load = subscribersPath === null ? () => loadConfig(/** @type {import("./types.js").Paths} */ (paths)) : () => loadConfigFrom(subscribersPath);
     const config = await bounded(load, { clock, deadline: workDeadline }, 'subscriber configuration did not load before the deadline');
-    checkBudget(config, budget, { harness, kind: adapter.events[nativeEvent].kind });
+    checkBudget(config, budget, { harness, kind: hookEvent.kind, nativeEvent });
     const raw = await readInput(input, { clock, deadline: Math.min(workDeadline, start + budget.inputMs) });
-    event = normalizeEvent(harness, nativeEvent, raw);
-    if (harness === 'agy') agyAppDataDir = applyOptions.agyAppDataDir === undefined ? appDataDirFromPayload(raw, event.sessionId) : applyOptions.agyAppDataDir;
-    if (event.background === null) diagnostics.push('BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries');
+    event = normalizeHookEvent(harness, nativeEvent, raw, { invokingCwd: deps.invokingCwd ?? process.cwd() });
+    // agy Stop reaches its policy even when registry identity is unusable; publication is then skipped
+    // with a diagnostic. Every other event without a usable registry event fails as before.
+    try { registryEvent = registryEventFor(event); }
+    catch (caught) { if (harness !== 'agy' || nativeEvent !== 'Stop') throw caught; registryError = /** @type {import('./types.js').Failure} */ (caught); }
+    if (harness === 'agy' && registryEvent !== null) agyAppDataDir = applyOptions.agyAppDataDir === undefined ? appDataDirFromPayload(raw, registryEvent.sessionId) : applyOptions.agyAppDataDir;
+    if (registryEvent?.background === null) diagnostics.push('BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries');
     const matching = matchSubscribers(config, event);
+    const notice = matching.find((subscriber) => subscriber.role === 'notice');
+    if (notice !== undefined) throw relayError('UNSUPPORTED_ROLE', `notice ${notice.name} is not delivered by this relay build`);
     guards = matching.filter((subscriber) => subscriber.role === 'guard');
     observers = matching.filter((subscriber) => subscriber.role === 'observer');
   } catch (caught) { const error = /** @type {import('./types.js').Failure} */ (caught); return abort(error); }
   const { denial, error, context } = await runGuards(guards, event, capability, { clock, workDeadline, run }, diagnostics);
   if (denial !== null) return refuse(denial);
   if (error) return abort(error);
-  let result = null;
-  try {
+  let result = null, published = registryEvent === null && registryError === null;
+  if (registryError !== null) diagnostics.push(`registry: ${describe(registryError)}`);
+  if (registryEvent !== null) try {
     paths ??= statePaths();
     const deadline = Math.min(workDeadline, clock() + budget.registryMs);
-    result = await bounded(() => apply(event, { ...applyOptions, ...(agyAppDataDir === undefined ? {} : { agyAppDataDir }), ...(applyOptions.env === undefined ? { env: deps.env ?? process.env } : {}), paths: /** @type {import("./types.js").Paths} */ (paths), clock, deadline }), { clock, deadline }, 'registry publication did not finish before the deadline');
+    const publishing = registryEvent;
+    result = await bounded(() => apply(publishing, { ...applyOptions, ...(agyAppDataDir === undefined ? {} : { agyAppDataDir }), ...(applyOptions.env === undefined ? { env: deps.env ?? process.env } : {}), paths: /** @type {import("./types.js").Paths} */ (paths), clock, deadline }), { clock, deadline }, 'registry publication did not finish before the deadline');
     for (const diagnostic of result.diagnostics) diagnostics.push(`${diagnostic.code}: ${diagnostic.message}${diagnostic.agentId ? ` (${diagnostic.agentId})` : ''}`);
+    published = true;
   } catch (caught) { const cause = /** @type {import('./types.js').Failure} */ (caught); diagnostics.push(`registry: ${describe(cause)}`); }
-  if (result === null) for (const observer of observers) diagnostics.push(`SUBSCRIBER_SKIPPED: ${observer.name} skipped after registry failure`);
-  else await runObservers(observers, (observer) => envelope('event', observer, event, result), { clock, workDeadline, run }, diagnostics);
+  const hooked = /** @type {import("./types.js").HookEvent} */ (event);
+  if (!published) for (const observer of observers) diagnostics.push(`SUBSCRIBER_SKIPPED: ${observer.name} skipped after registry failure`);
+  else await runObservers(observers, (observer) => projectEnvelope(hooked, observer, result === null ? NOT_REQUESTED : accessFor(result)), { clock, workDeadline, run }, diagnostics);
   const reply = adapter.encodeReply(nativeEvent, context ? { decision: 'allow', context } : { decision: 'allow' });
-  return { stdout: reply.stdout, stderr: lines(diagnostics), exitCode: result === null || event.background === null ? (adapter.failureExitCode ?? 1) : reply.exitCode };
+  return { stdout: reply.stdout, stderr: lines(diagnostics), exitCode: !published || registryEvent?.background === null ? (adapter.failureExitCode ?? 1) : reply.exitCode };
 }
 
 // relay reap: prune confirmed deaths, publish if changed, then tell reconcile observers to
@@ -154,6 +170,6 @@ export async function reconcile({ outerMs = 30000 } = {}, deps = {}) {
   const observers = checkBudget(config, budget, { kind: RECONCILE });
   const deadline = Math.min(workDeadline, clock() + budget.registryMs);
   const result = await bounded(() => reap({ paths, clock, deadline }), { clock, deadline }, 'registry reap did not finish before the deadline');
-  await runObservers(observers, (observer) => envelope('reconcile', observer, null, result), { clock, workDeadline, run }, diagnostics);
+  await runObservers(observers, (observer) => reconcileEnvelope(observer, result), { clock, workDeadline, run }, diagnostics);
   return { result, diagnostics };
 }

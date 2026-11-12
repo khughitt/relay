@@ -1,0 +1,8 @@
+{
+  "session_id": "thread-1",
+  "cwd": "/repo",
+  "hook_event_name": "SessionStart",
+  "source": "startup",
+  "model": "gpt-6",
+  "transcript_path": "/home/u/.codex/sessions/rollout.jsonl"
+}

@@ -1,0 +1,57 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "after-tool",
+    "harness": "codex",
+    "nativeEvent": "PostToolUse",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "codex:thread-1",
+        "sessionId": "thread-1"
+      }
+    },
+    "facts": {},
+    "tool": {
+      "name": {
+        "status": "valid",
+        "value": "collaborationspawn_agent"
+      },
+      "id": {
+        "status": "valid",
+        "value": "call_2"
+      }
+    },
+    "private": {
+      "toolInput": {
+        "status": "valid",
+        "value": {
+          "task_name": "review"
+        }
+      },
+      "command": {
+        "status": "missing"
+      },
+      "durationMs": {
+        "status": "missing"
+      },
+      "toolResult": {
+        "status": "valid",
+        "value": {
+          "taskName": {
+            "status": "valid",
+            "value": "review"
+          },
+          "scheduledForMs": {
+            "status": "missing"
+          },
+          "id": {
+            "status": "missing"
+          }
+        }
+      }
+    }
+  },
+  "registry": null
+}

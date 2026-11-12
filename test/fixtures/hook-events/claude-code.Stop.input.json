@@ -1,0 +1,24 @@
+{
+  "session_id": "sess",
+  "cwd": "/repo",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "background_tasks": [
+    {
+      "type": "subagent",
+      "status": "running",
+      "id": "b1"
+    },
+    {
+      "type": "shell",
+      "status": "completed"
+    }
+  ],
+  "session_crons": [
+    {
+      "id": "cron-1",
+      "prompt": "check CI",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "hookEvent": {
+    "schema": 2,
+    "kind": "child-start",
+    "harness": "codex",
+    "nativeEvent": "SubagentStart",
+    "cwd": "/repo",
+    "identity": {
+      "status": "valid",
+      "value": {
+        "agentId": "codex:worker-1",
+        "sessionId": "worker-1",
+        "root": "codex:thread-1"
+      }
+    },
+    "facts": {
+      "agentType": {
+        "status": "valid",
+        "value": "default"
+      }
+    },
+    "tool": null,
+    "private": {}
+  },
+  "registry": {
+    "schema": 1,
+    "kind": "session-start",
+    "harness": "codex",
+    "nativeEvent": "SubagentStart",
+    "agentId": "codex:worker-1",
+    "sessionId": "worker-1",
+    "cwd": "/repo",
+    "tool": null,
+    "root": "codex:thread-1"
+  }
+}

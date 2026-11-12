@@ -114,7 +114,7 @@ test('a rendered hook command runs under launchd\'s minimal PATH', async (t) => 
   const p = await tempState(t), dir = join(p.stateDir, 'config'), file = join(dir, 'subscribers.json');
   await mkdir(dir, { mode: 0o700 });
   const guard = { name: 'g', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], argv: [process.execPath, new URL('./fixtures/subscriber.js', import.meta.url).pathname, 'deny'], timeoutMs: 2000 };
-  await writeFile(file, JSON.stringify({ schema: 1, subscribers: [guard] }), { mode: 0o600 });
+  await writeFile(file, JSON.stringify({ schema: 2, subscribers: [guard] }), { mode: 0o600 });
   const relayBin = realpathSync(new URL('../bin/relay.js', import.meta.url).pathname), minimal = '/usr/bin:/bin:/usr/sbin:/sbin';
   const run = (command, searchPath = minimal) => spawnSync('/bin/sh', ['-c', command], { encoding: 'utf8', timeout: 20000,
     env: { PATH: searchPath, HOME: p.stateDir, RELAY_STATE_DIR: join(p.stateDir, 'state') },

@@ -88,6 +88,9 @@ STATES: readonly State[];
 paths(env?: Record<string, string | undefined>): Paths;
 adapterFor(harness: Harness): Adapter;
 normalizeEvent(harness: Harness, nativeEvent: string, raw: string | Buffer): Event;
+normalizeHookEvent(harness: Harness, nativeEvent: string, raw: string | Buffer, options: { invokingCwd: string }): HookEvent;
+registryEventFor(event: HookEvent): Event | null;
+projectEnvelope(event: HookEvent, subscriber: Subscriber, registry: RegistryAccess): SubscriberEnvelope;
 readNativeInput(stream: NodeJS.ReadableStream, options?: ClockOptions): Promise<Buffer>;
 createProcessOps(options?: {
   platform?: 'linux' | 'darwin';
@@ -106,9 +109,9 @@ CONTEXT_LIMIT: 10000;
 parseReply(output: string, options?: { limit?: number }): Reply;
 validateSubscribers(value: unknown): SubscriberConfig;
 loadSubscribers(paths: Paths): Promise<SubscriberConfig>;
-matchSubscribers(config: SubscriberConfig, event: Event): Subscriber[];
+matchSubscribers(config: SubscriberConfig, event: HookEvent): Subscriber[];
 budgetFor(options: { harness?: Harness; nativeEvent?: string; outerMs?: number }): Budget;
-checkBudget(config: SubscriberConfig, budget: Budget, scope: { harness?: Harness; kind: string }): Subscriber[];
+checkBudget(config: SubscriberConfig, budget: Budget, scope: { harness?: Harness; kind: string; nativeEvent?: string }): Subscriber[];
 dispatchHook(request: { harness: Harness; nativeEvent: string; input: NodeJS.ReadableStream; outerMs?: number }, deps?): Promise<HookResult>;
 reconcile(request?: { outerMs?: number }, deps?): Promise<{ result: MutationResult; diagnostics: string[] }>;
 
@@ -120,6 +123,10 @@ validateHandle(value: unknown): Handle;
 parsePayload(raw: string | Buffer, nativeEvent: string): Record<string, any>;
 whoami(options?: WhoamiOptions): Promise<WhoamiResult>;
 ```
+
+`normalizeEvent` and `applyEvent` keep the schema-1 registry `Event`. Subscribers receive the schema-2 `HookEvent` instead: `normalizeHookEvent` decodes every event an adapter's `hookEvents` table lists, `registryEventFor` returns the registry `Event` an event publishes (or `null` for policy metadata such as `PostToolUse`) and accepts only an object `normalizeHookEvent` returned, and `projectEnvelope` builds one subscriber's stdin. `HookEvent`, `Fact`, `RegistryAccess` and `SubscriberEnvelope` are defined in [adapters.md](adapters.md#hook-events).
+
+Subscriber configuration is schema 2 (`SubscriberConfig = { schema: 2, subscribers }`, [adapters.md](adapters.md#subscriber-configuration)). `validateSubscribers` and `loadSubscribers` reject a schema-1 file with `INVALID_CONFIG` before any subscriber runs; there is no translation. To migrate a schema-1 file: set `"schema": 2`; add `"registry": "snapshot"` to each observer that reads `$STATE/agents.json` and `"registry": "occurrence"` to each that does not; move a Codex `SubagentStop` subscriber from `turn-end` to `child-stop` and a Codex `SubagentStart` subscriber from `session-start` to `child-start`; and read guard input from the schema-2 envelope (`event.private.toolInput`, `event.private.command`, `event.facts.stopHookActive`, `event.identity.value.agentId`). An installed relay keeps the configuration it was installed with until a separately authorized cutover replaces both together.
 
 Defaults resolve once at operation entry: `paths` from environment, fresh process provider, `clock = performance.now`, `now = Date.now`, `uuid = randomUUID`. Registry operations use `deadline = clock() + 12000`. `deadline` is monotonic absolute time, not Unix milliseconds; nested work shares it. Process and Git subprocesses use at most two seconds and remaining deadline, bounded output, and `SIGKILL` on timeout. `readNativeInput` accepts at most 4 MiB and requires EOF within `min(caller deadline, clock() + 5000)`, with fatal UTF-8 decoding, rejecting partial input on errors or expiry. OS stalls can exceed userspace bounds; no timeout releases another live writer's lock or interrupts an active transaction callback.
 
@@ -310,7 +317,7 @@ Storage, process, lock, dispatch, install, and model error codes:
 - `LOCK_TIMEOUT`, `LOCK_IDENTITY_UNKNOWN`, `LOCK_REPAIR_REQUIRED`, `LOCK_CLEANUP_FAILED`, `LOCK_OWNERSHIP_LOST` (see [`registry-lock-repair.md`](runbooks/registry-lock-repair.md))
 - `IO_ERROR`, `GIT_ERROR`, `USAGE`
 - `INVALID_ARTIFACT` (an install artifact fails validation, or a rollback artifact file is not valid JSON; the message names the file), `TARGET_DRIFT` (an install or rollback target holds neither the artifact's before nor after image, or is absent where the operation expected an image; the message names the path, says which, and names the image the operation expected), `UNSAFE_TARGET` (a target is a symlink or not a regular file)
-- `INVALID_REPLY`, `UNSUPPORTED_REPLY`, `INVALID_CONFIG`, `INVALID_EVIDENCE`, `UNSUPPORTED_BINDING`, `GUARD_FAILED`
+- `INVALID_REPLY`, `UNSUPPORTED_REPLY`, `INVALID_CONFIG`, `INVALID_EVIDENCE`, `UNSUPPORTED_BINDING`, `GUARD_FAILED`, `UNSUPPORTED_ROLE` (a matching subscriber's role is not yet delivered by this build)
 - `BACKGROUND_UNREADABLE` (appears only as a diagnostic on Claude Code `Stop`, never as a thrown error)
 - `AGY_CLASSIFICATION_UNAVAILABLE` (appears only as a diagnostic on `agy` registry mutations when conversation classification is unavailable or capped, never as a thrown error)
 - `INVALID_ROLLOUT`, `INVALID_RECORD`, `UNSUPPORTED_RUNTIME` (agy model resolution requires SQLite support in the running Node)

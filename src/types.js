@@ -26,9 +26,17 @@
  * @typedef {{decision: 'allow'|'deny', reason?: string, context?: string}} Reply
  * @typedef {{stdout: string, stderr: string, exitCode: number}} Output
  * @typedef {{startPid?: number, ancestors?: (pid: number) => ProcessRow[], executableOf?: (pid: number) => string, argvOf?: (pid: number) => string[]}} AncestryOptions
- * @typedef {{events: Readonly<Record<string, {kind: Kind, level: State|null}>>, replies: Readonly<Record<string, Capability>>, outerTimeouts: Readonly<{default: number, max: Readonly<Record<string, number>>} & Record<string, number|Readonly<Record<string, number>>>>, stateForEvent: (event: string) => State|null, reduceState: (level: State|null, previous?: State|null, context?: {background?: Background}) => State|null, encodeReply: (event: string, reply: Reply) => Output, resolveSessionPid: (options?: AncestryOptions) => number|null, resolveTerminalPid: (options?: AncestryOptions) => number|null, isHarness: (row: ProcessRow, ops: {executableOf: (pid: number) => string}) => boolean, backgroundOf?: (data: Record<string, any>, nativeEvent: string) => Background|null|undefined, workerIdOf?: (data: Record<string, any>, nativeEvent: string) => string|null, failureExitCode?: 0|1, nativeFields?: (data: Record<string, any>, nativeEvent: string) => Record<string, any>}} Adapter
- * @typedef {{name: string, role: 'guard'|'observer', kinds: (Kind|'reconcile')[], harnesses: Harness[]|null, tools: string[]|null, argv: string[], timeoutMs: number}} Subscriber
- * @typedef {{schema: 1, subscribers: Subscriber[]}} Subscribers
+ * @typedef {{events: Readonly<Record<string, {kind: Kind, level: State|null}>>, hookEvents: Readonly<Record<string, HookEventEntry>>, replies: Readonly<Record<string, Capability>>, outerTimeouts: Readonly<{default: number, max: Readonly<Record<string, number>>} & Record<string, number|Readonly<Record<string, number>>>>, stateForEvent: (event: string) => State|null, reduceState: (level: State|null, previous?: State|null, context?: {background?: Background}) => State|null, encodeReply: (event: string, reply: Reply) => Output, resolveSessionPid: (options?: AncestryOptions) => number|null, resolveTerminalPid: (options?: AncestryOptions) => number|null, isHarness: (row: ProcessRow, ops: {executableOf: (pid: number) => string}) => boolean, backgroundOf?: (data: Record<string, any>, nativeEvent: string) => Background|null|undefined, workerIdOf?: (data: Record<string, any>, nativeEvent: string) => string|null, failureExitCode?: 0|1, nativeFields?: (data: Record<string, any>, nativeEvent: string) => Record<string, any>}} Adapter
+ * @typedef {'session-start'|'prompt'|'before-tool'|'after-tool'|'tool-error'|'activity'|'idle'|'needs-input'|'needs-approval'|'turn-end'|'turn-error'|'session-end'|'child-start'|'child-stop'|'model-change'|'compact-start'|'compact-end'} HookKind
+ * @typedef {{kind: HookKind, registry: boolean}} HookEventEntry
+ * @typedef {{nativeEvent: string, fields: string[]}} PrivateSelection
+ * @typedef {{name: string, role: 'guard'|'notice'|'observer', kinds: (HookKind|'reconcile')[], harnesses: Harness[]|null, tools: string[]|null, nativeEvents: string[]|null, argv: string[], timeoutMs: number, registry?: 'occurrence'|'snapshot', privateFields?: PrivateSelection[]}} Subscriber
+ * @typedef {{schema: 2, subscribers: Subscriber[]}} Subscribers
+ * @typedef {{agentId: string, sessionId: string, root?: string}} HookIdentity
+ * @typedef {{schema: 2, kind: HookKind, harness: Harness, nativeEvent: string, cwd: string, identity: Fact<HookIdentity>, facts: Record<string, Fact<any>>, tool: null|{name: Fact<string>, id: Fact<string>}, private: Record<string, Fact<any>>}} HookEvent
+ * @typedef {{status: 'ready', generation: string, revision: number}|{status: 'unavailable', code: string}|{status: 'not-requested'}} RegistryAccess
+ * @typedef {{schema: 2, type: 'event', subscriber: string, event: HookEvent, registry: RegistryAccess}} SubscriberEnvelope
+ * @typedef {{schema: 2, type: 'reconcile', subscriber: string, registry: RegistryAccess, reaped: string[]}} ReconcileEnvelope
  * @typedef {{outerMs: number, totalMs: number, inputMs: number, registryMs: number, reserveMs: number, marginMs: number, subscribersMs: number}} Budget
  * @typedef {{status: string, exitCode: number|null, signal: string|null, stdout: string, stderr: string, error?: unknown}} ChildResult
  * @typedef {{kind: 'user', agentId?: never}|{kind: 'agent', agentId: string}} Party
@@ -38,6 +46,11 @@
  * @typedef {{class: 'clarification'|'artifact-review'|'authorization', expiresAt: number, native: {harness: 'claude-code'|'codex'|'opencode', sessionId: string, callId: string}|null, artifact: {ref: string, revision: string}|null, supersedes: string|null, items: Item[]}} Question
  * @typedef {{type: 'boolean', value: boolean}|{type: 'choice', optionIds: string[]}|{type: 'other'|'text', text: string}} Value
  * @typedef {{answerId: string, surface: string, outcome: 'answered'|'declined', artifactRevision: string|null, values: Record<string, Value>}} Answer
+ */
+/**
+ * A native value with its validity explicit: missing when absent, invalid without copying the rejected value.
+ * @template T
+ * @typedef {{status: 'valid', value: T}|{status: 'missing'}|{status: 'invalid'}} Fact
  */
 /**
  * @template {string} K

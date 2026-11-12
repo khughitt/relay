@@ -9,7 +9,7 @@ export async function fleetBase(ctx, stateDir) {
   mkdirSync(stateDir, { mode: 0o700, recursive: true });
   const env = { ...ctx.env, RELAY_STATE_DIR: stateDir };
   const subscribers = join(ctx.root, 'xdg/relay/subscribers.json');
-  writeFileSync(subscribers, '{"schema":1,"subscribers":[]}\n', { mode: 0o600 });
+  writeFileSync(subscribers, '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
   const repo = join(ctx.root, 'fleet-repo'); mkdirSync(repo, { recursive: true }); execFileSync('git', ['init', '-q', repo]);
   // A short path (the root is /tmp/rdp.XXXXXX) keeps D5 and D8 independent of the ps width
   // question D4 owns; parentCapture below confirms it on the Mac rather than assuming it.

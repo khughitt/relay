@@ -14,7 +14,7 @@ export async function tempPaths(t) {
 }
 export async function writeSubscribers(p, subscribers, { text } = {}) {
   await mkdir(p.configDir, { recursive: true, mode: 0o700 });
-  await writeFile(p.subscribersPath, text ?? `${JSON.stringify({ schema: 1, subscribers }, null, 2)}\n`, { mode: 0o600 });
+  await writeFile(p.subscribersPath, text ?? `${JSON.stringify({ schema: 2, subscribers }, null, 2)}\n`, { mode: 0o600 });
 }
 export const localObservation = (p) => ({ paths: p, resolveSessionPid: () => process.pid,
   gitContext: async () => ({ remote: null, repoRoot: null }) });
