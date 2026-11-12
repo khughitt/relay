@@ -44,9 +44,12 @@ export async function createChildSupervisor({ deadline, sessionHandle, recordDir
   /** @type {((frame: Record<string, any>|null, error?: Error|null) => void)[]} */
   let waiters = [];
   let gone = false, failed = /** @type {Error|null} */ (null);
+  // A supervisor that stops on its own (deadline, session or parent loss) reports closed before
+  // anyone asks; remember it so a later close() does not wait for a frame already delivered.
+  let closed = /** @type {Record<string, any>|null} */ (null);
   const exited = new Promise((resolve) => child.once('exit', () => { gone = true; resolve(undefined); for (const w of waiters) w(null); waiters = []; }));
   child.once('error', (error) => { failed ??= error; gone = true; for (const w of waiters) w(null, error); waiters = []; });
-  readFrames(results, LIMITS.result, (frame) => { for (const w of [...waiters]) w(frame); }, (error) => { failed ??= error; for (const w of waiters) w(null, error); waiters = []; });
+  readFrames(results, LIMITS.result, (frame) => { if (frame.type === 'closed' && frame.nonce === nonce) closed = frame; for (const w of [...waiters]) w(frame); }, (error) => { failed ??= error; for (const w of waiters) w(null, error); waiters = []; });
   /** Waits for the first frame accepted by match, or null when the supervisor is gone or the time is up. @param {(f: Record<string, any>) => boolean} match @param {number} until */
   const next = (match, until) => new Promise((resolve) => {
     if (gone) { resolve(null); return; }
@@ -101,6 +104,11 @@ export async function createChildSupervisor({ deadline, sessionHandle, recordDir
         ...(r.error ? { error: relayError(r.error.code, r.error.message) } : {}), cleanup: r.cleanup, timings: r.timings };
     },
     async close() {
+      if (closed !== null) {
+        await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, CLEANUP_MS))]);
+        if (!gone) kill();
+        return { cleanup: closed.cleanup === 'complete' && broken === null ? 'complete' : 'failed' };
+      }
       if (gone) return { cleanup: broken === null && failed === null ? 'complete' : 'failed' };
       writeFrame(control, { type: 'close', nonce });
       const frame = await next((f) => f.type === 'closed', clock() + CLEANUP_MS);
