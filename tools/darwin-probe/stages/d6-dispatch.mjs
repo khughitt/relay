@@ -3,10 +3,11 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ps } from '../lib/ps.mjs';
 const HANG = '599.4242'; // a unique sleep argument, so a survivor is findable
+// Subscriber argv[0] is a PATH basename; the probe's guards live in bin/ beside, never inside, the event repository.
 const GUARDS = {
-  allow: (dir) => { const p = join(dir, 'allow.sh'); writeFileSync(p, '#!/bin/sh\nprintf \'{"decision":"allow"}\'\n', { mode: 0o755 }); return [p]; },
-  deny: (dir) => { const p = join(dir, 'deny.sh'); writeFileSync(p, '#!/bin/sh\nprintf \'{"decision":"deny","reason":"d6 probe"}\'\n', { mode: 0o755 }); return [p]; },
-  hang: () => ['/bin/sleep', HANG],
+  allow: (bin) => { writeFileSync(join(bin, 'relay-d6-allow'), '#!/bin/sh\nprintf \'{"decision":"allow"}\'\n', { mode: 0o755 }); return ['relay-d6-allow']; },
+  deny: (bin) => { writeFileSync(join(bin, 'relay-d6-deny'), '#!/bin/sh\nprintf \'{"decision":"deny","reason":"d6 probe"}\'\n', { mode: 0o755 }); return ['relay-d6-deny']; },
+  hang: () => ['sleep', HANG],
 };
 const scanSurvivors = () => ps(['-ww', '-axo', 'pid=,args=']).stdout.split('\n').filter((l) => l.includes(`sleep ${HANG}`)).map((l) => Number(l.trim().split(/\s+/)[0]));
 // relay's dispatcher resolves a guard call once it has sent SIGKILL, not once the kernel has
@@ -21,12 +22,14 @@ async function pollSurvivors({ intervalMs = 100, timeoutMs = 3000 } = {}) {
 export async function replay(ctx) {
   const dir = join(ctx.root, 'd6'); mkdirSync(dir, { recursive: true });
   const repo = join(dir, 'repo'); mkdirSync(repo); execFileSync('git', ['init', '-q', repo]);
+  const bin = join(dir, 'bin'); mkdirSync(bin, { recursive: true });
+  const env = { ...ctx.env, PATH: `${bin}:${ctx.env.PATH ?? '/usr/bin:/bin'}` };
   const rows = [];
   for (const harness of ['claude-code', 'codex']) for (const [guard, argv] of Object.entries(GUARDS)) {
     const subs = join(ctx.root, 'xdg/relay', `d6-${harness}-${guard}.json`);
-    writeFileSync(subs, JSON.stringify({ schema: 2, subscribers: [{ name: `d6-${guard}`, role: 'guard', kinds: ['before-tool'], harnesses: [harness], argv: argv(dir), timeoutMs: 2000 }] }), { mode: 0o600 });
+    writeFileSync(subs, JSON.stringify({ schema: 2, subscribers: [{ name: `d6-${guard}`, role: 'guard', kinds: ['before-tool'], harnesses: [harness], argv: argv(bin), timeoutMs: 2000 }] }), { mode: 0o600 });
     const payload = JSON.stringify({ session_id: `d6-${harness}-${guard}`, cwd: repo, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'true' } });
-    const r = await ctx.t.run(process.execPath, [join(ctx.clone, 'bin/relay.js'), 'hook', '--harness', harness, '--subscribers', subs, 'PreToolUse'], { env: ctx.env, input: payload });
+    const r = await ctx.t.run(process.execPath, [join(ctx.clone, 'bin/relay.js'), 'hook', '--harness', harness, '--subscribers', subs, 'PreToolUse'], { env, input: payload });
     const survivors = guard === 'hang' ? await pollSurvivors() : [];
     rows.push({ harness, guard, exit: r.exit, stdout: r.stdout, ms: r.ms, budget_ms: 2000, survivors });
   }

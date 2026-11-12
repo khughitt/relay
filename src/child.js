@@ -3,16 +3,16 @@ import { spawn } from 'node:child_process';
 
 export const OUTPUT_LIMIT = 64 * 1024;
 
-// Runs one subscriber directly: no shell, the hook environment inherited untouched (no env
-// option), stdin fed once, stdout/stderr each capped. It resolves a status instead of
+// Runs one subscriber directly: no shell, the given cwd and environment (inherited when
+// omitted), stdin fed once, stdout/stderr each capped. It resolves a status instead of
 // throwing so the dispatcher can classify a failure without losing partial output.
-/** @param {string[]} argv @param {string} input @param {{clock?: () => number, deadline: number, timeoutMs: number, spawnFn?: typeof spawn, limit?: number, graceMs?: number}} options @returns {Promise<import("./types.js").ChildResult>} */
-export function runChild(argv, input, { clock = performance.now.bind(performance), deadline, timeoutMs, spawnFn = spawn, limit = OUTPUT_LIMIT, graceMs = 200 } = /** @type {NonNullable<Parameters<typeof runChild>[2]>} */ ({})) {
+/** @param {string[]} argv @param {string} input @param {{clock?: () => number, deadline: number, timeoutMs: number, env?: NodeJS.ProcessEnv, cwd?: string, spawnFn?: typeof spawn, limit?: number, graceMs?: number}} options @returns {Promise<import("./types.js").ChildResult>} */
+export function runChild(argv, input, { clock = performance.now.bind(performance), deadline, timeoutMs, env, cwd, spawnFn = spawn, limit = OUTPUT_LIMIT, graceMs = 200 } = /** @type {NonNullable<Parameters<typeof runChild>[2]>} */ ({})) {
   const allowed = Math.min(timeoutMs, deadline - clock());
   if (allowed <= 0) return Promise.resolve({ status: 'timeout', exitCode: null, signal: null, stdout: '', stderr: '' });
   return new Promise((resolve) => {
     let child;
-    try { child = spawnFn(argv[0], argv.slice(1), { shell: false, stdio: ['pipe', 'pipe', 'pipe'] }); }
+    try { child = spawnFn(argv[0], argv.slice(1), { shell: false, stdio: ['pipe', 'pipe', 'pipe'], ...(env === undefined ? {} : { env }), ...(cwd === undefined ? {} : { cwd }) }); }
     catch (caught) { const error = /** @type {import('./types.js').Failure} */ (caught); resolve({ status: 'spawn-failed', exitCode: null, signal: null, stdout: '', stderr: '', error }); return; }
     /** @type {{chunks: Buffer[], bytes: number}} */
     const out = { chunks: [], bytes: 0 }, err = { chunks: /** @type {Buffer[]} */ ([]), bytes: 0 };

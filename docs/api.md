@@ -160,6 +160,12 @@ the clock and absolute deadline pass to the default registry read. `startPid`,
 `platform`, `readRaw` and a zero-argument `readRegistry` provide identity test seams.
 An injected `readRegistry` owns its own read options.
 
+### Subscriber commands
+
+A subscriber's `argv[0]` is a command basename. Before the first subscriber of a dispatch, relay finds the event's trust boundaries from the filesystem (`src/executable.js`), without running `git`: the native cwd, the invoking cwd, and every enclosing checkout root found by walking at most 128 ancestors of each (a `.git` directory, a `.git` file of at most 8192 bytes whose `gitdir:` line names a directory, or a bare repository's `HEAD`, `objects` and `refs`). A linked worktree's main checkout is a boundary only when it encloses the cwd. A malformed or unreadable marker, an incomplete walk, or the expiry of discovery's 500 ms reservation is `REPOSITORY_UNREADABLE`; an unknown root is never treated as outside.
+
+Relay then searches `PATH` itself. Empty and relative entries are skipped. Each entry is canonicalized (directory aliases included) before the basename is joined, and a candidate whose canonical directory lies inside a boundary (by path components, not string prefix) is `EXECUTABLE_FORBIDDEN` and ends the search: a repository-local `bin` never yields to a later copy. A host-installed symlink outside every boundary is accepted even when its final target lies inside the event's checkout, because the containing directory, not the link target, decides membership. A candidate that exists but is not an executable regular file is `EXECUTABLE_UNUSABLE`; only an absent candidate advances the search, and exhausting it is `EXECUTABLE_NOT_FOUND`. Relay executes the checked absolute path with the remaining arguments literally, in the event cwd, with the hook environment except `PATH`, which keeps only the canonical directories outside the boundaries so an `env` shebang cannot reach a repository interpreter. Failure diagnostics name the subscriber, event, candidate and resolved real path, never argv or input. This identifies the installed copy relay selected; it is not an attestation of its bytes, and a non-repository working directory is itself a boundary.
+
 ## CLI
 
 Registry, hook dispatch, installation, and model commands:
@@ -317,6 +323,7 @@ Storage, process, lock, dispatch, install, and model error codes:
 - `LOCK_TIMEOUT`, `LOCK_IDENTITY_UNKNOWN`, `LOCK_REPAIR_REQUIRED`, `LOCK_CLEANUP_FAILED`, `LOCK_OWNERSHIP_LOST` (see [`registry-lock-repair.md`](runbooks/registry-lock-repair.md))
 - `IO_ERROR`, `GIT_ERROR`, `USAGE`
 - `INVALID_ARTIFACT` (an install artifact fails validation, or a rollback artifact file is not valid JSON; the message names the file), `TARGET_DRIFT` (an install or rollback target holds neither the artifact's before nor after image, or is absent where the operation expected an image; the message names the path, says which, and names the image the operation expected), `UNSAFE_TARGET` (a target is a symlink or not a regular file)
+- `EXECUTABLE_NOT_FOUND`, `EXECUTABLE_FORBIDDEN`, `EXECUTABLE_UNUSABLE`, `REPOSITORY_UNREADABLE` (subscriber command resolution; see [Subscriber commands](#subscriber-commands))
 - `INVALID_REPLY`, `UNSUPPORTED_REPLY`, `INVALID_CONFIG`, `INVALID_EVIDENCE`, `UNSUPPORTED_BINDING`, `GUARD_FAILED`, `UNSUPPORTED_ROLE` (a matching subscriber's role is not yet delivered by this build)
 - `BACKGROUND_UNREADABLE` (appears only as a diagnostic on Claude Code `Stop`, never as a thrown error)
 - `AGY_CLASSIFICATION_UNAVAILABLE` (appears only as a diagnostic on `agy` registry mutations when conversation classification is unavailable or capped, never as a thrown error)

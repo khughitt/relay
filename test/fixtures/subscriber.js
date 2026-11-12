@@ -24,6 +24,7 @@ switch (mode) {
   case 'slow': await new Promise((resolve) => setTimeout(resolve, Number(file))); out({ decision: 'allow' }); break;
   case 'record': writeFileSync(file, input); out({ decision: 'allow' }); break;
   case 'env': writeFileSync(file, process.env.RELAY_TEST_MARKER ?? ''); out({ decision: 'allow' }); break;
+  case 'argv': writeFileSync(file, JSON.stringify({ argv: process.argv.slice(4), cwd: process.cwd(), path: process.env.PATH })); out({ decision: 'allow' }); break;
   case 'noisy': process.stderr.write('observer noise\n'); out({ decision: 'deny', reason: 'observer output must be ignored' }); break;
   default: process.exit(9);
 }

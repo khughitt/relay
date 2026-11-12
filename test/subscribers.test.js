@@ -7,8 +7,8 @@ import { adapterFor } from '../src/adapters/index.js';
 import { normalizeHookEvent } from '../src/adapters/hook-event.js';
 import { tempPaths, writeSubscribers } from './helpers/fixture.js';
 
-const guard = (over = {}) => ({ name: 'guard', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], tools: ['Bash'], argv: ['/usr/bin/true'], timeoutMs: 100, ...over });
-const observer = (over = {}) => ({ name: 'observer', role: 'observer', registry: 'snapshot', kinds: ['before-tool', RECONCILE], argv: ['/usr/bin/true'], timeoutMs: 100, ...over });
+const guard = (over = {}) => ({ name: 'guard', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], tools: ['Bash'], argv: ['true'], timeoutMs: 100, ...over });
+const observer = (over = {}) => ({ name: 'observer', role: 'observer', registry: 'snapshot', kinds: ['before-tool', RECONCILE], argv: ['true'], timeoutMs: 100, ...over });
 const event = (harness = 'claude-code', native = 'PreToolUse', tool = { tool_name: 'Bash', tool_input: { command: 'ls' } }) =>
   normalizeHookEvent(harness, native, JSON.stringify({ session_id: 's', cwd: '/repo', ...tool }), { invokingCwd: '/invoking' });
 
@@ -31,12 +31,13 @@ test('validateSubscribers normalizes entries and rejects every malformed field',
     { schema: 2, subscribers: [guard({ kinds: ['needs-approval'], tools: null })] },
     { schema: 2, subscribers: [guard({ kinds: ['prompt', 'before-tool'] })] },
     { schema: 2, subscribers: [guard({ tools: [] })] }, { schema: 2, subscribers: [guard({ tools: [''] })] }, { schema: 2, subscribers: [guard({ tools: ['Bash', 'Bash'] })] },
-    { schema: 2, subscribers: [guard({ argv: [] })] }, { schema: 2, subscribers: [guard({ argv: ['python3'] })] }, { schema: 2, subscribers: [guard({ argv: ['/usr/bin/true', 1] })] },
+    { schema: 2, subscribers: [guard({ argv: [] })] }, { schema: 2, subscribers: [guard({ argv: ['/usr/bin/python3'] })] }, { schema: 2, subscribers: [guard({ argv: ['bin/guard'] })] }, { schema: 2, subscribers: [guard({ argv: ['.'] })] }, { schema: 2, subscribers: [guard({ argv: ['..'] })] }, { schema: 2, subscribers: [guard({ argv: [''] })] }, { schema: 2, subscribers: [guard({ argv: ['a\0b'] })] }, { schema: 2, subscribers: [guard({ argv: ['true', 1] })] },
     { schema: 2, subscribers: [guard({ timeoutMs: 0 })] }, { schema: 2, subscribers: [guard({ timeoutMs: 1.5 })] }, { schema: 2, subscribers: [guard({ timeoutMs: 60001 })] },
     { schema: 2, subscribers: [guard({ shell: true })] },
   ];
   for (const value of bad) assert.throws(() => validateSubscribers(value), { code: 'INVALID_CONFIG' }, JSON.stringify(value));
   validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['prompt', 'before-tool', 'turn-end'], tools: null })] });
+  assert.deepEqual(validateSubscribers({ schema: 2, subscribers: [guard({ argv: ['python3', '/abs/hooks/relay-guard', '; $(x)'] })] }).subscribers[0].argv, ['python3', '/abs/hooks/relay-guard', '; $(x)'], 'later arguments stay literal');
   validateSubscribers({ schema: 2, subscribers: [observer({ kinds: ['needs-approval', 'idle', RECONCILE], harnesses: ['opencode'] })] });
 });
 
@@ -110,9 +111,9 @@ test('budgetFor derives the profile from the outer timeout and enforces document
 });
 
 test('the documented example configuration fits every mapped harness/event and reconciliation', () => {
-  const familiar = ['/abs/path/familiar/bin/familiar', 'observe'];
+  const familiar = ['familiar', 'observe'];
   const example = validateSubscribers({ schema: 2, subscribers: [
-    { name: 'ops-guard', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], tools: ['Bash'], argv: ['/usr/bin/python3', '/abs/path/hooks/relay-guard'], timeoutMs: 4000 },
+    { name: 'ops-guard', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], tools: ['Bash'], argv: ['relay-guard'], timeoutMs: 4000 },
     { name: 'familiar', role: 'observer', harnesses: ['claude-code', 'codex'], registry: 'snapshot', kinds: ['session-start', 'prompt', 'before-tool', 'idle', 'needs-input', 'needs-approval', 'turn-end', 'turn-error', 'child-start', 'child-stop', RECONCILE], argv: familiar, timeoutMs: 2000 },
     { name: 'familiar-opencode', role: 'observer', registry: 'snapshot', harnesses: ['opencode'], kinds: ['session-start', 'activity', 'idle', 'needs-approval', 'turn-error', 'session-end'], argv: familiar, timeoutMs: 1000 },
     { name: 'familiar-teardown', role: 'observer', registry: 'snapshot', harnesses: ['claude-code', 'codex'], kinds: ['session-end'], argv: familiar, timeoutMs: 200 } ] });
@@ -147,7 +148,7 @@ test('Codex Stop and SubagentStop guards bind separately through hook kinds', ()
 });
 
 test('schema 2 roles: notices need a context channel, observers declare registry use, and only observers select private fields', () => {
-  const notice = (over = {}) => ({ name: 'notice', role: 'notice', kinds: ['prompt'], harnesses: ['claude-code'], argv: ['/usr/bin/true'], timeoutMs: 100, ...over });
+  const notice = (over = {}) => ({ name: 'notice', role: 'notice', kinds: ['prompt'], harnesses: ['claude-code'], argv: ['true'], timeoutMs: 100, ...over });
   const counter = (over = {}) => observer({ name: 'counter', registry: 'occurrence', kinds: ['after-tool', 'tool-error'], harnesses: ['claude-code'], tools: ['Bash'],
     privateFields: [{ nativeEvent: 'PostToolUse', fields: ['command', 'durationMs'] }], ...over });
   const config = validateSubscribers({ schema: 2, subscribers: [notice(), counter()] });

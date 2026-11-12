@@ -9,6 +9,10 @@ import { applyEvent, reapRegistry } from './bus/transaction.js';
 import { relayError } from './protocol.js';
 import { loadSubscribers, loadSubscribersFrom, matchSubscribers, checkBudget, budgetFor, RECONCILE } from './subscribers.js';
 import { runChild } from './child.js';
+import { discoverBoundaries, resolveExecutable } from './executable.js';
+
+// The per-dispatch reservation for repository discovery before the first subscriber.
+const DISCOVERY_MS = 500;
 
 const NONE = Object.freeze({ refuse: false, context: false });
 /** @param {import("./types.js").Failure} error */
@@ -43,29 +47,61 @@ export const accessFor = (result) => result.snapshot === null ? { status: 'unava
 export const reconcileEnvelope = (subscriber, result) => ({ schema: 2, type: 'reconcile', subscriber: subscriber.name, registry: accessFor(result), reaped: result.reaped });
 const NOT_REQUESTED = Object.freeze({ status: /** @type {'not-requested'} */ ('not-requested') });
 
-/** @param {import("./types.js").Subscriber[]} observers @param {(observer: import("./types.js").Subscriber) => unknown} inputFor @param {{clock: () => number, workDeadline: number, run: typeof runChild}} deps @param {string[]} diagnostics */
-export async function runObservers(observers, inputFor, { clock, workDeadline, run }, diagnostics) {
+/**
+ * @typedef {{candidate: string, realPath: string}} Selected
+ * @typedef {(subscriber: import("./types.js").Subscriber, input: string) => Promise<{result: import("./types.js").ChildResult, selected: Selected}>} Launch
+ */
+// Which installed copy ran (or was refused): metadata only, never argv or input.
+/** @param {Partial<Selected>|null|undefined} selected */
+const where = (selected) => selected?.candidate === undefined ? '' : ` (candidate ${selected.candidate}, real ${selected.realPath ?? 'unresolved'})`;
+
+// Resolves a subscriber's command on PATH outside the event's repository, then runs it with its
+// literal arguments in the event cwd and a PATH holding only the trusted directories. Discovery
+// runs once per dispatch, before the first subscriber, inside its own reservation.
+/** @param {{cwd: string, invokingCwd: string, env: NodeJS.ProcessEnv, clock: () => number, workDeadline: number, run: typeof runChild}} options @returns {Launch} */
+function launcher({ cwd, invokingCwd, env, clock, workDeadline, run }) {
+  /** @type {Promise<{directories: string[]}>|null} */
+  let boundaries = null;
+  return async (subscriber, input) => {
+    boundaries ??= discoverBoundaries({ cwd, invokingCwd, deadline: Math.min(workDeadline, clock() + DISCOVERY_MS), clock });
+    const resolved = await resolveExecutable(subscriber.argv[0], { path: env.PATH, boundaries: await boundaries, deadline: workDeadline, clock });
+    const result = await run([resolved.candidate, ...subscriber.argv.slice(1)], input,
+      { clock, deadline: workDeadline, timeoutMs: subscriber.timeoutMs, env: { ...env, PATH: resolved.childPath }, cwd });
+    return { result, selected: resolved };
+  };
+}
+
+/** @param {import("./types.js").Subscriber[]} observers @param {(observer: import("./types.js").Subscriber) => unknown} inputFor @param {{clock: () => number, workDeadline: number, launch: Launch, nativeEvent: string}} deps @param {string[]} diagnostics */
+export async function runObservers(observers, inputFor, { clock, workDeadline, launch, nativeEvent }, diagnostics) {
   for (const observer of observers) {
     if (clock() + observer.timeoutMs > workDeadline) { diagnostics.push(`SUBSCRIBER_SKIPPED: ${observer.name} does not fit the remaining budget`); continue; }
-    const result = await run(observer.argv, JSON.stringify(inputFor(observer)), { clock, deadline: workDeadline, timeoutMs: observer.timeoutMs });
-    if (result.status !== 'exited' || result.exitCode !== 0) diagnostics.push(`SUBSCRIBER_FAILED: ${observer.name} ${result.status}${result.exitCode === null ? '' : ` exit ${result.exitCode}`}`);
+    let launched;
+    try { launched = await launch(observer, JSON.stringify(inputFor(observer))); }
+    catch (caught) { const cause = /** @type {import('./types.js').Failure & Partial<Selected>} */ (caught); diagnostics.push(`SUBSCRIBER_FAILED: ${observer.name} ${nativeEvent} ${cause.code ?? 'IO_ERROR'}${where(cause)}`); continue; }
+    const { result, selected } = launched;
+    if (result.status !== 'exited' || result.exitCode !== 0) diagnostics.push(`SUBSCRIBER_FAILED: ${observer.name} ${result.status}${result.exitCode === null ? '' : ` exit ${result.exitCode}`}${where(selected)}`);
     for (const line of result.stderr.split('\n').filter(Boolean)) diagnostics.push(`${observer.name}: ${line}`);
   }
 }
 
-/** @param {import("./types.js").Subscriber[]} guards @param {import("./types.js").HookEvent} event @param {import("./types.js").Capability} capability @param {{clock: () => number, workDeadline: number, run: typeof runChild}} deps @param {string[]} diagnostics */
-async function runGuards(guards, event, capability, { clock, workDeadline, run }, diagnostics) {
+/** @param {import("./types.js").Subscriber[]} guards @param {import("./types.js").HookEvent} event @param {import("./types.js").Capability} capability @param {{clock: () => number, workDeadline: number, launch: Launch}} deps @param {string[]} diagnostics */
+async function runGuards(guards, event, capability, { clock, workDeadline, launch }, diagnostics) {
   const contexts = []; let denial = null, error = null;
   for (const guard of guards) {
     if (clock() >= workDeadline) { error ??= relayError('DEADLINE_EXCEEDED', `guard ${guard.name} did not start before the deadline`); break; }
-    let input, result;
+    let input, result, selected;
     try { input = JSON.stringify(projectEnvelope(event, guard, NOT_REQUESTED)); }
     catch (cause) { error ??= relayError('GUARD_FAILED', `guard ${guard.name} input serialization failed`, cause); continue; }
-    try { result = await run(guard.argv, input, { clock, deadline: workDeadline, timeoutMs: guard.timeoutMs }); }
-    catch (cause) { error ??= relayError('GUARD_FAILED', `guard ${guard.name} invocation failed`, cause); continue; }
+    try { ({ result, selected } = await launch(guard, input)); }
+    catch (caught) {
+      const cause = /** @type {import('./types.js').Failure & Partial<Selected>} */ (caught);
+      error ??= cause.code ? relayError(cause.code, `guard ${guard.name} ${event.nativeEvent}: ${cause.message}${where(cause)}`, cause)
+        : relayError('GUARD_FAILED', `guard ${guard.name} invocation failed`, cause);
+      continue;
+    }
     try {
-      if (result.status !== 'exited') throw relayError('GUARD_FAILED', `guard ${guard.name} ${result.status}`);
-      if (result.exitCode !== 0) throw relayError('GUARD_FAILED', `guard ${guard.name} exited ${result.exitCode}`);
+      if (result.status !== 'exited') throw relayError('GUARD_FAILED', `guard ${guard.name} ${result.status}${where(selected)}`);
+      if (result.exitCode !== 0) throw relayError('GUARD_FAILED', `guard ${guard.name} exited ${result.exitCode}${where(selected)}`);
       let reply;
       try { reply = parseReply(result.stdout); } catch (caught) { const cause = /** @type {import('./types.js').Failure} */ (caught); throw relayError(cause.code, `guard ${guard.name}: ${cause.message}`, cause); }
       // A denial is complete with its reason; context on a denial is dropped, so the channel
@@ -111,6 +147,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   /** @param {import("./types.js").Failure} error */
   const abort = (error) => capability.refuse ? refuse(refusalReason(error)) : failure(error);
   const workDeadline = start + budget.totalMs - budget.reserveMs, diagnostics = /** @type {string[]} */ ([]);
+  const invokingCwd = deps.invokingCwd ?? process.cwd(), childEnv = deps.env ?? process.env;
   // An installed entry names its file, so the hook environment decides nothing about
   // policy. State paths are only needed for publication, where failure is diagnostic.
   const statePaths = () => deps.paths ?? defaultPaths(deps.env ?? process.env);
@@ -125,7 +162,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
     const config = await bounded(load, { clock, deadline: workDeadline }, 'subscriber configuration did not load before the deadline');
     checkBudget(config, budget, { harness, kind: hookEvent.kind, nativeEvent });
     const raw = await readInput(input, { clock, deadline: Math.min(workDeadline, start + budget.inputMs) });
-    event = normalizeHookEvent(harness, nativeEvent, raw, { invokingCwd: deps.invokingCwd ?? process.cwd() });
+    event = normalizeHookEvent(harness, nativeEvent, raw, { invokingCwd });
     // agy Stop reaches its policy even when registry identity is unusable; publication is then skipped
     // with a diagnostic. Every other event without a usable registry event fails as before.
     try { registryEvent = registryEventFor(event); }
@@ -138,7 +175,8 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
     guards = matching.filter((subscriber) => subscriber.role === 'guard');
     observers = matching.filter((subscriber) => subscriber.role === 'observer');
   } catch (caught) { const error = /** @type {import('./types.js').Failure} */ (caught); return abort(error); }
-  const { denial, error, context } = await runGuards(guards, event, capability, { clock, workDeadline, run }, diagnostics);
+  const launch = launcher({ cwd: event.cwd, invokingCwd, env: childEnv, clock, workDeadline, run });
+  const { denial, error, context } = await runGuards(guards, event, capability, { clock, workDeadline, launch }, diagnostics);
   if (denial !== null) return refuse(denial);
   if (error) return abort(error);
   let result = null, published = registryEvent === null && registryError === null;
@@ -153,7 +191,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   } catch (caught) { const cause = /** @type {import('./types.js').Failure} */ (caught); diagnostics.push(`registry: ${describe(cause)}`); }
   const hooked = /** @type {import("./types.js").HookEvent} */ (event);
   if (!published) for (const observer of observers) diagnostics.push(`SUBSCRIBER_SKIPPED: ${observer.name} skipped after registry failure`);
-  else await runObservers(observers, (observer) => projectEnvelope(hooked, observer, result === null ? NOT_REQUESTED : accessFor(result)), { clock, workDeadline, run }, diagnostics);
+  else await runObservers(observers, (observer) => projectEnvelope(hooked, observer, result === null ? NOT_REQUESTED : accessFor(result)), { clock, workDeadline, launch, nativeEvent }, diagnostics);
   const reply = adapter.encodeReply(nativeEvent, context ? { decision: 'allow', context } : { decision: 'allow' });
   return { stdout: reply.stdout, stderr: lines(diagnostics), exitCode: !published || registryEvent?.background === null ? (adapter.failureExitCode ?? 1) : reply.exitCode };
 }
@@ -161,7 +199,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
 // relay reap: prune confirmed deaths, publish if changed, then tell reconcile observers to
 // reread the snapshot. No event is fabricated and no guard runs. Loading and reaping errors
 // propagate so the CLI reports them; observer failures are diagnostics.
-/** @param {{outerMs?: number}} [request] @param {{clock?: () => number, loadConfig?: typeof loadSubscribers, run?: typeof runChild, reap?: typeof reapRegistry, paths?: import("./types.js").Paths}} [deps] */
+/** @param {{outerMs?: number}} [request] @param {{clock?: () => number, loadConfig?: typeof loadSubscribers, run?: typeof runChild, reap?: typeof reapRegistry, paths?: import("./types.js").Paths, env?: NodeJS.ProcessEnv}} [deps] */
 export async function reconcile({ outerMs = 30000 } = {}, deps = {}) {
   const clock = deps.clock ?? performance.now.bind(performance), start = clock();
   const { loadConfig = loadSubscribers, run = runChild, reap = reapRegistry } = deps, paths = deps.paths ?? defaultPaths();
@@ -170,6 +208,7 @@ export async function reconcile({ outerMs = 30000 } = {}, deps = {}) {
   const observers = checkBudget(config, budget, { kind: RECONCILE });
   const deadline = Math.min(workDeadline, clock() + budget.registryMs);
   const result = await bounded(() => reap({ paths, clock, deadline }), { clock, deadline }, 'registry reap did not finish before the deadline');
-  await runObservers(observers, (observer) => reconcileEnvelope(observer, result), { clock, workDeadline, run }, diagnostics);
+  const launch = launcher({ cwd: process.cwd(), invokingCwd: process.cwd(), env: deps.env ?? process.env, clock, workDeadline, run });
+  await runObservers(observers, (observer) => reconcileEnvelope(observer, result), { clock, workDeadline, launch, nativeEvent: RECONCILE }, diagnostics);
   return { result, diagnostics };
 }

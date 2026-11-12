@@ -54,7 +54,7 @@ const layout=(base)=>({stateDir:join(base.stateDir,'state'),configHome:join(base
 const body=JSON.stringify({session_id:'sess',cwd:process.cwd(),tool_name:'Bash',tool_input:{command:'ls'}});
 test('hook denial through the real CLI is JSON on stdout, reason on stderr, exit 2',async t=>{
   const base=await tempState(t),p=layout(base);
-  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code','codex'],argv:[process.execPath,fixture,'deny'],timeoutMs:2000}]);
+  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code','codex'],argv:['node',fixture,'deny'],timeoutMs:2000}]);
   const r=hookRun(p,['--harness','codex','PreToolUse'],body);
   assert.equal(r.status,2);assert.equal(r.stdout,'{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"denied by fixture"}}\n');assert.equal(r.stderr,'denied by fixture\n');
   // Identity comes from a live codex terminal ancestor; outside one the publication only reports it.
@@ -64,7 +64,7 @@ test('hook denial through the real CLI is JSON on stdout, reason on stderr, exit
 });
 test('an installed entry keeps its guard when the hook environment loses the config base', async t => {
   const base=await tempState(t),p=layout(base);
-  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code','codex'],argv:[process.execPath,fixture,'deny'],timeoutMs:2000}]);
+  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code','codex'],argv:['node',fixture,'deny'],timeoutMs:2000}]);
   const file=join(p.configHome,'relay','subscribers.json');
   // The regression the Codex probe missed: a login shell rewrote XDG_CONFIG_HOME before relay ran.
   for(const configHome of [join(base.stateDir,'elsewhere'),'relative']) {
@@ -81,7 +81,7 @@ test('an installed entry keeps its guard when the hook environment loses the con
 test('survival limitation: the internal deadline refuses; an outer kill, missing node or startup error cannot',async t=>{
   const base=await tempState(t),p=layout(base),marker=processMarker();
   t.after(()=>reapMarked(marker));
-  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code'],argv:[process.execPath,fixture,'hang',marker],timeoutMs:300}]);
+  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code'],argv:['node',fixture,'hang',marker],timeoutMs:300}]);
   const started=performance.now(),r=hookRun(p,['--harness','claude-code','--outer-ms','1500','PreToolUse'],body);
   assert.equal(r.status,2);assert.match(r.stdout,/relay refused: GUARD_FAILED: guard g timeout/);assert.ok(performance.now()-started<1500,'refused inside the outer timeout');
   await noneMarked(marker); // relay's own deadline kills the guard

@@ -21,6 +21,8 @@ const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const text = (v) => typeof v === 'string' && v.trim().length > 0;
 /** @param {unknown} v @param {(v: any) => boolean} ok */
 const list = (v, ok) => Array.isArray(v) && v.length > 0 && new Set(v).size === v.length && v.every(ok);
+/** A PATH basename: no slash or NUL, not "." or "..". @param {unknown} v */
+const commandName = (v) => typeof v === 'string' && v !== '' && v !== '.' && v !== '..' && !v.includes('/') && !v.includes('\0');
 /** @param {number} v @param {number} lo @param {number} hi */
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 /** Native events a (harness, kind) pair selects, narrowed by an optional nativeEvents list. @param {string} harness @param {string} kind @param {string[]|null} only */
@@ -79,7 +81,7 @@ function validateSubscriber(v, index) {
     && admitted(harnesses).some((harness) => hookKinds.some((kind) => nativeEventsFor(harness, kind, null).includes(native))))) {
     fail(`${where}: nativeEvents must be a nonempty unique list of native events its kinds and harnesses select`);
   }
-  if (!Array.isArray(v.argv) || !v.argv.length || !v.argv.every((arg) => typeof arg === 'string') || !isAbsolute(v.argv[0])) fail(`${where}: argv must be strings starting with an absolute executable`);
+  if (!Array.isArray(v.argv) || !v.argv.length || !v.argv.every((arg) => typeof arg === 'string') || !commandName(v.argv[0])) fail(`${where}: argv must be strings starting with a command basename resolved on PATH (no slash)`);
   if (!Number.isInteger(v.timeoutMs) || v.timeoutMs < 1 || v.timeoutMs > MAX_TIMEOUT_MS) fail(`${where}: timeoutMs must be an integer from 1 to ${MAX_TIMEOUT_MS}`);
   const selector = { harnesses: admitted(harnesses), kinds: hookKinds, nativeEvents };
   const base = { name: v.name, role: v.role, kinds: [...v.kinds], harnesses: harnesses && [...harnesses], tools: tools && [...tools],

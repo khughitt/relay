@@ -1,4 +1,4 @@
-import { writeFileSync, realpathSync } from 'node:fs';
+import { mkdirSync, writeFileSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fleetBase, killParents, PARENT_ROW_CUT, parentCapture, parentRowCut, startFleet } from '../lib/fleet.mjs';
@@ -20,16 +20,17 @@ export async function run(ctx) {
       handles_unchanged: live.every((id) => after?.agents[id] && JSON.stringify(after.agents[id].process) === JSON.stringify(before?.agents[id]?.process)) };
     // The command relay's installer renders for PreToolUse, from its own hook planner. The
     // installer CLI would demand capability evidence first; rendering needs none.
-    const deny = join(ctx.root, 'd8-deny.sh');
-    writeFileSync(deny, '#!/bin/sh\nprintf \'{"decision":"deny","reason":"d8 probe"}\'\n', { mode: 0o755 });
+    // Subscriber argv[0] is a PATH basename resolved outside the event repository.
+    const denyBin = join(ctx.root, 'd8-bin'); mkdirSync(denyBin, { recursive: true });
+    writeFileSync(join(denyBin, 'relay-d8-deny'), '#!/bin/sh\nprintf \'{"decision":"deny","reason":"d8 probe"}\'\n', { mode: 0o755 });
     const subs = join(ctx.root, 'xdg/relay/d8-subscribers.json');
-    writeFileSync(subs, JSON.stringify({ schema: 2, subscribers: [{ name: 'd8-deny', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: [deny], timeoutMs: 5000 }] }), { mode: 0o600 });
+    writeFileSync(subs, JSON.stringify({ schema: 2, subscribers: [{ name: 'd8-deny', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['relay-d8-deny'], timeoutMs: 5000 }] }), { mode: 0o600 });
     const { planHooks } = await import(pathToFileURL(join(ctx.clone, 'src/install/hooks.js')).href);
     const rendered = JSON.parse(planHooks({ text: '{}', harness: 'claude-code', relayBin: realpathSync(join(ctx.clone, 'bin/relay.js')), subscribersPath: subs }));
     const command = rendered.hooks.PreToolUse.flatMap((e) => e.hooks).find((h) => / hook /.test(h.command))?.command;
     if (!command) return { status: 'error', reason: 'planHooks rendered no PreToolUse relay command', observations: { parent_capture, reap } };
     const payload = JSON.stringify({ session_id: 'd8', cwd: base.repo, hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'true' } });
-    const h = await ctx.t.run('/bin/sh', ['-c', command], { env: { ...base.env, PATH: '/usr/bin:/bin:/usr/sbin:/sbin' }, input: payload });
+    const h = await ctx.t.run('/bin/sh', ['-c', command], { env: { ...base.env, PATH: `${denyBin}:/usr/bin:/bin:/usr/sbin:/sbin` }, input: payload });
     return { status: 'ran', observations: { parent_capture, reap, hook_path: { exit: h.exit, denied: h.stdout.includes('"permissionDecision":"deny"'), stderr_head: h.stderr.slice(0, 400), command } } };
   } finally { await killParents(ctx, fleet); }
 }

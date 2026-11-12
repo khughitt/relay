@@ -319,16 +319,16 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
   "subscribers": [
     { "name": "ops-guard", "role": "guard", "kinds": ["before-tool"],
       "harnesses": ["claude-code", "codex"], "tools": ["Bash"],
-      "argv": ["/usr/bin/python3", "/abs/path/hooks/relay-guard"], "timeoutMs": 4000 },
+      "argv": ["relay-guard"], "timeoutMs": 4000 },
     { "name": "familiar", "role": "observer", "registry": "snapshot", "harnesses": ["claude-code", "codex"],
       "kinds": ["session-start", "prompt", "before-tool", "idle", "needs-input",
                 "needs-approval", "turn-end", "turn-error", "child-start", "child-stop", "reconcile"],
-      "argv": ["/abs/path/familiar/bin/familiar", "observe"], "timeoutMs": 2000 },
+      "argv": ["familiar", "observe"], "timeoutMs": 2000 },
     { "name": "test-counter", "role": "observer", "registry": "occurrence", "harnesses": ["claude-code"],
       "kinds": ["after-tool", "tool-error"], "tools": ["Bash"],
       "privateFields": [{ "nativeEvent": "PostToolUse", "fields": ["command", "durationMs"] },
                         { "nativeEvent": "PostToolUseFailure", "fields": ["command", "durationMs"] }],
-      "argv": ["/abs/path/hooks/test-counter"], "timeoutMs": 1000 }
+      "argv": ["test-counter"], "timeoutMs": 1000 }
   ]
 }
 ```
@@ -340,7 +340,7 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 - `tools` is allowed only when every kind is a tool kind (`before-tool`, `after-tool`, `tool-error`).
 - Observers must declare `registry`: `snapshot` for one that reads `$STATE/agents.json`, `occurrence` for one that counts events. The field is rejected on other roles.
 - `privateFields` (observers only) lists `{ nativeEvent, fields }` entries: each native event at most once and one this subscriber selects, each field an exact private key applicable to that event. There is no wildcard. An ordinary observer receives `private: {}`.
-- `argv[0]` must be absolute; `timeoutMs` is an integer in `1..60000`. There is no detach option.
+- `argv[0]` is a command basename (no `/`, not `.` or `..`) resolved on `PATH` outside the event's repository ([api.md](api.md#subscriber-commands)); later arguments are passed literally, without a shell. `timeoutMs` is an integer in `1..60000`. There is no detach option.
 
 ### Budget
 

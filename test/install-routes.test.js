@@ -104,7 +104,7 @@ test('after a harness upgrade the stale route refuses with --with ask and goes w
 });
 
 test('a guard subscriber needs one evidence record holding both the dispatch probes and the route rows', async () => {
-  const guard = { name: 'g', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['/usr/bin/true'], timeoutMs: 1000 };
+  const guard = { name: 'g', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['true'], timeoutMs: 1000 };
   const probes = ['refuse', 'context'].map((reply) => ({ event: 'PreToolUse', reply, outerMs: 600000, passed: true }));
   const base = { target: '/t/settings.json', text: '{}', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
     subscribers: validateSubscribers({ schema: 2, subscribers: [guard] }), withAsk: true, installedVersion: '2.1.296' };

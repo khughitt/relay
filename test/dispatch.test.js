@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs/promises';
-import { readFile, access } from 'node:fs/promises';
+import { readFile, access, mkdir, writeFile, symlink } from 'node:fs/promises';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -20,11 +22,14 @@ import { agyStore, encodeTrajectoryMetadata } from './helpers/agy-store.js';
 import { processMarker, noneMarked, reapMarked } from './helpers/survivors.js';
 
 const fixture = new URL('./fixtures/subscriber.js', import.meta.url).pathname;
-const argv = (mode, ...rest) => [process.execPath, fixture, mode, ...rest];
+const argv = (mode, ...rest) => ['node', fixture, mode, ...rest];
+// Subscribers run in the event cwd and resolve against it, so the payload cwd is a real, non-repository directory.
+const CWD = realpathSync(mkdtempSync(join(tmpdir(), 'relay-cwd-')));
+test.after(() => rmSync(CWD, { recursive: true, force: true }));
 const guard = (name, mode, over = {}) => ({ name, role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], argv: argv(mode, ...(over.file ? [over.file] : [])), timeoutMs: 3000, ...over, file: undefined });
 const observer = (name, mode, over = {}) => ({ name, role: 'observer', registry: 'snapshot', kinds: ['before-tool'], argv: argv(mode, ...(over.file ? [over.file] : [])), timeoutMs: 3000, ...over, file: undefined });
 const strip = (s) => Object.fromEntries(Object.entries(s).filter(([, v]) => v !== undefined));
-const payload = (over = {}) => JSON.stringify({ session_id: 'sess', cwd: '/repo', tool_name: 'Bash', tool_input: { command: 'echo PRIVATE_COMMAND' }, ...over });
+const payload = (over = {}) => JSON.stringify({ session_id: 'sess', cwd: CWD, tool_name: 'Bash', tool_input: { command: 'echo PRIVATE_COMMAND' }, ...over });
 const local = { resolveSessionPid: () => process.pid, gitContext: async () => ({ remote: null, repoRoot: null }) };
 async function hook(p, { harness = 'claude-code', nativeEvent = 'PreToolUse', body = payload(), outerMs, subscribersPath, deps = {} } = {}) {
   return dispatchHook({ harness, nativeEvent, input: Readable.from([Buffer.from(body)]), outerMs, subscribersPath }, { paths: p, applyOptions: local, ...deps });
@@ -66,10 +71,10 @@ test('allow replies concatenate context in configuration order and honor the cha
   const r = await hook(p);
   assert.deepEqual(r, { stdout: '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"context from one\\ncontext from three"}}\n', stderr: '', exitCode: 0 });
   await writeSubscribers(p, [strip(guard('prompt', 'context', { kinds: ['prompt'], argv: argv('context', 'p') }))]);
-  const prompt = await hook(p, { nativeEvent: 'UserPromptSubmit', body: JSON.stringify({ session_id: 'sess', cwd: '/repo' }) });
+  const prompt = await hook(p, { nativeEvent: 'UserPromptSubmit', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.equal(prompt.stdout, '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"context from p"}}\n');
   await writeSubscribers(p, [strip(guard('stop', 'context', { kinds: ['turn-end'] }))]);
-  const stop = await hook(p, { nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: '/repo', stop_hook_active: true }) });
+  const stop = await hook(p, { nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: CWD, stop_hook_active: true }) });
   assert.equal(stop.exitCode, 2); assert.match(stop.stdout, /^\{"decision":"block","reason":"relay refused: UNSUPPORTED_REPLY: /);
 });
 
@@ -77,7 +82,7 @@ test('every guard failure relay survives is a native refusal', async (t) => {
   const p = await tempPaths(t), marker = processMarker();
   t.after(() => reapMarked(marker));
   const cases = [['hang', 'GUARD_FAILED', { timeoutMs: 300, argv: argv('hang', marker) }], ['crash', 'GUARD_FAILED'], ['garbage', 'INVALID_REPLY'], ['extra-field', 'INVALID_REPLY'],
-    ['unreasoned', 'INVALID_REPLY'], ['big-context', 'INVALID_REPLY'], ['big', 'GUARD_FAILED'], ['missing', 'GUARD_FAILED', { argv: ['/nonexistent/guard'] }]];
+    ['unreasoned', 'INVALID_REPLY'], ['big-context', 'INVALID_REPLY'], ['big', 'GUARD_FAILED'], ['missing', 'EXECUTABLE_NOT_FOUND', { argv: ['relay-nonexistent-guard'] }]];
   for (const [mode, code, over = {}] of cases) {
     await writeSubscribers(p, [strip(guard('g', mode, over))]);
     const r = await hook(p);
@@ -120,7 +125,7 @@ test('tool input beyond its structural bound refuses without invoking the guard'
   const p = await tempPaths(t), file = join(p.stateDir, '..', 'guard-ran');
   await writeSubscribers(p, [strip(guard('deep', 'record', { file }))]);
   const nested = `${'['.repeat(10000)}0${']'.repeat(10000)}`;
-  const body = `{"session_id":"sess","cwd":"/repo","tool_name":"Bash","tool_input":{"nested":${nested}}}`;
+  const body = `{"session_id":"sess","cwd":${JSON.stringify(CWD)},"tool_name":"Bash","tool_input":{"nested":${nested}}}`;
   const r = await hook(p, { body });
   assert.equal(r.exitCode, 2);
   assert.match(r.stdout, /relay refused: INVALID_INPUT/);
@@ -158,11 +163,11 @@ test('an expired deadline refuses before running the remaining guards', async (t
 test('Stop denial continues the turn and guards see stopHookActive', async (t) => {
   const p = await tempPaths(t), file = join(p.stateDir, '..', 'stop.json');
   await writeSubscribers(p, [strip(guard('see', 'record', { kinds: ['turn-end'], file })), strip(guard('stop', 'deny', { kinds: ['turn-end'] }))]);
-  const r = await hook(p, { harness: 'codex', nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: '/repo', stop_hook_active: true }) });
+  const r = await hook(p, { harness: 'codex', nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: CWD, stop_hook_active: true }) });
   assert.deepEqual(r, { stdout: '{"decision":"block","reason":"denied by fixture"}\n', stderr: 'denied by fixture\n', exitCode: 2 });
   assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).event.facts.stopHookActive, { status: 'valid', value: true });
   await writeSubscribers(p, [strip(guard('stop', 'deny-context', { kinds: ['turn-end'] }))]);
-  const kept = await hook(p, { harness: 'claude-code', nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: '/repo' }) });
+  const kept = await hook(p, { harness: 'claude-code', nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.deepEqual(kept, { stdout: '{"decision":"block","reason":"denied by fixture"}\n', stderr: 'denied by fixture\n', exitCode: 2 });
 });
 
@@ -213,7 +218,7 @@ test('path resolution failures are refusals, not startup errors', async (t) => {
   const env = { ...process.env, RELAY_STATE_DIR: 'relative' };
   let r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'PreToolUse', input: Readable.from([payload()]) }, { env, applyOptions: local });
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /relay refused: INVALID_INPUT: expected absolute directory/);
-  r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'SessionStart', input: Readable.from(['{"session_id":"s","cwd":"/repo"}']) }, { env, applyOptions: local });
+  r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'SessionStart', input: Readable.from([JSON.stringify({ session_id: 's', cwd: CWD })]) }, { env, applyOptions: local });
   assert.deepEqual(r, { stdout: '', stderr: 'INVALID_INPUT: expected absolute directory\n', exitCode: 1 });
 });
 
@@ -237,14 +242,14 @@ test('an explicit subscriber path is loaded from that file, not the environment'
   assert.equal(r.exitCode, 2); assert.ok(r.stdout.startsWith(denyOut));
   const absent = await hook(p, { subscribersPath: p.subscribersPath });
   assert.equal(absent.exitCode, 2); assert.match(absent.stdout, /relay refused: INVALID_CONFIG: subscriber config .* does not exist/);
-  const start = await hook(p, { nativeEvent: 'SessionStart', body: JSON.stringify({ session_id: 'sess', cwd: '/repo' }), subscribersPath: p.subscribersPath });
+  const start = await hook(p, { nativeEvent: 'SessionStart', body: JSON.stringify({ session_id: 'sess', cwd: CWD }), subscribersPath: p.subscribersPath });
   assert.deepEqual([start.exitCode, start.stdout], [1, '']); assert.match(start.stderr, /INVALID_CONFIG/);
 });
 
 test('an unusable environment cannot reach the policy phase when the path is explicit', async (t) => {
   const p = await tempPaths(t);
   await writeSubscribers(p, [guard('g', 'deny'), guard('h', 'context')]);
-  const bad = { HOME: 'relative', XDG_CONFIG_HOME: 'relative', XDG_STATE_HOME: 'relative' };
+  const bad = { PATH: process.env.PATH, HOME: 'relative', XDG_CONFIG_HOME: 'relative', XDG_STATE_HOME: 'relative' };
   const denied = await hook(p, { subscribersPath: p.subscribersPath, deps: { paths: undefined, env: bad } });
   assert.equal(denied.exitCode, 2); assert.ok(denied.stdout.startsWith(denyOut));
   await writeSubscribers(p, [guard('h', 'context')]);
@@ -260,7 +265,7 @@ test('slow configuration loading and publication end at the deadline', async (t)
   let r = await hook(p, { outerMs: 500, deps: { loadConfig: slow(empty, 650) } });
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /relay refused: DEADLINE_EXCEEDED: subscriber configuration did not load before the deadline/);
   assert.ok(performance.now() - started < 500);
-  r = await hook(p, { nativeEvent: 'Notification:idle_prompt', body: '{"session_id":"sess","cwd":"/repo"}', outerMs: 500, deps: { loadConfig: slow(empty, 650) } });
+  r = await hook(p, { nativeEvent: 'Notification:idle_prompt', body: JSON.stringify({ session_id: 'sess', cwd: CWD }), outerMs: 500, deps: { loadConfig: slow(empty, 650) } });
   assert.deepEqual(r, { stdout: '', stderr: 'DEADLINE_EXCEEDED: subscriber configuration did not load before the deadline\n', exitCode: 1 });
   started = performance.now();
   r = await hook(p, { outerMs: 500, deps: { apply: slow(published, 650) } });
@@ -273,7 +278,7 @@ test('configuration errors refuse on guard-capable events and report on the rest
   const p = await tempPaths(t);
   await writeSubscribers(p, [], { text: '{ broken' });
   let r = await hook(p); assert.equal(r.exitCode, 2); assert.match(r.stdout, /relay refused: INVALID_CONFIG/);
-  r = await hook(p, { nativeEvent: 'Notification:idle_prompt', body: JSON.stringify({ session_id: 'sess', cwd: '/repo' }) });
+  r = await hook(p, { nativeEvent: 'Notification:idle_prompt', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.equal(r.exitCode, 1); assert.equal(r.stdout, ''); assert.match(r.stderr, /^INVALID_CONFIG: /);
   await writeSubscribers(p, [strip(guard('g', 'allow', { timeoutMs: 5000 }))]);
   r = await hook(p, { outerMs: 1000 }); assert.match(r.stdout, /relay refused: INVALID_CONFIG: subscribers for claude-code before-tool need 5000 ms/);
@@ -302,7 +307,7 @@ test('observers get sanitized metadata after publication and cannot touch the re
   assert.equal(r.stderr, 'noisy: observer noise\n');
   const seen = JSON.parse(await readFile(file, 'utf8')), snapshot = await readSnapshot({ paths: p });
   assert.deepEqual(seen, { schema: 2, type: 'event', subscriber: 'rec',
-    event: { schema: 2, kind: 'before-tool', harness: 'claude-code', nativeEvent: 'PreToolUse', cwd: '/repo',
+    event: { schema: 2, kind: 'before-tool', harness: 'claude-code', nativeEvent: 'PreToolUse', cwd: CWD,
       identity: { status: 'valid', value: { agentId: 'claude-code:sess', sessionId: 'sess' } }, facts: {},
       tool: { name: { status: 'valid', value: 'Bash' }, id: { status: 'missing' } }, private: {} },
     registry: { status: 'ready', generation: snapshot.generation, revision: 1 } });
@@ -348,13 +353,13 @@ test('observers are skipped, not run, after a registry failure', async (t) => {
 test('Codex SessionEnd fits its one-second default and OpenCode events observe only', async (t) => {
   const p = await tempPaths(t), file = join(p.stateDir, '..', 'end.json');
   await writeSubscribers(p, [strip(observer('end', 'record', { kinds: ['session-end'], file, timeoutMs: 250 }))]);
-  await applyEvent(normalizeEvent('codex', 'SessionStart', JSON.stringify({ session_id: 'sess', cwd: '/repo' })), { paths: p, ...local });
-  const started = performance.now(), r = await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: JSON.stringify({ session_id: 'sess', cwd: '/repo' }) });
+  await applyEvent(normalizeEvent('codex', 'SessionStart', JSON.stringify({ session_id: 'sess', cwd: CWD })), { paths: p, ...local });
+  const started = performance.now(), r = await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 }); assert.ok(performance.now() - started < 1000);
   assert.equal(JSON.parse(await readFile(file, 'utf8')).registry.status, 'ready');
   await writeSubscribers(p, [strip(observer('end', 'allow', { kinds: ['session-end'], timeoutMs: 300 }))]);
-  assert.match((await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: '{"session_id":"sess","cwd":"/repo"}' })).stderr, /^INVALID_CONFIG: subscribers for codex session-end need 300 ms but 267 ms fit inside 1000 ms/);
-  const oc = await hook(p, { harness: 'opencode', nativeEvent: 'session.busy', body: '{"session_id":"opencode:42","cwd":"/repo"}' });
+  assert.match((await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) })).stderr, /^INVALID_CONFIG: subscribers for codex session-end need 300 ms but 267 ms fit inside 1000 ms/);
+  const oc = await hook(p, { harness: 'opencode', nativeEvent: 'session.busy', body: JSON.stringify({ session_id: 'opencode:42', cwd: CWD }) });
   assert.deepEqual(oc, { stdout: '', stderr: '', exitCode: 0 });
   assert.equal((await readSnapshot({ paths: p })).agents['opencode:opencode:42'].state, 'working');
 });
@@ -429,7 +434,7 @@ test('a malformed Codex agent_id refuses even with no guard, and publishes nothi
   assert.equal(await readSnapshot({ paths: p }), null);
 });
 
-const stopBody = (list) => JSON.stringify({ session_id: 'sess', cwd: '/repo', stop_hook_active: false, background_tasks: list });
+const stopBody = (list) => JSON.stringify({ session_id: 'sess', cwd: CWD, stop_hook_active: false, background_tasks: list });
 test('an unreadable background report publishes and exits 1 without refusing', async t => {
   const p = await tempPaths(t);
   assert.deepEqual(await hook(p, { nativeEvent: 'Stop', body: stopBody('x') }), {
@@ -468,7 +473,8 @@ test('a readable empty background report still allows without diagnostics', asyn
   assert.deepEqual(await hook(p, { nativeEvent: 'Stop', body: stopBody([]) }), { stdout: '', stderr: '', exitCode: 0 });
 });
 
-const agyFixture = (name) => readFile(new URL(`./fixtures/agy/${name}.json`, import.meta.url), 'utf8');
+// The recorded payloads name /work/project; subscribers run in the event cwd, so point it at a real directory.
+const agyFixture = async (name) => (await readFile(new URL(`./fixtures/agy/${name}.json`, import.meta.url), 'utf8')).replaceAll('"/work/project"', JSON.stringify(CWD));
 test('agy before-tool guards: deny and allow replies', async (t) => {
   const p = await tempPaths(t), body = await agyFixture('PreToolUse');
   await writeSubscribers(p, [strip(guard('g', 'deny', { harnesses: ['agy'] }))]);
@@ -535,7 +541,7 @@ test('dispatchHook forwards agyAppDataDir from artifactDirectoryPath and falls b
     body: JSON.stringify({
       conversationId: r1,
       artifactDirectoryPath: `${appData}/brain/${r1}`,
-      workspacePaths: ['/repo'],
+      workspacePaths: [CWD],
       executionNum: 0,
     }),
   });
@@ -548,7 +554,7 @@ test('dispatchHook forwards agyAppDataDir from artifactDirectoryPath and falls b
     body: JSON.stringify({
       conversationId: r2,
       artifactDirectoryPath: `${appData}/brain/${r2}`,
-      workspacePaths: ['/repo'],
+      workspacePaths: [CWD],
     }),
     deps: { env: { HOME: '/nonexistent' } },
   });
@@ -562,7 +568,7 @@ test('dispatchHook forwards agyAppDataDir from artifactDirectoryPath and falls b
     body: JSON.stringify({
       conversationId: r2,
       artifactDirectoryPath: 'relative/brain/' + r2,
-      workspacePaths: ['/repo'],
+      workspacePaths: [CWD],
       executionNum: 0,
     }),
     deps: { env: { ANTIGRAVITY_APP_DATA_DIR: appData } },
@@ -573,10 +579,68 @@ test('dispatchHook forwards agyAppDataDir from artifactDirectoryPath and falls b
     body: JSON.stringify({
       conversationId: r3,
       artifactDirectoryPath: 'relative/brain/' + r3,
-      workspacePaths: ['/repo'],
+      workspacePaths: [CWD],
     }),
     deps: { env: { ANTIGRAVITY_APP_DATA_DIR: appData } },
   });
   assert.deepEqual(res3, { stdout: '', stderr: '', exitCode: 0 });
   assert.deepEqual(Object.keys((await readSnapshot({ paths: p })).agents), [`agy:${r3}`]);
+});
+
+// Executable resolution: argv[0] is a PATH basename resolved outside the event's repository.
+async function repository(t) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'relay-resolve-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const repo = join(root, 'repo'), hostbin = join(root, 'hostbin');
+  await mkdir(join(repo, '.git'), { recursive: true }); await mkdir(join(repo, 'bin')); await mkdir(hostbin);
+  await writeFile(join(repo, 'bin', 'relay-test-guard'), `#!/bin/sh\ncat >/dev/null\nprintf '{"decision":"allow"}'\n`, { mode: 0o755 });
+  return { root, repo, hostbin };
+}
+
+test('subscriber argv stays literal and runs in the event cwd with a trusted PATH', async (t) => {
+  const p = await tempPaths(t), file = join(p.stateDir, '..', 'argv.json');
+  const { repo } = await repository(t);
+  const env = { ...process.env, PATH: `${join(repo, 'bin')}:${process.env.PATH}` };
+  await writeSubscribers(p, [strip(guard('lit', 'argv', { argv: argv('argv', file, 'literal; $(never-run)', '*.md') }))]);
+  const r = await hook(p, { body: payload({ cwd: join(repo) }), deps: { env } });
+  assert.equal(r.exitCode, 0, r.stdout + r.stderr);
+  const seen = JSON.parse(await readFile(file, 'utf8'));
+  const recordedArgv = seen.argv;
+  assert.deepEqual(recordedArgv, ['literal; $(never-run)', '*.md']);
+  assert.equal(seen.cwd, repo);
+  assert.equal(seen.path.split(':').includes(join(repo, 'bin')), false, 'the repository bin never reaches the child PATH');
+});
+
+test('a repository-local command refuses closed and diagnoses paths without argv or payload', async (t) => {
+  const p = await tempPaths(t);
+  const { repo } = await repository(t);
+  const env = { ...process.env, PATH: `${join(repo, 'bin')}:${process.env.PATH}` };
+  await writeSubscribers(p, [{ name: 'local', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['relay-test-guard', 'ARGV_SECRET'], timeoutMs: 1000 }]);
+  const r = await hook(p, { body: payload({ cwd: repo }), deps: { env } });
+  assert.equal(r.exitCode, 2);
+  assert.match(r.stdout, /relay refused: EXECUTABLE_FORBIDDEN: guard local PreToolUse/);
+  const all = r.stdout + r.stderr;
+  assert.ok(all.includes(join(repo, 'bin', 'relay-test-guard')), 'the checked candidate is named');
+  assert.equal(all.includes('ARGV_SECRET'), false);
+  assert.equal(all.includes('PRIVATE_COMMAND'), false);
+  assert.ok(await absent(p.agentsPath));
+});
+
+test('an installed host link into the event checkout resolves and runs', async (t) => {
+  const p = await tempPaths(t);
+  const { repo, hostbin } = await repository(t);
+  await symlink(join(repo, 'bin', 'relay-test-guard'), join(hostbin, 'relay-test-guard'));
+  const env = { ...process.env, PATH: `${hostbin}:${join(repo, 'bin')}:${process.env.PATH}` };
+  await writeSubscribers(p, [{ name: 'installed', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['relay-test-guard'], timeoutMs: 2000 }]);
+  const r = await hook(p, { body: payload({ cwd: repo }), deps: { env } });
+  assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 });
+});
+
+test('observer resolution failures are diagnostics; the reply and publication stand', async (t) => {
+  const p = await tempPaths(t);
+  await writeSubscribers(p, [{ name: 'gone', role: 'observer', registry: 'snapshot', kinds: ['before-tool'], argv: ['relay-no-such-command-x'], timeoutMs: 1000 }]);
+  const r = await hook(p);
+  assert.equal(r.exitCode, 0);
+  assert.match(r.stderr, /^SUBSCRIBER_FAILED: gone PreToolUse EXECUTABLE_NOT_FOUND/m);
+  assert.equal((await readSnapshot({ paths: p })).agents['claude-code:sess'].state, 'working');
 });

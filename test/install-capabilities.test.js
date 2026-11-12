@@ -4,7 +4,7 @@ import { validateSubscribers } from '../src/subscribers.js';
 import { parseEvidence, validateCapabilities } from '../src/install/capabilities.js';
 import { bindingsFor } from '../src/install/hooks.js';
 
-const guard = { name: 'guard', role: 'guard', kinds: ['before-tool'], harnesses: ['codex'], argv: ['/usr/bin/true'], timeoutMs: 100 };
+const guard = { name: 'guard', role: 'guard', kinds: ['before-tool'], harnesses: ['codex'], argv: ['true'], timeoutMs: 100 };
 const subscribers = (...entries) => validateSubscribers({ schema: 2, subscribers: entries });
 const evidence = (probes, over = {}) => JSON.stringify({ schema: 1, harness: 'codex', version: '0.154.0', probes, ...over });
 const probe = (reply, over = {}) => ({ event: 'PreToolUse', reply, outerMs: 60000, passed: true, ...over });
@@ -34,7 +34,7 @@ test('observation-only bindings need no evidence and guards cannot target OpenCo
     bindings: [{ event: 'session.busy', outerMs: 5000 }] }), /OpenCode/);
 });
 test('a Codex guard on turn-end and child-stop needs a passed SubagentStop refusal probe as well as Stop', () => {
-  const only = (kinds) => ({ schema: 2, subscribers: [{ name: 'g', role: 'guard', kinds, harnesses: ['codex'], tools: null, nativeEvents: null, argv: ['/usr/bin/true'], timeoutMs: 1000 }] });
+  const only = (kinds) => ({ schema: 2, subscribers: [{ name: 'g', role: 'guard', kinds, harnesses: ['codex'], tools: null, nativeEvents: null, argv: ['true'], timeoutMs: 1000 }] });
   const subscribers = only(['turn-end', 'child-stop']);
   const evidence = (events) => ({ schema: 1, harness: 'codex', version: '0.162.1',
     probes: events.map(event => ({ event, reply: 'refuse', outerMs: 600000, passed: true })) });
