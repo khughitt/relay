@@ -147,7 +147,10 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   /** @param {import("./types.js").Failure} error */
   const abort = (error) => capability.refuse ? refuse(refusalReason(error)) : failure(error);
   const workDeadline = start + budget.totalMs - budget.reserveMs, diagnostics = /** @type {string[]} */ ([]);
-  const invokingCwd = deps.invokingCwd ?? process.cwd(), childEnv = deps.env ?? process.env;
+  const childEnv = deps.env ?? process.env;
+  // process.cwd() throws when the harness started relay in a since-deleted directory; read it
+  // inside the guarded block so that failure refuses like any other.
+  let invokingCwd = /** @type {string} */ ('');
   // An installed entry names its file, so the hook environment decides nothing about
   // policy. State paths are only needed for publication, where failure is diagnostic.
   const statePaths = () => deps.paths ?? defaultPaths(deps.env ?? process.env);
@@ -157,6 +160,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
   /** @type {import("./types.js").Failure|null} */
   let registryError = null;
   try {
+    invokingCwd = deps.invokingCwd ?? process.cwd();
     if (subscribersPath === null) paths = statePaths();
     const load = subscribersPath === null ? () => loadConfig(/** @type {import("./types.js").Paths} */ (paths)) : () => loadConfigFrom(subscribersPath);
     const config = await bounded(load, { clock, deadline: workDeadline }, 'subscriber configuration did not load before the deadline');

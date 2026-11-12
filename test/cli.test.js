@@ -147,3 +147,13 @@ test('list text names each row\'s scope, and a worker\'s root',async()=>{
   let out='';const code=await main(['list','--pretty'],{stdout:{write:(s,cb)=>{out+=s;cb?.();}},stderr:{write:(s,cb)=>cb?.()},list:async()=>({snapshot,liveness:{}})});
   assert.equal(code,0);assert.equal(out,'codex:r1 codex working session\ncodex:w1 codex working worker root=codex:r1\n');
 });
+test('a hook started from a deleted working directory still refuses rather than failing open', async t => {
+  const base=await tempState(t),p=layout(base),gone=join(base.stateDir,'gone');
+  await fs.mkdir(gone);
+  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code'],argv:['node',fixture,'allow'],timeoutMs:2000}]);
+  // The shell enters the directory, removes it, then execs relay, so relay's own cwd no longer exists.
+  const env={PATH:process.env.PATH,HOME:base.stateDir,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome};
+  const r=spawnSync('/bin/sh',['-c','cd "$1" && rmdir "$1" && exec "$2" "$3" hook --harness claude-code PreToolUse','sh',gone,process.execPath,cli.pathname],{encoding:'utf8',input:body,env});
+  assert.equal(r.status,2,r.stdout+r.stderr);
+  assert.match(r.stdout,/"permissionDecision":"deny","permissionDecisionReason":"relay refused: /);
+});

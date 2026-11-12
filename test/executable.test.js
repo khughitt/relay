@@ -46,16 +46,25 @@ async function tree(t) {
   return { root, checkout, inner, beside, hostbin, bare, plain };
 }
 
-test('boundary discovery finds every enclosing checkout through the filesystem, never through git', async (t) => {
+test('boundary discovery finds every enclosing repository through the filesystem, never through git', async (t) => {
   const f = await tree(t);
   const dirs = async (cwd, invokingCwd = cwd) => (await discoverBoundaries({ cwd, invokingCwd, deadline: soon() })).directories.sort();
-  assert.deepEqual(await dirs(join(f.checkout, 'sub', 'nested')), [f.checkout, join(f.checkout, 'sub', 'nested')].sort());
-  assert.deepEqual(await dirs(join(f.inner, 'src')), [f.checkout, f.inner, join(f.inner, 'src')].sort(), 'nested linked worktree and its enclosing main checkout');
-  assert.deepEqual(await dirs(join(f.beside, 'src')), [f.beside, join(f.beside, 'src')].sort(), 'a linked worktree beside its main checkout excludes only itself');
-  assert.deepEqual(await dirs(join(f.root, 'cwdlink', 'nested')), [f.checkout, join(f.checkout, 'sub', 'nested')].sort(), 'a symlinked cwd resolves before the walk');
-  assert.deepEqual(await dirs(join(f.bare, 'objects')), [f.bare, join(f.bare, 'objects')].sort(), 'bare repository markers');
-  assert.deepEqual(await dirs(f.plain), [f.plain], 'a proven non-repository contributes only the working directory');
-  assert.deepEqual(await dirs(f.plain, join(f.checkout, 'sub')), [f.checkout, f.plain, join(f.checkout, 'sub')].sort(), 'native and invoking cwd both participate');
+  assert.deepEqual(await dirs(join(f.checkout, 'sub', 'nested')), [f.checkout]);
+  assert.deepEqual(await dirs(join(f.inner, 'src')), [f.checkout, f.inner].sort(), 'nested linked worktree and its enclosing main checkout');
+  assert.deepEqual(await dirs(join(f.beside, 'src')), [f.beside], 'a linked worktree beside its main checkout excludes only itself');
+  assert.deepEqual(await dirs(join(f.root, 'cwdlink', 'nested')), [f.checkout], 'a symlinked cwd resolves before the walk');
+  assert.deepEqual(await dirs(join(f.bare, 'objects')), [f.bare], 'bare repository markers');
+  assert.deepEqual(await dirs(f.plain), [], 'a proven non-repository working directory contributes no boundary');
+  assert.deepEqual(await dirs(f.plain, join(f.checkout, 'sub')), [f.checkout], 'native and invoking cwd both participate');
+});
+
+test('a non-repository working directory never forbids commands beneath it', async (t) => {
+  const f = await tree(t);
+  await executable(join(f.plain, 'bin', 'relay-home-guard'));
+  const boundaries = await discoverBoundaries({ cwd: f.plain, invokingCwd: f.plain, deadline: soon() });
+  const resolved = await resolveExecutable('relay-home-guard', { path: join(f.plain, 'bin'), boundaries, deadline: soon() });
+  assert.equal(resolved.candidate, join(f.plain, 'bin', 'relay-home-guard'));
+  assert.equal(resolved.childPath, join(f.plain, 'bin'));
 });
 
 test('discovery refuses malformed markers, unreadable paths and an exhausted deadline instead of assuming outside', async (t) => {

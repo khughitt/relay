@@ -60,8 +60,9 @@ async function isCheckoutRoot(dir, { deadline, clock, io }) {
 }
 
 /**
- * The directories a subscriber command may not be found in: each working directory (native and
- * invoking) and every checkout or bare repository enclosing either one.
+ * The directories a subscriber command may not be found in: every checkout or bare repository
+ * enclosing the native or invoking working directory. A working directory proven to lie in no
+ * repository contributes none; failing to establish that is REPOSITORY_UNREADABLE.
  * @param {{cwd: string, invokingCwd: string, deadline: number, clock?: () => number, io?: typeof fs}} options
  * @returns {Promise<{directories: string[]}>}
  */
@@ -72,7 +73,6 @@ export async function discoverBoundaries({ cwd, invokingCwd, deadline, clock = p
   for (const start of new Set([cwd, invokingCwd])) {
     if (typeof start !== 'string' || !isAbsolute(start)) throw failure(code, 'working directory must be absolute');
     const real = await step(() => io.realpath(start), timing, code).catch((cause) => { throw cause?.code === code ? cause : failure(code, `cannot resolve working directory ${start}`, { cause }); });
-    directories.add(real);
     let current = real;
     for (let depth = 0; ; depth++) {
       if (depth >= MAX_ANCESTORS) throw failure(code, `repository discovery exceeded ${MAX_ANCESTORS} ancestors from ${real}`);

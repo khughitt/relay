@@ -599,8 +599,8 @@ async function repository(t) {
 
 test('subscriber argv stays literal and runs in the event cwd with a trusted PATH', async (t) => {
   const p = await tempPaths(t), file = join(p.stateDir, '..', 'argv.json');
-  const { repo } = await repository(t);
-  const env = { ...process.env, PATH: `${join(repo, 'bin')}:${process.env.PATH}` };
+  const { root, repo } = await repository(t);
+  const env = { PATH: `${join(repo, 'bin')}:${process.env.PATH}`, HOME: root };
   await writeSubscribers(p, [strip(guard('lit', 'argv', { argv: argv('argv', file, 'literal; $(never-run)', '*.md') }))]);
   const r = await hook(p, { body: payload({ cwd: join(repo) }), deps: { env } });
   assert.equal(r.exitCode, 0, r.stdout + r.stderr);
@@ -613,8 +613,8 @@ test('subscriber argv stays literal and runs in the event cwd with a trusted PAT
 
 test('a repository-local command refuses closed and diagnoses paths without argv or payload', async (t) => {
   const p = await tempPaths(t);
-  const { repo } = await repository(t);
-  const env = { ...process.env, PATH: `${join(repo, 'bin')}:${process.env.PATH}` };
+  const { root, repo } = await repository(t);
+  const env = { PATH: `${join(repo, 'bin')}:${process.env.PATH}`, HOME: root };
   await writeSubscribers(p, [{ name: 'local', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['relay-test-guard', 'ARGV_SECRET'], timeoutMs: 1000 }]);
   const r = await hook(p, { body: payload({ cwd: repo }), deps: { env } });
   assert.equal(r.exitCode, 2);
@@ -628,9 +628,9 @@ test('a repository-local command refuses closed and diagnoses paths without argv
 
 test('an installed host link into the event checkout resolves and runs', async (t) => {
   const p = await tempPaths(t);
-  const { repo, hostbin } = await repository(t);
+  const { root, repo, hostbin } = await repository(t);
   await symlink(join(repo, 'bin', 'relay-test-guard'), join(hostbin, 'relay-test-guard'));
-  const env = { ...process.env, PATH: `${hostbin}:${join(repo, 'bin')}:${process.env.PATH}` };
+  const env = { PATH: `${hostbin}:${join(repo, 'bin')}:${process.env.PATH}`, HOME: root };
   await writeSubscribers(p, [{ name: 'installed', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['relay-test-guard'], timeoutMs: 2000 }]);
   const r = await hook(p, { body: payload({ cwd: repo }), deps: { env } });
   assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 });
