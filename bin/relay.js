@@ -162,7 +162,10 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
       return 0;
     }
     if (cmd.path[0] === 'reap') {
-      const { result, diagnostics } = await reap(parse(rest, { harness: false }));
+      let reaped;
+      try { reaped = await reap(parse(rest, { harness: false })); }
+      catch (error) { await emit(stderr, (/** @type {any} */ (error)?.recovery ?? []).map((/** @type {string} */ l) => `${l}\n`).join('')); throw error; }
+      const { result, diagnostics } = reaped;
       if (!silent) {
         if (mode === 'json') await emit(stdout, `${JSON.stringify({ reaped: result.reaped.length })}\n`);
         else await emit(stdout, `Reaped ${result.reaped.length} agent(s).\n`);

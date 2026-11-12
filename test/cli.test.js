@@ -81,9 +81,10 @@ test('an installed entry keeps its guard when the hook environment loses the con
 test('survival limitation: the internal deadline refuses; an outer kill, missing node or startup error cannot',async t=>{
   const base=await tempState(t),p=layout(base),marker=processMarker();
   t.after(()=>reapMarked(marker));
-  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code'],argv:['node',fixture,'hang',marker],timeoutMs:300}]);
-  const started=performance.now(),r=hookRun(p,['--harness','claude-code','--outer-ms','1500','PreToolUse'],body);
-  assert.equal(r.status,2);assert.match(r.stdout,/relay refused: GUARD_FAILED: guard g timeout/);assert.ok(performance.now()-started<1500,'refused inside the outer timeout');
+  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code'],argv:['node',fixture,'hang',marker],timeoutMs:80}]);
+  // 5000 ms is about the smallest outer budget that admits one subscriber with its supervisor, discovery and cleanup reserves.
+  const started=performance.now(),r=hookRun(p,['--harness','claude-code','--outer-ms','5000','PreToolUse'],body);
+  assert.equal(r.status,2);assert.match(r.stdout,/relay refused: GUARD_FAILED: guard g timeout/);assert.ok(performance.now()-started<5000,'refused inside the outer timeout');
   await noneMarked(marker); // relay's own deadline kills the guard
   // The harness's own timeout discards everything relay would have said: no refusal exists.
   const killed=hookRun(p,['--harness','claude-code','PreToolUse'],body,{timeout:200,killSignal:'SIGKILL'});

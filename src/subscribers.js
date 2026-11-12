@@ -2,6 +2,9 @@
 import * as fs from 'node:fs/promises';
 import { dirname, isAbsolute } from 'node:path';
 import { relayError } from './protocol.js';
+import { CLEANUP_MS } from './child.js';
+import { STARTUP_MS as SUPERVISOR_STARTUP_MS } from './child-supervisor.js';
+import { DISCOVERY_MS } from './executable.js';
 import { adapterFor, hookEventOf } from './adapters/index.js';
 import { HOOK_KINDS, TOOL_KINDS, privateFieldsFor } from './adapters/hook-event.js';
 import { checkPrivate } from './bus/store.js';
@@ -171,7 +174,10 @@ export function budgetFor({ harness = null, nativeEvent = null, outerMs } = {}) 
 /** @param {import("./types.js").Subscribers} config @param {import("./types.js").Budget} budget @param {{harness?: string|null, kind: string, nativeEvent?: string|null}} event */
 export function checkBudget(config, budget, { harness = null, kind, nativeEvent = null }) {
   const matching = config.subscribers.filter((subscriber) => (/** @type {string[]} */ (subscriber.kinds)).includes(kind) && admits(subscriber, harness) && selects(subscriber, nativeEvent));
-  const need = matching.reduce((sum, subscriber) => sum + subscriber.timeoutMs, 0), fit = Math.max(0, budget.subscribersMs);
+  // Worst case for a dispatch that admits anything: one supervisor startup, one repository
+  // discovery, and each subscriber's timeout plus its cleanup reserve. Nothing admitted costs nothing.
+  const need = matching.length === 0 ? 0 : SUPERVISOR_STARTUP_MS + DISCOVERY_MS + matching.reduce((sum, subscriber) => sum + subscriber.timeoutMs + CLEANUP_MS, 0);
+  const fit = Math.max(0, budget.subscribersMs);
   if (need > fit) fail(`subscribers for ${harness ?? 'reconcile'} ${kind} need ${need} ms but ${fit} ms fit inside ${budget.outerMs} ms`);
   return matching;
 }

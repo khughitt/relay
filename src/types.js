@@ -38,7 +38,7 @@
  * @typedef {{schema: 2, type: 'event', subscriber: string, event: HookEvent, registry: RegistryAccess}} SubscriberEnvelope
  * @typedef {{schema: 2, type: 'reconcile', subscriber: string, registry: RegistryAccess, reaped: string[]}} ReconcileEnvelope
  * @typedef {{outerMs: number, totalMs: number, inputMs: number, registryMs: number, reserveMs: number, marginMs: number, subscribersMs: number}} Budget
- * @typedef {{status: string, exitCode: number|null, signal: string|null, stdout: string, stderr: string, error?: unknown}} ChildResult
+ * @typedef {{status: string, exitCode: number|null, signal: string|null, stdout: string, stderr: string, error?: unknown, cleanup?: 'complete'|'failed', timings?: {runMs: number, cleanupMs: number}}} ChildResult
  * @typedef {{kind: 'user', agentId?: never}|{kind: 'agent', agentId: string}} Party
  * @typedef {{project: string|null, taskId: string|null, cwd: string|null}} Context
  * @typedef {{id: string, label: string, description: string|null}} Option

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "note": "Frozen by plan revision 3 (records 88832d1d, Frozen measurement workload and acceptance). Bounds are Binding; a change needs a reviewed amendment.",
+  "pilot": {
+    "harness": "claude-code",
+    "event": "PreToolUse",
+    "outerMs": 20000,
+    "timeoutMs": 1000,
+    "payloadBytes": 1024,
+    "subscribers": ["ops-guard", "turn-pause", "familiar"],
+    "supervisorAlone": { "samples": 50, "bounds": { "combinedP99Ms": 150, "combinedMaxMs": 250 } },
+    "migrated": { "warmups": 20, "samples": 200, "bounds": { "p95DeltaMs": 100, "p99DeltaMs": 150, "maxDeltaMs": 250, "absoluteMaxMs": 1000 } },
+    "noSubscriber": { "warmups": 20, "samples": 200 },
+    "invocationWallMs": 300000
+  }
+}

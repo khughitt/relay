@@ -150,12 +150,12 @@ test('a rejected guard invocation does not outrank a later denial', async (t) =>
 test('an expired deadline refuses before running the remaining guards', async (t) => {
   const p = await tempPaths(t), never = join(p.stateDir, '..', 'never');
   await writeSubscribers(p, [strip(guard('slow', 'slow', { argv: argv('slow', '400'), timeoutMs: 150 })), strip(guard('never', 'record', { file: never, timeoutMs: 100 }))]);
-  const late = await hook(p, { outerMs: 1000, deps: { clock: (() => { let n = 0; return () => (n += 400); })() } });
+  const late = await hook(p, { outerMs: 20000, deps: { clock: (() => { let n = 0; return () => (n += 4000); })() } });
   assert.equal(late.exitCode, 2); assert.match(late.stdout, /relay refused: (DEADLINE_EXCEEDED|INPUT_TIMEOUT)/);
   assert.ok(await absent(never), 'no guard started after the deadline');
-  // never must outlast a real Node startup under load; outerMs 10000 gives subscribersMs 2667 >= 150 + 2000.
+  // never must outlast a real Node startup under load; outerMs 20000 gives subscribersMs 6334 >= 250 + 500 + (150 + 500) + (2000 + 500).
   await writeSubscribers(p, [strip(guard('slow', 'slow', { argv: argv('slow', '400'), timeoutMs: 150 })), strip(guard('never', 'record', { file: never, timeoutMs: 2000 }))]);
-  const r = await hook(p, { outerMs: 10000 });
+  const r = await hook(p, { outerMs: 20000 });
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /GUARD_FAILED: guard slow timeout/);
   assert.equal(await absent(never), false);
 });
@@ -176,19 +176,20 @@ test('guard results survive missing storage, broken enrichment and lock exhausti
   await writeSubscribers(p, [strip(guard('g', 'allow'))]);
   const broken = { ...p, stateDir: p.subscribersPath, agentsPath: join(p.subscribersPath, 'agents.json'), lockPath: join(p.subscribersPath, 'agents.lock') };
   let r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'PreToolUse', input: Readable.from([payload()]) }, { paths: broken, applyOptions: local });
-  assert.equal(r.exitCode, 1); assert.equal(r.stdout, ''); assert.match(r.stderr, /^registry: IO_ERROR/);
+  assert.equal(r.exitCode, 1); assert.equal(r.stdout, ''); assert.match(r.stderr, /^registry: IO_ERROR/m);
   r = await hook(p, { deps: { apply: async () => { throw relayError('GIT_ERROR', 'git exploded'); } } });
   assert.equal(r.exitCode, 1); assert.match(r.stderr, /registry: GIT_ERROR/);
   await writeSubscribers(p, [strip(guard('g', 'deny'))]);
   r = await hook(p, { deps: { apply: async () => assert.fail('a denial never reaches the registry') } });
   assert.equal(r.exitCode, 2);
-  await writeSubscribers(p, [strip(guard('g', 'allow', { timeoutMs: 300 }))]);
+  await writeSubscribers(p, [strip(guard('g', 'allow', { timeoutMs: 50 }))]);
   let release; const held = new Promise((resolve) => { release = resolve; });
   const holder = withLock(p.lockPath, async () => { await held; }, { deadline: performance.now() + 20000 });
   await new Promise((resolve) => setTimeout(resolve, 100));
   let pending;
   // Exercise lock exhaustion without spending the guard budget on subprocess startup.
-  r = await hook(p, { outerMs: 1500, deps: {
+  // 5000 ms is about the smallest outer budget admitting one subscriber; its registry share is 1666 ms.
+  r = await hook(p, { outerMs: 5000, deps: {
     run: async () => ({ status: 'exited', exitCode: 0, signal: null, stdout: '{"decision":"allow"}', stderr: '' }),
     apply: (...args) => (pending = applyEvent(...args)),
   } });
@@ -281,7 +282,7 @@ test('configuration errors refuse on guard-capable events and report on the rest
   r = await hook(p, { nativeEvent: 'Notification:idle_prompt', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.equal(r.exitCode, 1); assert.equal(r.stdout, ''); assert.match(r.stderr, /^INVALID_CONFIG: /);
   await writeSubscribers(p, [strip(guard('g', 'allow', { timeoutMs: 5000 }))]);
-  r = await hook(p, { outerMs: 1000 }); assert.match(r.stdout, /relay refused: INVALID_CONFIG: subscribers for claude-code before-tool need 5000 ms/);
+  r = await hook(p, { outerMs: 1000 }); assert.match(r.stdout, /relay refused: INVALID_CONFIG: subscribers for claude-code before-tool need 6250 ms/);
   r = await hook(p, { body: '{"session_id":"sess"}' }); assert.match(r.stdout, /relay refused: INVALID_INPUT/);
   r = await hook(p, { body: 'x'.repeat(5 * 1024 * 1024) }); assert.match(r.stdout, /relay refused: INPUT_TOO_LARGE/);
   r = await hook(p, { harness: 'codex', nativeEvent: 'Interrupt', body: '{}' }); assert.deepEqual(r, { stdout: '', stderr: 'UNSUPPORTED_EVENT: unsupported harness event\n', exitCode: 1 });
@@ -323,8 +324,8 @@ test('a slow observer never delays a denial and observers run only within their 
   assert.equal(r.exitCode, 2); assert.ok(performance.now() - started < 2000, 'the denial returned before the observer could run');
   const marker = processMarker(); t.after(() => reapMarked(marker));
   await writeSubscribers(p, [strip(observer('hang', 'hang', { argv: argv('hang', marker), timeoutMs: 150 })), strip(observer('quick', 'slow', { argv: argv('slow', '10'), timeoutMs: 150 })), strip(observer('after', 'record', { file, timeoutMs: 2000 }))]);
-  // after's budget must outlast a real Node startup under load; subscribersMs 2667 = 150 + 150 + 2000 + 367 scheduling slack
-  started = performance.now(); r = await hook(p, { outerMs: 10000 });
+  // after's budget must outlast a real Node startup under load; subscribersMs 6334 covers 250 + 500 + (150 + 500) * 2 + (2000 + 500)
+  started = performance.now(); r = await hook(p, { outerMs: 20000 });
   const elapsed = performance.now() - started;
   assert.equal(r.exitCode, 0); assert.match(r.stderr, /SUBSCRIBER_FAILED: hang timeout/);
   // Each observer is held to its own budget (150 + 150 + 2000), so the run ends well inside outerMs;
@@ -336,7 +337,7 @@ test('a slow observer never delays a denial and observers run only within their 
   await writeSubscribers(p, [strip(observer('never', 'record', { file: join(p.stateDir, '..', 'never'), timeoutMs: 100 }))]);
   let now = 0;
   const published = { snapshot: { schema: 2, generation: '00000000-0000-4000-8000-000000000000', revision: 1, agents: {} }, changed: true, reaped: [], diagnostics: [] };
-  r = await hook(p, { outerMs: 1500, deps: { clock: () => now, apply: async () => { now = 1300; return published; } } });
+  r = await hook(p, { outerMs: 8000, deps: { clock: () => now, apply: async () => { now = 3000; return published; } } });
   assert.match(r.stderr, /registry: DEADLINE_EXCEEDED: registry publication did not finish before the deadline/);
   assert.match(r.stderr, /SUBSCRIBER_SKIPPED: never skipped after registry failure/);
   assert.ok(await absent(join(p.stateDir, '..', 'never')));
@@ -350,15 +351,16 @@ test('observers are skipped, not run, after a registry failure', async (t) => {
   assert.ok(await absent(join(p.stateDir, '..', 'never')));
 });
 
-test('Codex SessionEnd fits its one-second default and OpenCode events observe only', async (t) => {
-  const p = await tempPaths(t), file = join(p.stateDir, '..', 'end.json');
-  await writeSubscribers(p, [strip(observer('end', 'record', { kinds: ['session-end'], file, timeoutMs: 250 }))]);
+test('Codex SessionEnd publishes inside its one-second default but admits no subscriber; OpenCode events observe only', async (t) => {
+  const p = await tempPaths(t);
+  await writeSubscribers(p, []);
   await applyEvent(normalizeEvent('codex', 'SessionStart', JSON.stringify({ session_id: 'sess', cwd: CWD })), { paths: p, ...local });
   const started = performance.now(), r = await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 }); assert.ok(performance.now() - started < 1000);
-  assert.equal(JSON.parse(await readFile(file, 'utf8')).registry.status, 'ready');
-  await writeSubscribers(p, [strip(observer('end', 'allow', { kinds: ['session-end'], timeoutMs: 300 }))]);
-  assert.match((await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) })).stderr, /^INVALID_CONFIG: subscribers for codex session-end need 300 ms but 267 ms fit inside 1000 ms/);
+  assert.equal((await readSnapshot({ paths: p })).agents['codex:sess'], undefined);
+  // Supervisor startup, discovery and cleanup reserves exceed what Codex's 3 s SessionEnd cap leaves.
+  await writeSubscribers(p, [strip(observer('end', 'allow', { kinds: ['session-end'], timeoutMs: 1 }))]);
+  assert.match((await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', outerMs: 3000, body: JSON.stringify({ session_id: 'sess', cwd: CWD }) })).stderr, /^INVALID_CONFIG: subscribers for codex session-end need 1251 ms but 800 ms fit inside 3000 ms/);
   const oc = await hook(p, { harness: 'opencode', nativeEvent: 'session.busy', body: JSON.stringify({ session_id: 'opencode:42', cwd: CWD }) });
   assert.deepEqual(oc, { stdout: '', stderr: '', exitCode: 0 });
   assert.equal((await readSnapshot({ paths: p })).agents['opencode:opencode:42'].state, 'working');
@@ -392,7 +394,7 @@ test('reconcile prunes, then notifies reconcile observers even when nothing chan
   assert.equal(result.snapshot, null); assert.deepEqual(diagnostics, []);
   assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), { schema: 2, type: 'reconcile', subscriber: 'r', registry: { status: 'unavailable', code: 'NO_SNAPSHOT' }, reaped: [] });
   await hook(p);
-  ({ result } = await reconcile({ outerMs: 2000 }, { paths: p }));
+  ({ result } = await reconcile({ outerMs: 8000 }, { paths: p }));
   assert.equal(result.changed, false);
   assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).registry, { status: 'ready', generation: result.snapshot.generation, revision: 1 });
   assert.ok(await absent(join(p.stateDir, '..', 'never')));
@@ -410,7 +412,7 @@ test('reconcile rejects a reap that fulfills after its deadline without notifyin
   const p = await tempPaths(t), file = join(p.stateDir, '..', 'late-reap.json');
   await writeSubscribers(p, [strip(observer('late', 'record', { kinds: [RECONCILE], file, timeoutMs: 100 }))]);
   let now = 0;
-  await assert.rejects(reconcile({ outerMs: 1500 }, { paths: p, clock: () => now, reap: async () => { now = 550; return published; } }), { code: 'DEADLINE_EXCEEDED' });
+  await assert.rejects(reconcile({ outerMs: 8000 }, { paths: p, clock: () => now, reap: async () => { now = 3000; return published; } }), { code: 'DEADLINE_EXCEEDED' });
   assert.ok(await absent(file));
 });
 
@@ -491,10 +493,10 @@ test('agy failures exit 0 with diagnostics', async (t) => {
   await writeSubscribers(p, [strip(guard('g', 'allow', { harnesses: ['agy'] }))]);
   const broken = { ...p, stateDir: p.subscribersPath, agentsPath: join(p.subscribersPath, 'agents.json'), lockPath: join(p.subscribersPath, 'agents.lock') };
   r = await dispatchHook({ harness: 'agy', nativeEvent: 'PreToolUse', input: Readable.from([body]) }, { paths: broken, applyOptions: local });
-  assert.equal(r.exitCode, 0); assert.equal(r.stdout, ''); assert.match(r.stderr, /^registry: IO_ERROR/);
+  assert.equal(r.exitCode, 0); assert.equal(r.stdout, ''); assert.match(r.stderr, /^registry: IO_ERROR/m);
   await writeSubscribers(p, [strip(guard('g', 'allow'))]);
   r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'PreToolUse', input: Readable.from([payload()]) }, { paths: broken, applyOptions: local });
-  assert.equal(r.exitCode, 1); assert.match(r.stderr, /^registry: IO_ERROR/);
+  assert.equal(r.exitCode, 1); assert.match(r.stderr, /^registry: IO_ERROR/m);
   r = await hook(p, { nativeEvent: 'SessionStart', body: '{}' });
   assert.equal(r.exitCode, 1); assert.match(r.stderr, /INVALID_INPUT/);
 });

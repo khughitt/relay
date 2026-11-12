@@ -4,7 +4,8 @@ import { mkdtemp, mkdir, writeFile, symlink, chmod, realpath, rm, readFile, acce
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { discoverBoundaries, resolveExecutable } from '../src/executable.js';
-import { runChild } from '../src/child.js';
+import { runGroupLeader } from '../src/child.js';
+const runChild = (argv, input, options) => runGroupLeader(argv, input, options).done;
 
 const script = (body) => `#!/bin/sh\n${body}\n`;
 async function executable(path, body = 'exit 0') { await mkdir(dirname(path), { recursive: true }); await writeFile(path, script(body), { mode: 0o755 }); }
@@ -133,7 +134,7 @@ test('the child PATH keeps only canonical outside directories, so an env shebang
   assert.equal((await readFile(safe, 'utf8')).trim(), 'safe');
 });
 
-test('runChild runs in the given cwd with exactly the given environment', async (t) => {
+test('a subscriber runs in the given cwd with exactly the given environment', async (t) => {
   const f = await tree(t);
   const out = join(f.root, 'env-out');
   await executable(join(f.root, 'probe', 'probe'), `pwd > ${out}; echo "$RELAY_ONLY:$HOME:\${LEAK-unset}" >> ${out}`);

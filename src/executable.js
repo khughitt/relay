@@ -9,6 +9,8 @@ import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { relayError } from './protocol.js';
 
 const MAX_ANCESTORS = 128, GITDIR_MAX_BYTES = 8192;
+// The per-dispatch reservation for repository discovery before the first subscriber.
+export const DISCOVERY_MS = 500;
 const ABSENT = new Set(['ENOENT', 'ENOTDIR']);
 
 /** @param {string} code @param {string} message @param {{candidate?: string, realPath?: string|null, cause?: unknown}} [details] */

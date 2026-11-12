@@ -115,26 +115,36 @@ test('the documented example configuration fits every mapped harness/event and r
   const example = validateSubscribers({ schema: 2, subscribers: [
     { name: 'ops-guard', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], tools: ['Bash'], argv: ['relay-guard'], timeoutMs: 4000 },
     { name: 'familiar', role: 'observer', harnesses: ['claude-code', 'codex'], registry: 'snapshot', kinds: ['session-start', 'prompt', 'before-tool', 'idle', 'needs-input', 'needs-approval', 'turn-end', 'turn-error', 'child-start', 'child-stop', RECONCILE], argv: familiar, timeoutMs: 2000 },
-    { name: 'familiar-opencode', role: 'observer', registry: 'snapshot', harnesses: ['opencode'], kinds: ['session-start', 'activity', 'idle', 'needs-approval', 'turn-error', 'session-end'], argv: familiar, timeoutMs: 1000 },
+    { name: 'familiar-opencode', role: 'observer', registry: 'snapshot', harnesses: ['opencode'], kinds: ['session-start', 'activity', 'idle', 'needs-approval', 'turn-error', 'session-end'], argv: familiar, timeoutMs: 80 },
     { name: 'familiar-teardown', role: 'observer', registry: 'snapshot', harnesses: ['claude-code', 'codex'], kinds: ['session-end'], argv: familiar, timeoutMs: 200 } ] });
+  // OpenCode's fixed 5 s lifetime admits at most 84 ms of subscriber timeout once startup, discovery and cleanup are reserved.
+  const opencode = (timeoutMs) => validateSubscribers({ schema: 2, subscribers: [{ name: 'o', role: 'observer', registry: 'snapshot', harnesses: ['opencode'], kinds: ['session-start'], argv: ['familiar'], timeoutMs }] });
+  assert.equal(checkBudget(opencode(84), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }).length, 1);
+  assert.throws(() => checkBudget(opencode(85), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }), { code: 'INVALID_CONFIG' });
+  // SessionEnd's native caps leave less than one subscriber's startup, discovery and cleanup reserves.
+  for (const [harness, outerMs] of [['claude-code', 1500], ['codex', 3000]]) {
+    assert.throws(() => checkBudget(example, budgetFor({ harness, nativeEvent: 'SessionEnd', outerMs }), { harness, kind: 'session-end', nativeEvent: 'SessionEnd' }), { code: 'INVALID_CONFIG' });
+  }
+  assert.deepEqual(checkBudget(example, budgetFor({ harness: 'claude-code', nativeEvent: 'SessionEnd', outerMs: 60000 }), { harness: 'claude-code', kind: 'session-end', nativeEvent: 'SessionEnd' }).map((s) => s.name), ['familiar-teardown']);
   for (const harness of ['claude-code', 'codex', 'opencode']) {
-    for (const nativeEvent of Object.keys(adapterFor(harness).events)) {
+    for (const nativeEvent of Object.keys(adapterFor(harness).events).filter((name) => name !== 'SessionEnd')) {
       const { kind } = adapterFor(harness).hookEvents[nativeEvent];
       const matched = checkBudget(example, budgetFor({ harness, nativeEvent }), { harness, kind, nativeEvent });
       assert.ok(matched.length > 0, `${harness} ${nativeEvent} has an observer`);
     }
   }
-  checkBudget(example, budgetFor({ harness: 'codex', nativeEvent: 'SessionEnd', outerMs: 3000 }), { harness: 'codex', kind: 'session-end' });
   assert.deepEqual(checkBudget(example, budgetFor({ outerMs: 30000 }), { kind: RECONCILE }).map((s) => s.name), ['familiar']);
 });
 
 test('checkBudget sums the worst match ignoring tool filters', () => {
   const config = validateSubscribers({ schema: 2, subscribers: [guard({ timeoutMs: 200 }), guard({ name: 'edit', tools: ['Edit'], timeoutMs: 150 }), observer({ timeoutMs: 100 })] });
-  const budget = budgetFor({ harness: 'codex', nativeEvent: 'SessionEnd', outerMs: 3000 });
+  // need: 250 startup + 500 discovery + (200 + 500) + (150 + 500) + (100 + 500) = 2700 ms
+  const budget = budgetFor({ outerMs: 20000 });
   assert.deepEqual(checkBudget(config, budget, { harness: 'codex', kind: 'before-tool' }).map((s) => s.name), ['guard', 'edit', 'observer']);
   assert.throws(() => checkBudget(config, budgetFor({ harness: 'codex', nativeEvent: 'SessionEnd' }), { harness: 'codex', kind: 'before-tool' }), { code: 'INVALID_CONFIG' });
   assert.deepEqual(checkBudget(config, budgetFor({ harness: 'codex', nativeEvent: 'SessionEnd' }), { harness: 'codex', kind: 'session-end' }), []);
-  assert.deepEqual(checkBudget(config, budgetFor({ outerMs: 1000 }), { kind: RECONCILE }).map((s) => s.name), ['observer']);
+  assert.deepEqual(checkBudget(config, budgetFor({ outerMs: 8000 }), { kind: RECONCILE }).map((s) => s.name), ['observer']);
+  assert.deepEqual(checkBudget(config, budgetFor({ outerMs: 500 }), { kind: 'session-end' }), [], 'nothing admitted reserves nothing');
   assert.throws(() => checkBudget(config, budgetFor({ outerMs: 500 }), { kind: RECONCILE }), { code: 'INVALID_CONFIG' });
 });
 test('Codex Stop and SubagentStop guards bind separately through hook kinds', () => {

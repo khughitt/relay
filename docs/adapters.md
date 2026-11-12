@@ -355,6 +355,8 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 | `total` (relay deadline) | `H - margin` | 900 | 1350 | 27000 | 55000 |
 | `subscribers` (sum of matching timeouts) | `total - input - registry - reserve` | 267 | 400 | 11000 | 37000 |
 
+A dispatch admitting any subscriber needs `250` (supervisor startup) `+ 500` (repository discovery) `+ Σ (timeoutMs + 500)` (each subscriber's cleanup reserve) to fit `subscribers`, ignoring tool filters; a dispatch admitting none reserves nothing. At run time an observer starts only with its timeout and cleanup reserve still left, plus startup if it would be the first subscriber; otherwise it is `SUBSCRIBER_SKIPPED`, never deferred. Consequences at native caps: Claude Code `SessionEnd` at its 1.5 s default, Codex `SessionEnd` at any allowed `--outer-ms` (3 s maximum) and OpenCode at its fixed 5 s lifetime above 84 ms of subscriber timeout admit no subscriber; their registry-only bindings still publish.
+
 ### Guard protocol
 
 Each matching guard receives a `SubscriberEnvelope` on stdin with `registry: {"status":"not-requested"}` (guards run before publication) and every applicable private field, and writes one JSON object `{"decision":"allow"|"deny","reason"?,"context"?}` on stdout with exit code `0`. `deny` requires `reason`. Present `reason` and `context` strings and combined `allow` context across guards are each capped at `CONTEXT_LIMIT` (`10000` characters); oversize output is `INVALID_REPLY` (a refusal on refusal-capable events). All matching guards run in configuration order even after a denial; the first denial's `reason` wins and drops any `context`. Any guard error or timeout produces a refusal with reason `relay refused: <CODE>: <message>`.
@@ -383,4 +385,4 @@ For `agy` (`Adapter.failureExitCode: 0`), every failure that would exit `1` exit
 
 `BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries` is a stderr diagnostic, never a thrown error: the event still publishes and observers still run.
 
-**Child termination:** At `min(timeoutMs, remaining)`, relay sends `SIGKILL`, destroys pipes, and waits at most 200 ms for `close`. A missing Node executable, a crash before encoding, or the harness's outer timeout leaves the action to the harness's own policy. For hook installation and rollback procedures, see `docs/runbooks/hook-install-rollback.md` in the repository.
+**Child termination:** At `min(timeoutMs, remaining)`, or on output overflow, the supervisor sends `SIGTERM` to the subscriber's process group, `SIGKILL` 100 ms later, and waits for the whole group within the 500 ms cleanup reserve ([api.md](api.md#subscriber-containment)). A missing Node executable, a crash before encoding, or the harness's outer timeout leaves the action to the harness's own policy. For hook installation and rollback procedures, see `docs/runbooks/hook-install-rollback.md` in the repository.
