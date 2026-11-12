@@ -2,8 +2,7 @@
 import * as fs from 'node:fs/promises';
 import { dirname, isAbsolute } from 'node:path';
 import { relayError } from './protocol.js';
-import { CLEANUP_MS } from './child.js';
-import { STARTUP_MS as SUPERVISOR_STARTUP_MS } from './child-supervisor.js';
+import { CLEANUP_MS, SUPERVISOR_STARTUP_MS } from './child.js';
 import { DISCOVERY_MS } from './executable.js';
 import { adapterFor, hookEventOf } from './adapters/index.js';
 import { HOOK_KINDS, TOOL_KINDS, privateFieldsFor } from './adapters/hook-event.js';

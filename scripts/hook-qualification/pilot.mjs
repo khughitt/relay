@@ -91,6 +91,10 @@ function prepare(out) {
     { name: 'ops-guard', role: 'guard', harnesses: ['claude-code'], kinds: ['before-tool'], tools: ['Bash'], argv: ['relay-fixture-guard'], timeoutMs },
     { name: 'turn-pause', role: 'guard', harnesses: ['claude-code'], kinds: ['before-tool'], argv: ['relay-fixture-guard'], timeoutMs },
     { name: 'familiar', role: 'observer', registry: 'snapshot', harnesses: ['claude-code'], kinds: ['before-tool'], argv: ['relay-fixture-observer'], timeoutMs } ] });
+  // PostToolUse is not relayed today: the native-only diagnostic's candidate migrates the test counter as an occurrence observer.
+  write('candidate-posttool.json', { schema: 2, subscribers: [
+    { name: 'test-counter', role: 'observer', registry: 'occurrence', harnesses: ['claude-code'], kinds: ['after-tool'], tools: ['Bash'],
+      privateFields: [{ nativeEvent: 'PostToolUse', fields: ['command', 'durationMs'] }], argv: ['relay-fixture-observer'], timeoutMs } ] });
   write('deployed-empty.json', { schema: 1, subscribers: [] });
   write('candidate-empty.json', { schema: 2, subscribers: [] });
   const digests = Object.fromEntries([...readdirSync(bin).map((n) => [`bin/${n}`, sha(join(bin, n))]), ...readdirSync(config).map((n) => [`config/${n}`, sha(join(config, n))])]);
@@ -106,7 +110,7 @@ function parse(argv) {
   const options = {};
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i];
-    if (key === '--smoke' || key === '--prepare') options[key.slice(2)] = true;
+    if (key === '--smoke' || key === '--prepare' || key === '--post-tool') options[key.slice(2)] = true;
     else if (['--candidate', '--baseline-manifest', '--output'].includes(key) && i + 1 < argv.length) options[key.slice(2)] = argv[++i];
     else throw new Error(`unknown or incomplete option ${key}`);
   }
@@ -183,6 +187,22 @@ async function measure(options) {
     if (i < nWarm) continue;
     for (const [name, r] of /** @type {[('deployed'|'candidate'|'native'), any][]} */ (rows)) { noSubscriber[name].push(r.elapsedMs); if (!r.ok) noSubscriber.failures.push({ name, ...r }); }
   }
+  // Case 4 (optional, diagnostic): a newly transported route against its native-only baseline.
+  const postTool = { baseline: /** @type {any[]} */ ([]), candidate: /** @type {any[]} */ ([]) };
+  if (options['post-tool']) {
+    const postPayload = (() => { const base = { session_id: `pilot-${runtime}`, cwd, hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'toolu_pilot', tool_input: { command: '' }, tool_response: { stdout: 'ok', stderr: '' }, duration_ms: 4200 };
+      const pad = PAYLOAD_BYTES - Buffer.byteLength(JSON.stringify(base)); return JSON.stringify({ ...base, tool_input: { command: tool.slice(0, Math.max(0, pad)) } }); })();
+    const postState = stateFor('posttool');
+    const nativeOnly = single('claude-posttooluse', join(bin, 'relay-fixture-native'));
+    const relayed = single('candidate-relay', `'${node}' '${join(candidate, 'bin/relay.js')}' hook --harness claude-code --outer-ms ${w.outerMs} --subscribers '${join(config, 'candidate-posttool.json')}' PostToolUse`);
+    const sample = async (/** @type {any} */ m) => { const e = env(postState), r = await runBaseline({ ...m, event: 'PostToolUse' }, { event: 'PostToolUse', input: postPayload, env: e, cwd });
+      return { elapsedMs: r.elapsedMs, ok: r.statuses.every((x) => x === 'exited 0') && r.survivors.length === 0, statuses: r.statuses, supervisors: parents(e.RELAY_PILOT_PPID_FILE) }; };
+    for (let i = 0; i < warm + measured; i++) {
+      const b = await sample(nativeOnly), c = await sample(relayed);
+      if (i >= warm) { postTool.baseline.push(b); postTool.candidate.push(c); }
+    }
+    loadLog.postTool = load();
+  }
   // A supervisor writes its ownership record on start, creating the children directory.
   noSubscriber.candidateSupervisorStarts = existsSync(join(emptyCandidateState, 'children')) ? 1 : 0;
   loadLog.end = load();
@@ -192,7 +212,7 @@ async function measure(options) {
     candidate: { path: candidate, commit: git(['rev-parse', 'HEAD']), dirty: git(['status', '--porcelain']).length > 0, entry: join(candidate, 'bin/relay.js'), configSha256: digests['config/candidate.json'] },
     baseline: { manifest: resolve(String(options['baseline-manifest'])), manifestSha256: sha(String(options['baseline-manifest'])), deployedEntry },
     fixtureDigests: digests, payloadBytes: Buffer.byteLength(payload),
-    supervisorAlone: { samples: alone }, migrated, noSubscriber,
+    supervisorAlone: { samples: alone }, migrated, noSubscriber, ...(options['post-tool'] ? { postTool } : {}),
   };
   const verdict = smoke ? null : judgePilot(results, workload);
   writeFileSync(join(out, `results-${tag}.json`), `${JSON.stringify({ ...results, verdict }, null, 2)}\n`);
@@ -203,6 +223,8 @@ async function measure(options) {
     show('supervisor-alone startup', alone.map((s) => s.startupMs)), show('supervisor-alone cleanup', alone.map((s) => s.cleanupMs)), show('supervisor-alone combined', alone.map((s) => s.combinedMs)),
     show('migrated baseline', migrated.baseline.map((s) => s.elapsedMs)), show('migrated candidate', migrated.candidate.map((s) => s.elapsedMs)),
     show('no-subscriber deployed', noSubscriber.deployed), show('no-subscriber candidate', noSubscriber.candidate), show('no-subscriber native', noSubscriber.native),
+    ...(options['post-tool'] ? [show('posttool native-only baseline', postTool.baseline.map((x) => x.elapsedMs)), show('posttool relayed candidate', postTool.candidate.map((x) => x.elapsedMs)),
+      `posttool diagnostic (not gated in Task 3): failed ${[...postTool.baseline, ...postTool.candidate].filter((x) => !x.ok).length}; deltas ${postTool.candidate.length ? ['p95', 'p99', 'max'].map((q) => `${q} ${(/** @type {any} */ (statistics(postTool.candidate.map((x) => x.elapsedMs)))[q] - /** @type {any} */ (statistics(postTool.baseline.map((x) => x.elapsedMs)))[q]).toFixed(1)}`).join(' ') : 'none'} (warm bounds +100/+150/+250)`] : []),
     `failed calls: migrated ${[...migrated.baseline, ...migrated.candidate].filter((s) => !s.ok).length}, no-subscriber ${noSubscriber.failures.length}; candidate supervisors per dispatch ${[...new Set(migrated.candidate.map((s) => s.supervisors))].join(',')}; empty-candidate supervisor starts ${noSubscriber.candidateSupervisorStarts}`,
     verdict ? `verdict: ${verdict.passed ? 'PASS' : 'FAIL'}${verdict.failures.length ? ` — ${verdict.failures.join('; ')}` : ''}` : 'smoke: no verdict',
   ].join('\n');

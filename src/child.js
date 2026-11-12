@@ -9,6 +9,8 @@ import { containGroup, groupExists } from './bus/process-group.js';
 
 export const OUTPUT_LIMIT = 64 * 1024;
 export const CLEANUP_MS = 500;
+// The per-dispatch reservation for starting the supervisor (src/child-supervisor.js).
+export const SUPERVISOR_STARTUP_MS = 250;
 export const TERM_GRACE_MS = 100;
 
 /**

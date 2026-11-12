@@ -97,13 +97,13 @@ test('retained subscriber work must be accounted exactly once on both sides', ()
 
 test('a parallel baseline is timed on its critical path, never as a sum of branches', async () => {
   const m = manifest({ branches: [
-    { name: 'deployed-relay', role: 'deployed-relay', argv: ['/bin/sh', '-c', 'cat >/dev/null; sleep 0.15'] },
-    { name: 'turn-pause', role: 'native', argv: ['/bin/sh', '-c', 'cat >/dev/null; sleep 0.10'] }] });
+    { name: 'deployed-relay', role: 'deployed-relay', argv: ['/bin/sh', '-c', 'cat >/dev/null; sleep 0.3'] },
+    { name: 'turn-pause', role: 'native', argv: ['/bin/sh', '-c', 'cat >/dev/null; sleep 0.2'] }] });
   const env = { PATH: '/usr/bin:/bin' };
   const parallel = await runBaseline(m, { event: 'PreToolUse', input: '{}', env, cwd: '/' });
-  assert.ok(parallel.elapsedMs >= 150 && parallel.elapsedMs < 240, `critical path ${parallel.elapsedMs} ms`);
+  assert.ok(parallel.elapsedMs >= 300 && parallel.elapsedMs < 450, `critical path ${parallel.elapsedMs} ms (the branch sum is 500 ms)`);
   assert.deepEqual(parallel.statuses, ['exited 0', 'exited 0']);
   const serial = await runBaseline({ ...m, schedule: { kind: 'serial', evidence: 'test' } }, { event: 'PreToolUse', input: '{}', env, cwd: '/' });
-  assert.ok(serial.elapsedMs >= 250, `serial ${serial.elapsedMs} ms`);
+  assert.ok(serial.elapsedMs >= 500, `serial ${serial.elapsedMs} ms`);
   await assert.rejects(runBaseline(m, { event: 'Stop', input: '{}', env, cwd: '/' }), { code: 'BASELINE_INVALID' });
 });

@@ -4,14 +4,19 @@ import { realpathSync, readFileSync, existsSync, statSync, accessSync, constants
 import { execFileSync } from 'node:child_process';
 import { join, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { listAgents } from '../src/index.js';
-import { dispatchHook, reconcile } from '../src/dispatch.js';
 import { relayError } from '../src/protocol.js';
 import { HARNESSES, HOOK_HARNESSES, commandAt, commandFor, stripGlobals, resolveMode, helpText, rootHelp } from '../src/commands.js';
 import { paths } from '../src/bus/paths.js';
-import { runServe, servePaths } from '../src/serve/serve.js';
-import { runAsk } from '../src/routes/ask.js';
-import { runInbox, runPresence } from '../src/cli/desk.js';
+// Each command loads its own modules when it runs: `relay hook` is on every relayed tool call, so
+// its startup pays only for the dispatch path (test/startup.test.js).
+/** @type {(...args: Parameters<typeof import('../src/bus/transaction.js').listAgents>) => ReturnType<typeof import('../src/bus/transaction.js').listAgents>} */
+const listAgents = async (...args) => (await import('../src/bus/transaction.js')).listAgents(...args);
+/** @type {(...args: Parameters<typeof import('../src/dispatch.js').dispatchHook>) => ReturnType<typeof import('../src/dispatch.js').dispatchHook>} */
+const dispatchHook = async (...args) => (await import('../src/dispatch.js')).dispatchHook(...args);
+/** @type {(...args: Parameters<typeof import('../src/dispatch.js').reconcile>) => ReturnType<typeof import('../src/dispatch.js').reconcile>} */
+const reconcile = async (...args) => (await import('../src/dispatch.js')).reconcile(...args);
+/** @param {string} stateDir */
+const socketPathOf = async (stateDir) => (await import('../src/serve/serve.js')).servePaths(stateDir).socketPath;
 
 const { version, engines } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 /** @param {string} message */
@@ -185,7 +190,7 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
       if (rest.length) throw usage('serve takes no arguments');
       const controller = new AbortController(), stop = () => controller.abort();
       process.once('SIGTERM', stop); process.once('SIGINT', stop);
-      try { await runServe({ signal: controller.signal }); }
+      try { await (await import('../src/serve/serve.js')).runServe({ signal: controller.signal }); }
       finally { process.off('SIGTERM', stop); process.off('SIGINT', stop); }
       return 0;
     }
@@ -198,7 +203,7 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
       if (handback) tail.shift();
       if (tail.length !== 1 || !['PreToolUse', 'PostToolUse'].includes(tail[0])) throw usage('ask requires [--handback] then exactly one EVENT: PreToolUse or PostToolUse');
       try {
-        const r = await runAsk({ nativeEvent: tail[0], handback, stdin, socketPath: servePaths(paths().stateDir).socketPath });
+        const r = await (await import('../src/routes/ask.js')).runAsk({ nativeEvent: tail[0], handback, stdin, socketPath: await socketPathOf(paths().stateDir) });
         await emit(stdout, r.stdout); await emit(stderr, r.stderr);
         return r.exitCode;
       } catch (caught) { const error = /** @type {import('../src/types.js').Failure} */ (caught);
@@ -220,15 +225,15 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
         if (!/^[0-9]+$/.test(f['--since']) || !Number.isSafeInteger(Number(f['--since']))) throw usage('--since must be a nonnegative safe integer');
         since = Number(f['--since']);
       }
-      const r = await runInbox({ action, args, decline: f['--decline'] === true, since, file: f['--file'],
+      const r = await (await import('../src/cli/desk.js')).runInbox({ action, args, decline: f['--decline'] === true, since, file: f['--file'],
         surface: /** @type {'cli'|'terminal'|undefined} */ (f['--surface']), reason: /** @type {'user'|'asker'|undefined} */ (f['--reason']),
-        socketPath: servePaths(paths().stateDir).socketPath });
+        socketPath: await socketPathOf(paths().stateDir) });
       await emit(stdout, mode === 'json' ? `${JSON.stringify(r.json)}\n` : r.text);
       return 0;
     }
     if (cmdName === 'presence') {
       if (rest.length > 1 || (rest.length && !['here', 'away'].includes(rest[0]))) throw usage('presence takes only here or away');
-      const r = await runPresence({ mode: rest[0], socketPath: servePaths(paths().stateDir).socketPath });
+      const r = await (await import('../src/cli/desk.js')).runPresence({ mode: rest[0], socketPath: await socketPathOf(paths().stateDir) });
       await emit(stdout, mode === 'json' ? `${JSON.stringify(r.json)}\n` : r.text);
       return 0;
     }

@@ -8,8 +8,7 @@ import { paths as defaultPaths } from './bus/paths.js';
 import { applyEvent, reapRegistry } from './bus/transaction.js';
 import { relayError } from './protocol.js';
 import { loadSubscribers, loadSubscribersFrom, matchSubscribers, checkBudget, budgetFor, RECONCILE } from './subscribers.js';
-import { CLEANUP_MS } from './child.js';
-import { createChildSupervisor, recoverChildRecords, STARTUP_MS } from './child-supervisor.js';
+import { CLEANUP_MS, SUPERVISOR_STARTUP_MS as STARTUP_MS } from './child.js';
 import { discoverBoundaries, resolveExecutable, DISCOVERY_MS } from './executable.js';
 import { createProcessOps } from './bus/proc.js';
 import { join } from 'node:path';
@@ -51,7 +50,7 @@ const NOT_REQUESTED = Object.freeze({ status: /** @type {'not-requested'} */ ('n
 /**
  * @typedef {{candidate: string, realPath: string}} Selected
  * @typedef {(subscriber: import("./types.js").Subscriber, input: string) => Promise<{result: import("./types.js").ChildResult, selected: Selected}>} Launch
- * @typedef {Awaited<ReturnType<typeof createChildSupervisor>>} Supervisor
+ * @typedef {Awaited<ReturnType<typeof import('./child-supervisor.js').createChildSupervisor>>} Supervisor
  * @typedef {(options: {deadline: number, sessionHandle: import("./types.js").Handle|null, recordDir: string|null, clock: () => number}) => Promise<Pick<Supervisor, 'runChild'|'close'|'recording'>>} Supervise
  */
 // Which installed copy ran (or was refused): metadata only, never argv or input.
@@ -268,17 +267,19 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
 }
 
 /** @type {Supervise} */
-const supervisorFactory = ({ deadline, sessionHandle, recordDir, clock }) => createChildSupervisor({ deadline, sessionHandle, recordDir, clock });
+// Loaded only when a dispatch admits a subscriber, so dispatches without one never pay for it.
+const supervisorFactory = async ({ deadline, sessionHandle, recordDir, clock }) => (await import('./child-supervisor.js')).createChildSupervisor({ deadline, sessionHandle, recordDir, clock });
 
 // relay reap: prune confirmed deaths, publish if changed, then tell reconcile observers to
 // reread the snapshot. No event is fabricated and no guard runs. Loading and reaping errors
 // propagate so the CLI reports them; observer failures are diagnostics. Afterwards, even when
 // reconciliation failed, the supervisors' ownership records are inspected (never signalled);
 // their diagnostics travel with a thrown error as error.recovery.
-/** @param {{outerMs?: number}} [request] @param {{clock?: () => number, loadConfig?: typeof loadSubscribers, run?: Runner, supervise?: Supervise, reap?: typeof reapRegistry, recover?: typeof recoverChildRecords, paths?: import("./types.js").Paths, env?: NodeJS.ProcessEnv, cwd?: string}} [deps] */
+/** @param {{outerMs?: number}} [request] @param {{clock?: () => number, loadConfig?: typeof loadSubscribers, run?: Runner, supervise?: Supervise, reap?: typeof reapRegistry, recover?: typeof import('./child-supervisor.js').recoverChildRecords, paths?: import("./types.js").Paths, env?: NodeJS.ProcessEnv, cwd?: string}} [deps] */
 export async function reconcile({ outerMs = 30000 } = {}, deps = {}) {
   const clock = deps.clock ?? performance.now.bind(performance), start = clock();
-  const { loadConfig = loadSubscribers, reap = reapRegistry, recover = recoverChildRecords } = deps, paths = deps.paths ?? defaultPaths();
+  const { loadConfig = loadSubscribers, reap = reapRegistry } = deps, paths = deps.paths ?? defaultPaths();
+  const recover = deps.recover ?? (async (/** @type {Parameters<typeof import('./child-supervisor.js').recoverChildRecords>[0]} */ options) => (await import('./child-supervisor.js')).recoverChildRecords(options));
   const supervise = deps.supervise ?? (deps.run ? injected(deps.run) : supervisorFactory);
   const budget = budgetFor({ outerMs }), workDeadline = start + budget.totalMs - budget.reserveMs, diagnostics = /** @type {string[]} */ ([]);
   const recordDir = join(paths.stateDir, 'children'), cursorPath = join(recordDir, '.cursor');
