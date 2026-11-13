@@ -74,6 +74,7 @@ Contributor and developer guides in the repository (not shipped in the npm tarba
 
 - `docs/test-execution-policy.md` — Local `.tt.toml` policy (`automatic_broad = false`), focused checks, and hosted CI verification.
 - `docs/runbooks/hook-install-rollback.md` — Hook installation, rollback, schema-2 activation, and Codex worker row rollout.
+- `docs/runbooks/hook-qualification.md` — Route qualification runner, latency judge, and per-host evidence procedure.
 - `docs/runbooks/answer-route-probes.md` — Claude Code answer-route capability probes and Codex lifecycle probes.
 - `docs/runbooks/codex-question-reproof.md` — Repeatable Codex `0.166.0` source and native-pilot re-proof procedure.
 - `docs/runbooks/darwin-probe.md` — Physical macOS validation bundle and judge procedure.

@@ -24,6 +24,7 @@ references = [
   "docs/runbooks/codex-question-reproof.md",
   "docs/runbooks/darwin-probe.md",
   "docs/runbooks/hook-install-rollback.md",
+  "docs/runbooks/hook-qualification.md",
   "docs/runbooks/inbox-service.md",
   "docs/runbooks/registry-lock-repair.md",
   "docs/runbooks/release.md",

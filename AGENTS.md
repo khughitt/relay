@@ -34,7 +34,7 @@ Code follows `tools/code-organization.md`.
 - `src/types.js` — Shared JSDoc contracts; preserve runtime validation at JSON boundaries. `test/types/` holds compile-time contract checks, never runtime tests.
 - `docs/api.md`, `docs/registry.md`, `docs/adapters.md`, `docs/questions.md` — Shipped reference contracts.
 - `docs/runbooks/inbox-service.md`, `docs/runbooks/registry-lock-repair.md` — Shipped operator runbooks.
-- `docs/test-execution-policy.md`, `docs/runbooks/hook-install-rollback.md`, `docs/runbooks/answer-route-probes.md`, `docs/runbooks/codex-question-reproof.md`, `docs/runbooks/darwin-probe.md`, `docs/runbooks/release.md` — Repository-only contributor and developer guides (not shipped in the npm tarball; shipped Markdown files must not link to them with relative Markdown links).
+- `docs/test-execution-policy.md`, `docs/runbooks/hook-install-rollback.md`, `docs/runbooks/hook-qualification.md`, `docs/runbooks/answer-route-probes.md`, `docs/runbooks/codex-question-reproof.md`, `docs/runbooks/darwin-probe.md`, `docs/runbooks/release.md` — Repository-only contributor and developer guides (not shipped in the npm tarball; shipped Markdown files must not link to them with relative Markdown links).
 
 ## Rules
 

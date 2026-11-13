@@ -12,5 +12,20 @@
     "migrated": { "warmups": 20, "samples": 200, "bounds": { "p95DeltaMs": 100, "p99DeltaMs": 150, "maxDeltaMs": 250, "absoluteMaxMs": 1000 } },
     "noSubscriber": { "warmups": 20, "samples": 200 },
     "invocationWallMs": 300000
+  },
+  "qualification": {
+    "note": "Final route qualification table (plan revision 3, Final route qualification): calls per path/event/runtime/host and Binding gates, verbatim. Baseline is the per-host/event deployed composition or native-only path.",
+    "outerMs": 20000, "timeoutMs": 1000, "contextChars": 64, "payloadBytes": 1024, "wallMs": 600000, "hosts": 2,
+    "runtimes": {"floorMajor": 22, "development": "any other major"},
+    "schedules": {"claude-code": {"kind": "parallel", "evidence": "https://code.claude.com/docs/en/hooks#hook-handler-fields"}},
+    "conditions": {
+      "warm": {"warmups": 20, "samples": 200, "bounds": {"p95DeltaMs": 100, "p99DeltaMs": 150, "maxDeltaMs": 250, "absoluteMaxMs": 1000}},
+      "cold": {"samples": 50, "bounds": {"p99DeltaMs": 200, "maxDeltaMs": 300, "absoluteMaxMs": 1500}},
+      "missing": {"samples": 50, "bounds": {"maxMs": 1000}},
+      "timeout": {"samples": 20, "bounds": {"overTimeoutMs": 750}},
+      "concurrent": {"batches": 20, "batchSize": 4, "bounds": {"p99DeltaMs": 250, "maxDeltaMs": 500, "absoluteMaxMs": 2000}},
+      "supervisorAlone": {"samples": 50, "bounds": {"combinedP99Ms": 150, "combinedMaxMs": 250}},
+      "noSubscriber": {"warmups": 20, "samples": 200}
+    }
   }
 }
