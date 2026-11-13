@@ -264,6 +264,9 @@ async function dispatchOnce({ harness, nativeEvent, input, outerMs, subscribersP
     if (registryEvent?.background === null) diagnostics.push('BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries');
     const matching = matchSubscribers(config, event);
     guards = matching.filter((subscriber) => subscriber.role === 'guard');
+    // A guard decides on the tool input it is given; when that input crossed its bound, a matching
+    // guard is an infrastructure failure, never a manufactured refusal of an unguarded tool call.
+    if (guards.length && hookEvent.kind === 'before-tool' && event.private.toolInput?.status !== 'valid') throw relayError('INVALID_INPUT', 'native tool input exceeds its structural bound for a matching guard');
     notices = matching.filter((subscriber) => subscriber.role === 'notice');
     observers = matching.filter((subscriber) => subscriber.role === 'observer');
   } catch (caught) { return fail(/** @type {import('./types.js').Failure} */ (caught)); }

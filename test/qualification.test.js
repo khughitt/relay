@@ -73,7 +73,7 @@ test('a complete pair of hosts, each on Node 22 and the development runtime, pas
   assert.equal(verdict.passed, true);
   assert.ok(verdict.rows.some((r) => r.host === 'host-b' && r.runtime === 'v26.5.0' && r.case === 'warm candidate'));
   assert.deepEqual(verdict.evidence.map((e) => e.split(' ', 1)[0]).sort(), ['host=host-a', 'host=host-a', 'host=host-b', 'host=host-b']);
-  assert.ok(verdict.evidence.every((e) => e.includes(COMMIT) && e.includes('claude-code PreToolUse')));
+  assert.ok(verdict.evidence.every((e) => e.includes(COMMIT) && e.includes('claude-code PreToolUse') && / outerMs=20000 /.test(e)), 'each line names the budget it was measured at');
 });
 
 test('the judge refuses incomplete, mismatched or unsound evidence', () => {

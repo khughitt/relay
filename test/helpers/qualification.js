@@ -6,11 +6,11 @@ import { bindingsFor } from '../../src/install/hooks.js';
 export const COMMIT = 'a'.repeat(40);
 export const DIGEST = 'b'.repeat(64);
 
-/** @param {string} harness @param {{event: string, role: string}} route */
+/** @param {string} harness @param {{event: string, role: string, outerMs?: number}} route */
 export function passedChecks(harness, route) {
   const required = applicableChecks(harness, route);
   return Object.fromEntries(QUALIFICATION_CHECKS.map((check) => [check, !required.includes(check) ? { status: 'not-applicable', evidence: [] }
-    : check === 'latency' ? { status: 'passed', evidence: [`host=host-a ${route.event} p95 within bound at ${COMMIT}`, `host=host-b ${route.event} p95 within bound at ${COMMIT}`] }
+    : check === 'latency' ? { status: 'passed', evidence: [`host=host-a outerMs=${Math.min(20000, route.outerMs ?? 20000)} ${route.event} p95 within bound at ${COMMIT}`, `host=host-b outerMs=${Math.min(20000, route.outerMs ?? 20000)} ${route.event} p95 within bound at ${COMMIT}`] }
       : { status: 'passed', evidence: [`fixture ${check} ${harness} ${route.event} at ${COMMIT}`] }]));
 }
 

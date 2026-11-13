@@ -94,6 +94,18 @@ test('planClaudeCode adds the route only with withAsk', () => {
   assert.deepEqual(removed.PostToolUse, []);
 });
 
+test('an ask-only install needs no route qualification and leaves dispatch entries as they were', () => {
+  const prior = '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"\'/old/node\' \'/old/bin/relay.js\' hook --harness claude-code --outer-ms 600000 --subscribers \'/old/subscribers.json\' Stop","timeout":600}]}]}}';
+  const base = { target: '/t/settings.json', text: prior, relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
+    subscribers: validateSubscribers({ schema: 2, subscribers: [] }), evidence: parseEvidence(record(all)), withAsk: true, installedVersion: '2.1.296' };
+  const hooks = JSON.parse(planClaudeCode(base).changes[0].after).hooks;
+  assert.deepEqual(hooks.Stop, JSON.parse(prior).hooks.Stop, 'dispatch entries untouched');
+  assert.deepEqual(Object.keys(hooks).sort(), ['PostToolUse', 'PreToolUse', 'Stop']);
+  assert.match(hooks.PreToolUse[0].hooks[0].command, / ask --harness claude-code --handback PreToolUse$/);
+  assert.throws(() => planClaudeCode({ ...base, events: ['Stop'] }), { code: 'UNQUALIFIED_ROUTE' }, 'selecting a dispatch event still needs qualification');
+  assert.throws(() => planClaudeCode({ ...base, withAsk: false }), { code: 'UNQUALIFIED_ROUTE' });
+});
+
 test('after a harness upgrade the stale route refuses with --with ask and goes without it', () => {
   const base = { target: '/t/settings.json', text: '{}', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
     subscribers: validateSubscribers({ schema: 2, subscribers: [] }), evidence: parseEvidence(record(all)), ...qualifiedInstall('claude-code', { subscribers: [] }) };

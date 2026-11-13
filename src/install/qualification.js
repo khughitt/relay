@@ -114,6 +114,14 @@ export function qualifyBinding(row, target) {
     if (result.status !== 'passed') unqualified(`unqualified route ${route}: ${check} is ${result.status}${result.owner ? ` (owner ${result.owner})` : ''}: ${result.evidence[0] ?? 'no reason recorded'}`);
   }
   if (hosts(row.latency.evidence).size < 2) unqualified(`unqualified route ${route}: latency needs passed results from two hosts (evidence naming host=NAME)`);
+  // Each host's result names the outer budget it was measured at. A composition's transport cost does
+  // not grow with its outer deadline once admitted, so a smaller measured budget stands for the row's
+  // (whose admission install checks); a larger one never does.
+  for (const line of row.latency.evidence.filter((item) => /(?:^|\s)host=/.test(item))) {
+    const measured = /(?:^|\s)outerMs=(\d+)(?:\s|$)/.exec(line)?.[1];
+    if (measured === undefined) unqualified(`unqualified route ${route}: latency evidence must name the outer budget it was measured at (outerMs=N): ${line}`);
+    if (Number(measured) > row.outerMs) unqualified(`unqualified route ${route}: latency was measured at outerMs=${measured}, above the row's ${row.outerMs}`);
+  }
   let contextLimit = null;
   if (usesContext(adapterFor(row.harness), row.event, row.role)) {
     if (row.contextLimit === undefined) unqualified(`unqualified route ${route}: contextLimit, the qualified native context limit, is missing`);

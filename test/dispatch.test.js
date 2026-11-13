@@ -137,6 +137,21 @@ test('tool input beyond its structural bound refuses without invoking the guard'
   assert.ok(await absent(p.agentsPath));
 });
 
+test('oversize tool input refuses only where a matching guard would need it', async (t) => {
+  const p = await tempPaths(t), file = join(p.stateDir, '..', 'guard-ran');
+  const body = JSON.stringify({ session_id: 'sess', cwd: CWD, tool_name: 'Write', tool_input: { file_path: '/tmp/big', content: 'x'.repeat(1536 * 1024) } });
+  const none = await hook(p, { body });
+  assert.deepEqual(none, { stdout: '', stderr: '', exitCode: 0 }, 'no guard: the write is not refused and the event publishes');
+  assert.equal((await readSnapshot({ paths: p })).agents['claude-code:sess'].state, 'working');
+  await writeSubscribers(p, [strip(guard('bash-only', 'record', { file, tools: ['Bash'] }))]);
+  assert.equal((await hook(p, { body })).exitCode, 0, 'a guard whose tool filter does not match does not refuse');
+  assert.ok(await absent(file));
+  await writeSubscribers(p, [strip(guard('writes', 'record', { file, tools: ['Write'] }))]);
+  const guarded = await hook(p, { body });
+  assert.equal(guarded.exitCode, 2); assert.match(guarded.stdout, /relay refused: INVALID_INPUT/);
+  assert.ok(await absent(file), 'the matching guard is not invoked with input it cannot be given');
+});
+
 test('a rejected guard invocation does not outrank a later denial', async (t) => {
   const p = await tempPaths(t);
   await writeSubscribers(p, [guard('broken', 'allow'), guard('deny', 'deny')].map(strip));

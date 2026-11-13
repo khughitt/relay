@@ -193,7 +193,7 @@ function standardIdentity(harness, adapter, nativeEvent, data) {
 
 // Events normalized here whose cwd came from the invoking directory rather than the native
 // payload. Registry publication needs the native cwd, so registryEventFor refuses them.
-/** @type {WeakMap<object, {nativeCwd: boolean}>} */
+/** @type {WeakMap<object, {nativeCwd: boolean, toolInput?: Record<string, any>}>} */
 const provenance = new WeakMap();
 
 /**
@@ -232,8 +232,13 @@ export function normalizeHookEvent(harness, nativeEvent, raw, { invokingCwd } = 
   }
   const event = { schema: /** @type {2} */ (2), kind, harness: /** @type {import("../types.js").Harness} */ (harness), nativeEvent,
     cwd: nativeCwd ?? invokingCwd, identity, facts: factsOf(harness, nativeEvent, data), tool, private: privateOf(harness, nativeEvent, data, toolCall) };
-  if (kind === 'before-tool' && (event.tool?.name.status !== 'valid' || event.private.toolInput?.status !== 'valid')) reject('invalid native tool fields');
-  provenance.set(event, { nativeCwd: nativeCwd !== null });
+  // A tool input that is an object but crosses a structural bound is an invalid private fact, not a
+  // malformed event: only a guard that would receive it fails closed (dispatch). The registry keeps
+  // publishing the native object, as the released normalizeEvent did.
+  const rawInput = kind !== 'before-tool' ? undefined : harness === 'agy' ? agyTool(toolCall).input : data.tool_input;
+  const oversize = kind === 'before-tool' && event.private.toolInput?.status === 'invalid' && object(rawInput);
+  if (kind === 'before-tool' && (event.tool?.name.status !== 'valid' || (event.private.toolInput?.status !== 'valid' && !oversize))) reject('invalid native tool fields');
+  provenance.set(event, { nativeCwd: nativeCwd !== null, ...(oversize ? { toolInput: rawInput } : {}) });
   return event;
 }
 
@@ -259,7 +264,8 @@ export function registryEventFor(event) {
   let tool = null;
   if (event.kind === 'before-tool') {
     const name = /** @type {string} */ (/** @type {{status: 'valid', value: string}} */ (event.tool?.name).value);
-    const input = /** @type {{status: 'valid', value: Record<string, any>}} */ (event.private.toolInput).value;
+    const fact = event.private.toolInput;
+    const input = fact?.status === 'valid' ? fact.value : origin.toolInput;
     tool = { name, input, command: name === 'Bash' && typeof input.command === 'string' ? input.command : null };
   }
   return validateEvent({ schema: 1, kind: adapter.events[event.nativeEvent].kind, harness: event.harness, nativeEvent: event.nativeEvent,

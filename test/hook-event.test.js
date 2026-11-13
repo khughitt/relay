@@ -43,6 +43,15 @@ test('every fixture normalizes to its expected hook event and registry effect', 
   }
 });
 
+test('an oversize tool input is an invalid private fact, and the registry event keeps the released result', () => {
+  const raw = JSON.stringify({ session_id: 'sess', cwd: '/repo', hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: '/tmp/big', content: 'x'.repeat(1536 * 1024) } });
+  const event = normalizeHookEvent('claude-code', 'PreToolUse', raw, { invokingCwd: '/repo' });
+  assert.equal(event.private.toolInput.status, 'invalid');
+  assert.deepEqual(registryEventFor(event), normalizeEvent('claude-code', 'PreToolUse', raw));
+  const notObject = JSON.stringify({ session_id: 'sess', cwd: '/repo', hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: 'text' });
+  assert.throws(() => normalizeHookEvent('claude-code', 'PreToolUse', notObject, { invokingCwd: '/repo' }), { code: 'INVALID_INPUT' }, 'a non-object tool input is still malformed');
+});
+
 test('registry events keep the released normalizeEvent results exactly', () => {
   for (const f of manifest.fixtures) {
     const { registry } = read(f.expected);
@@ -96,13 +105,13 @@ test('unsupported or unusable events refuse rather than inventing decoders or id
   assert.throws(() => normalizeHookEvent('agy', 'Stop', JSON.stringify({ terminationReason: 'ERROR' }), { invokingCwd: 'relative' }), { code: 'USAGE' });
 });
 
-test('before-tool name and input are required; their invalidity is not a Fact', () => {
+test('before-tool name and an object input are required; an input over its bound is an invalid Fact', () => {
   assert.throws(() => claude('PreToolUse', { tool_name: ' ', tool_input: {} }), { code: 'INVALID_INPUT' });
   assert.throws(() => claude('PreToolUse', { tool_name: 'Bash', tool_input: [] }), { code: 'INVALID_INPUT' });
   assert.throws(() => claude('PreToolUse', { tool_name: 'x'.repeat(257), tool_input: {} }), { code: 'INVALID_INPUT' });
   let deep = {};
   for (let i = 0; i < 64; i++) deep = { d: deep };
-  assert.throws(() => claude('PreToolUse', { tool_name: 'Bash', tool_input: deep }), { code: 'INVALID_INPUT' });
+  assert.equal(claude('PreToolUse', { tool_name: 'Bash', tool_input: deep }).private.toolInput.status, 'invalid', 'a matching guard fails closed on it in dispatch');
   assert.equal(claude('PreToolUse', { tool_name: 'x'.repeat(256), tool_input: {} }).tool.name.status, 'valid');
 });
 

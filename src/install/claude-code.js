@@ -10,11 +10,17 @@ import { relayError } from '../protocol.js';
 export function planClaudeCode({ target, text, relayBin, nodeBin = process.execPath, subscribersPath, subscribers, evidence = null, retireFamiliar = false, withAsk = false, installedVersion,
   events, qualification = null, identity }) {
   if (!isAbsolute(target) || !isAbsolute(relayBin) || !isAbsolute(nodeBin ?? '') || !isAbsolute(subscribersPath ?? '') || typeof text !== 'string') throw relayError('INVALID_CONFIG', 'Claude target, relay path, node path, subscriber path, and text must be explicit');
-  const bindings = selectBindings('claude-code', events);
+  // The ask route keeps its own domain: --with ask with no route qualification and no selected event
+  // writes the ask route alone and leaves every dispatch entry as it was.
+  const askOnly = withAsk && qualification === null && events === undefined;
+  const bindings = askOnly ? [] : selectBindings('claude-code', events);
   const capability = validateCapabilities({ harness: 'claude-code', subscribers, bindings, evidence });
-  assertPairRetained({ harness: 'claude-code', text, relayBin, subscribersPath });
-  qualifyInstall({ harness: 'claude-code', subscribers, bindings, qualification, target: identity });
-  let after = planHooks({ text, harness: 'claude-code', relayBin, nodeBin, subscribersPath, retireFamiliar, bindings });
+  let after = text;
+  if (!askOnly) {
+    assertPairRetained({ harness: 'claude-code', text, relayBin, subscribersPath });
+    qualifyInstall({ harness: 'claude-code', subscribers, bindings, qualification, target: identity });
+    after = planHooks({ text, harness: 'claude-code', relayBin, nodeBin, subscribersPath, retireFamiliar, bindings });
+  }
   // The ask route is reconciled on every full install: without --with ask it declares no rows, so a
   // route installed before (perhaps on a harness version since upgraded) is removed. An install of
   // selected events leaves it alone unless --with ask names it.

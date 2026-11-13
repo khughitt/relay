@@ -66,7 +66,12 @@ test('qualifyBinding refuses a Stop guard without exact-event retry proof and an
     ['relayCommit', { relayCommit: 'c'.repeat(40) }], ['configDigest', { configDigest: 'd'.repeat(64) }], ['harness', { harness: 'codex' }]]) {
     assert.throws(() => qualifyBinding(rowOf([stop]), target(over)), { code: 'UNQUALIFIED_ROUTE', message: new RegExp(field) }, field);
   }
-  const oneHost = doc([stop]); oneHost.rows[0].latency.evidence = ['host=host-a p95 within bound'];
+  const budget = (lines) => { const d = doc([{ event: 'SessionEnd', role: 'registry', outerMs: 3000 }]); d.rows[0].latency.evidence = lines; return qualificationRows(parseQualification(JSON.stringify(d)))[0]; };
+  assert.throws(() => qualifyBinding(budget(['host=host-a outerMs=20000 ok', 'host=host-b outerMs=20000 ok']), target()), { code: 'UNQUALIFIED_ROUTE', message: /measured at outerMs=20000.*3000/ },
+    'latency measured at a larger budget than the row installs does not qualify it');
+  assert.throws(() => qualifyBinding(budget(['host=host-a ok', 'host=host-b ok']), target()), { code: 'UNQUALIFIED_ROUTE', message: /outerMs=N/ });
+  assert.equal(qualifyBinding(budget(['host=host-a outerMs=3000 ok', 'host=host-b outerMs=3000 ok']), target()).outerMs, 3000);
+  const oneHost = doc([stop]); oneHost.rows[0].latency.evidence = ['host=host-a outerMs=20000 p95 within bound'];
   assert.throws(() => qualifyBinding(qualificationRows(parseQualification(JSON.stringify(oneHost)))[0], target()), { code: 'UNQUALIFIED_ROUTE', message: /latency.*two hosts/ });
 });
 

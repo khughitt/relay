@@ -68,7 +68,7 @@
           "latency": {
             "status": "unavailable",
             "evidence": [
-              "with every native line migrating, the 5-subscriber composition does not fit the frozen 20 s measurement budget (needs 8250 ms, 6334 ms fit); host-a pilot at 16cf7daeda3519d660faa5e41d52f8a552422925"
+              "with every native line migrating, the 5-subscriber composition is not admitted at the frozen 20 s measurement budget, so it was never measured (the installed 600 s binding admits it; admission there is not latency evidence) (needs 8250 ms, 6334 ms fit); host-a pilot at 16cf7daeda3519d660faa5e41d52f8a552422925"
             ],
             "owner": "relay-d487c1"
           },
@@ -132,7 +132,7 @@
           "latency": {
             "status": "unknown",
             "evidence": [
-              "host=host-a runtime=v22.23.2,v26.5.0 claude-code UserPromptSubmit commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [8.3, 18.7] p99 delta [10.8, 84.2] max delta [15.6, 21.6] ms (absolute max [170.9, 304.9]); cold p99 delta [9.8, 2.9] ms; concurrent p99 delta [41.8, 30.7] ms; missing-command max [166.7, 220.3] ms; timeout max [1201.8, 1255.2] ms; supervisor-alone p99 [74.2, 72.6] ms",
+              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code UserPromptSubmit commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [8.3, 18.7] p99 delta [10.8, 84.2] max delta [15.6, 21.6] ms (absolute max [170.9, 304.9]); cold p99 delta [9.8, 2.9] ms; concurrent p99 delta [41.8, 30.7] ms; missing-command max [166.7, 220.3] ms; timeout max [1201.8, 1255.2] ms; supervisor-alone p99 [74.2, 72.6] ms",
               "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
               "second host (europa) not run: package prepared; user or authorized operator action"
             ],
@@ -198,7 +198,7 @@
           "latency": {
             "status": "unknown",
             "evidence": [
-              "host=host-a runtime=v22.23.2,v26.5.0 claude-code PreToolUse commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [7.9, 6.8] p99 delta [13.9, 120.7] max delta [17.6, 159.1] ms (absolute max [178, 326.9]); cold p99 delta [22.8, 16.4] ms; concurrent p99 delta [41.6, -44.4] ms; missing-command max [145.8, 133.4] ms; timeout max [1137.5, 1136.9] ms; supervisor-alone p99 [76.3, 108.8] ms",
+              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code PreToolUse commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [7.9, 6.8] p99 delta [13.9, 120.7] max delta [17.6, 159.1] ms (absolute max [178, 326.9]); cold p99 delta [22.8, 16.4] ms; concurrent p99 delta [41.6, -44.4] ms; missing-command max [145.8, 133.4] ms; timeout max [1137.5, 1136.9] ms; supervisor-alone p99 [76.3, 108.8] ms",
               "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
               "second host (europa) not run: package prepared; user or authorized operator action"
             ],
@@ -262,7 +262,7 @@
           "latency": {
             "status": "unknown",
             "evidence": [
-              "host=host-a runtime=v22.23.2,v26.5.0 claude-code Notification:idle_prompt commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-9.1, -12.1] p99 delta [-10.5, -10.3] max delta [-11.4, -21.3] ms (absolute max [142.2, 136.9]); cold p99 delta [-12.6, 5.9] ms; concurrent p99 delta [-11.5, 20] ms; missing-command max [129.2, 123.9] ms; timeout max [1140.1, 1137.4] ms; supervisor-alone p99 [74.3, 69.1] ms",
+              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code Notification:idle_prompt commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-9.1, -12.1] p99 delta [-10.5, -10.3] max delta [-11.4, -21.3] ms (absolute max [142.2, 136.9]); cold p99 delta [-12.6, 5.9] ms; concurrent p99 delta [-11.5, 20] ms; missing-command max [129.2, 123.9] ms; timeout max [1140.1, 1137.4] ms; supervisor-alone p99 [74.3, 69.1] ms",
               "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
               "second host (europa) not run: package prepared; user or authorized operator action"
             ],
@@ -326,7 +326,7 @@
           "latency": {
             "status": "unknown",
             "evidence": [
-              "host=host-a runtime=v22.23.2,v26.5.0 claude-code Notification:permission_prompt commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-9.8, -7.7] p99 delta [-10.1, -8.1] max delta [-11.5, -11.5] ms (absolute max [139.2, 137.6]); cold p99 delta [-11.7, -14.6] ms; concurrent p99 delta [-22.1, -11.7] ms; missing-command max [132, 122.7] ms; timeout max [1147, 1133.7] ms; supervisor-alone p99 [77.8, 73] ms",
+              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code Notification:permission_prompt commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-9.8, -7.7] p99 delta [-10.1, -8.1] max delta [-11.5, -11.5] ms (absolute max [139.2, 137.6]); cold p99 delta [-11.7, -14.6] ms; concurrent p99 delta [-22.1, -11.7] ms; missing-command max [132, 122.7] ms; timeout max [1147, 1133.7] ms; supervisor-alone p99 [77.8, 73] ms",
               "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
               "second host (europa) not run: package prepared; user or authorized operator action"
             ],
@@ -393,7 +393,7 @@
           "latency": {
             "status": "unavailable",
             "evidence": [
-              "with every native line migrating, the 4-subscriber composition does not fit the frozen 20 s measurement budget (needs 6750 ms, 6334 ms fit); host-a pilot at 16cf7daeda3519d660faa5e41d52f8a552422925"
+              "with every native line migrating, the 4-subscriber composition is not admitted at the frozen 20 s measurement budget, so it was never measured (the installed 600 s binding admits it; admission there is not latency evidence) (needs 6750 ms, 6334 ms fit); host-a pilot at 16cf7daeda3519d660faa5e41d52f8a552422925"
             ],
             "owner": "relay-d487c1"
           },
@@ -458,7 +458,7 @@
           "latency": {
             "status": "unknown",
             "evidence": [
-              "host=host-a runtime=v22.23.2,v26.5.0 claude-code StopFailure commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-3.3, -10.8] p99 delta [-3.1, -8.8] max delta [-15.4, -9.5] ms (absolute max [190, 160.1]); cold p99 delta [-1.5, -6.8] ms; concurrent p99 delta [13.1, -30] ms; missing-command max [131.2, 126.9] ms; timeout max [1135.2, 1134] ms; supervisor-alone p99 [120.8, 73.4] ms",
+              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code StopFailure commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-3.3, -10.8] p99 delta [-3.1, -8.8] max delta [-15.4, -9.5] ms (absolute max [190, 160.1]); cold p99 delta [-1.5, -6.8] ms; concurrent p99 delta [13.1, -30] ms; missing-command max [131.2, 126.9] ms; timeout max [1135.2, 1134] ms; supervisor-alone p99 [120.8, 73.4] ms",
               "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
               "second host (europa) not run: package prepared; user or authorized operator action"
             ],
@@ -524,7 +524,7 @@
           "latency": {
             "status": "unknown",
             "evidence": [
-              "host=host-a runtime=v22.23.2,v26.5.0 claude-code SessionEnd commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [13.2, 0.8] p99 delta [65.7, 2.4] max delta [92.9, 2.9] ms (absolute max [260.5, 139.5]); cold p99 delta [69, 4.8] ms; concurrent p99 delta [17.9, 0.9] ms; missing-command max [143.7, 130.7] ms; timeout max [1201.8, 1145.4] ms; supervisor-alone p99 [90.4, 76.2] ms",
+              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code SessionEnd commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [13.2, 0.8] p99 delta [65.7, 2.4] max delta [92.9, 2.9] ms (absolute max [260.5, 139.5]); cold p99 delta [69, 4.8] ms; concurrent p99 delta [17.9, 0.9] ms; missing-command max [143.7, 130.7] ms; timeout max [1201.8, 1145.4] ms; supervisor-alone p99 [90.4, 76.2] ms",
               "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
               "second host (europa) not run: package prepared; user or authorized operator action"
             ],
@@ -728,8 +728,7 @@
           "cleanup": {
             "status": "passed",
             "evidence": [
-              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
-              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
             ]
           },
           "latency": {
@@ -792,8 +791,7 @@
           "cleanup": {
             "status": "passed",
             "evidence": [
-              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
-              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
             ]
           },
           "latency": {
@@ -1052,8 +1050,7 @@
           "cleanup": {
             "status": "passed",
             "evidence": [
-              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
-              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
             ]
           },
           "latency": {

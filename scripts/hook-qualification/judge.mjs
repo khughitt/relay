@@ -75,7 +75,7 @@ export function judge(samples, workload) {
     const warm = r.conditions?.warm;
     if (warm?.baseline?.length && warm?.candidate?.length) {
       const b = statistics(warm.baseline.map((/** @type {any} */ s) => s.elapsedMs)), x = statistics(warm.candidate.map((/** @type {any} */ s) => s.elapsedMs));
-      evidence.push(`host=${r.host} runtime=${r.runtime} ${label} commit=${commit} baseline=${manifest.baselineKind} warm p95 delta ${ms(x.p95 - b.p95)} p99 delta ${ms(x.p99 - b.p99)} max delta ${ms(x.max - b.max)} ms`);
+      evidence.push(`host=${r.host} outerMs=${route.outerMs} runtime=${r.runtime} ${label} commit=${commit} baseline=${manifest.baselineKind} warm p95 delta ${ms(x.p95 - b.p95)} p99 delta ${ms(x.p99 - b.p99)} max delta ${ms(x.max - b.max)} ms`);
     }
   }
   return { passed: complete && failures.length === 0, complete, failures, rows, evidence };
