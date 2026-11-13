@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createChildSupervisor, recoverChildRecords } from '../src/child-supervisor.js';
+import { launchSupervisor, releaseSupervisor } from '../src/supervisor-launch.js';
 import { createProcessOps } from '../src/bus/proc.js';
 import { dispatchHook, reconcile } from '../src/dispatch.js';
 import { relayError } from '../src/protocol.js';
@@ -169,6 +170,27 @@ test('the supervisor holds its own absolute deadline when the dispatcher stops t
   await until(() => ops.probe(own).status === 'dead', { timeoutMs: 3000, what: 'supervisor exit at its deadline' });
   assert.deepEqual(await records(dir), []);
   assert.equal((await supervisor.close()).cleanup, 'complete');
+});
+
+test('an early-started supervisor keeps its provisional deadline; init can only shorten it', async (t) => {
+  const dir = await recordDir(t);
+  const short = launchSupervisor({ deadlineMs: 300 });
+  await createChildSupervisor({ deadline: far(), sessionHandle: null, recordDir: dir, launched: short });
+  const { supervisor: first } = await readRecord(dir);
+  await until(() => ops.probe(first).status === 'dead', { timeoutMs: 2500, what: 'the provisional deadline wins over a later init deadline' });
+  const long = launchSupervisor({ deadlineMs: 20000 });
+  await createChildSupervisor({ deadline: performance.now() + 300, sessionHandle: null, recordDir: dir, launched: long });
+  const { supervisor: second } = await readRecord(dir);
+  await until(() => ops.probe(second).status === 'dead', { timeoutMs: 2500, what: 'an earlier init deadline shortens the provisional one' });
+});
+
+test('an early supervisor that is never adopted exits without a record', async (t) => {
+  const dir = await recordDir(t);
+  const early = launchSupervisor({ deadlineMs: 20000 });
+  const handle = ops.handleOf(early.pid);
+  await releaseSupervisor(early);
+  assert.equal(ops.probe(handle).status, 'dead');
+  assert.deepEqual(await records(dir), []);
 });
 
 test('a killed supervisor with an acknowledged group is contained by the living dispatcher and leaves an incident record', async (t) => {

@@ -9,7 +9,6 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import { createProcessOps } from './bus/proc.js';
 import { containGroup, groupMembers } from './bus/process-group.js';
 import * as fsp from 'node:fs/promises';
@@ -18,8 +17,7 @@ import { CLEANUP_MS } from './child.js';
 import { readFrames, writeFrame, LIMITS } from './supervisor-process.js';
 
 export { SUPERVISOR_STARTUP_MS as STARTUP_MS } from './child.js';
-// The supervisor process runs a separate entry with a minimal import graph: its startup is on the hook path.
-const SCRIPT = fileURLToPath(new URL('./supervisor-process.js', import.meta.url));
+import { launchSupervisor } from './supervisor-launch.js';
 
 /** Monotonic nanoseconds shared by every process on the host (CLOCK_MONOTONIC). */
 const nowNs = () => process.hrtime.bigint();
@@ -31,14 +29,15 @@ const toNs = (deadline, clock) => (nowNs() + BigInt(Math.max(0, Math.floor((dead
  * The ownership record is recovery evidence, not part of live containment: with no record directory,
  * or when the record cannot be written, runs still proceed and `recording` is false.
  * @param {{deadline: number, sessionHandle: import("./types.js").Handle|null, recordDir: string|null, env?: NodeJS.ProcessEnv, cwd?: string,
- *   clock?: () => number, processOps?: ReturnType<typeof createProcessOps>, spawnFn?: typeof spawn}} options
+ *   clock?: () => number, processOps?: ReturnType<typeof createProcessOps>, spawnFn?: typeof spawn, launched?: import('node:child_process').ChildProcess|null}} options
  * @returns {Promise<{runChild: (argv: string[], input: string, options: {timeoutMs: number, deadline: number, env: NodeJS.ProcessEnv, cwd: string}) => Promise<import("./types.js").ChildResult>,
  *   close: () => Promise<{cleanup: 'complete'|'failed'}>, timings: {startupMs: number}, nonce: string, recording: boolean}>}
  */
 export async function createChildSupervisor({ deadline, sessionHandle, recordDir, env = {}, cwd = '/', clock = performance.now.bind(performance),
-  processOps = createProcessOps(), spawnFn = spawn }) {
+  processOps = createProcessOps(), spawnFn = spawn, launched = null }) {
   const started = clock(), nonce = randomUUID(), recordPath = recordDir === null ? null : join(recordDir, `${nonce}.json`);
-  const child = spawnFn(process.execPath, [SCRIPT, '--relay-supervisor'], { stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'], env, cwd, detached: false });
+  // An early-started supervisor (relay hook) is adopted; otherwise one starts now with this deadline.
+  const child = launched ?? launchSupervisor({ deadlineMs: Math.max(0, deadline - clock()), env, cwd, spawnFn });
   const control = /** @type {import('node:stream').Writable} */ (child.stdio[3]), results = /** @type {import('node:stream').Readable} */ (child.stdio[4]);
   control.on('error', () => {});
   /** @type {((frame: Record<string, any>|null, error?: Error|null) => void)[]} */
@@ -50,7 +49,8 @@ export async function createChildSupervisor({ deadline, sessionHandle, recordDir
   // Acknowledged groups by invocation, kept from the frame stream so a run never waits for one.
   /** @type {Map<number, Record<string, any>>} */
   const admissions = new Map();
-  const exited = new Promise((resolve) => child.once('exit', () => { gone = true; resolve(undefined); for (const w of waiters) w(null); waiters = []; }));
+  const exited = child.exitCode !== null || child.signalCode !== null ? (gone = true, Promise.resolve(undefined))
+    : new Promise((resolve) => child.once('exit', () => { gone = true; resolve(undefined); for (const w of waiters) w(null); waiters = []; }));
   child.once('error', (error) => { failed ??= error; gone = true; for (const w of waiters) w(null, error); waiters = []; });
   readFrames(results, LIMITS.result, (frame) => {
     if (frame.nonce === nonce && frame.type === 'closed') closed = frame;

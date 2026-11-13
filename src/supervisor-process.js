@@ -66,6 +66,9 @@ async function supervise() {
   /** @type {{n: number, abort: (why: string) => void, done: Promise<any>}|null} */
   let active = null;
   let last = 0, stopping = false, incident = false, recording = false;
+  // A provisional absolute deadline from the command line bounds an early-started supervisor until
+  // init, which may only shorten it.
+  const provisional = /^[0-9]+$/.test(process.argv[3] ?? '') ? process.argv[3] : null;
   /** @type {Record<string, unknown>} */
   let record = {};
   const self = processOps.handleOf(process.pid);
@@ -113,10 +116,15 @@ async function supervise() {
     const { error, ...rest } = result;
     writeFrame(results, { type: 'result', nonce: init.nonce, n: frame.n, result: { ...rest, ...(error === undefined ? {} : { error: errorOf(error) }) } });
   }
+  if (provisional !== null) {
+    timers.push(setTimeout(() => void stop('deadline'), Math.max(0, remainingMs(provisional) + CLEANUP_MS)));
+    setTimeout(() => process.exit(1), Math.max(0, remainingMs(provisional) + 2 * CLEANUP_MS)).unref();
+  }
   readFrames(control, LIMITS.control, (frame) => {
     if (init === null) {
       if (frame.type !== 'init' || typeof frame.nonce !== 'string' || !(frame.recordPath === null || typeof frame.recordPath === 'string') || typeof frame.deadlineNs !== 'string') { void stop('bad init'); return; }
-      init = { nonce: frame.nonce, deadlineNs: frame.deadlineNs, parent: frame.parent ?? null, session: frame.session ?? null, recordPath: frame.recordPath };
+      const deadlineNs = provisional !== null && BigInt(provisional) < BigInt(frame.deadlineNs) ? provisional : frame.deadlineNs;
+      init = { nonce: frame.nonce, deadlineNs, parent: frame.parent ?? null, session: frame.session ?? null, recordPath: frame.recordPath };
       const host = processOps.handleOf(process.pid);
       recording = init.recordPath !== null;
       note({ nonce: init.nonce, host: host?.host ?? null, bootId: host?.bootId ?? null, parent: init.parent, supervisor: self, session: init.session,

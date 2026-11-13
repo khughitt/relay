@@ -186,8 +186,23 @@ async function runNotices(notices, event, { clock, workDeadline, launch, since }
 }
 
 /** @typedef {(argv: string[], input: string, options: any) => Promise<import("./types.js").ChildResult>} Runner */
-/** @param {{harness: string, nativeEvent: string, input: import("node:stream").Readable, outerMs?: number, subscribersPath?: string|null}} request @param {{clock?: () => number, loadConfig?: typeof loadSubscribers, loadConfigFrom?: typeof loadSubscribersFrom, run?: Runner, supervise?: Supervise, apply?: typeof applyEvent, readInput?: typeof readNativeInput, applyOptions?: import("./types.js").RegistryOptions, paths?: import("./types.js").Paths, env?: NodeJS.ProcessEnv, invokingCwd?: string}} [deps] */
-export async function dispatchHook({ harness, nativeEvent, input, outerMs, subscribersPath = null }, deps = {}) {
+/** @typedef {{clock?: () => number, loadConfig?: typeof loadSubscribers, loadConfigFrom?: typeof loadSubscribersFrom, run?: Runner, supervise?: Supervise, apply?: typeof applyEvent, readInput?: typeof readNativeInput, applyOptions?: import("./types.js").RegistryOptions, paths?: import("./types.js").Paths, env?: NodeJS.ProcessEnv, invokingCwd?: string, launched?: import('node:child_process').ChildProcess|null}} DispatchDeps */
+/** @typedef {{harness: string, nativeEvent: string, input: import("node:stream").Readable, outerMs?: number, subscribersPath?: string|null}} DispatchRequest */
+// A supervisor started early by `relay hook` (deps.launched) is adopted by the first subscriber, or
+// released unused before the reply.
+/** @param {DispatchRequest} request @param {DispatchDeps} [deps] */
+export async function dispatchHook(request, deps = {}) {
+  const launched = deps.launched ?? null;
+  let adopted = false;
+  /** @type {Supervise|undefined} */
+  const adopt = launched !== null && deps.supervise === undefined && deps.run === undefined
+    ? async (options) => { adopted = true; return (await import('./child-supervisor.js')).createChildSupervisor({ ...options, launched }); } : deps.supervise;
+  try { return await dispatchOnce(request, { ...deps, ...(adopt === undefined ? {} : { supervise: adopt }) }); }
+  finally { if (launched !== null && !adopted) await (await import('./supervisor-launch.js')).releaseSupervisor(launched); }
+}
+
+/** @param {DispatchRequest} request @param {DispatchDeps} [deps] */
+async function dispatchOnce({ harness, nativeEvent, input, outerMs, subscribersPath = null }, deps = {}) {
   const clock = deps.clock ?? performance.now.bind(performance), start = clock();
   const { loadConfig = loadSubscribers, loadConfigFrom = loadSubscribersFrom, apply = applyEvent, readInput = readNativeInput, applyOptions = {} } = deps;
   const supervise = deps.supervise ?? (deps.run ? injected(deps.run) : supervisorFactory);

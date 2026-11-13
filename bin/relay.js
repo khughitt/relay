@@ -15,6 +15,18 @@ const listAgents = async (...args) => (await import('../src/bus/transaction.js')
 const dispatchHook = async (...args) => (await import('../src/dispatch.js')).dispatchHook(...args);
 /** @type {(...args: Parameters<typeof import('../src/dispatch.js').reconcile>) => ReturnType<typeof import('../src/dispatch.js').reconcile>} */
 const reconcile = async (...args) => (await import('../src/dispatch.js')).reconcile(...args);
+// A bounded raw look at the named subscriber file (at most 64 KiB, JSON only): does any subscriber
+// admit this harness? It decides only whether to start the supervisor early; the dispatch still
+// loads and validates the file itself.
+/** @param {string} file @param {string} harness */
+function mayNeedSupervisor(file, harness) {
+  try {
+    if (statSync(file).size > 64 * 1024) return false;
+    const config = JSON.parse(readFileSync(file, 'utf8'));
+    return Array.isArray(config?.subscribers) && config.subscribers.some((/** @type {any} */ s) => s && typeof s === 'object'
+      && (s.harnesses === undefined || s.harnesses === null || (Array.isArray(s.harnesses) && s.harnesses.includes(harness))));
+  } catch { return false; }
+}
 // The harness and native event a hook invocation names, when it names a retry-escaping Stop.
 /** @param {string[]} args @returns {{harness: string, nativeEvent: string}|null} */
 function stopNamed(args) {
@@ -200,7 +212,11 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
         await emit(stdout, r.stdout); await emit(stderr, r.stderr);
         return r.exitCode;
       }
-      const r = await hook({ ...request, input: stdin });
+      // Start the supervisor before loading the dispatch modules when a subscriber could need it, so
+      // the two startups overlap; the dispatch adopts it or releases it unused (plan amendment 1).
+      const launched = request.subscribersPath && mayNeedSupervisor(request.subscribersPath, request.harness)
+        ? (await import('../src/supervisor-launch.js')).launchSupervisor({ deadlineMs: Math.min(request.outerMs ?? 60000, 60000) }) : null;
+      const r = await hook({ ...request, input: stdin }, launched === null ? {} : { launched });
       await emit(stdout, r.stdout); await emit(stderr, r.stderr);
       return r.exitCode;
     }
