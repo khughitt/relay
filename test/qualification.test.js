@@ -48,7 +48,7 @@ function result(host, runtime) {
   const pair = (n, base, cand, dirs) => ({ baseline: range(n, (i) => sample(base, dirs ? `/s/${host}/${runtime}/b${i}` : `/s/${host}/${runtime}/warm-b`)),
     candidate: range(n, (i) => candidateSample(cand, dirs ? `/s/${host}/${runtime}/c${i}` : `/s/${host}/${runtime}/warm-c`)) });
   return {
-    schema: 1, mode: 'measure', route: { harness: 'claude-code', event: 'PreToolUse', outerMs: 20000 }, host, runtime,
+    schema: 1, mode: 'measure', route: { harness: 'claude-code', event: 'PreToolUse', outerMs: 20000 }, host, runtime, harnessAncestor: { pid: 4100, resolved: 4100 },
     candidate: { commit: COMMIT, dirty: false, configSha256: 'c'.repeat(64) }, manifest: manifest(host), deployedDigest: PACKAGE,
     workLists: { baseline: ['deployed-relay:ops-guard', 'deployed-relay:familiar', 'turn-pause'], candidate: ['candidate:ops-guard', 'candidate:turn-pause', 'candidate:familiar'] },
     fixtures: { baseline: { 'deployed-relay:ops-guard': SCRIPT, 'deployed-relay:familiar': SCRIPT, 'turn-pause': SCRIPT },
@@ -110,6 +110,8 @@ test('the judge refuses incomplete, mismatched or unsound evidence', () => {
     ['pilot results', /pilot/, (s) => { s[0].mode = 'pilot'; }],
     ['speculative start unobserved', /speculative/, (s) => { Object.assign(s[0].conditions.noSubscriber, { speculative: range(200, () => 95) }); s[0].conditions.noSubscriber.starts.speculative = false; }],
     ['unscheduled harness', /scheduling evidence/, (s) => { for (const r of s) { r.route.harness = 'codex'; r.manifest.harness = 'codex'; } }],
+    ['no harness ancestor check', /harness ancestor/, (s) => { delete s[0].harnessAncestor; }],
+    ['hooks borrowed another session', /harness ancestor/, (s) => { s[3].harnessAncestor.resolved = 1; }],
   ];
   for (const [name, message, mutate] of cases) {
     const verdict = failing(mutate);
@@ -157,26 +159,30 @@ test('the qualification scripts import without an entry script path', async () =
   }
 });
 
-// Node 24 and later rename the main thread at startup, which hides a link's name from /proc comm;
-// a route that did not stand in for its harness left its hooks without a session or, under a real
-// harness session, borrowing that outer session silently.
-test('a route stands in for its harness on every runtime, so its hooks resolve the route process', async () => {
-  const { mkdtempSync, symlinkSync, rmSync } = await import('node:fs');
+// A route process is plain node, whose /proc comm names no harness (Node 24 and later rename the
+// main thread at startup); a route that did not name itself for its harness left its hooks without a
+// session or, under a real harness session, borrowing that outer session silently. Its command line
+// stays its own, so the runner is never mistaken for a harness session in ps.
+test('a route names itself for its harness on every runtime, so its hooks resolve the route process', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
   const { spawnSync } = await import('node:child_process');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { fileURLToPath } = await import('node:url');
   const dir = mkdtempSync(join(tmpdir(), 'relay-harness-'));
   try {
-    const link = join(dir, 'claude');
-    symlinkSync(process.execPath, link);
     const run = new URL('../scripts/hook-qualification/run.mjs', import.meta.url).href, candidate = fileURLToPath(new URL('..', import.meta.url));
-    const script = `const { becomeHarness, hookSessionPid } = await import(${JSON.stringify(run)});
+    const script = `const { readFileSync } = await import('node:fs');
+const { becomeHarness, hookSessionPid } = await import(${JSON.stringify(run)});
+const before = readFileSync('/proc/self/cmdline');
 becomeHarness('claude-code');
-process.stdout.write(JSON.stringify({ pid: process.pid, resolved: hookSessionPid({ candidate: ${JSON.stringify(candidate)}, harness: 'claude-code' }) }));`;
-    const r = spawnSync(link, ['--input-type=module', '-e', script], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: dir } });
+process.stdout.write(JSON.stringify({ pid: process.pid, comm: readFileSync('/proc/self/comm', 'utf8').trim(), cmdlineKept: before.equals(readFileSync('/proc/self/cmdline')),
+  resolved: hookSessionPid({ candidate: ${JSON.stringify(candidate)}, harness: 'claude-code' }) }));`;
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: dir } });
     assert.equal(r.status, 0, r.stderr);
-    const { pid, resolved } = JSON.parse(r.stdout);
+    const { pid, comm, cmdlineKept, resolved } = JSON.parse(r.stdout);
+    assert.equal(comm, 'claude');
+    assert.equal(cmdlineKept, true, 'the route keeps its own command line');
     assert.equal(resolved, pid, `on ${process.version} hooks resolved session ${resolved}, not the route process ${pid}`);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

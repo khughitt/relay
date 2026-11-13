@@ -61,6 +61,8 @@ export function judge(samples, workload) {
     try { manifest = validateManifest(r.manifest, { harness: route.harness, event: route.event }); }
     catch (error) { failures.push(`${where}: ${/** @type {Error} */ (error).message}`); continue; }
     if (manifest.host !== r.host) failures.push(`${where}: the baseline manifest is for ${manifest.host}; each host freezes its own deployment`);
+    const ancestor = r.harnessAncestor;
+    if (!Number.isInteger(ancestor?.pid) || ancestor.resolved !== ancestor.pid) failures.push(`${where}: the harness ancestor check is ${ancestor ? `failed (hooks resolved session ${ancestor.resolved ?? 'none'}, not the route process ${ancestor.pid})` : 'missing'}`);
     const relayed = Array.isArray(manifest.inventory?.relayedEvents) ? manifest.inventory.relayedEvents.includes(route.event) : null;
     if (relayed === null) failures.push(`${where}: the manifest records no deployment inventory`);
     else if (relayed !== (manifest.baselineKind === 'deployed-relay-plus-native')) failures.push(`${where}: the deployment ${relayed ? 'relays' : 'does not relay'} ${route.event} but the baseline is ${manifest.baselineKind}`);

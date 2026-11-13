@@ -9,13 +9,13 @@
 //
 // --pilot runs one case of every condition, to validate cleanup and results before a measurement;
 // --measure runs the frozen counts. Each route runs in its own process with the table's 10-minute
-// wall bound, re-executed through a link named for the harness so every hook has a verified fake
-// harness ancestor, and writes its own result file: a rerun skips a route whose result for the same
+// wall bound, named for the harness in /proc comm so every hook has a verified fake harness
+// ancestor (checked before timing), and writes its own result file: a rerun skips a route whose result for the same
 // candidate commit, manifest and mode is already written. One host's results never qualify a route
 // on their own; judge.mjs combines both hosts' results. --route selects routes, never their workload.
 import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cpus } from 'node:os';
@@ -34,11 +34,12 @@ const shellQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
 
 // ---- fake harness ancestor ----
 
-/** Names this process for its harness, so hooks it launches find it as their session ancestor. The
- * link it runs through is not enough: Node 24 and later rename the main thread at startup (for
- * example node-MainThread), which hides the link's name from /proc comm. @param {string} harness */
+/** Names this process for its harness in /proc comm, so hooks it launches find it as their session
+ * ancestor. Written after startup, since Node 24 and later rename the main thread then (for example
+ * node-MainThread); the command line stays the runner's own, so ps never shows it as a harness
+ * session. @param {string} harness */
 export function becomeHarness(harness) {
-  process.title = HARNESS_COMMANDS[harness] ?? refuse(`${harness} has no harness command to stand in for`);
+  writeFileSync('/proc/self/comm', HARNESS_COMMANDS[harness] ?? refuse(`${harness} has no harness command to stand in for`));
 }
 
 /** The session pid a hook launched from this process the way the runner launches hooks (under
@@ -448,11 +449,9 @@ async function main() {
     const file = join(out, routeDir(m), `${process.version}${mode === 'pilot' ? '-pilot' : ''}.json`);
     const prior = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
     if (!(prior && prior.candidate?.commit === commit && prior.manifestSetSha256 === setSha && prior.mode === mode)) {
-      // Each route runs under its harness's name, so its hooks have a verified fake harness ancestor.
-      const link = join(out, `harness-${process.version}`, HARNESS_COMMANDS[m.harness]);
-      mkdirSync(dirname(link), { recursive: true }); rmSync(link, { force: true }); symlinkSync(process.execPath, link);
+      // Each route names itself for its harness (becomeHarness), so its hooks have a verified fake harness ancestor.
       const args = [fileURLToPath(import.meta.url), ...process.argv.slice(2).filter((a, i, all) => a !== '--route' && all[i - 1] !== '--route'), '--one', routeKey(m)];
-      const child = spawnSync(link, args, { stdio: ['ignore', 'inherit', 'inherit'], timeout: workload.qualification.wallMs, killSignal: 'SIGKILL' });
+      const child = spawnSync(process.execPath, args, { stdio: ['ignore', 'inherit', 'inherit'], timeout: workload.qualification.wallMs, killSignal: 'SIGKILL' });
       if (child.status !== 0 || !existsSync(file)) { failed++; process.stdout.write(`${routeKey(m)}: run failed (${child.error?.message ?? `exit ${child.status ?? child.signal}`}); no result written\n`); continue; }
     }
     const result = JSON.parse(readFileSync(file, 'utf8'));
