@@ -39,6 +39,8 @@ export const reduceState = (level) => level;
 // uses a different decision object and stays unexposed in v1.
 /** @type {Readonly<Record<string, import("../types.js").Capability>>} */
 export const replies = Object.freeze({
+  // SessionStart context: hookSpecificOutput.additionalContext; live delivery is qualified separately.
+  'SessionStart': Object.freeze({ refuse: false, context: true }),
   'UserPromptSubmit': Object.freeze({ refuse: true, context: true }),
   'PreToolUse': Object.freeze({ refuse: true, context: true }),
   'Stop': Object.freeze({ refuse: true, context: false }),

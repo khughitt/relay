@@ -17,7 +17,8 @@ export function parseReply(output, { limit = CONTEXT_LIMIT } = {}) {
   try { value = JSON.parse(output); } catch (cause) { fail('subscriber reply is not JSON', cause); }
   if (!object(value)) fail('subscriber reply must be a JSON object');
   const extra = Object.keys(value).find((k) => !FIELDS.includes(k));
-  if (extra !== undefined) fail(`unexpected reply field ${extra}`);
+  // The field name is the subscriber's output, which may echo private input: never repeat it.
+  if (extra !== undefined) fail('unexpected reply field');
   if (!['allow', 'deny'].includes(value.decision)) fail('reply decision must be allow or deny');
   for (const field of ['reason', 'context']) {
     if (Object.hasOwn(value, field) && (!text(value[field]) || value[field].length > limit)) fail(`reply ${field} must be nonempty text of at most ${limit} characters`);

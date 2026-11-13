@@ -24,10 +24,16 @@ export function stateForEvent(event) {
 }
 /** @param {import("../types.js").State|null} level */
 export const reduceState = (level) => level;
-// agy's PreToolUse refusal is JSON; Stop and SessionStart have no refusal channel and nothing has a context channel.
+// agy replies (agy 1.4.12 evidence; installed-version qualification is separate): PreToolUse refuses
+// with {"decision":"deny"}; Stop holds the turn with {"decision":"continue","reason"} on exit 0;
+// SessionStart and PreInvocation inject context as one systemMessage step. PreInvocation has no
+// decoder yet, so only its encoding exists.
 /** @type {Readonly<Record<string, import("../types.js").Capability>>} */
 export const replies = Object.freeze({
   'PreToolUse': Object.freeze({ refuse: true, context: false }),
+  'Stop': Object.freeze({ refuse: true, context: false }),
+  'SessionStart': Object.freeze({ refuse: false, context: true }),
+  'PreInvocation': Object.freeze({ refuse: false, context: true }),
 });
 // agy's documented handler default; a handler timeout raises it, so installs raise both together.
 /** @type {import("../types.js").Adapter["outerTimeouts"]} */
@@ -39,12 +45,15 @@ export const outerTimeouts = Object.freeze({ default: 30000, max: Object.freeze(
 export const failureExitCode = 0;
 /** @param {string} nativeEvent @param {import("../types.js").Reply} reply */
 export function encodeReply(nativeEvent, reply) {
+  const capability = Object.hasOwn(replies, nativeEvent) ? replies[nativeEvent] : { refuse: false, context: false };
   if (reply.decision === 'deny') {
-    if (!Object.hasOwn(replies, nativeEvent) || !replies[nativeEvent].refuse) throw relayError('UNSUPPORTED_REPLY', `${nativeEvent} has no refusal channel`);
-    return { stdout: `${JSON.stringify({ decision: 'deny', reason: reply.reason })}\n`, stderr: `${reply.reason}\n`, exitCode: 0 };
+    if (!capability.refuse) throw relayError('UNSUPPORTED_REPLY', `${nativeEvent} has no refusal channel`);
+    const decision = nativeEvent === 'Stop' ? 'continue' : 'deny';
+    return { stdout: `${JSON.stringify({ decision, reason: reply.reason })}\n`, stderr: `${reply.reason}\n`, exitCode: 0 };
   }
-  if (reply.context !== undefined) throw relayError('UNSUPPORTED_REPLY', `${nativeEvent} has no context channel`);
-  return { stdout: '', stderr: '', exitCode: 0 };
+  if (reply.context === undefined) return { stdout: '', stderr: '', exitCode: 0 };
+  if (!capability.context) throw relayError('UNSUPPORTED_REPLY', `${nativeEvent} has no context channel`);
+  return { stdout: `${JSON.stringify({ injectSteps: [{ systemMessage: { systemMessage: reply.context } }] })}\n`, stderr: '', exitCode: 0 };
 }
 /** @param {unknown} v @returns {v is Record<string, any>} */
 const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);

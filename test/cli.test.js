@@ -43,8 +43,9 @@ test('usage: help, list [--json], reap [--outer-ms N], hook --harness NAME [--ou
   }
   // A well-formed hook invocation whose budget is too small to survive fails inside dispatchHook's own
   // protocol, not at CLI parse time: it keeps its historical exit code and "CODE: message" text.
+  // An unplannable budget is infrastructure, so a tool call fails closed with a native refusal.
   const tooShort=run(p,['hook','--harness','claude-code','--outer-ms','100','PreToolUse']);
-  assert.equal(tooShort.status,1);assert.match(tooShort.stderr,/^USAGE: outer timeout must be/);
+  assert.equal(tooShort.status,2);assert.match(tooShort.stdout,/relay refused: USAGE: outer timeout must be/);
 });
 const fixture=new URL('./fixtures/subscriber.js',import.meta.url).pathname;
 const hookRun=(p,args,input,opts={})=>spawnSync(process.execPath,[cli.pathname,'hook',...args],{encoding:'utf8',input,env:{...process.env,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome},...opts});

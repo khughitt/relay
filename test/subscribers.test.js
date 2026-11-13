@@ -202,8 +202,9 @@ test('budgetFor admits hook-only events and keeps unknown events unsupported', (
   assert.throws(() => budgetFor({ harness: 'agy', nativeEvent: 'PreInvocation' }), { code: 'UNSUPPORTED_EVENT' });
 });
 
-test('agy turn-end guard is rejected at load; a before-tool guard validates', () => {
-  assert.throws(() => validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['turn-end'], harnesses: ['agy'], tools: null })] }), (e) => e.code === 'INVALID_CONFIG' && e.message.includes('agy turn-end has no refusal channel'));
+test('agy turn-end guards now load (Stop holds with continue); a session-start guard is rejected', () => {
+  validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['turn-end'], harnesses: ['agy'], tools: null })] });
+  assert.throws(() => validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['session-start'], harnesses: ['agy'], tools: null })] }), (e) => e.code === 'INVALID_CONFIG' && e.message.includes('agy session-start has no refusal channel'));
   validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['before-tool'], harnesses: ['agy'] })] });
 });
 test('agy budget follows the 30 s outer timeout and an explicit outer timeout', () => {

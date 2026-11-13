@@ -67,6 +67,8 @@ export function backgroundOf(data, nativeEvent) {
 // UserPromptSubmit and Stop block; only the first two carry additionalContext.
 /** @type {Readonly<Record<string, import("../types.js").Capability>>} */
 export const replies = Object.freeze({
+  // SessionStart context: hookSpecificOutput.additionalContext (hooks reference); live delivery is qualified separately.
+  'SessionStart': Object.freeze({ refuse: false, context: true }),
   'UserPromptSubmit': Object.freeze({ refuse: true, context: true }),
   'PreToolUse': Object.freeze({ refuse: true, context: true }),
   'Stop': Object.freeze({ refuse: true, context: false }),

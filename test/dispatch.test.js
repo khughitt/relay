@@ -74,8 +74,11 @@ test('allow replies concatenate context in configuration order and honor the cha
   const prompt = await hook(p, { nativeEvent: 'UserPromptSubmit', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.equal(prompt.stdout, '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"context from p"}}\n');
   await writeSubscribers(p, [strip(guard('stop', 'context', { kinds: ['turn-end'] }))]);
-  const stop = await hook(p, { nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: CWD, stop_hook_active: true }) });
+  const stop = await hook(p, { nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.equal(stop.exitCode, 2); assert.match(stop.stdout, /^\{"decision":"block","reason":"relay refused: UNSUPPORTED_REPLY: /);
+  const retried = await hook(p, { nativeEvent: 'Stop', body: JSON.stringify({ session_id: 'sess', cwd: CWD, stop_hook_active: true }) });
+  assert.deepEqual([retried.exitCode, retried.stdout], [0, ''], 'a reply error is infrastructure: a validated retry is not blocked again');
+  assert.match(retried.stderr, /UNSUPPORTED_REPLY/);
 });
 
 test('every guard failure relay survives is a native refusal', async (t) => {
@@ -100,7 +103,8 @@ test('oversized dispatcher errors use bounded classified refusals before registr
   await writeSubscribers(p, [strip(guard('g', 'huge-field'))]);
   let r = await hook(p, { deps: { apply: neverApply } });
   let reason = JSON.parse(r.stdout).hookSpecificOutput.permissionDecisionReason;
-  assert.deepEqual(r, { stdout: `${denyOut}"relay refused: INVALID_REPLY"}}\n`, stderr: 'relay refused: INVALID_REPLY\n', exitCode: 2 });
+  // The unexpected field's name is the subscriber's output and is never echoed.
+  assert.deepEqual(r, { stdout: `${denyOut}"relay refused: INVALID_REPLY: guard g: unexpected reply field"}}\n`, stderr: 'relay refused: INVALID_REPLY: guard g: unexpected reply field\n', exitCode: 2 });
   assert.ok(reason.length <= CONTEXT_LIMIT);
 
   for (const subscriber of [guard('x'.repeat(60000), 'allow'), { ...guard('g', 'allow'), ['x'.repeat(60000)]: true }]) {
@@ -255,7 +259,8 @@ test('an unusable environment cannot reach the policy phase when the path is exp
   assert.equal(denied.exitCode, 2); assert.ok(denied.stdout.startsWith(denyOut));
   await writeSubscribers(p, [guard('h', 'context')]);
   const allowed = await hook(p, { subscribersPath: p.subscribersPath, deps: { paths: undefined, env: bad } });
-  assert.equal(allowed.exitCode, 1); assert.match(allowed.stdout, /additionalContext/); assert.match(allowed.stderr, /^registry: INVALID_INPUT/m);
+  // Context is read only on exit 0, so a reply carrying context keeps exit 0 when publication fails.
+  assert.equal(allowed.exitCode, 0); assert.match(allowed.stdout, /additionalContext/); assert.match(allowed.stderr, /^registry: INVALID_INPUT/m);
   const flagless = await hook(p, { deps: { paths: undefined, env: bad } });
   assert.equal(flagless.exitCode, 2); assert.match(flagless.stdout, /relay refused: INVALID_INPUT/);
 });
@@ -425,10 +430,12 @@ test('a malformed Codex agent_id refuses even with no guard, and publishes nothi
   const codex = (nativeEvent, over) => hook(p, { harness: 'codex', nativeEvent, body: payload(over) });
   let r = await codex('PreToolUse', { agent_id: null });
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /"permissionDecision":"deny".*relay refused: INVALID_INPUT: invalid worker agent_id/);
-  r = await codex('SubagentStop', { agent_id: null, stop_hook_active: true });
+  r = await codex('SubagentStop', { agent_id: null });
   assert.deepEqual(r, { stdout: '{"decision":"block","reason":"relay refused: INVALID_INPUT: invalid worker agent_id"}\n',
     stderr: 'relay refused: INVALID_INPUT: invalid worker agent_id\n', exitCode: 2 });
-  r = await codex('Stop', { agent_id: null, stop_hook_active: true });
+  r = await codex('SubagentStop', { agent_id: null, stop_hook_active: true });
+  assert.deepEqual([r.exitCode, r.stdout], [0, ''], 'an unusable identity on a validated retry is not blocked again');
+  r = await codex('Stop', { agent_id: null });
   assert.deepEqual(r, { stdout: '{"decision":"block","reason":"relay refused: INVALID_INPUT: invalid worker agent_id"}\n',
     stderr: 'relay refused: INVALID_INPUT: invalid worker agent_id\n', exitCode: 2 });
   r = await codex('SubagentStart', {});
@@ -512,8 +519,11 @@ test('a budget that cannot be planned refuses agy PreToolUse and leaves other ha
   assert.equal(r.exitCode, 0); assert.match(r.stdout, /^\{"decision":"deny","reason":"relay refused: /);
   const stop = await hook(p, { harness: 'agy', nativeEvent: 'Stop', body: await agyFixture('Stop'), outerMs: 400 });
   assert.equal(stop.exitCode, 0); assert.equal(stop.stdout, ''); assert.match(stop.stderr, /\S/);
+  // An unplannable budget is infrastructure: tool calls fail closed on every harness.
   const claude = await hook(p, { outerMs: 400 });
-  assert.equal(claude.exitCode, 1); assert.equal(claude.stdout, ''); assert.match(claude.stderr, /\S/);
+  assert.equal(claude.exitCode, 2); assert.match(claude.stdout, /"permissionDecision":"deny".*relay refused: USAGE/);
+  const idle = await hook(p, { nativeEvent: 'Notification:idle_prompt', body: JSON.stringify({ session_id: 'sess', cwd: CWD }), outerMs: 400 });
+  assert.equal(idle.exitCode, 1); assert.equal(idle.stdout, ''); assert.match(idle.stderr, /USAGE/);
 });
 
 test('dispatchHook forwards agyAppDataDir from artifactDirectoryPath and falls back to deps.env', async (t) => {

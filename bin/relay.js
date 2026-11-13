@@ -15,6 +15,13 @@ const listAgents = async (...args) => (await import('../src/bus/transaction.js')
 const dispatchHook = async (...args) => (await import('../src/dispatch.js')).dispatchHook(...args);
 /** @type {(...args: Parameters<typeof import('../src/dispatch.js').reconcile>) => ReturnType<typeof import('../src/dispatch.js').reconcile>} */
 const reconcile = async (...args) => (await import('../src/dispatch.js')).reconcile(...args);
+// The harness and native event a hook invocation names, when it names a retry-escaping Stop.
+/** @param {string[]} args @returns {{harness: string, nativeEvent: string}|null} */
+function stopNamed(args) {
+  const at = args.indexOf('--harness'), harness = at >= 0 ? args[at + 1] : undefined, nativeEvent = args[args.length - 1];
+  if (!['claude-code', 'codex'].includes(String(harness)) || !['Stop', 'SubagentStop'].includes(nativeEvent)) return null;
+  return { harness: /** @type {string} */ (harness), nativeEvent };
+}
 /** @param {string} stateDir */
 const socketPathOf = async (stateDir) => (await import('../src/serve/serve.js')).servePaths(stateDir).socketPath;
 
@@ -181,7 +188,18 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
     if (cmd.path[0] === 'hook') {
       // Protocol row: stdout is the harness reply, the exit code is the guard's. Untouched
       // beyond reading its option names from the table above.
-      const request = /** @type {{harness: string, nativeEvent: string, outerMs?: number, subscribersPath?: string}} */ (parse(rest, { harness: true }));
+      /** @type {{harness: string, nativeEvent: string, outerMs?: number, subscribersPath?: string}} */
+      let request;
+      try { request = /** @type {any} */ (parse(rest, { harness: true })); }
+      catch (caught) {
+        // A malformed invocation that still names a retry-escaping Stop answers by the Stop rule, so a
+        // broken hook line cannot keep a session from stopping on its native retry.
+        const named = stopNamed(rest);
+        if (named === null) throw caught;
+        const r = await (await import('../src/dispatch.js')).stopUsageReply({ ...named, input: stdin, error: /** @type {any} */ (caught) });
+        await emit(stdout, r.stdout); await emit(stderr, r.stderr);
+        return r.exitCode;
+      }
       const r = await hook({ ...request, input: stdin });
       await emit(stdout, r.stdout); await emit(stderr, r.stderr);
       return r.exitCode;

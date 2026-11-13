@@ -63,15 +63,19 @@ test('agy replies', () => {
   const { encodeReply } = adapterFor('agy');
   assert.deepEqual(encodeReply('PreToolUse', { decision: 'deny', reason: 'no' }), { stdout: '{"decision":"deny","reason":"no"}\n', stderr: 'no\n', exitCode: 0 });
   for (const event of ['SessionStart', 'PreToolUse', 'Stop']) assert.deepEqual(encodeReply(event, { decision: 'allow' }), { stdout: '', stderr: '', exitCode: 0 });
-  for (const event of ['Stop', 'SessionStart']) assert.throws(() => encodeReply(event, { decision: 'deny', reason: 'no' }), { code: 'UNSUPPORTED_REPLY' });
-  for (const event of ['SessionStart', 'PreToolUse', 'Stop']) assert.throws(() => encodeReply(event, { decision: 'allow', context: 'c' }), { code: 'UNSUPPORTED_REPLY' });
+  // A Stop denial holds the turn with decision continue on exit 0; SessionStart and PreInvocation inject context.
+  assert.deepEqual(encodeReply('Stop', { decision: 'deny', reason: 'held claim' }), { stdout: '{"decision":"continue","reason":"held claim"}\n', stderr: 'held claim\n', exitCode: 0 });
+  for (const event of ['SessionStart', 'PreInvocation']) assert.deepEqual(encodeReply(event, { decision: 'allow', context: 'c' }), { stdout: '{"injectSteps":[{"systemMessage":{"systemMessage":"c"}}]}\n', stderr: '', exitCode: 0 });
+  for (const event of ['SessionStart', 'PreInvocation']) assert.throws(() => encodeReply(event, { decision: 'deny', reason: 'no' }), { code: 'UNSUPPORTED_REPLY' });
+  for (const event of ['PreToolUse', 'Stop']) assert.throws(() => encodeReply(event, { decision: 'allow', context: 'c' }), { code: 'UNSUPPORTED_REPLY' });
 });
 
 test('agy events and state', () => {
   const agy = adapterFor('agy');
   assert.deepEqual(Object.entries(agy.events).map(([k, v]) => [k, v.kind, v.level]),
     [['SessionStart', 'session-start', 'idle'], ['PreToolUse', 'before-tool', 'working'], ['Stop', 'turn-end', 'done']]);
-  assert.deepEqual(agy.replies, { PreToolUse: { refuse: true, context: false } });
+  assert.deepEqual(agy.replies, { PreToolUse: { refuse: true, context: false }, Stop: { refuse: true, context: false },
+    SessionStart: { refuse: false, context: true }, PreInvocation: { refuse: false, context: true } });
   for (const event of ['PreInvocation', 'PostToolUse']) assert.throws(() => agy.stateForEvent(event), { code: 'UNSUPPORTED_EVENT' });
   assert.equal(agy.reduceState('done', 'working'), 'done');
 });

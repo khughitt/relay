@@ -133,7 +133,7 @@ consumer rules, failure stdout and Darwin's decoded-environment qualification.
 
 | Harness | Native event | Kind | Level | Refuse | Context |
 | --- | --- | --- | --- | --- | --- |
-| Claude, Codex, agy | `SessionStart` | `session-start` | `idle` | no | no |
+| Claude, Codex, agy | `SessionStart` | `session-start` | `idle` | no | yes (Claude, Codex `additionalContext`; agy `injectSteps`) |
 | Claude, Codex | `UserPromptSubmit` | `prompt` | `working` | yes | yes |
 | Claude, Codex | `PreToolUse` | `before-tool` | `working` | yes | yes |
 | agy | `PreToolUse` | `before-tool` | `working` | yes | no |
@@ -142,7 +142,7 @@ consumer rules, failure stdout and Darwin's decoded-environment qualification.
 | Claude | `StopFailure` | `turn-error` | `error` | no | no |
 | Codex | `PermissionRequest` | `needs-approval` | `needs-approval` | no | no |
 | Codex | `SubagentStart` | `session-start` | `working` | no | no |
-| Claude, Codex, agy | `Stop` | `turn-end` | `done` | Claude, Codex: yes; agy: no | no |
+| Claude, Codex, agy | `Stop` | `turn-end` | `done` | yes (agy: `{"decision":"continue","reason"}` on exit 0) | no |
 | Codex | `SubagentStop` | `turn-end` | `done` | yes | no |
 | Claude, Codex | `SessionEnd` | `session-end` | remove | no | no |
 | OpenCode | `init` | `session-start` | `idle` | no | no |
@@ -334,7 +334,7 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 ```
 
 - `name` matches `^[a-z0-9][a-z0-9-]{0,63}$` and is unique.
-- `role` is `guard`, `notice` or `observer`. Guards and notices must name `harnesses`. Every guard `(harness, kind)` pair must select native events that all have a refusal channel; every notice pair, events that all have a context channel. This build validates notices but refuses to dispatch one (`UNSUPPORTED_ROLE`) rather than ignore it.
+- `role` is `guard`, `notice` or `observer`. Guards and notices must name `harnesses`. Every guard `(harness, kind)` pair must select native events that all have a refusal channel; every notice pair, events that all have a context channel. A static channel is not proof of live delivery on an installed harness version; route qualification is separate.
 - `kinds` is a nonempty unique subset of the hook kinds; observers may add `reconcile`.
 - `nativeEvents` (optional) is a nonempty unique list of native events those kinds and harnesses select, and narrows matching to them.
 - `tools` is allowed only when every kind is a tool kind (`before-tool`, `after-tool`, `tool-error`).
@@ -357,6 +357,10 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 
 A dispatch admitting any subscriber needs `250` (supervisor startup) `+ 500` (repository discovery) `+ Σ (timeoutMs + 500)` (each subscriber's cleanup reserve) to fit `subscribers`, ignoring tool filters; a dispatch admitting none reserves nothing. At run time an observer starts only with its timeout and cleanup reserve still left, plus startup if it would be the first subscriber; otherwise it is `SUBSCRIBER_SKIPPED`, never deferred. Consequences at native caps: Claude Code `SessionEnd` at its 1.5 s default, Codex `SessionEnd` at any allowed `--outer-ms` (3 s maximum) and OpenCode at its fixed 5 s lifetime above 84 ms of subscriber timeout admit no subscriber; their registry-only bindings still publish.
 
+### Notice protocol
+
+A notice runs only after every guard allowed, before registry publication, and in configuration order: a notice that reads `$STATE/agents.json` sees this event's pre-publication state, and slow notices delay publication. It receives the same `SubscriberEnvelope` as a guard and writes exactly `{}` or `{"context":"<nonempty text>"}`; it cannot deny. Malformed output, a nonzero exit, a timeout, output overflow or a containment failure contributes nothing and is a `NOTICE_FAILED: <name> <event> <code> after <ms> ms` diagnostic; the reply fails open with the remaining context. Guard context, then notice context, joins with newlines under the 10,000-character ceiling (JavaScript string length): guard overflow is a guard failure, and a notice that no longer fits is dropped whole (`NOTICE_DROPPED`), never clipped, so configuration order decides which notices fit. agy's own injection limit is unmeasured and its route unqualified. Context is returned with exit `0` even when publication failed, because harnesses read a reply's context only on exit `0`.
+
 ### Guard protocol
 
 Each matching guard receives a `SubscriberEnvelope` on stdin with `registry: {"status":"not-requested"}` (guards run before publication) and every applicable private field, and writes one JSON object `{"decision":"allow"|"deny","reason"?,"context"?}` on stdout with exit code `0`. `deny` requires `reason`. Present `reason` and `context` strings and combined `allow` context across guards are each capped at `CONTEXT_LIMIT` (`10000` characters); oversize output is `INVALID_REPLY` (a refusal on refusal-capable events). All matching guards run in configuration order even after a denial; the first denial's `reason` wins and drops any `context`. Any guard error or timeout produces a refusal with reason `relay refused: <CODE>: <message>`.
@@ -377,11 +381,22 @@ Each matching observer receives a `SubscriberEnvelope` on stdin (stdout is disca
 
 | Exit code | Meaning |
 | --- | --- |
-| `0` | An `allow` reply (with or without `context`), or on `agy` any refusal (`{"decision":"deny","reason":R}` on stdout) or non-refusal failure (empty stdout, diagnostic on stderr). |
-| `2` | A refusal on Claude Code or Codex (JSON refusal on stdout and reason on stderr), or a CLI usage error. |
-| `1` | (Claude Code, Codex, OpenCode) An error on an event without a refusal channel, an `allow` reply whose registry publication failed, or a published Claude Code `Stop` event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`). The guard result stands; exit `1` does not imply the registry is unchanged. |
+| `0` | An `allow` reply (with or without `context`, including context returned when publication failed), a Claude Code or Codex `Stop`/`SubagentStop` infrastructure failure on a validated `stop_hook_active: true` retry (empty stdout, diagnostic on stderr), or on `agy` any refusal (`{"decision":"deny"}` on `PreToolUse`, `{"decision":"continue"}` on `Stop`) or non-refusal failure (empty stdout, diagnostic on stderr). |
+| `2` | A refusal on Claude Code or Codex (JSON refusal on stdout and reason on stderr), or a CLI usage error on an event other than `Stop`/`SubagentStop`. |
+| `1` | (Claude Code, Codex, OpenCode) An error on an event without a refusal channel, an `allow` reply without context whose registry publication failed, or a published Claude Code `Stop` event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`). The guard result stands; exit `1` does not imply the registry is unchanged. |
 
-For `agy` (`Adapter.failureExitCode: 0`), every failure that would exit `1` exits `0` with empty stdout and a stderr diagnostic because exit `1` fails `agy`'s `PreToolUse` tool call, while a budget failure on `agy` `PreToolUse` still emits a native JSON denial so the tool does not run unguarded. Because `agy` ignores exit `2` usage errors (failing open), installing an `agy` `PreToolUse` hook requires verifying a live guard denial through the installed command.
+Infrastructure failures (configuration load or schema, budget, input, normalization, repository discovery, command resolution, spawn, nonzero exit, invalid reply, overflow, timeout, containment) follow one rule per event (`failureReply`, `src/dispatch-failure.js`):
+
+| Event | Infrastructure failure | Explicit policy denial |
+| --- | --- | --- |
+| `PreToolUse`, `UserPromptSubmit` (and agy `PreToolUse`) | native refusal (fail closed) | native refusal |
+| Claude Code / Codex `Stop`, Codex `SubagentStop` | refusal on the first attempt; nonblocking on a validated `stop_hook_active: true` retry | refusal, retry or not |
+| agy `Stop` | empty stdout, exit 0 (never `continue`) | `{"decision":"continue","reason"}` |
+| `SessionStart` and other events | diagnostic | not available (no refusal channel) |
+
+For `Stop`/`SubagentStop` relay reads stdin first, once, with a fixed 250 ms / 4 MiB bound that does not depend on the configuration or budget, and takes the retry flag only from an exact boolean `stop_hook_active` in a parsed JSON object: a string, a number, malformed or oversized input is never `true`. A CLI option error on a hook line that still names a Claude Code or Codex `Stop`/`SubagentStop` answers by the same rule. An unreadable outer input or a relay process killed by the harness is the harness's own outer failure, qualified separately; a lasting refusal is recovered outside the harness with the rollback runbook.
+
+For `agy` (`Adapter.failureExitCode: 0`), every failure that would exit `1` exits `0` with empty stdout and a stderr diagnostic because exit `1` fails `agy`'s `PreToolUse` tool call, while an infrastructure failure on `agy` `PreToolUse` still emits a native JSON denial so the tool does not run unguarded. Because `agy` ignores exit `2` usage errors (failing open), installing an `agy` `PreToolUse` hook requires verifying a live guard denial through the installed command.
 
 `BACKGROUND_UNREADABLE: background_tasks is not a list of {type, status} entries` is a stderr diagnostic, never a thrown error: the event still publishes and observers still run.
 
