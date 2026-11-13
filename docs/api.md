@@ -100,6 +100,7 @@ createProcessOps(options?: {
   hostname?: () => string;
 }): ProcessOps;
 readSnapshot(options?: ReadOptions): Promise<Snapshot | null>;
+readSnapshotFor(position: { generation: string }, options?: ReadOptions): Promise<Snapshot | null>; // current snapshot under the lock when its generation matches, else null
 listAgents(options?: ReadOptions): Promise<Listing>;
 applyEvent(event: Event, options?: MutationOptions): Promise<MutationResult>;
 reapRegistry(options?: ReadOptions): Promise<MutationResult>;

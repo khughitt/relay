@@ -95,6 +95,7 @@ function validateSubscriber(v, index) {
     return base;
   }
   if (!['occurrence', 'snapshot'].includes(v.registry)) fail(`${where}: an observer must declare registry "occurrence" or "snapshot"`);
+  if (v.registry === 'occurrence' && v.kinds.includes(RECONCILE)) fail(`${where}: reconcile carries no occurrence; only a snapshot observer may select it`);
   return { ...base, registry: v.registry, privateFields: validatePrivateFields(where, v.privateFields, selector) };
 }
 
@@ -150,7 +151,7 @@ export function matchSubscribers(config, event) {
 }
 
 /** @param {import("./types.js").Subscribers} config */
-export const matchReconcile = (config) => config.subscribers.filter((subscriber) => subscriber.role === 'observer' && subscriber.kinds.includes(RECONCILE));
+export const matchReconcile = (config) => config.subscribers.filter((subscriber) => subscriber.role === 'observer' && subscriber.registry === 'snapshot' && subscriber.kinds.includes(RECONCILE));
 
 /** @param {{harness?: string|null, nativeEvent?: string|null, outerMs?: number}} [options] @returns {import("./types.js").Budget} */
 export function budgetFor({ harness = null, nativeEvent = null, outerMs } = {}) {

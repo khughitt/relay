@@ -56,6 +56,29 @@ async function readForMutation(opts, diagnostics) {
 }
 /** @param {import("../types.js").RegistryOptions} [given] */
 export async function readSnapshot(given = {}) { return read(options(given)); }
+
+// The current validated snapshot read under the writer lock, so no mutation is in flight. Nothing
+// but this read runs under the lock: callers apply what they learn after it is released.
+/** @param {ReturnType<typeof options>} opts */
+async function authoritative(opts) {
+  if (opts.clock() >= opts.deadline) throw relayError('DEADLINE_EXCEEDED','registry read deadline exceeded');
+  const locked = await withLock(opts.paths.lockPath,async () => read(opts),opts);
+  return locked.value;
+}
+/** @param {import("../types.js").RegistryOptions} [given] @returns {Promise<import("../types.js").Snapshot|null>} */
+export async function readAuthoritative(given = {}) { return authoritative(options(given)); }
+
+/**
+ * The consumption primitive for snapshot-derived observers: the current snapshot when its generation
+ * equals the given one, otherwise null (a different or absent registry). Generation ids are never
+ * ordered; a consumer adopts a changed generation only from this read. Errors stay explicit.
+ * @param {{generation: string}} position @param {import("../types.js").RegistryOptions} [given]
+ * @returns {Promise<import("../types.js").Snapshot|null>}
+ */
+export async function readSnapshotFor({ generation }, given = {}) {
+  const snapshot = await authoritative(options(given));
+  return snapshot !== null && snapshot.generation === generation ? snapshot : null;
+}
 /** @param {import("../types.js").RegistryOptions} [given] */
 export async function listAgents(given = {}) {
   const opts = options(given), snapshot = await read(opts);
@@ -70,6 +93,8 @@ const sameProcess = (a,b) => a !== null && b !== null && (a.platform !== 'linux'
   && a.platform === b.platform && a.host === b.host && a.bootId === b.bootId && a.pid === b.pid && a.start === b.start;
 /** @param {ReturnType<typeof options>} opts @param {import("../types.js").Event|null} event @param {{remote: string|null, repoRoot: string|null}|null} context @param {import("../types.js").Handle|null} handle @param {import("../types.js").Diagnostic[]} diagnostics @returns {Promise<import("../types.js").RegistryResult>} */
 async function mutate(opts, event, context, handle, diagnostics) {
+  // No mutation is admitted once its deadline has passed, and none commits after it.
+  if (opts.clock() >= opts.deadline) throw relayError('DEADLINE_EXCEEDED','registry mutation deadline exceeded before admission');
   const locked = await withLock(opts.paths.lockPath,async () => {
     const {before,superseded} = await readForMutation(opts,diagnostics);
     const {agents,reaped,liveness} = pruneDead(before?.agents ?? {},{probe:h=>opts.processOps.probe(h,opts)});
@@ -147,6 +172,9 @@ async function mutate(opts, event, context, handle, diagnostics) {
     }
     if (!changed) return {snapshot:before,changed:false,reaped,diagnostics};
     const snapshot = validateSnapshot({schema:2,generation:before?.generation ?? opts.uuid(),revision:(before?.revision ?? 0)+1,agents});
+    if (opts.clock() >= opts.deadline) throw relayError('DEADLINE_EXCEEDED','registry mutation deadline exceeded before commit');
+    // A caller that has already reported this publication failed refuses its commit.
+    if (opts.admitCommit && !opts.admitCommit()) throw relayError('DEADLINE_EXCEEDED','registry mutation abandoned by its caller before commit');
     await writeJsonAtomic(opts.paths.agentsPath,snapshot,opts);
     return {snapshot,changed:true,reaped,diagnostics};
   },opts);

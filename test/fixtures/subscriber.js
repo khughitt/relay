@@ -34,6 +34,8 @@ switch (mode) {
   // Echoes its private input to stderr and replies with malformed stdout carrying it too.
   case 'echo-private': process.stderr.write(`ECHO ${input}\n`); process.stdout.write(`not json ${input}`); break;
   case 'echo-private-field': process.stderr.write(`ECHO ${input}\n`); out({ decision: 'allow', [`leak ${input.slice(0, 40)}`]: 1 }); break;
+  // Copies argv[3] (or "absent") to argv[4], then replies as a notice.
+  case 'copy-then-notice': { const { readFileSync } = await import('node:fs'); let text = 'absent'; try { text = readFileSync(file, 'utf8'); } catch {} writeFileSync(process.argv[4], text); out({}); break; }
   case 'noisy': process.stderr.write('observer noise\n'); out({ decision: 'deny', reason: 'observer output must be ignored' }); break;
   default: process.exit(9);
 }

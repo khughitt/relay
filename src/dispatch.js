@@ -5,7 +5,7 @@ import { appDataDirFromPayload } from './adapters/agy.js';
 import { readNativeInput } from './adapters/payload.js';
 import { parseReply, CONTEXT_LIMIT } from './adapters/reply.js';
 import { paths as defaultPaths } from './bus/paths.js';
-import { applyEvent, reapRegistry } from './bus/transaction.js';
+import { applyEvent, reapRegistry, readAuthoritative } from './bus/transaction.js';
 import { relayError } from './protocol.js';
 import { describe, refusalReason, retryEscapes, readRecoveryInput, failureReply, parseNoticeReply, combineContext } from './dispatch-failure.js';
 import { loadSubscribers, loadSubscribersFrom, matchSubscribers, checkBudget, budgetFor, RECONCILE } from './subscribers.js';
@@ -51,6 +51,7 @@ export const accessFor = (result) => result.snapshot === null ? { status: 'unava
 // Reconciliation carries no event: the registry position and the rows pruned for dead processes.
 /** @param {import("./types.js").Subscriber} subscriber @param {import("./types.js").RegistryResult} result @returns {import("./types.js").ReconcileEnvelope} */
 export const reconcileEnvelope = (subscriber, result) => ({ schema: 2, type: 'reconcile', subscriber: subscriber.name, registry: accessFor(result), reaped: result.reaped });
+const EXPIRED = Symbol('expired');
 const NOT_REQUESTED = Object.freeze({ status: /** @type {'not-requested'} */ ('not-requested') });
 
 /**
@@ -301,19 +302,56 @@ async function dispatchOnce({ harness, nativeEvent, input, outerMs, subscribersP
     try { combined = combineContext(guardContexts, noticeContexts.map((n) => n.context)); }
     catch (caught) { return failureReply({ adapter, harness, nativeEvent, retry: recovery?.retry ?? null, error: /** @type {import('./types.js').Failure} */ (caught), diagnostics: [] }); }
     for (const index of combined.dropped) diagnostics.push(`NOTICE_DROPPED: ${noticeContexts[index].name} ${nativeEvent} context does not fit the remaining ${CONTEXT_LIMIT}-character allowance`);
+    // Publication is awaited, never raced: its deadline is checked before admission, carried through
+    // lock acquisition and checked again before commit inside applyEvent, so no mutation runs on after
+    // this dispatch reports a deadline failure.
     let result = null, published = registryEvent === null && registryError === null;
-    if (registryError !== null) diagnostics.push(`registry: ${describe(registryError)}`);
-    if (registryEvent !== null) try {
-      paths ??= statePaths();
+    /** @type {import("./types.js").RegistryAccess} */
+    let access = NOT_REQUESTED;
+    if (registryError !== null) { diagnostics.push(`registry: ${describe(registryError)}`); access = { status: 'unavailable', code: String(registryError.code ?? 'INVALID_INPUT') }; }
+    if (registryEvent !== null) {
       const deadline = Math.min(workDeadline, clock() + budget.registryMs);
-      const publishing = registryEvent;
-      result = await bounded(() => apply(publishing, { ...applyOptions, ...(agyAppDataDir === undefined ? {} : { agyAppDataDir }), ...(applyOptions.env === undefined ? { env: deps.env ?? process.env } : {}), paths: /** @type {import("./types.js").Paths} */ (paths), clock, deadline }), { clock, deadline }, 'registry publication did not finish before the deadline');
-      for (const diagnostic of result.diagnostics) diagnostics.push(`${diagnostic.code}: ${diagnostic.message}${diagnostic.agentId ? ` (${diagnostic.agentId})` : ''}`);
-      published = true;
-    } catch (caught) { const cause = /** @type {import('./types.js').Failure} */ (caught); diagnostics.push(`registry: ${describe(cause)}`); }
+      try {
+        paths ??= statePaths();
+        if (clock() >= deadline) throw relayError('DEADLINE_EXCEEDED', 'registry publication was not admitted before its deadline');
+        // The publication is raced against its deadline only until it asks to commit. Once this
+        // dispatch reports the deadline it refuses that commit, so stalled work can never write
+        // later; a commit admitted before the deadline is awaited.
+        let reported = false, committing = false;
+        const admitCommit = () => { if (reported) return false; committing = true; return true; };
+        const work = apply(registryEvent, { ...applyOptions, ...(agyAppDataDir === undefined ? {} : { agyAppDataDir }), ...(applyOptions.env === undefined ? { env: deps.env ?? process.env } : {}), paths: /** @type {import("./types.js").Paths} */ (paths), clock, deadline, admitCommit });
+        /** @type {NodeJS.Timeout|undefined} */
+        let timer;
+        const expired = new Promise((resolve) => { timer = setTimeout(() => resolve(EXPIRED), Math.max(0, deadline - clock())); });
+        const first = await Promise.race([work, expired]).finally(() => clearTimeout(timer));
+        if (first === EXPIRED && !committing) { reported = true; work.catch(() => {}); throw relayError('DEADLINE_EXCEEDED', 'registry publication did not finish before the deadline'); }
+        result = first === EXPIRED ? await work : /** @type {import("./types.js").RegistryResult} */ (first);
+        for (const diagnostic of result.diagnostics) diagnostics.push(`${diagnostic.code}: ${diagnostic.message}${diagnostic.agentId ? ` (${diagnostic.agentId})` : ''}`);
+        if (clock() > deadline) throw relayError('DEADLINE_EXCEEDED', 'registry publication did not finish before the deadline');
+        published = true; access = accessFor(result);
+      } catch (caught) { const cause = /** @type {import('./types.js').Failure} */ (caught); diagnostics.push(`registry: ${describe(cause)}`); access = { status: 'unavailable', code: String(cause.code ?? 'IO_ERROR') }; }
+    }
+    // A snapshot observer needs an authoritative position: the publication, or for an event with no
+    // registry effect a read under the lock that mutates nothing. Occurrence observers never wait
+    // for the registry and run whatever happened to it.
+    let snapshotAccess = access, authoritativeOk = registryEvent !== null && published;
+    if (registryEvent === null && registryError === null && observers.some((o) => o.registry === 'snapshot')) {
+      const deadline = Math.min(workDeadline, clock() + budget.registryMs);
+      try {
+        paths ??= statePaths();
+        const snapshot = await readAuthoritative({ paths: /** @type {import("./types.js").Paths} */ (paths), clock, deadline });
+        snapshotAccess = snapshot === null ? { status: 'unavailable', code: 'NO_SNAPSHOT' } : { status: 'ready', generation: snapshot.generation, revision: snapshot.revision };
+        authoritativeOk = true;
+      } catch (caught) { const cause = /** @type {import('./types.js').Failure} */ (caught); diagnostics.push(`registry: ${describe(cause)}`); snapshotAccess = { status: 'unavailable', code: String(cause.code ?? 'IO_ERROR') }; }
+    }
     const hooked = event;
-    if (!published) for (const observer of observers) diagnostics.push(`SUBSCRIBER_SKIPPED: ${observer.name} skipped after registry failure`);
-    else await runObservers(observers, (observer) => projectEnvelope(hooked, observer, result === null ? NOT_REQUESTED : accessFor(result)), { clock, workDeadline, launch, started, nativeEvent }, diagnostics);
+    /** @param {import("./types.js").Subscriber} observer */
+    const accessOf = (observer) => observer.registry === 'snapshot' ? snapshotAccess : access;
+    // A snapshot observer runs only after a successful authoritative step (publication or read);
+    // an empty registry then reaches it as unavailable NO_SNAPSHOT, as reconciliation reports it.
+    const eligible = observers.filter((observer) => observer.registry === 'occurrence' || authoritativeOk);
+    for (const observer of observers) if (!eligible.includes(observer)) diagnostics.push(`SUBSCRIBER_SKIPPED: ${observer.name} skipped after registry failure`);
+    await runObservers(eligible, (observer) => projectEnvelope(hooked, observer, accessOf(observer)), { clock, workDeadline, launch, started, nativeEvent }, diagnostics);
     const reply = adapter.encodeReply(nativeEvent, combined.context ? { decision: 'allow', context: combined.context } : { decision: 'allow' });
     // Harnesses read a reply's context only on exit 0, so a reply carrying context keeps exit 0 even
     // when publication failed; the failure stays on stderr.

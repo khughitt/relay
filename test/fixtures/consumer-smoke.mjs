@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import * as relay from 'relay';
 import * as plugin from 'relay/opencode';
 
-const EXPORTS = ['STATES', 'paths', 'adapterFor', 'normalizeEvent', 'normalizeHookEvent', 'registryEventFor', 'projectEnvelope', 'readNativeInput', 'createProcessOps', 'readSnapshot', 'listAgents',
+const EXPORTS = ['STATES', 'paths', 'adapterFor', 'normalizeEvent', 'normalizeHookEvent', 'registryEventFor', 'projectEnvelope', 'readNativeInput', 'createProcessOps', 'readSnapshot', 'readSnapshotFor', 'listAgents',
   'applyEvent', 'reapRegistry', 'CONTEXT_LIMIT', 'parseReply', 'validateSubscribers', 'loadSubscribers', 'matchSubscribers', 'budgetFor',
   'checkBudget', 'dispatchHook', 'reconcile', 'withLock', 'validateHandle', 'parsePayload', 'whoami'].sort();
 assert.deepEqual(Object.keys(relay).sort(), EXPORTS);

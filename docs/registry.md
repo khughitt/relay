@@ -53,6 +53,16 @@ State directory resolution (`paths(env)` in `src/config/paths.js`):
 
 Repository identity resolution (`src/bus/git.js`) prefers normalized `remote`, then `repoRoot`, then `cwd`; the display basename `project` is not a unique key. Remote credentials, query strings, and fragments are stripped. Recognized not-a-repository and missing-origin results are ordinary absence (`remote: null`); permissions errors, dubious ownership, spawn failures, and timeouts fail with `GIT_ERROR` and never silently rekey to `cwd`. Process resolver failures `PROCESS_UNREADABLE` or `PROCESS_UNAVAILABLE` permit a `process: null` record with a diagnostic; unrelated errors abort. Timestamps are sampled from `now()` at write time, never derived from process start.
 
+## Publication order and snapshot consumption
+
+Publication order is writer-lock acquisition order, not the order a harness emitted its hooks: concurrent hooks can publish in a different order from their source events. Only an actual mutation advances `revision`, and revisions compare only within one `generation`; generation ids are UUIDs and are never ordered.
+
+Events with no registry effect (`registryEventFor` returns `null`: Claude Code `PostToolUse`, `PostToolUseFailure`, child, model and compaction events) take no lock and mutate nothing. When a matching observer declares `registry: "snapshot"`, the dispatch reads the current snapshot under the lock (`readAuthoritative`), which runs no callback under the lock and bumps nothing; `registry: "occurrence"` observers never wait for the registry and run even when publication failed, receiving `{"status":"unavailable","code":…}`. Distinct occurrences are separate deliveries: an unchanged revision is never a reason to discard one.
+
+`readSnapshotFor({ generation }, options)` (a root export) is the consumption primitive for snapshot-derived state: under the existing lock it returns the current validated snapshot when its generation equals the given one, and `null` otherwise (a replaced or absent registry). Errors stay explicit. A consumer serializes its applications and keeps the last accepted generation and revision: it discards a revision not newer within its generation, adopts a changed generation only after `readSnapshotFor` confirms it, and resets revision tracking then. Any asynchronous apply that waits must call `readSnapshotFor` again before it commits; the primitive alone cannot make an external write atomic. `test/fixtures/snapshot-consumer.js` is a worked example. No exactly-once or durable occurrence delivery is promised.
+
+The dispatch carries its absolute deadline through lock acquisition: no mutation is admitted once the deadline has passed, `applyEvent` refuses to commit after it, and a publication still waiting when the dispatch reports `DEADLINE_EXCEEDED` is refused its commit (`admitCommit`). A commit admitted before the deadline is awaited before the reply, so no deferred mutation runs after a reported failure.
+
 ## Schema-1 supersession
 
 Schema 2 publishes, as `Agent.process`, the handle of the process that is the session, not of the terminal that displays it.
