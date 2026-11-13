@@ -159,10 +159,31 @@ test('the qualification scripts import without an entry script path', async () =
   }
 });
 
+// Node resolves symlinks in the entry module's URL but not in process.argv[1]; a script reached
+// through a linked directory (a checkout's .worktrees link) must still run, never exit 0 unrun.
+test('the qualification scripts run when invoked through a symlinked path', async () => {
+  const { mkdtempSync, symlinkSync, rmSync } = await import('node:fs');
+  const { spawnSync } = await import('node:child_process');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const dir = mkdtempSync(join(tmpdir(), 'relay-linked-'));
+  try {
+    const linked = join(dir, 'scripts');
+    symlinkSync(fileURLToPath(new URL('../scripts/hook-qualification', import.meta.url)), linked);
+    const env = { PATH: '/usr/bin:/bin', HOME: dir };
+    const judged = spawnSync(process.execPath, [join(linked, 'judge.mjs'), join(dir, 'absent.json')], { encoding: 'utf8', env });
+    assert.notEqual(judged.status, 0, 'a judge that never ran must not report a pass');
+    const ran = spawnSync(process.execPath, [join(linked, 'run.mjs')], { encoding: 'utf8', env });
+    assert.equal(ran.status, 2, ran.stderr);
+    assert.match(ran.stderr, /--output DIR is required/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 // A route process is plain node, whose /proc comm names no harness (Node 24 and later rename the
 // main thread at startup); a route that did not name itself for its harness left its hooks without a
 // session or, under a real harness session, borrowing that outer session silently. Its command line
-// stays its own, so the runner is never mistaken for a harness session in ps.
+// stays its own, so command-line views show the runner rather than a harness session.
 test('a route names itself for its harness on every runtime, so its hooks resolve the route process', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs');
   const { spawnSync } = await import('node:child_process');

@@ -15,7 +15,7 @@
 // on their own; judge.mjs combines both hosts' results. --route selects routes, never their workload.
 import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cpus } from 'node:os';
@@ -36,8 +36,8 @@ const shellQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
 
 /** Names this process for its harness in /proc comm, so hooks it launches find it as their session
  * ancestor. Written after startup, since Node 24 and later rename the main thread then (for example
- * node-MainThread); the command line stays the runner's own, so ps never shows it as a harness
- * session. @param {string} harness */
+ * node-MainThread). The command line stays the runner's own, so command-line views (ps -f, pgrep -f,
+ * host-load) show the runner; comm-based listings show the harness name, which hooks need. @param {string} harness */
 export function becomeHarness(harness) {
   writeFileSync('/proc/self/comm', HARNESS_COMMANDS[harness] ?? refuse(`${harness} has no harness command to stand in for`));
 }
@@ -442,6 +442,7 @@ async function main() {
   for (const r of options.route) if (!known.includes(r)) refuse(`--route ${r} is not in the manifest set (${known.join(', ')})`);
   const selected = options.route.length ? manifests.filter((m) => options.route.includes(routeKey(m))) : manifests;
   const commit = git(resolve(String(options.candidate)), ['rev-parse', 'HEAD']), setSha = sha(resolve(String(options['baseline-manifest'])));
+  mkdirSync(out, { recursive: true });
   let failed = 0;
   /** @type {any[]} */
   const results = [];
@@ -472,7 +473,8 @@ async function main() {
   return failed ? 1 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// The entry module's URL has its symlinks resolved; argv[1] does not, so compare its real path.
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   try { process.exitCode = await main(); }
   catch (error) { process.stderr.write(`run.mjs: ${/** @type {Error} */ (error).message}\n`); process.exitCode = 2; }
 }

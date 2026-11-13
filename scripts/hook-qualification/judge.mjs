@@ -10,7 +10,7 @@
 // that host's own frozen deployed composition (or its native-only path), with every condition's
 // exact sample count, no failed or excluded call, no survivor, and every bound met. Synthetic
 // results are transport evidence; a policy route's own cost is replayed separately before cutover.
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { statistics } from './statistics.mjs';
 import { validateManifest, checkRetainedWork } from './baseline.mjs';
@@ -178,7 +178,8 @@ export function qualifiedRows(qualification, target) {
   return [...events].filter(([, ok]) => ok).map(([event]) => event);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// The entry module's URL has its symlinks resolved; argv[1] does not, so compare its real path.
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const files = process.argv.slice(2);
   if (!files.length) { process.stderr.write('usage: node judge.mjs RESULT.json...\n'); process.exit(2); }
   const workload = JSON.parse(readFileSync(new URL('./workload.json', import.meta.url), 'utf8'));
