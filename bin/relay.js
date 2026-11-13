@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
-import { realpathSync, readFileSync, existsSync, statSync, accessSync, constants } from 'node:fs';
+import { realpathSync, readFileSync, existsSync, statSync, accessSync, constants, openSync, fstatSync, readSync, closeSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -20,12 +20,19 @@ const reconcile = async (...args) => (await import('../src/dispatch.js')).reconc
 // loads and validates the file itself.
 /** @param {string} file @param {string} harness */
 function mayNeedSupervisor(file, harness) {
+  const limit = 64 * 1024;
+  let fd = null;
   try {
-    if (statSync(file).size > 64 * 1024) return false;
-    const config = JSON.parse(readFileSync(file, 'utf8'));
+    // Non-blocking and no symlink: a FIFO, device or link at the path is never read here.
+    fd = openSync(file, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW);
+    if (!fstatSync(fd).isFile()) return false;
+    const buffer = Buffer.alloc(limit + 1), size = readSync(fd, buffer, 0, limit + 1, 0);
+    if (size > limit) return false;
+    const config = JSON.parse(buffer.subarray(0, size).toString('utf8'));
     return Array.isArray(config?.subscribers) && config.subscribers.some((/** @type {any} */ s) => s && typeof s === 'object'
       && (s.harnesses === undefined || s.harnesses === null || (Array.isArray(s.harnesses) && s.harnesses.includes(harness))));
   } catch { return false; }
+  finally { if (fd !== null) closeSync(fd); }
 }
 // The harness and native event a hook invocation names, when it names a retry-escaping Stop.
 /** @param {string[]} args @returns {{harness: string, nativeEvent: string}|null} */

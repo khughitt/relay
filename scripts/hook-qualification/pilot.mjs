@@ -100,6 +100,10 @@ function prepare(out) {
   write('candidate-posttool.json', { schema: 2, subscribers: [
     { name: 'test-counter', role: 'observer', registry: 'occurrence', harnesses: ['claude-code'], kinds: ['after-tool'], tools: ['Bash'],
       privateFields: [{ nativeEvent: 'PostToolUse', fields: ['command', 'durationMs'] }], argv: ['relay-fixture-observer'], timeoutMs } ] });
+  // Amendment 1 diagnostic: a subscriber for this harness whose tool filter admits nothing on a Bash
+  // PreToolUse, so the supervisor starts speculatively and is released unused.
+  write('candidate-speculative.json', { schema: 2, subscribers: [
+    { name: 'edit-guard', role: 'guard', harnesses: ['claude-code'], kinds: ['before-tool'], tools: ['Edit'], argv: ['relay-fixture-guard'], timeoutMs } ] });
   write('deployed-empty.json', { schema: 1, subscribers: [] });
   write('candidate-empty.json', { schema: 2, subscribers: [] });
   const digests = Object.fromEntries([...readdirSync(bin).map((n) => [`bin/${n}`, sha(join(bin, n))]), ...readdirSync(config).map((n) => [`config/${n}`, sha(join(config, n))])]);
@@ -187,15 +191,20 @@ async function measure(options) {
   }
   loadLog.migrated = load();
   // Case 3: no-subscriber relay paths and the direct native reader (diagnostic only).
-  const noSubscriber = { deployed: /** @type {number[]} */ ([]), candidate: /** @type {number[]} */ ([]), native: /** @type {number[]} */ ([]), candidateSupervisorStarts: 0, failures: /** @type {any[]} */ ([]) };
+  const noSubscriber = { deployed: /** @type {number[]} */ ([]), candidate: /** @type {number[]} */ ([]), native: /** @type {number[]} */ ([]), speculative: /** @type {number[]} */ ([]), candidateSupervisorStarts: 0, failures: /** @type {any[]} */ ([]) };
+  const speculativeState = stateFor('candidate-speculative');
   const nWarm = smoke ? 0 : w.noSubscriber.warmups, nMeasured = smoke ? 1 : w.noSubscriber.samples;
   for (let i = 0; i < nWarm + nMeasured; i++) {
     const rows = await Promise.resolve().then(async () => [
       ['deployed', await event(single('deployed-empty', relay(deployedEntry, 600000, 'deployed-empty.json')), emptyDeployedState)],
       ['candidate', await event(single('candidate-empty', relay(join(candidate, 'bin/relay.js'), w.outerMs, 'candidate-empty.json')), emptyCandidateState)],
-      ['native', await event(single('native', join(bin, 'relay-fixture-native')), emptyDeployedState)]]);
+      ['native', await event(single('native', join(bin, 'relay-fixture-native')), emptyDeployedState)],
+      ['speculative', await event(single('candidate-speculative', relay(join(candidate, 'bin/relay.js'), w.outerMs, 'candidate-speculative.json')), speculativeState)]]);
     if (i < nWarm) continue;
-    for (const [name, r] of /** @type {[('deployed'|'candidate'|'native'), any][]} */ (rows)) { noSubscriber[name].push(r.elapsedMs); if (!r.ok) noSubscriber.failures.push({ name, ...r }); }
+    for (const [name, r] of /** @type {[('deployed'|'candidate'|'native'|'speculative'), any][]} */ (rows)) {
+      noSubscriber[name].push(r.elapsedMs);
+      if (!r.ok || (name === 'speculative' && r.invocations !== 0)) noSubscriber.failures.push({ name, ...r });
+    }
   }
   // Case 4 (optional, diagnostic): a newly transported route against its native-only baseline.
   const postTool = { baseline: /** @type {any[]} */ ([]), candidate: /** @type {any[]} */ ([]) };
@@ -233,6 +242,8 @@ async function measure(options) {
     show('supervisor-alone startup', alone.map((s) => s.startupMs)), show('supervisor-alone cleanup', alone.map((s) => s.cleanupMs)), show('supervisor-alone combined', alone.map((s) => s.combinedMs)),
     show('migrated baseline', migrated.baseline.map((s) => s.elapsedMs)), show('migrated candidate', migrated.candidate.map((s) => s.elapsedMs)),
     show('no-subscriber deployed', noSubscriber.deployed), show('no-subscriber candidate', noSubscriber.candidate), show('no-subscriber native', noSubscriber.native),
+    show('speculative supervisor, unused', noSubscriber.speculative),
+    noSubscriber.speculative.length && noSubscriber.candidate.length ? `speculative start cost over empty config (diagnostic): ${['p50', 'p95', 'p99', 'max'].map((q) => `${q} ${(/** @type {any} */ (statistics(noSubscriber.speculative))[q] - /** @type {any} */ (statistics(noSubscriber.candidate))[q]).toFixed(1)}`).join(' ')}` : 'speculative start: no samples',
     ...(options['post-tool'] ? [show('posttool native-only baseline', postTool.baseline.map((x) => x.elapsedMs)), show('posttool relayed candidate', postTool.candidate.map((x) => x.elapsedMs)),
       `posttool diagnostic (not gated in Task 3): failed ${[...postTool.baseline, ...postTool.candidate].filter((x) => !x.ok).length}; deltas ${postTool.candidate.length ? ['p95', 'p99', 'max'].map((q) => `${q} ${(/** @type {any} */ (statistics(postTool.candidate.map((x) => x.elapsedMs)))[q] - /** @type {any} */ (statistics(postTool.baseline.map((x) => x.elapsedMs)))[q]).toFixed(1)}`).join(' ') : 'none'} (warm bounds +100/+150/+250)`] : []),
     `failed calls: migrated ${[...migrated.baseline, ...migrated.candidate].filter((s) => !s.ok).length}, no-subscriber ${noSubscriber.failures.length}; candidate supervisors per dispatch ${[...new Set(migrated.candidate.map((s) => s.supervisors))].join(',')}; empty-candidate supervisor starts ${noSubscriber.candidateSupervisorStarts}`,

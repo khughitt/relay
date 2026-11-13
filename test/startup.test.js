@@ -67,3 +67,19 @@ test('an early supervisor is closed unused, with no record, when the dispatch ad
   const none = await hookRun(t, [{ ...observer(['before-tool']), harnesses: ['codex'] }]);
   assert.equal(none.lines.some((line) => line.includes('supervisor-process.js')), false, 'no subscriber for this harness starts none');
 });
+
+test('the early pre-read never blocks on a FIFO or other special file at the subscriber path', async (t) => {
+  const root = realpathSync(await mkdtemp(join(tmpdir(), 'relay-fifo-')));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const config = join(root, 'config');
+  await mkdir(config, { mode: 0o700 });
+  const fifo = join(config, 'subscribers.json');
+  assert.equal(spawnSync('mkfifo', ['-m', '600', fifo]).status, 0);
+  const env = { PATH: process.env.PATH, HOME: root, RELAY_STATE_DIR: join(root, 'state') };
+  const started = performance.now();
+  const r = spawnSync(process.execPath, [cli, 'hook', '--harness', 'claude-code', '--outer-ms', '3000', '--subscribers', fifo, 'PreToolUse'],
+    { encoding: 'utf8', env, timeout: 5000, killSignal: 'SIGKILL', input: JSON.stringify({ session_id: 's', cwd: root, tool_name: 'Bash', tool_input: { command: 'ls' } }) });
+  assert.equal(r.signal, null, 'relay returned before the outer kill');
+  assert.ok(performance.now() - started < 2500, `refused promptly (${(performance.now() - started).toFixed(0)} ms)`);
+  assert.equal(r.status, 2); assert.match(r.stdout, /"permissionDecision":"deny"/);
+});
