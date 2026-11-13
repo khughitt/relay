@@ -92,14 +92,25 @@
  * @typedef {Awaited<ReturnType<typeof import('./serve/inbox.js').openInbox>>['inbox']} Inbox
  * @typedef {Awaited<ReturnType<typeof import('./serve/client.js').connectSocket>>} Connection
  * @typedef {{name: string, value: string, values?: string[], required?: boolean, variadic?: boolean}} Argument
- * @typedef {{names: string[], value: string, values?: string[], required?: boolean}} Flag
+ * @typedef {{names: string[], value: string, values?: string[], required?: boolean, repeatable?: boolean}} Flag
  * @typedef {{path: string[], summary: string, options?: Flag[], args?: Argument[], output?: string, protocol?: string}} Command
  * @typedef {{path: string, before: string|null, after: string}} Change
  * @typedef {{schema: 1, harness: string, changes: Change[], evidence: {harness: string, version: string}|null}} Artifact
  * @typedef {{schema: 1, harness: string, version: string, probes: {event: string, reply: string, outerMs: number, passed: boolean}[], routes?: {name: string, passed: boolean, note: string}[]}} Evidence
  * @typedef {{event: string, matcher?: string, outerMs: number, handback?: boolean}} Binding
- * @typedef {{text: string, harness: string, relayBin: string, subscribersPath: string, nodeBin?: string, retireFamiliar?: boolean|string}} HookPlan
- * @typedef {Omit<HookPlan, 'harness'> & {target: string, subscribers: Subscribers, evidence?: Evidence|null, withAsk?: boolean, installedVersion?: string}} InstallPlan
+ * @typedef {{text: string, harness: string, relayBin: string, subscribersPath: string, nodeBin?: string, retireFamiliar?: boolean|string, bindings?: Binding[]}} HookPlan
+ * @typedef {Omit<HookPlan, 'harness'> & {target: string, subscribers: Subscribers, evidence?: Evidence|null, withAsk?: boolean, installedVersion?: string,
+ *   events?: string[], qualification?: HookQualification|null, identity?: QualificationTarget}} InstallPlan
+ * @typedef {'passed'|'failed'|'unknown'|'unavailable'|'unsupported'|'not-applicable'} QualificationStatus
+ * @typedef {{status: QualificationStatus, evidence: string[], owner?: string}} QualificationCheck
+ * @typedef {{decode: QualificationCheck, nativeReply: QualificationCheck, liveDelivery: QualificationCheck, failure: QualificationCheck, cleanup: QualificationCheck,
+ *   latency: QualificationCheck, retryFlag: QualificationCheck, outerFailure: QualificationCheck, policyEquivalence: QualificationCheck}} QualificationChecks
+ * @typedef {{event: string, role: 'guard'|'notice'|'observer'|'registry', outerMs: number, contextLimit?: number} & QualificationChecks} QualificationEntry
+ * @typedef {{schema: 1, harness: string, version: string, sessionMode: string, platform: string, relayCommit: string, configDigest: string, rows: QualificationEntry[]}} HookQualification
+ * @typedef {Omit<HookQualification, 'schema'|'rows'> & QualificationEntry} QualificationRow
+ * @typedef {{harness: string, version: string, mode: string, platform: string, relayCommit: string|null, configDigest: string}} QualificationTarget
+ * @typedef {{events: string[], node: string|null, relay: string, subscribers: string|null}} RelayPair
+ * @typedef {RelayPair & {nodeDigest: string|null, binaryDigest: string, configDigest: string|null}} PairDigests
  * @typedef {Error & {code?: string|number, killed?: boolean, signal?: string, stderr?: string, status?: number, entry?: QuestionEntry}} Failure
  */
 export {};

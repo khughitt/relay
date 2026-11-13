@@ -12,9 +12,22 @@ Every installed entry also names the node that runs relay.js: the installer's ow
 
 After a Codex apply, re-trust the changed hooks in Codex. The installer never writes trust hashes.
 
-Rollback uses only the artifact: `relay rollback --artifact FILE`. For each change, `after` restores `before`, `before` is skipped, and any other bytes refuse with `TARGET_DRIFT` naming the path (a symlink or non-file target refuses with `UNSAFE_TARGET`), exit `1`, before that file is touched. A partial cutover can therefore be completed with install or recovered with rollback. OpenCode modifies only its server plugin entry; it never touches `tui.json`.
+Rollback uses only the artifact: `relay rollback --artifact FILE`. For each change, `after` restores `before`, `before` is skipped, and any other bytes refuse with `TARGET_DRIFT` naming the path (a symlink or non-file target refuses with `UNSAFE_TARGET`), exit `1`, before that file is touched. A partial cutover (an apply interrupted between targets, or a selected-event install) can therefore be completed with install or recovered with rollback. OpenCode modifies only its server plugin entry; it never touches `tui.json`.
 
 Guard/context bindings require the real capability evidence record for the installed harness version; fixture artifacts are not live capability proof.
+
+Dispatch bindings also require a HookQualification record (`--qualification FILE --session-mode MODE`) whose rows match the installed harness version, the session mode, the platform, the commit this relay was installed from and the subscriber file's digest ([adapters.md](../adapters.md#route-qualification)). `--event NAME` installs only the routes that qualify and leaves every other entry, native and relay alike, as it was.
+
+## Cutover with a retained rollback pair
+
+Applying a cutover changes a live harness surface: it needs explicit activation authority at the time, and runs with no live session of the affected harness. Native hook lines (policy commands, ask and connector routes) stay until their owner's policy-equivalence proof passes; an install never removes a native line because its command's basename matches a subscriber. Every value below is data from the authorized installation, recorded in its task, not a literal from this guide.
+
+1. **Prepare the new pair beside the prior one.** Install the new relay at a new versioned path (for example a fresh npm prefix per version, so its lock names the installed commit) and write its schema-2 subscriber file at a new versioned path (a 0600 file in a 0700 directory). Never rewrite the prior relay or its subscriber file in place: `install` refuses (`PAIR_NOT_RETAINED`) to give the prior relay's subscriber file to the new relay.
+2. **Record the prior pair.** `node NEW_RELAY pairs --harness HARNESS --target SETTINGS > PRIOR_PAIRS` records each pinned node, relay and subscriber file with its digests. Keep the prior node, relay installation and subscriber file unchanged until the cutover is retired.
+3. **Prove the prior pair still runs.** Run the prior relay against its own subscriber file outside the harness, with the plan-only install of a scratch target (`node PREVIOUS_RELAY install --harness HARNESS --subscribers PREVIOUS_CONFIG --target SCRATCH`, adding the flags that relay's own version requires), and confirm it exits `0` without writing the scratch file. The new relay rejects a schema-1 file with its migration message; the prior relay may reject the new file; neither is ever pointed at the other's file.
+4. **Plan, then apply the cutover.** `node NEW_RELAY install --harness HARNESS --subscribers NEW_CONFIG --target SETTINGS --qualification QUALIFICATION --session-mode MODE [--event NAME]...` prints the artifact; inspect it, then rerun with `--apply --artifact CUTOVER_ARTIFACT`. A selected-event cutover leaves the other events on the prior pair; `relay pairs` then lists both.
+5. **Freeze the recovery command** in the task before any session runs the new hooks: `PRIOR_NODE PREVIOUS_RELAY rollback --artifact CUTOVER_ARTIFACT`, run outside the affected harness (from another terminal or harness), using the retained prior node and relay. It needs nothing the cutover changed.
+6. **After a rollback,** compare `node PREVIOUS_RELAY pairs` output (or the new relay's, if the prior relay predates `pairs`) with `PRIOR_PAIRS`: every pinned digest matches, and the settings file's bytes equal the artifact's `before` image. A rerun of the rollback skips a restored target; a target edited since the cutover refuses with `TARGET_DRIFT` and is left untouched for the operator.
 
 ## Activating session handles (registry schema 2)
 

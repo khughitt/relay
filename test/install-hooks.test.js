@@ -8,6 +8,7 @@ import { bindingsFor, planHooks, shellQuote, timeoutSeconds, versionManagerOf, v
 import { planClaudeCode } from '../src/install/claude-code.js';
 import { planCodex } from '../src/install/codex.js';
 import { tempState } from './helpers/fixture.js';
+import { qualifiedInstall } from './helpers/qualification.js';
 
 const relay = '/opt/relay/bin/relay';
 const subscribers = '/home/me/.config/relay/subscribers.json';
@@ -104,8 +105,8 @@ test('every relay entry runs relay.js with the installer\'s node, and older entr
   assert.throws(() => planHooks({ text: '{"hooks":{}}', harness: 'codex', relayBin: relay, subscribersPath: subscribers, nodeBin: 'node' }), /node path must be absolute/);
   const args = { text: '{"hooks":{}}', relayBin: relay, nodeBin: custom, subscribersPath: subscribers, subscribers: { subscribers: [] } };
   const preToolUse = (artifact) => JSON.parse(artifact.changes[0].after).hooks.PreToolUse[0].hooks[0].command;
-  assert.match(preToolUse(planClaudeCode({ ...args, target: '/checkout/ai/claude/settings.json' })), new RegExp(`^${quoted} `));
-  assert.match(preToolUse(planCodex({ ...args, target: '/checkout/ai/codex/hooks.json' })), new RegExp(`^${quoted} `));
+  assert.match(preToolUse(planClaudeCode({ ...args, ...qualifiedInstall('claude-code', args.subscribers), target: '/checkout/ai/claude/settings.json' })), new RegExp(`^${quoted} `));
+  assert.match(preToolUse(planCodex({ ...args, ...qualifiedInstall('codex', args.subscribers), target: '/checkout/ai/codex/hooks.json' })), new RegExp(`^${quoted} `));
   for (const plan of [planClaudeCode, planCodex]) assert.throws(() => plan({ ...args, nodeBin: 'node', target: '/checkout/ai/codex/hooks.json' }), /node path/);
 });
 

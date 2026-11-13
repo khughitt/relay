@@ -377,6 +377,35 @@ Each matching observer receives a `SubscriberEnvelope` on stdin (stdout is disca
 
 `reaped` lists only rows pruned for dead processes. Rows an event removes (a `SessionEnd`'s root and workers, a Codex root `SessionStart`'s retired rows, a Codex worker `SubagentStop` removal when its root row is absent, an `agy` root event's retired same-process peers, or an `agy` subagent `Stop` removal alongside a live peer) and rows dropped by schema-1 supersession appear only as their absence from the snapshot. The envelope carries no snapshot; observers read `$STATE/agents.json` at or after `registry.revision`.
 
+## Route qualification
+
+A dispatch binding is installed only on proof that its route works on the exact installation. Static encoder support (a decoder and a reply encoding in this package) is not that proof, and neither is the schema-1 capability and ask-route `--evidence` record, which keeps its own domain. The proof is a **HookQualification** record, read by `relay install --qualification FILE` and validated by `parseQualification` (exported as `relay/qualification`):
+
+```ts
+type QualificationCheck = { status: 'passed' | 'failed' | 'unknown' | 'unavailable' | 'unsupported' | 'not-applicable';
+  evidence: string[]; owner?: string };            // owner: an open task id, e.g. relay-91ecda
+type HookQualification = {
+  schema: 1; harness: 'claude-code' | 'codex' | 'agy'; version: string; sessionMode: string; platform: string;
+  relayCommit: string;                             // the full 40-hex commit tested
+  configDigest: string;                            // sha256 of the subscriber file tested
+  rows: {
+    event: string;                                 // a binding name: SessionStart, Notification:idle_prompt, ...
+    role: 'guard' | 'notice' | 'observer' | 'registry'; // registry: a writer no subscriber matches
+    outerMs: number;                               // the binding's outer budget, exactly
+    contextLimit?: number;                         // the qualified native context limit
+    decode: QualificationCheck; nativeReply: QualificationCheck; liveDelivery: QualificationCheck;
+    failure: QualificationCheck; cleanup: QualificationCheck; latency: QualificationCheck;
+    retryFlag: QualificationCheck; outerFailure: QualificationCheck; policyEquivalence: QualificationCheck;
+  }[];
+};
+```
+
+Validation is strict: no other fields, rows unique by `(event, role, outerMs)`, a `passed` check carries evidence, and any other status except `not-applicable` carries both an owner and a reason in its evidence. `not-applicable` is allowed only by these rules (`applicableChecks`): `retryFlag` everywhere except Claude Code and Codex `Stop`, and `SubagentStop` where it can refuse, where it is required for every role, because relay's own infrastructure failure refuses there on a first attempt whatever subscribers run; `cleanup` and `policyEquivalence` for a `registry` row, which starts no subscriber and carries no policy. Each check's evidence names the tested revision, route, version and mode, and its source; latency evidence names each host it was measured on as `host=NAME`.
+
+An installation qualifies a route (`qualifyBinding`) when a row's harness, version, `sessionMode`, platform, `relayCommit` and `configDigest` equal the installation's, every applicable check is `passed`, its latency names at least two hosts, and, for a guard or notice on an event with a context channel, `contextLimit` is present and at least relay's own 10,000-character limit (relay enforces no smaller one). `qualifyInstall` requires one such row for each route the selected bindings install: one per role among the subscribers matching the binding, or one `registry` route when none match. A failure is `UNQUALIFIED_ROUTE`, naming the route and the first missing proof with its owner. A route that qualifies installs independently of every other: `--event SessionStart` installs SessionStart while Stop stays native and unqualified.
+
+Each cutover pins a binary/config pair: every relay dispatch entry names its node, `relay.js` and subscriber file. A cutover installs the new relay at a new versioned path with its own versioned subscriber file, so the prior pair stays runnable beside it; `install` refuses (`PAIR_NOT_RETAINED`) to give a prior relay's subscriber file to a different relay. `relay pairs` lists the pairs a settings file pins with their digests, so a pair recorded before cutover can be compared after recovery. The cutover artifact keeps the schema-1 artifact format, so the prior relay's own `relay rollback --artifact FILE` restores the exact prior settings. agy settings are generated outside relay; that generator validates its records with `relay/qualification` against the contract in `relay/fixtures/hook-qualification.json`.
+
 ## Failure modes
 
 | Exit code | Meaning |

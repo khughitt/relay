@@ -11,6 +11,10 @@ import { COMMANDS } from '../src/commands.js';
 import { tempState } from './helpers/fixture.js';
 import { questionMessage } from './helpers/interaction.js';
 import { serveCli, askCli, entryForCli, runCli, cliEnv } from './helpers/cli-interaction.js';
+import { createHash } from 'node:crypto';
+import { bindingsFor } from '../src/install/hooks.js';
+import { COMMIT, VERSIONS, qualificationFor, registryRoutes } from './helpers/qualification.js';
+import { relayCopy } from './helpers/relay-copy.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BIN = path.join(ROOT, 'bin', 'relay.js');
@@ -40,18 +44,29 @@ const STATE = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-state-'));
 after(() => fs.rmSync(STATE, { recursive: true, force: true }));
 const run = (args, env = {}, input) => spawnSync(process.execPath, [BIN, ...args], { encoding: 'utf8', env: cliEnv({ stateDir: STATE }, env), input });
 
-function fixture(t) {
+async function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-cli-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const subscribers = path.join(dir, 'subscribers.json'); fs.writeFileSync(subscribers, '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
   const target = path.join(dir, 'hooks.json'); fs.writeFileSync(target, '{"hooks":{}}\n');
   const bin = path.join(dir, 'bin'); fs.mkdirSync(bin);
-  fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\nprintf "%s\\n" "2.1.296 (Claude Code)"\n', { mode: 0o700 });
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nprintf "%s\\n" "${VERSIONS['claude-code']} (Claude Code)"\n`, { mode: 0o700 });
+  fs.writeFileSync(path.join(bin, 'codex'), `#!/bin/sh\nprintf "%s\\n" "codex-cli ${VERSIONS.codex}"\n`, { mode: 0o700 });
+  // install binds route qualification to the commit it was installed from: run it from a copy
+  // whose npm lock names one, with qualification for every default binding of each harness.
+  const relay = await relayCopy(path.join(dir, 'prefix'), COMMIT);
+  const configDigest = createHash('sha256').update(fs.readFileSync(subscribers)).digest('hex');
+  const qualified = Object.fromEntries(['claude-code', 'codex'].map((harness) => {
+    const file = path.join(dir, `qualification-${harness}.json`);
+    fs.writeFileSync(file, JSON.stringify(qualificationFor({ harness, version: VERSIONS[harness], configDigest, routes: registryRoutes(bindingsFor(harness)) })));
+    return [harness, ['--qualification', file, '--session-mode', 'interactive']];
+  }));
+  const installRun = (args, env = {}, input) => spawnSync(process.execPath, [relay, ...args], { encoding: 'utf8', env: cliEnv({ stateDir: STATE }, { PATH: `${bin}:${process.env.PATH}`, ...env }), input });
   const evidence = path.join(dir, 'evidence.json');
   fs.writeFileSync(evidence, JSON.stringify({ schema: 1, harness: 'claude-code', version: '2.1.296', probes: [],
     routes: ['answer-hook-terminal', 'answer-hook-deny-stops', 'answer-release-native', 'answer-receipt-observed', 'answer-hook-under-denial']
       .map((name) => ({ name, passed: true, note: 'fixture' })) }));
-  return { dir, subscribers, target, bin, evidence };
+  return { dir, subscribers, target, bin, evidence, qualified, installRun };
 }
 
 test('declared surface equals tools/cli.toml', () => {
@@ -79,18 +94,19 @@ test('usage errors exit 2 with stderr only', () => {
 });
 
 test('enum baselines cover every enum row', async (t) => {
-  const { subscribers, target, bin, evidence } = fixture(t);
+  const { subscribers, target, bin, evidence, qualified, installRun } = await fixture(t);
   const p = await tempState(t); await serveCli(t, p); runCli(p, ['presence', 'away']);
   const first = askCli(t, p, [], 'enum_answer'), answer = await entryForCli(p, 'enum_answer');
   const second = askCli(t, p, [], 'enum_withdraw'), withdrawal = await entryForCli(p, 'enum_withdraw');
   const env = { PATH: `${bin}:${process.env.PATH}`, CODEX_THREAD_ID: '', RELAY_STATE_DIR: p.stateDir };
   const payload = JSON.stringify({ session_id: 's1', hook_event_name: 'SessionStart', cwd: os.tmpdir() });
   const baselines = [
-    [['install'], '--harness', ['install', '--harness', 'codex', '--subscribers', subscribers, '--target', target]],
-    [['install'], '--retire', ['install', '--harness', 'codex', '--subscribers', subscribers, '--target', target, '--retire', 'familiar']],
+    [['install'], '--harness', ['install', '--harness', 'codex', '--subscribers', subscribers, '--target', target, ...qualified.codex]],
+    [['install'], '--retire', ['install', '--harness', 'codex', '--subscribers', subscribers, '--target', target, ...qualified.codex, '--retire', 'familiar']],
+    [['pairs'], '--harness', ['pairs', '--harness', 'codex', '--target', target]],
     [['hook'], '--harness', ['hook', '--harness', 'claude-code', '--subscribers', subscribers, 'SessionStart']],
     [['ask'], '--harness', ['ask', '--harness', 'claude-code', 'PostToolUse']],
-    [['install'], '--with', ['install', '--harness', 'claude-code', '--subscribers', subscribers, '--target', target, '--evidence', evidence, '--with', 'ask']],
+    [['install'], '--with', ['install', '--harness', 'claude-code', '--subscribers', subscribers, '--target', target, ...qualified['claude-code'], '--evidence', evidence, '--with', 'ask']],
     [['model'], '--harness', ['model', '--harness', 'codex']],
     [['inbox', 'answer'], '--surface', ['inbox', 'answer', answer.id, 'q1=o1', '--surface', 'terminal']],
     [['inbox', 'withdraw'], '--reason', ['inbox', 'withdraw', withdrawal.id, '--reason', 'asker']],
@@ -98,29 +114,30 @@ test('enum baselines cover every enum row', async (t) => {
   const table = [...tableRows()].map((r) => JSON.parse(r)).filter((r) => r[0] === 'option' && r[3] === 'enum').map((r) => `${r[1].join(' ')} ${r[2][0]}`).sort();
   assert.deepEqual(baselines.map(([p, b]) => `${p.join(' ')} ${b}`).sort(), table, 'every enum row needs a baseline');
   for (const [, binding, argv] of baselines) {
-    const ok = run(argv, env, payload);
+    const runner = argv[0] === 'install' ? installRun : run;
+    const ok = runner(argv, env, payload);
     assert.equal(ok.status, 0, `${argv.join(' ')}: ${ok.stderr}`);
     const bad = [...argv]; bad[bad.indexOf(binding) + 1] = '__not_in_set__';
-    const r = run(bad, env, payload);
+    const r = runner(bad, env, payload);
     assert.equal(r.status, 2, bad.join(' ')); assert.ok(r.stderr.includes(binding) && r.stderr.includes('__not_in_set__'), r.stderr);
   }
   await first.exited; await second.exited;
 });
 
-test('global routing, output rows, precedence, json failure', (t) => {
-  const { dir, subscribers, target } = fixture(t);
+test('global routing, output rows, precedence, json failure', async (t) => {
+  const { dir, subscribers, target, qualified, installRun } = await fixture(t);
   assert.equal(typeof JSON.parse(run(['--json', 'list']).stdout), 'object');
   assert.equal(typeof JSON.parse(run(['list', '--json']).stdout), 'object');
   assert.throws(() => JSON.parse(run(['list']).stdout));
   assert.equal(typeof JSON.parse(run(['list'], { RELAY_FORMAT: 'json' }).stdout), 'object');
   assert.throws(() => JSON.parse(run(['--pretty', 'list'], { RELAY_FORMAT: 'json' }).stdout));
   // install: output = "json" → JSON unflagged; RELAY_FORMAT=pretty gives text; --json under it JSON
-  const plan = ['install', '--harness', 'codex', '--subscribers', subscribers, '--target', target];
-  assert.equal(typeof JSON.parse(run(plan).stdout), 'object');
-  assert.throws(() => JSON.parse(run(plan, { RELAY_FORMAT: 'pretty' }).stdout));
-  assert.equal(typeof JSON.parse(run(['--json', ...plan], { RELAY_FORMAT: 'pretty' }).stdout), 'object');
+  const plan = ['install', '--harness', 'codex', '--subscribers', subscribers, '--target', target, ...qualified.codex];
+  assert.equal(typeof JSON.parse(installRun(plan).stdout), 'object');
+  assert.throws(() => JSON.parse(installRun(plan, { RELAY_FORMAT: 'pretty' }).stdout));
+  assert.equal(typeof JSON.parse(installRun(['--json', ...plan], { RELAY_FORMAT: 'pretty' }).stdout), 'object');
   // rollback: output = "none" → empty stdout with and without --json
-  const artifact = path.join(dir, 'artifact.json'); fs.writeFileSync(artifact, run(plan).stdout);
+  const artifact = path.join(dir, 'artifact.json'); fs.writeFileSync(artifact, installRun(plan).stdout);
   for (const args of [['rollback', '--artifact', artifact], ['--json', 'rollback', '--artifact', artifact]]) {
     const r = run(args); assert.equal(r.status, 0, r.stderr); assert.equal(r.stdout, '');
   }
@@ -163,8 +180,8 @@ test('every command without a declared output row emits one JSON value under --j
 // the harness's. RELAY_FORMAT selects relay's own output format, which they never print, so a
 // value outside json|pretty must not turn a hook into an exit-2 usage error (Claude Code
 // blocks the tool on a PreToolUse exit 2).
-test('protocol rows ignore RELAY_FORMAT', (t) => {
-  const { subscribers } = fixture(t);
+test('protocol rows ignore RELAY_FORMAT', async (t) => {
+  const { subscribers } = await fixture(t);
   const pre = JSON.stringify({ session_id: 's', cwd: '/tmp', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'ls' } });
   const ask = JSON.stringify({ session_id: 's', cwd: '/tmp', hook_event_name: 'PreToolUse', tool_name: 'AskUserQuestion', tool_use_id: 'toolu_fmt',
     tool_input: { questions: [{ question: 'Which?', header: 'Pick', multiSelect: false, options: [{ label: 'A' }, { label: 'B' }] }] } });

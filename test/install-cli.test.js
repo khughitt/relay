@@ -5,7 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { shellQuote } from '../src/install/hooks.js';
 import { main } from '../bin/relay.js';
-import { runCli } from './helpers/cli-interaction.js';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { cliEnv } from './helpers/cli-interaction.js';
+import { bindingsFor } from '../src/install/hooks.js';
+import { COMMIT, VERSIONS, qualificationFor, registryRoutes } from './helpers/qualification.js';
+import { relayCopy } from './helpers/relay-copy.js';
 
 const stream = () => ({ text: '', write(value, done) { this.text += value; done?.(); } });
 test('install and rollback require their explicit inputs', async () => {
@@ -22,7 +27,15 @@ async function scratch(t) {
   const dir = join(root, 'relay'); await mkdir(dir, { mode: 0o700 });
   const file = join(dir, 'subscribers.json'); await writeFile(file, '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
   const target = join(root, 'hooks.json'); await writeFile(target, '{"hooks":{}}\n');
-  return { root, dir, file, target };
+  const s = { root, dir, file, target };
+  // Qualification for every default binding of a harness, bound to the subscriber file's bytes now.
+  s.q = async (harness, version = VERSIONS[harness]) => {
+    const path = join(root, `qualification-${harness}.json`);
+    const configDigest = createHash('sha256').update(await readFile(s.file)).digest('hex');
+    await writeFile(path, JSON.stringify(qualificationFor({ harness, version, configDigest, routes: registryRoutes(bindingsFor(harness)) })));
+    return ['--qualification', path, '--session-mode', 'interactive'];
+  };
+  return s;
 }
 // An executable at a chosen path stands in for node: install runs only its --version, then writes the path.
 async function fakeNode(dir, reports = 'v22.0.0') {
@@ -32,11 +45,13 @@ async function fakeNode(dir, reports = 'v22.0.0') {
 }
 const quoted = (value) => shellQuote(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const commands = (artifact) => Object.values(JSON.parse(artifact.changes[0].after).hooks).flat().map((entry) => entry.hooks[0].command);
-const install = (args) => { const out = stream(), err = stream(); return main(args, { stdout: out, stderr: err }).then((code) => ({ code, out: out.text, err: err.text })); };
+// In process, the installed harness version and relay commit are the test's own.
+const deps = { harnessVersion: (harness) => VERSIONS[harness], relayCommit: async () => ({ commit: COMMIT, source: 'test' }) };
+const install = (args) => { const out = stream(), err = stream(); return main(args, { stdout: out, stderr: err, ...deps }).then((code) => ({ code, out: out.text, err: err.text })); };
 
 test('install reads the subscriber file with the runtime checks and writes its path', async (t) => {
   const s = await scratch(t);
-  const ok = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target]);
+  const ok = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, ...await s.q('codex')]);
   assert.equal(ok.code, 0, ok.err);
   const artifact = JSON.parse(ok.out);
   assert.match(artifact.changes[0].after, new RegExp(`--subscribers '${s.file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}' PreToolUse`));
@@ -65,14 +80,17 @@ test('install refuses a subscriber file the hook would refuse at runtime', async
 async function askInstall(t) {
   const s = await scratch(t), bin = join(s.root, 'bin'), evidence = join(s.root, 'evidence.json');
   await mkdir(bin);
+  // A separately installed copy whose npm lock names its commit, so install can bind qualification to it.
+  const relay = await relayCopy(join(s.root, 'prefix'), COMMIT);
   await writeFile(evidence, await readFile(new URL('../docs/evidence/claude-code-answer-routes.json', import.meta.url)));
   const claude = join(bin, 'claude');
   await writeFile(claude, '#!/bin/sh\nprintf "%s\\n" "2.1.296 (Claude Code)"\n', { mode: 0o700 });
   // An explicit, unversioned node keeps the run's stderr free of the versioned-path warning
   // on a host whose own node lives under a version manager.
   const node = await fakeNode(join(s.root, 'stable'));
-  const args = ['install', '--harness', 'claude-code', '--subscribers', s.file, '--target', s.target, '--node', node, '--evidence', evidence, '--with', 'ask'];
-  return { ...s, bin, evidence, claude, args, run: (argv = args) => runCli({ stateDir: s.dir }, argv, undefined, { PATH: bin }) };
+  const args = ['install', '--harness', 'claude-code', '--subscribers', s.file, '--target', s.target, '--node', node, ...await s.q('claude-code'), '--evidence', evidence, '--with', 'ask'];
+  return { ...s, bin, evidence, claude, args, run: (argv = args) => spawnSync(process.execPath, [relay, ...argv], {
+    encoding: 'utf8', env: cliEnv({ stateDir: s.dir }, { PATH: bin }), timeout: 10000, killSignal: 'SIGKILL' }) };
 }
 
 test('install --with ask plans, applies and rolls back only a fixture settings file', async (t) => {
@@ -99,10 +117,12 @@ test('install --with ask refuses missing Claude, mismatched version and insuffic
   assert.equal(missing.status, 1, missing.stderr);
   assert.match(JSON.parse(missing.stderr).error.detail, /^HARNESS_UNAVAILABLE/);
   await writeFile(s.claude, '#!/bin/sh\nprintf "%s\\n" "2.2.0 (Claude Code)"\n', { mode: 0o700 });
+  await s.q('claude-code', '2.2.0'); // the dispatch routes qualify at 2.2.0, so the stale ask-route evidence is what refuses
   const mismatch = s.run();
   assert.equal(mismatch.status, 1, mismatch.stderr);
   assert.match(JSON.parse(mismatch.stderr).error.detail, /^UNSUPPORTED_BINDING: .*2\.1\.296.*2\.2\.0/);
   await writeFile(s.claude, '#!/bin/sh\nprintf "%s\\n" "2.1.296 (Claude Code)"\n', { mode: 0o700 });
+  await s.q('claude-code');
   await writeFile(s.evidence, JSON.stringify({ schema: 1, harness: 'claude-code', version: '2.1.296', probes: [], routes: [] }));
   const unsupported = s.run();
   assert.equal(unsupported.status, 1, unsupported.stderr);
@@ -154,7 +174,7 @@ test('successful Claude version checks do not leak subprocess stderr', async (t)
 test('install --node names that node in every command it writes, for both harnesses', async (t) => {
   const s = await scratch(t), node = await fakeNode(join(s.root, "o'stable"));
   for (const harness of ['claude-code', 'codex']) {
-    const r = await install(['install', '--harness', harness, '--subscribers', s.file, '--target', s.target, '--node', node]);
+    const r = await install(['install', '--harness', harness, '--subscribers', s.file, '--target', s.target, '--node', node, ...await s.q(harness)]);
     assert.equal(r.code, 0, r.err); assert.equal(r.err, '', harness);
     const written = commands(JSON.parse(r.out));
     assert.ok(written.length > 0, harness);
@@ -180,7 +200,7 @@ test('install refuses a --node that is not an absolute path to an executable fil
   const failing = join(s.root, 'failing', 'node'); await mkdir(join(s.root, 'failing')); await writeFile(failing, '#!/bin/sh\nexit 3\n', { mode: 0o700 });
   const failed = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', failing]);
   assert.equal(failed.code, 2); assert.match(failed.err, /--node .* --version failed: exit 3/);
-  const prerelease = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', await fakeNode(join(s.root, 'nightly'), 'v24.0.0-nightly20250101abcdef')]);
+  const prerelease = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', await fakeNode(join(s.root, 'nightly'), 'v24.0.0-nightly20250101abcdef'), ...await s.q('codex')]);
   assert.equal(prerelease.code, 0, prerelease.err);
   if (process.getuid?.() !== 0) {
     const sealed = join(s.root, 'sealed'), hidden = await fakeNode(sealed);
@@ -199,7 +219,7 @@ test('install warns when the node it writes lives in one version\'s directory, a
   for (const [dir, manager] of [[join(s.root, '.nvm/versions/node/v26.5.0/bin'), 'nvm or n'], [join(s.root, 'opt/homebrew/Cellar/node/26.5.0/bin'), 'Homebrew']]) {
     const node = await fakeNode(dir);
     for (const format of [[], ['--pretty']]) {
-      const r = await install([...format, 'install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', node]);
+      const r = await install([...format, 'install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', node, ...await s.q('codex')]);
       assert.equal(r.code, 0, r.err);
       assert.equal(r.err.split('\n').filter(Boolean).length, 1, r.err);
       assert.match(r.err, new RegExp(`^relay: warning: node path ${node.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} is managed by ${manager};`));
@@ -210,7 +230,7 @@ test('install warns when the node it writes lives in one version\'s directory, a
 
 test('a failed apply leaves its one error envelope on stderr, without the versioned-path warning', async (t) => {
   const s = await scratch(t), node = await fakeNode(join(s.root, '.nvm/versions/node/v26.5.0/bin'));
-  const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', node, '--apply', '--artifact', join(s.root, 'missing', 'artifact.json')]);
+  const r = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--node', node, ...await s.q('codex'), '--apply', '--artifact', join(s.root, 'missing', 'artifact.json')]);
   assert.equal(r.code, 1, r.err); assert.equal(r.out, '');
   assert.equal(JSON.parse(r.err).error.kind, 'install_failed');
 });
@@ -232,7 +252,7 @@ test('a Codex target not named hooks.json refuses with INVALID_CONFIG naming the
 
 test('rollback on a drifted target names the code and path in both output modes', async (t) => {
   const s = await scratch(t), file = join(s.root, 'artifact.json');
-  const applied = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, '--apply', '--artifact', file]);
+  const applied = await install(['install', '--harness', 'codex', '--subscribers', s.file, '--target', s.target, ...await s.q('codex'), '--apply', '--artifact', file]);
   assert.equal(applied.code, 0, applied.err);
   await writeFile(s.target, '{"hooks":{},"edited":true}\n');
   const expected = `TARGET_DRIFT: target drift: ${s.target} matches neither image; rollback expected its after image`;

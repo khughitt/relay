@@ -23,6 +23,34 @@ const command = (node, bin, harness, event, outerMs, subscribersPath) => `${shel
 // An entry installed before the node path, with relay.js alone, is still relay's own.
 /** @param {string} value @param {string} harness @param {string} event */
 const relay = (value, harness, event) => new RegExp(`^(?:${executable} )?${executable} hook --harness ${esc(harness)}(?: --outer-ms \\d+)?(?: --subscribers ${executable})? ${esc(event)}$`).test(value);
+const WORD = /'((?:[^']|'\\'')*)'|([^\s']+)/y;
+/** The words of a command relay wrote, unquoted, or null when it is not one word list. @param {string} value */
+function words(value) {
+  /** @type {string[]} */
+  const out = [];
+  WORD.lastIndex = 0;
+  while (WORD.lastIndex < value.length) {
+    const match = WORD.exec(value);
+    if (!match) return null;
+    out.push(match[1] === undefined ? match[2] : match[1].replaceAll("'\\''", "'"));
+    if (WORD.lastIndex < value.length && value[WORD.lastIndex++] !== ' ') return null;
+  }
+  return out;
+}
+/**
+ * The node, relay.js and subscriber file a relay dispatch entry pins, or null for any other
+ * command. An entry written before the node or subscriber flags pins null for that part.
+ * @param {string} value @param {string} harness
+ * @returns {{node: string|null, relay: string, subscribers: string|null, event: string}|null}
+ */
+export function relayCommandOf(value, harness) {
+  const list = words(value);
+  if (!list) return null;
+  const at = list.indexOf('hook'), event = list.at(-1);
+  if (at < 1 || at > 2 || event === undefined || !relay(value, harness, event)) return null;
+  const subscribers = list.indexOf('--subscribers');
+  return { node: at === 2 ? list[0] : null, relay: list[at - 1], subscribers: subscribers > at ? list[subscribers + 1] : null, event };
+}
 /** @param {string} value @param {string} event */
 const familiar = (value, event) => new RegExp(`^${executable} hook(?: --agent codex)? ${esc(event)}(?: --agent codex)?$`).test(value);
 // Directories that hold one Node version, which a version manager removes with it. Node
@@ -67,6 +95,22 @@ export function bindingsFor(harness) {
   return table[harness].map(([event, matcher, outerMs = 600000]) => ({ event, matcher, outerMs }));
 }
 
+/**
+ * The exact dispatch bindings an installation writes: every default binding, or exactly the named
+ * events (each once, by its binding name, e.g. Notification:idle_prompt), in table order.
+ * @param {string} harness @param {string[]|undefined} events @returns {import("../types.js").Binding[]}
+ */
+export function selectBindings(harness, events) {
+  const all = bindingsFor(harness);
+  if (events === undefined) return all;
+  if (!Array.isArray(events) || !events.length) throw relayError('INVALID_CONFIG', 'select at least one event');
+  for (const [index, event] of events.entries()) {
+    if (!all.some((binding) => binding.event === event)) throw relayError('INVALID_CONFIG', `${harness} has no hook binding ${JSON.stringify(event)}; choose from ${all.map((b) => b.event).join(', ')}`);
+    if (events.indexOf(event) !== index) throw relayError('INVALID_CONFIG', `select event ${event} once`);
+  }
+  return all.filter((binding) => events.includes(binding.event));
+}
+
 /** @param {string} text */
 function parseHooks(text) {
   const errors = /** @type {import("jsonc-parser").ParseError[]} */ ([]), value = parse(text, errors, { allowTrailingComma: true });
@@ -77,12 +121,12 @@ function parseHooks(text) {
 }
 
 /** @param {import("../types.js").HookPlan} options */
-export function planHooks({ text, harness, relayBin, subscribersPath, nodeBin = process.execPath, retireFamiliar = false }) {
+export function planHooks({ text, harness, relayBin, subscribersPath, nodeBin = process.execPath, retireFamiliar = false, bindings = bindingsFor(harness) }) {
   if (typeof subscribersPath !== 'string' || !isAbsolute(subscribersPath)) throw new Error('subscriber path must be absolute');
   if (typeof nodeBin !== 'string' || !isAbsolute(nodeBin)) throw new Error('node path must be absolute');
   parseHooks(text);
   let output = text;
-  for (const binding of bindingsFor(harness)) {
+  for (const binding of bindings) {
     const key = nativeKey(binding.event), existing = parse(output).hooks?.[key] ?? [];
     if (!Array.isArray(existing)) throw new Error(`hooks.${key} must be an array`);
     /** @param {any} item */

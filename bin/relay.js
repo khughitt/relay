@@ -92,18 +92,22 @@ function flags(args, cmd, positional) {
   const opts = cmd.options ?? [];
   /** @type {Record<string, string|true>} */
   const out = {};
+  /** @type {Record<string, string[]>} */
+  const repeated = {};
   for (let i = 0; i < args.length; i++) {
     const key = args[i];
     if (positional && !key.startsWith('-')) { positional.push(key); continue; }
     const opt = key.startsWith('--') ? opts.find((o) => o.names.includes(key)) : null;
-    if (!opt || Object.hasOwn(out, key)) throw usage(`invalid or repeated ${cmd.path.join(' ')} flag "${key}"`);
+    if (!opt || (Object.hasOwn(out, key) && !opt.repeatable)) throw usage(`invalid or repeated ${cmd.path.join(' ')} flag "${key}"`);
     if (opt.value === 'none') { out[key] = true; continue; }
     const value = args[++i];
     if (!value || value.startsWith('--')) throw usage(`${key} requires a value`);
     if (opt.values && !opt.values.includes(value)) throw usage(`${key} must be one of ${opt.values.join(', ')}, got ${JSON.stringify(value)}`);
-    out[key] = value;
+    if (opt.repeatable) (repeated[key] ??= []).push(value);
+    else out[key] = value;
   }
-  return /** @type {Record<string, string> & {"--apply"?: true, "--decline"?: true}} */ (out);
+  // A repeatable option's values arrive as an array, in the order given.
+  return /** @type {Record<string, string> & {"--apply"?: true, "--decline"?: true}} */ ({ ...out, ...repeated });
 }
 // The node an installed hook command runs, named by the operator: written as given, never
 // resolved, so a stable shim stays a shim.
@@ -127,8 +131,22 @@ function explicitNode(path, harness) {
   if (Number(major) < floor) throw usage(`--node ${path} is Node ${reported}; relay needs ${engines.node}`);
   return path;
 }
+// The installed harness's version, as its --version prints it ("2.1.322 (Claude Code)", "codex-cli 0.167.2").
+/** @param {string} harness */
+function harnessVersionOf(harness) {
+  const command = harness === 'claude-code' ? 'claude' : harness;
+  let text;
+  try { text = execFileSync(command, ['--version'], { encoding: 'utf8', timeout: 10000, stdio: 'pipe' }); }
+  catch (error) { throw relayError('HARNESS_UNAVAILABLE', `cannot read the installed ${harness} version`, error); }
+  const version = text.trim().split(/\s+/).find((word) => /^\d+\.\d+\.\d+/.test(word));
+  if (!version) throw relayError('HARNESS_UNAVAILABLE', `${command} --version printed no version: ${JSON.stringify(text.trim().split('\n', 1)[0])}`);
+  return version;
+}
+/** @param {string} relayBin */
+const installedCommit = async (relayBin) => (await import('../src/install/pair.js')).relayCommitOf(relayBin);
 /** @param {string[]} rawArgs */
-export async function main(rawArgs, { list = listAgents, whoami = async () => (await import('../src/identity/whoami.js')).whoami(), reap = reconcile, hook = dispatchHook, stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {
+export async function main(rawArgs, { list = listAgents, whoami = async () => (await import('../src/identity/whoami.js')).whoami(), reap = reconcile, hook = dispatchHook, stdin = process.stdin, stdout = process.stdout, stderr = process.stderr,
+  harnessVersion = harnessVersionOf, relayCommit = installedCommit } = {}) {
   /** @type {import('../src/commands.js').OutputMode} */
   let mode = 'pretty';
   let cmdName = null;
@@ -290,13 +308,24 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
       const subscribersPath = f['--subscribers'], subscribers = await loadSubscribersFrom(subscribersPath);
       const evidence = f['--evidence'] ? (await import('../src/install/capabilities.js')).parseEvidence(readFileSync(f['--evidence'], 'utf8')) : null;
       const relayBin = realpathSync(process.argv[1]); let artifact;
-      let installedVersion;
-      if (withAsk) {
-        try { installedVersion = execFileSync('claude', ['--version'], { encoding: 'utf8', timeout: 10000, stdio: 'pipe' }).trim().split(/\s+/, 1)[0]; }
-        catch (error) { throw relayError('HARNESS_UNAVAILABLE', 'cannot read the installed Claude Code version', error); }
+      const events = /** @type {string[]|undefined} */ (/** @type {unknown} */ (f['--event']));
+      if (harness === 'opencode' && (f['--qualification'] || f['--session-mode'] || events)) throw usage('--qualification, --session-mode and --event exist only for claude-code and codex');
+      if (f['--qualification'] && !f['--session-mode']) throw usage('--qualification requires --session-mode naming the session mode the routes were qualified in');
+      // The route proof (docs/adapters.md, "Route qualification") and the identity it must match:
+      // the installed harness version, the explicit session mode, this platform, the commit this
+      // relay was installed from, and the subscriber file's bytes.
+      const qualification = f['--qualification'] ? (await import('../src/install/qualification.js')).parseQualification(readFileSync(f['--qualification'], 'utf8')) : null;
+      const installedVersion = withAsk || qualification ? harnessVersion(harness) : undefined;
+      let identity;
+      if (qualification) {
+        const { commit, source } = await relayCommit(relayBin);
+        if (commit === null) throw relayError('UNQUALIFIED_ROUTE', `cannot determine the relay commit this installation runs (${source}); qualification is bound to one`);
+        identity = { harness, version: /** @type {string} */ (installedVersion), mode: f['--session-mode'], platform: process.platform, relayCommit: commit,
+          configDigest: (await import('node:crypto')).createHash('sha256').update(readFileSync(subscribersPath)).digest('hex') };
       }
-      if (harness === 'claude-code') artifact = (await import('../src/install/claude-code.js')).planClaudeCode({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'], withAsk, installedVersion });
-      else if (harness === 'codex') artifact = (await import('../src/install/codex.js')).planCodex({ target: f['--target'], text: readFileSync(f['--target'], 'utf8'), relayBin, nodeBin, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'] });
+      const plan = { target: f['--target'], text: f['--target'] ? readFileSync(f['--target'], 'utf8') : '', relayBin, nodeBin, subscribersPath, subscribers, evidence, retireFamiliar: f['--retire'], events, qualification, identity };
+      if (harness === 'claude-code') artifact = (await import('../src/install/claude-code.js')).planClaudeCode({ ...plan, withAsk, installedVersion });
+      else if (harness === 'codex') artifact = (await import('../src/install/codex.js')).planCodex(plan);
       else { const dir = f['--config-dir'], read = (/** @type {string} */ name) => { const path = join(dir, name); return existsSync(path) ? readFileSync(path, 'utf8') : null; }; artifact = (await import('../src/install/opencode.js')).planOpenCode({ configDir: dir, json: read('opencode.json'), jsonc: read('opencode.jsonc'), relayPlugin: fileURLToPath(new URL('../integrations/opencode/plugin.js', import.meta.url)), subscribers }); }
       if (f['--apply']) (await import('../src/install/atomic.js')).applyArtifact(f['--artifact'], artifact);
       // After the apply, so a failure still leaves one error envelope alone on stderr.
@@ -308,6 +337,15 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
         if (mode === 'json') await emit(stdout, `${JSON.stringify(artifact)}\n`);
         else await emit(stdout, `harness=${artifact.harness} changes=${artifact.changes.length}\n`);
       }
+      return 0;
+    }
+    if (cmd.path[0] === 'pairs') {
+      const f = flags(rest, cmd);
+      if (!f['--harness'] || !f['--target'] || Object.keys(f).length !== 2) throw usage('pairs requires --harness and --target');
+      const { relayPairs, pairDigests } = await import('../src/install/pair.js');
+      const pairs = relayPairs({ harness: f['--harness'], text: readFileSync(f['--target'], 'utf8') }).map((pair) => pairDigests(pair));
+      if (mode === 'json') await emit(stdout, `${JSON.stringify(pairs)}\n`);
+      else await emit(stdout, pairs.map((p) => `${p.events.join(',')}\n  node=${p.node ?? '-'} ${p.nodeDigest ?? ''}\n  relay=${p.relay} ${p.binaryDigest}\n  subscribers=${p.subscribers ?? '-'} ${p.configDigest ?? ''}\n`).join(''));
       return 0;
     }
     if (cmd.path[0] === 'rollback') {

@@ -12,7 +12,9 @@
     "./opencode": "./integrations/opencode/plugin.js",
     "./fixtures/handles.json": "./test/fixtures/handles.json",
     "./fixtures/ancestry.json": "./test/fixtures/ancestry.json",
-    "./fixtures/whoami.json": "./test/fixtures/whoami.json"
+    "./fixtures/whoami.json": "./test/fixtures/whoami.json",
+    "./qualification": "./src/install/qualification.js",
+    "./fixtures/hook-qualification.json": "./test/fixtures/hook-qualification.json"
   },
   "scripts": {
     "test": "node --test test/*.test.js integrations/opencode/*.test.mjs"
@@ -24,6 +26,7 @@
     "test/fixtures/handles.json",
     "test/fixtures/ancestry.json",
     "test/fixtures/whoami.json",
+    "test/fixtures/hook-qualification.json",
     "docs/api.md",
     "docs/registry.md",
     "docs/adapters.md",

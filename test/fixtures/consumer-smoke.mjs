@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as relay from 'relay';
 import * as plugin from 'relay/opencode';
+import * as qualification from 'relay/qualification';
 
 const EXPORTS = ['STATES', 'paths', 'adapterFor', 'normalizeEvent', 'normalizeHookEvent', 'registryEventFor', 'projectEnvelope', 'readNativeInput', 'createProcessOps', 'readSnapshot', 'readSnapshotFor', 'listAgents',
   'applyEvent', 'reapRegistry', 'CONTEXT_LIMIT', 'parseReply', 'validateSubscribers', 'loadSubscribers', 'matchSubscribers', 'budgetFor',
@@ -36,6 +37,11 @@ const chains = JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixt
 assert.equal(chains.schema, 1); assert.ok(chains.chains.some(c => c.name === 'background-under-systemd'));
 const identities = JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixtures/whoami.json')), 'utf8'));
 assert.ok(Array.isArray(identities)); assert.ok(identities.some(item => item.expect?.status === 'resolved'));
+// The HookQualification validator and its fixture contract, for a settings generator outside relay.
+assert.deepEqual(Object.keys(qualification).sort(), ['QUALIFICATION_CHECKS', 'QUALIFICATION_ROLES', 'QUALIFICATION_STATUSES', 'applicableChecks',
+  'parseQualification', 'qualificationRows', 'qualifyBinding', 'qualifyInstall', 'requiredRoutes']);
+const contract = qualification.parseQualification(await readFile(new URL(import.meta.resolve('relay/fixtures/hook-qualification.json')), 'utf8'));
+assert.equal(contract.schema, 1); assert.ok(contract.rows.length > 0);
 assert.deepEqual(await relay.listAgents(), { snapshot: null, liveness: {} });
 
 const bin = fileURLToPath(new URL('node_modules/.bin/relay', import.meta.url));
@@ -51,8 +57,9 @@ try {
   const subscribers = join(scratch, 'subscribers.json'), hooks = join(scratch, 'hooks.json');
   writeFileSync(subscribers, '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
   writeFileSync(hooks, '{"hooks":{}}\n');
-  const plan = cli(['install', '--harness', 'codex', '--subscribers', subscribers, '--target', hooks]);
-  assert.equal(typeof JSON.parse(plan), 'object');
+  // Without route qualification the planner refuses; a tarball install records no commit to bind one to.
+  assert.throws(() => cli(['install', '--harness', 'codex', '--subscribers', subscribers, '--target', hooks]), (error) => /UNQUALIFIED_ROUTE: .*--qualification/.test(error.stderr));
+  assert.equal(cli(['pairs', '--harness', 'codex', '--target', hooks]), '[]\n');
   assert.equal(readFileSync(hooks, 'utf8'), '{"hooks":{}}\n');
 } finally { rmSync(scratch, { recursive: true, force: true }); }
 console.log('installed package verified');

@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "harness": "agy",
+  "version": "1.5.7",
+  "sessionMode": "interactive",
+  "platform": "linux",
+  "relayCommit": "0000000000000000000000000000000000000000",
+  "configDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "rows": [
+    {
+      "event": "SessionStart",
+      "role": "notice",
+      "outerMs": 600000,
+      "decode": { "status": "passed", "evidence": ["test/fixtures/hook-events agy SessionStart decoder fixture at the tested relay commit"] },
+      "nativeReply": { "status": "passed", "evidence": ["agy encodeReply injectSteps fixture at the tested relay commit"] },
+      "liveDelivery": { "status": "unknown", "evidence": ["fresh-session injectSteps delivery not yet observed on agy 1.5.7"], "owner": "hq-d1dd06" },
+      "failure": { "status": "unknown", "evidence": ["notice failure delivery not yet observed on agy 1.5.7"], "owner": "hq-d1dd06" },
+      "cleanup": { "status": "passed", "evidence": ["test/child-containment.test.js at the tested relay commit"] },
+      "latency": { "status": "unknown", "evidence": ["no agy native-only comparison measured"], "owner": "relay-91ecda" },
+      "retryFlag": { "status": "not-applicable", "evidence": [] },
+      "outerFailure": { "status": "unknown", "evidence": ["externally killed relay not yet observed on agy 1.5.7"], "owner": "hq-d1dd06" },
+      "policyEquivalence": { "status": "unknown", "evidence": ["no owner replay of the migrated policy"], "owner": "hq-a83688" }
+    },
+    {
+      "event": "Stop",
+      "role": "registry",
+      "outerMs": 600000,
+      "decode": { "status": "passed", "evidence": ["test/fixtures/hook-events agy Stop decoder fixture at the tested relay commit"] },
+      "nativeReply": { "status": "passed", "evidence": ["agy Stop reply fixture at the tested relay commit"] },
+      "liveDelivery": { "status": "unknown", "evidence": ["Stop delivery not yet observed on agy 1.5.7"], "owner": "hq-d1dd06" },
+      "failure": { "status": "unknown", "evidence": ["Stop infrastructure failure not yet observed on agy 1.5.7"], "owner": "hq-d1dd06" },
+      "cleanup": { "status": "not-applicable", "evidence": [] },
+      "latency": { "status": "unknown", "evidence": ["no agy native-only comparison measured"], "owner": "relay-91ecda" },
+      "retryFlag": { "status": "not-applicable", "evidence": [] },
+      "outerFailure": { "status": "unknown", "evidence": ["externally killed relay not yet observed on agy 1.5.7"], "owner": "hq-d1dd06" },
+      "policyEquivalence": { "status": "not-applicable", "evidence": [] }
+    }
+  ]
+}
