@@ -57,12 +57,16 @@ export async function readRecoveryInput(stream, { clock = performance.now.bind(p
  * @returns {import("./types.js").Output}
  */
 export function failureReply({ adapter, harness, nativeEvent, retry = null, explicitDenial = null, error = null, diagnostics }) {
-  if (explicitDenial !== null) return adapter.encodeReply(nativeEvent, { decision: 'deny', reason: explicitDenial });
+  const extra = diagnostics.map((line) => `${line}\n`).join('');
+  // A native refusal keeps its reason first on stderr; the dispatch's diagnostics follow it.
+  /** @param {string} reason */
+  const refuse = (reason) => { const reply = adapter.encodeReply(nativeEvent, { decision: 'deny', reason }); return { ...reply, stderr: `${reply.stderr}${extra}` }; };
+  if (explicitDenial !== null) return refuse(explicitDenial);
   const cause = error ?? relayError('IO_ERROR', 'relay failed');
-  const report = [...diagnostics, describe(cause)].map((line) => `${line}\n`).join('');
+  const report = `${extra}${describe(cause)}\n`;
   if (harness === 'agy' && nativeEvent === 'Stop') return { stdout: '', stderr: report, exitCode: 0 };
   if (retryEscapes(harness, nativeEvent) && retry?.status === 'valid' && retry.value === true) return { stdout: '', stderr: report, exitCode: 0 };
-  if (adapter.replies[nativeEvent]?.refuse) return adapter.encodeReply(nativeEvent, { decision: 'deny', reason: refusalReason(cause) });
+  if (adapter.replies[nativeEvent]?.refuse) return refuse(refusalReason(cause));
   return { stdout: '', stderr: report, exitCode: adapter.failureExitCode ?? 1 };
 }
 

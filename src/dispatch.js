@@ -128,6 +128,8 @@ export async function runObservers(observers, inputFor, { clock, workDeadline, l
 /** @param {import("./types.js").Subscriber[]} guards @param {import("./types.js").HookEvent} event @param {import("./types.js").Capability} capability @param {{clock: () => number, workDeadline: number, launch: Launch}} deps @param {string[]} diagnostics */
 async function runGuards(guards, event, capability, { clock, workDeadline, launch }, diagnostics) {
   const contexts = []; let denial = null, error = null;
+  /** @type {import('./types.js').Failure[]} Every guard failure, kept for diagnostics even when a denial wins. */
+  const failures = [];
   for (const guard of guards) {
     if (clock() >= workDeadline) { error ??= relayError('DEADLINE_EXCEEDED', `guard ${guard.name} did not start before the deadline`); break; }
     let input, result, selected;
@@ -136,8 +138,9 @@ async function runGuards(guards, event, capability, { clock, workDeadline, launc
     try { ({ result, selected } = await launch(guard, input)); }
     catch (caught) {
       const cause = /** @type {import('./types.js').Failure & Partial<Selected>} */ (caught);
-      error ??= cause.code ? relayError(cause.code, `guard ${guard.name} ${event.nativeEvent}: ${cause.message}${where(cause)}`, cause)
+      const failed = cause.code ? relayError(cause.code, `guard ${guard.name} ${event.nativeEvent}: ${cause.message}${where(cause)}`, cause)
         : relayError('GUARD_FAILED', `guard ${guard.name} invocation failed`, cause);
+      failures.push(failed); error ??= failed;
       continue;
     }
     try {
@@ -153,10 +156,10 @@ async function runGuards(guards, event, capability, { clock, workDeadline, launc
         if (!capability.context) throw relayError('UNSUPPORTED_REPLY', `guard ${guard.name} returned context on an event without a context channel`);
         contexts.push(reply.context);
       }
-    } catch (caught) { const cause = /** @type {import('./types.js').Failure} */ (caught); error ??= cause; }
+    } catch (caught) { const cause = /** @type {import('./types.js').Failure} */ (caught); failures.push(cause); error ??= cause; }
     // A guard's stdin carries private fields, so its raw stderr is never forwarded.
   }
-  return { denial, error, contexts };
+  return { denial, error, contexts, failures };
 }
 
 // Notices run after every guard allowed, before publication: a notice reading the registry sees
@@ -266,17 +269,22 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
     const closed = await close();
     if (closed?.cleanup === 'failed') diagnostics.push('CONTAINMENT_FAILED: the dispatch supervisor did not finish cleanup');
   }
-  return outcome;
+  // deliver() leaves the dispatch's diagnostics out of its stderr; they are appended here, after
+  // the supervisor has closed, so a cleanup failure is reported on every path.
+  return { ...outcome, stderr: `${outcome.stderr}${lines(diagnosticsFor(diagnostics))}` };
 
   /** @returns {Promise<import("./types.js").Output>} */
   async function deliver() {
-    const { denial, error, contexts: guardContexts } = await runGuards(guards, event, capability, { clock, workDeadline, launch }, diagnostics);
-    if (denial !== null) return failureReply({ adapter, harness, nativeEvent, explicitDenial: denial, diagnostics });
-    if (error) return fail(error);
+    const { denial, error, contexts: guardContexts, failures } = await runGuards(guards, event, capability, { clock, workDeadline, launch }, diagnostics);
+    if (denial !== null) {
+      for (const failure of failures) diagnostics.push(describe(failure));
+      return failureReply({ adapter, harness, nativeEvent, explicitDenial: denial, diagnostics: [] });
+    }
+    if (error) return failureReply({ adapter, harness, nativeEvent, retry: recovery?.retry ?? null, error, diagnostics: [] });
     const noticeContexts = await runNotices(notices, event, { clock, workDeadline, launch, since: start }, diagnostics);
     let combined;
     try { combined = combineContext(guardContexts, noticeContexts.map((n) => n.context)); }
-    catch (caught) { return fail(/** @type {import('./types.js').Failure} */ (caught)); }
+    catch (caught) { return failureReply({ adapter, harness, nativeEvent, retry: recovery?.retry ?? null, error: /** @type {import('./types.js').Failure} */ (caught), diagnostics: [] }); }
     for (const index of combined.dropped) diagnostics.push(`NOTICE_DROPPED: ${noticeContexts[index].name} ${nativeEvent} context does not fit the remaining ${CONTEXT_LIMIT}-character allowance`);
     let result = null, published = registryEvent === null && registryError === null;
     if (registryError !== null) diagnostics.push(`registry: ${describe(registryError)}`);
@@ -295,7 +303,7 @@ export async function dispatchHook({ harness, nativeEvent, input, outerMs, subsc
     // Harnesses read a reply's context only on exit 0, so a reply carrying context keeps exit 0 even
     // when publication failed; the failure stays on stderr.
     const failedExit = (!published || registryEvent?.background === null) && combined.context === undefined;
-    return { stdout: reply.stdout, stderr: lines(diagnosticsFor(diagnostics)), exitCode: failedExit ? (adapter.failureExitCode ?? 1) : reply.exitCode };
+    return { stdout: reply.stdout, stderr: '', exitCode: failedExit ? (adapter.failureExitCode ?? 1) : reply.exitCode };
   }
 }
 

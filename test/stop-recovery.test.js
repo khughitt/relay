@@ -135,3 +135,22 @@ test('a CLI option error on a known Stop event follows the Stop recovery rule', 
   const tool = spawnSync(process.execPath, [cli, 'hook', '--harness', 'claude-code', '--outer-ms', 'abc', 'PreToolUse'], { encoding: 'utf8', input: '{}', env });
   assert.equal(tool.status, 2); assert.equal(tool.stdout, '', 'other events keep the usage-error exit');
 });
+
+test('diagnostics survive a refusal and the supervisor close, beside the native reply', async (t) => {
+  const p = await tempPaths(t);
+  await writeSubscribers(p, [guard('claude-code', 'turn-end', { name: 'broken', argv: ['relay-no-such-guard'] }), guard('claude-code', 'turn-end', { name: 'deny', argv: ['node', fixture, 'deny'] })]);
+  const denied = await dispatchHook({ harness: 'claude-code', nativeEvent: 'Stop', input: Readable.from([body({}, undefined)]), outerMs: 20000, subscribersPath: p.subscribersPath }, { paths: p, env, applyOptions: local });
+  assert.equal(denied.stdout, block('denied by fixture'));
+  assert.match(denied.stderr, /^denied by fixture$/m);
+  assert.match(denied.stderr, /EXECUTABLE_NOT_FOUND/, 'the broken guard is reported beside the denial');
+  await writeSubscribers(p, [guard('claude-code', 'turn-end')]);
+  const failingClose = async () => ({ runChild: fake({}), close: async () => ({ cleanup: 'failed' }), recording: true });
+  const allowed = await dispatchHook({ harness: 'claude-code', nativeEvent: 'Stop', input: Readable.from([body({}, undefined)]), outerMs: 20000, subscribersPath: p.subscribersPath }, { paths: p, env, applyOptions: local, supervise: failingClose });
+  assert.equal(allowed.exitCode, 0);
+  assert.match(allowed.stderr, /CONTAINMENT_FAILED: the dispatch supervisor did not finish cleanup/);
+  await writeSubscribers(p, [guard('claude-code', 'turn-end', { argv: ['node', fixture, 'deny'] })]);
+  const refusedClose = await dispatchHook({ harness: 'claude-code', nativeEvent: 'Stop', input: Readable.from([body({}, undefined)]), outerMs: 20000, subscribersPath: p.subscribersPath }, { paths: p, env, applyOptions: local,
+    supervise: async () => ({ runChild: fake({ stdout: '{"decision":"deny","reason":"held"}' }), close: async () => ({ cleanup: 'failed' }), recording: true }) });
+  assert.equal(refusedClose.stdout, block('held'));
+  assert.match(refusedClose.stderr, /CONTAINMENT_FAILED/);
+});
