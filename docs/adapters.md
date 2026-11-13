@@ -408,6 +408,18 @@ Each cutover pins a binary/config pair: every relay dispatch entry names its nod
 
 A row's `latency` check passes only on transport latency evidence from at least two hosts, each on Node 22 and a development runtime, against that host's own deployed composition for an event the deployment already relays or its native-only path for a newly transported one, meeting every bound of the frozen table: warm serial (p95 +100, p99 +150, max +250 ms over the baseline; absolute max 1000 ms), fresh-process cold (p99 +200, max +300 ms; absolute 1500 ms), missing first command (the role's own failure, no fallback, max 1000 ms), timeout with a grandchild (within the subscriber timeout +750 ms, nothing surviving), concurrent batches of four (p99 +250, max +500 ms; absolute 2000 ms; no lost occurrence) and the supervisor alone (combined p99 150 ms, max 250 ms). The outer budget is 20 s or the harness's native cap, whichever is smaller. The evidence is synthetic, so a migrated policy's own cost is replayed by its owner before that policy's cutover.
 
+### Route status
+
+No hook transport route is qualified yet. The current rows, per harness version and session mode with each check's status and open owner, are recorded in the repository at `docs/evidence/hook-transport/route-status.json`:
+
+| Harness, version, mode | Installer routes | Status |
+| --- | --- | --- |
+| Claude Code 2.1.323, interactive | SessionStart, UserPromptSubmit, PreToolUse, Notification:idle_prompt, Notification:permission_prompt, Stop, StopFailure, SessionEnd | Unqualified. Decode, native reply, failure and cleanup fixtures pass. UserPromptSubmit, PreToolUse, both Notifications, StopFailure and SessionEnd met every latency bound on one host; the second host's run, live delivery, outer-failure, Stop retry and policy-equivalence proofs are open. SessionStart and Stop, with every native line migrated, do not fit the 20 s measurement budget. |
+| Codex 0.168.0, interactive | SessionStart, SubagentStart, UserPromptSubmit, PreToolUse, PermissionRequest, Stop, SubagentStop, SessionEnd | Unqualified. No verified hook-handler scheduling evidence, so no latency measurement; SessionEnd's 3 s native cap admits no subscriber. |
+| agy 1.5.7, interactive | generated outside relay | Unqualified; live facts open. |
+
+Claude Code `PostToolUse` and `PostToolUseFailure` and Codex `PostToolUse` stay native hooks: relay keeps their decoders, but their native-only latency delta exceeded the warm bound. Claude Code `SubagentStart`, `SubagentStop`, `PreCompact`, `PostCompact` and `PostModelSwitch` have decoders and no installer binding. Native hook lines stay in place until their route qualifies and their policy owner's equivalence replay passes.
+
 ## Failure modes
 
 | Exit code | Meaning |

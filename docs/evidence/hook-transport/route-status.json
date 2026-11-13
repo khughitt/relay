@@ -1,0 +1,1101 @@
+{
+  "schema": 1,
+  "title": "Hook transport route status",
+  "note": "No route is qualified. Rows follow the HookQualification check columns (docs/adapters.md, Route qualification) per harness, version and session mode on linux; \"unqualified\" rows name an open owner for each missing proof. Host labels are anonymized; raw samples stay in the plan workspace.",
+  "tested": {
+    "relayCommit": "16cf7daeda3519d660faa5e41d52f8a552422925",
+    "workloadSha256": "9806b52ca2bf97d681eb9baee85c905b0b61fb3c948d2e2ce9738f263b99103f",
+    "hostAManifestSetSha256": "4b0570749411d03a2acebf840c615c2971020e96a2f83ceaba036031f6189b16",
+    "hosts": {
+      "host-a": {
+        "node": [
+          "v22.23.2",
+          "v26.5.0"
+        ],
+        "claude-code": "2.1.323",
+        "codex": "0.168.0",
+        "agy": "1.5.7"
+      }
+    }
+  },
+  "harnesses": [
+    {
+      "harness": "claude-code",
+      "version": "2.1.323",
+      "sessionMode": "interactive",
+      "platform": "linux",
+      "routes": [
+        {
+          "event": "SessionStart",
+          "migratingNatives": [
+            "claude-sessionstart",
+            "claude-provenance",
+            "claude-profile",
+            "capture-notice"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.SessionStart.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at claude-code 2.1.323 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "with every native line migrating, the 5-subscriber composition does not fit the frozen 20 s measurement budget (needs 8250 ms, 6334 ms fit); host-a pilot at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at claude-code 2.1.323"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "UserPromptSubmit",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.UserPromptSubmit.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at claude-code 2.1.323 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "evidence": [
+              "host=host-a runtime=v22.23.2,v26.5.0 claude-code UserPromptSubmit commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [8.3, 18.7] p99 delta [10.8, 84.2] max delta [15.6, 21.6] ms (absolute max [170.9, 304.9]); cold p99 delta [9.8, 2.9] ms; concurrent p99 delta [41.8, 30.7] ms; missing-command max [166.7, 220.3] ms; timeout max [1201.8, 1255.2] ms; supervisor-alone p99 [74.2, 72.6] ms",
+              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
+              "second host (europa) not run: package prepared; user or authorized operator action"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at claude-code 2.1.323"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "PreToolUse",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.PreToolUse.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at claude-code 2.1.323 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "evidence": [
+              "host=host-a runtime=v22.23.2,v26.5.0 claude-code PreToolUse commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [7.9, 6.8] p99 delta [13.9, 120.7] max delta [17.6, 159.1] ms (absolute max [178, 326.9]); cold p99 delta [22.8, 16.4] ms; concurrent p99 delta [41.6, -44.4] ms; missing-command max [145.8, 133.4] ms; timeout max [1137.5, 1136.9] ms; supervisor-alone p99 [76.3, 108.8] ms",
+              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
+              "second host (europa) not run: package prepared; user or authorized operator action"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at claude-code 2.1.323"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "Notification:idle_prompt",
+          "migratingNatives": [],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.Notification.idle_prompt.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at claude-code 2.1.323 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "evidence": [
+              "host=host-a runtime=v22.23.2,v26.5.0 claude-code Notification:idle_prompt commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-9.1, -12.1] p99 delta [-10.5, -10.3] max delta [-11.4, -21.3] ms (absolute max [142.2, 136.9]); cold p99 delta [-12.6, 5.9] ms; concurrent p99 delta [-11.5, 20] ms; missing-command max [129.2, 123.9] ms; timeout max [1140.1, 1137.4] ms; supervisor-alone p99 [74.3, 69.1] ms",
+              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
+              "second host (europa) not run: package prepared; user or authorized operator action"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at claude-code 2.1.323"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "Notification:permission_prompt",
+          "migratingNatives": [],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.Notification.permission_prompt.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at claude-code 2.1.323 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "evidence": [
+              "host=host-a runtime=v22.23.2,v26.5.0 claude-code Notification:permission_prompt commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-9.8, -7.7] p99 delta [-10.1, -8.1] max delta [-11.5, -11.5] ms (absolute max [139.2, 137.6]); cold p99 delta [-11.7, -14.6] ms; concurrent p99 delta [-22.1, -11.7] ms; missing-command max [132, 122.7] ms; timeout max [1147, 1133.7] ms; supervisor-alone p99 [77.8, 73] ms",
+              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
+              "second host (europa) not run: package prepared; user or authorized operator action"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at claude-code 2.1.323"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "Stop",
+          "migratingNatives": [
+            "claim-guard",
+            "harness-state-refresh",
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.Stop.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at claude-code 2.1.323 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "with every native line migrating, the 4-subscriber composition does not fit the frozen 20 s measurement budget (needs 6750 ms, 6334 ms fit); host-a pilot at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "unknown",
+            "evidence": [
+              "retry after an infrastructure refusal not probed live"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at claude-code 2.1.323"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "tasks-e67608"
+          }
+        },
+        {
+          "event": "StopFailure",
+          "migratingNatives": [],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.StopFailure.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at claude-code 2.1.323 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "evidence": [
+              "host=host-a runtime=v22.23.2,v26.5.0 claude-code StopFailure commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-3.3, -10.8] p99 delta [-3.1, -8.8] max delta [-15.4, -9.5] ms (absolute max [190, 160.1]); cold p99 delta [-1.5, -6.8] ms; concurrent p99 delta [13.1, -30] ms; missing-command max [131.2, 126.9] ms; timeout max [1135.2, 1134] ms; supervisor-alone p99 [120.8, 73.4] ms",
+              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
+              "second host (europa) not run: package prepared; user or authorized operator action"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at claude-code 2.1.323"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "SessionEnd",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.SessionEnd.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at claude-code 2.1.323 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "evidence": [
+              "host=host-a runtime=v22.23.2,v26.5.0 claude-code SessionEnd commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [13.2, 0.8] p99 delta [65.7, 2.4] max delta [92.9, 2.9] ms (absolute max [260.5, 139.5]); cold p99 delta [69, 4.8] ms; concurrent p99 delta [17.9, 0.9] ms; missing-command max [143.7, 130.7] ms; timeout max [1201.8, 1145.4] ms; supervisor-alone p99 [90.4, 76.2] ms",
+              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
+              "second host (europa) not run: package prepared; user or authorized operator action"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at claude-code 2.1.323"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        }
+      ],
+      "notInstalled": {
+        "PostToolUse": "stays native (plan amendment 1: native-only warm p95 delta 121-143 ms against +100)",
+        "PostToolUseFailure": "stays native (plan amendment 1)",
+        "SubagentStart": "decoder fixture only; no installer binding",
+        "SubagentStop": "decoder fixture only; no installer binding",
+        "PreCompact": "decoder fixture only; no installer binding",
+        "PostCompact": "decoder fixture only; no installer binding",
+        "PostModelSwitch": "decoder fixture only; no installer binding",
+        "owner": "relay-d487c1"
+      }
+    },
+    {
+      "harness": "codex",
+      "version": "0.168.0",
+      "sessionMode": "interactive",
+      "platform": "linux",
+      "routes": [
+        {
+          "event": "SessionStart",
+          "migratingNatives": [
+            "claude-profile",
+            "capture-notice"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/codex.SessionStart.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at codex 0.168.0 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "no verified Codex hook-handler scheduling evidence; the deployed composition cannot be timed as Codex runs it"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at codex 0.168.0"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "SubagentStart",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/codex.SubagentStart.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at codex 0.168.0 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "no verified Codex hook-handler scheduling evidence; the deployed composition cannot be timed as Codex runs it"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at codex 0.168.0"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "UserPromptSubmit",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/codex.UserPromptSubmit.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at codex 0.168.0 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "no verified Codex hook-handler scheduling evidence; the deployed composition cannot be timed as Codex runs it"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at codex 0.168.0"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "PreToolUse",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/codex.PreToolUse.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at codex 0.168.0 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "no verified Codex hook-handler scheduling evidence; the deployed composition cannot be timed as Codex runs it"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at codex 0.168.0"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "PermissionRequest",
+          "migratingNatives": [],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/codex.PermissionRequest.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at codex 0.168.0 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "no verified Codex hook-handler scheduling evidence; the deployed composition cannot be timed as Codex runs it"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at codex 0.168.0"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "Stop",
+          "migratingNatives": [
+            "claim-guard",
+            "harness-state-refresh",
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/codex.Stop.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at codex 0.168.0 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "no verified Codex hook-handler scheduling evidence; the deployed composition cannot be timed as Codex runs it"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "unknown",
+            "evidence": [
+              "retry after an infrastructure refusal not probed live"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at codex 0.168.0"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "tasks-e67608"
+          }
+        },
+        {
+          "event": "SubagentStop",
+          "migratingNatives": [
+            "claim-guard",
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/codex.SubagentStop.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at codex 0.168.0 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "no verified Codex hook-handler scheduling evidence; the deployed composition cannot be timed as Codex runs it"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "unknown",
+            "evidence": [
+              "retry after an infrastructure refusal not probed live"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at codex 0.168.0"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "tasks-e67608"
+          }
+        },
+        {
+          "event": "SessionEnd",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/codex.SessionEnd.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "unknown",
+            "evidence": [
+              "no live probe at codex 0.168.0 interactive"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "no verified Codex hook-handler scheduling evidence; the deployed composition cannot be timed as Codex runs it"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "unknown",
+            "evidence": [
+              "externally killed or timed-out relay not observed at codex 0.168.0"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          },
+          "note": "Native cap 3000 ms admits no subscriber under the preserved reserves; only the registry-only binding can be measured (outerMs 3000)."
+        }
+      ],
+      "notInstalled": {
+        "PostToolUse": "stays native (plan amendment 1)",
+        "owner": "relay-d487c1"
+      }
+    },
+    {
+      "harness": "agy",
+      "version": "1.5.7",
+      "sessionMode": "interactive",
+      "platform": "linux",
+      "routes": [],
+      "note": "agy settings are generated by hq-a83688; live SessionStart/PreInvocation injectSteps, Stop and reset/wake facts at 1.5.7 are owned by hq-d1dd06, relay rows by relay-d487c1. Decoder fixtures exist for every agy event relay maps."
+    }
+  ]
+}
