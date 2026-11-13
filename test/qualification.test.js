@@ -156,3 +156,34 @@ test('the qualification scripts import without an entry script path', async () =
     assert.equal(r.status, 0, `${name}: ${r.stderr}`);
   }
 });
+
+// Node 24 and later rename the main thread at startup, which hides a link's name from /proc comm;
+// a route that did not stand in for its harness left its hooks without a session or, under a real
+// harness session, borrowing that outer session silently.
+test('a route stands in for its harness on every runtime, so its hooks resolve the route process', async () => {
+  const { mkdtempSync, symlinkSync, rmSync } = await import('node:fs');
+  const { spawnSync } = await import('node:child_process');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const dir = mkdtempSync(join(tmpdir(), 'relay-harness-'));
+  try {
+    const link = join(dir, 'claude');
+    symlinkSync(process.execPath, link);
+    const run = new URL('../scripts/hook-qualification/run.mjs', import.meta.url).href, candidate = fileURLToPath(new URL('..', import.meta.url));
+    const script = `const { becomeHarness, hookSessionPid } = await import(${JSON.stringify(run)});
+becomeHarness('claude-code');
+process.stdout.write(JSON.stringify({ pid: process.pid, resolved: hookSessionPid({ candidate: ${JSON.stringify(candidate)}, harness: 'claude-code' }) }));`;
+    const r = spawnSync(link, ['--input-type=module', '-e', script], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: dir } });
+    assert.equal(r.status, 0, r.stderr);
+    const { pid, resolved } = JSON.parse(r.stdout);
+    assert.equal(resolved, pid, `on ${process.version} hooks resolved session ${resolved}, not the route process ${pid}`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a route refuses when its hooks would resolve no session or another one', async () => {
+  const { assertHarnessAncestor } = await import('../scripts/hook-qualification/run.mjs');
+  assert.doesNotThrow(() => assertHarnessAncestor(41, 41));
+  assert.throws(() => assertHarnessAncestor(null, 41), /hooks would resolve session none, not this route's fake harness process 41/);
+  assert.throws(() => assertHarnessAncestor(7, 41), /hooks would resolve session 7, not this route's fake harness process 41/);
+});

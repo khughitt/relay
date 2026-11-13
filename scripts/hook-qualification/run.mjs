@@ -29,6 +29,35 @@ const HARNESS_COMMANDS = /** @type {Record<string, string>} */ ({ 'claude-code':
 const sha = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
 /** @type {(message: string) => never} */
 const refuse = (message) => { throw Object.assign(new Error(message), { code: 'QUALIFICATION_INPUT' }); };
+/** @param {string} value */
+const shellQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+
+// ---- fake harness ancestor ----
+
+/** Names this process for its harness, so hooks it launches find it as their session ancestor. The
+ * link it runs through is not enough: Node 24 and later rename the main thread at startup (for
+ * example node-MainThread), which hides the link's name from /proc comm. @param {string} harness */
+export function becomeHarness(harness) {
+  process.title = HARNESS_COMMANDS[harness] ?? refuse(`${harness} has no harness command to stand in for`);
+}
+
+/** The session pid a hook launched from this process the way the runner launches hooks (under
+ * /bin/sh) resolves with the candidate's own adapter. @param {{candidate: string, harness: string, node?: string}} options
+ * @returns {number|null} */
+export function hookSessionPid({ candidate, harness, node = process.execPath }) {
+  const adapters = pathToFileURL(join(candidate, 'src/adapters/index.js')).href;
+  const script = `const { adapterFor } = await import(${JSON.stringify(adapters)}); process.stdout.write(JSON.stringify(adapterFor(${JSON.stringify(harness)}).resolveSessionPid() ?? null));`;
+  const probe = spawnSync('/bin/sh', ['-c', `${shellQuote(node)} --input-type=module -e ${shellQuote(script)}`], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin' }, timeout: 10000 });
+  if (probe.status !== 0) refuse(`the session ancestry probe failed: ${probe.stderr.trim() || probe.error?.message || `exit ${probe.status ?? probe.signal}`}`);
+  return JSON.parse(probe.stdout);
+}
+
+/** Refuses a route whose hooks would not resolve this process as their session: without it every
+ * candidate condition carries a missing-handle diagnostic, and under a real harness session the
+ * hooks would borrow that outer session silently. @param {number|null} resolved @param {number} [pid] */
+export function assertHarnessAncestor(resolved, pid = process.pid) {
+  if (resolved !== pid) refuse(`hooks would resolve session ${resolved ?? 'none'}, not this route's fake harness process ${pid}`);
+}
 
 // ---- fixture ----
 
@@ -143,6 +172,9 @@ async function runRoute(options) {
   const candidate = resolve(String(options.candidate)), out = resolve(String(options.output)), pilot = options.pilot === true;
   const fixture = resolve(setDir, manifest.fixture), fixtureBin = join(fixture, 'bin'), fixtureConfig = join(fixture, 'config');
   const node = process.execPath, runtime = process.version, harness = manifest.harness, event = manifest.event, nativeEvent = event.split(':', 1)[0];
+  becomeHarness(harness);
+  const harnessAncestor = { pid: process.pid, resolved: hookSessionPid({ candidate, harness, node }) };
+  assertHarnessAncestor(harnessAncestor.resolved, harnessAncestor.pid);
   const { adapterFor } = await import(pathToFileURL(join(candidate, 'src/adapters/index.js')).href);
   const adapter = adapterFor(harness);
   const outerMs = Math.min(q.outerMs, adapter.outerTimeouts.max?.[nativeEvent] ?? q.outerMs);
@@ -164,9 +196,8 @@ async function runRoute(options) {
   const vars = { '@NODE@': node, '@FIXTURE@': fixture, '@DEPLOYED@': relayed ? manifest.deployed.relayEntry : '', '@CONFIG@': fixtureConfig, '@CANDIDATE@': candidate };
   const substitute = (/** @type {string} */ value) => Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(k, v), value);
   const baselineBranches = manifest.branches.map((/** @type {any} */ b) => ({ ...b, argv: b.argv.map(substitute) }));
-  const quote = (/** @type {string} */ v) => `'${v.replaceAll("'", "'\\''")}'`;
   const hook = (/** @type {string} */ entry, /** @type {string} */ config, /** @type {number} */ outer, /** @type {string} */ preload = '') =>
-    `${quote(node)}${preload ? ` --require ${quote(preload)}` : ''} ${quote(entry)} hook --harness ${harness} --outer-ms ${outer} --subscribers ${quote(config)} ${event}`;
+    `${shellQuote(node)}${preload ? ` --require ${shellQuote(preload)}` : ''} ${shellQuote(entry)} hook --harness ${harness} --outer-ms ${outer} --subscribers ${shellQuote(config)} ${event}`;
   // Start probes (never timed samples) preload a recorder that notes each process the hook spawns.
   const recorder = join(workBin, 'spawn-recorder.cjs');
   writeFileSync(recorder, SPAWN_RECORDER);
@@ -355,7 +386,7 @@ async function runRoute(options) {
 
   const result = {
     schema: 1, mode: pilot ? 'pilot' : 'measure', route: { harness, event, outerMs }, host: execFileSync('uname', ['-n'], { encoding: 'utf8' }).trim(), runtime, node, timeoutMs: q.timeoutMs,
-    cpus: cpus().length, load: loadLog,
+    cpus: cpus().length, load: loadLog, harnessAncestor,
     candidate: { path: candidate, commit: git(candidate, ['rev-parse', 'HEAD']), dirty: git(candidate, ['status', '--porcelain', '--untracked-files=no']).length > 0,
       entry: join(candidate, 'bin/relay.js'), configSha256: manifest.candidate.configSha256 },
     manifest, manifestSetSha256: sha(setFile), workloadSha256: sha(workloadFile), deployedDigest, workLists: lists, fixtures,
