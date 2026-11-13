@@ -123,6 +123,8 @@ async function supervise() {
         phase: 'idle', invocation: null, child: null, pgid: null, deadlineNs: init.deadlineNs });
       // The absolute deadline holds even if the dispatcher survives but stops talking.
       timers.push(setTimeout(() => void stop('deadline'), Math.max(0, remainingMs(init.deadlineNs) + CLEANUP_MS)));
+      // A hard exit no stop path can postpone: one more cleanup reserve after the deadline.
+      setTimeout(() => process.exit(1), Math.max(0, remainingMs(init.deadlineNs) + 2 * CLEANUP_MS)).unref();
       timers.push(setInterval(() => {
         if (init === null) return;
         for (const [who, handle] of /** @type {[string, any][]} */ ([['parent', init.parent], ['session', init.session]])) {

@@ -67,9 +67,36 @@ test('timeout and overflow contain the whole group; a fast exit needs no signal'
   const fast = await run(supervisor, ['/bin/true']);
   assert.equal(fast.status, 'exited'); assert.equal(fast.exitCode, 0); assert.equal(fast.cleanup, 'complete');
   assert.ok(fast.timings.cleanupMs < 50, `a group already empty cleans at once (${fast.timings.cleanupMs} ms)`);
-  const missing = await run(supervisor, ['/nonexistent/relay-subscriber']);
+  started = performance.now();
+  const missing = await run(supervisor, ['/nonexistent/relay-subscriber'], 3000);
   assert.equal(missing.status, 'spawn-failed'); assert.equal(missing.cleanup, 'complete');
+  assert.ok(performance.now() - started < 1000, `a spawn failure reports at once, not after its timeout (${(performance.now() - started).toFixed(0)} ms)`);
+  started = performance.now();
+  const late = await supervisor.runChild(node('allow'), '', { timeoutMs: 3000, deadline: performance.now() - 1, env: env(), cwd: '/' });
+  assert.equal(late.status, 'timeout');
+  assert.ok(performance.now() - started < 1000, 'an expired deadline reports at once');
   assert.deepEqual(await supervisor.close(), { cleanup: 'complete' });
+});
+
+test('a descendant escaping its group but holding the pipes ends the run within its cleanup reserve as a failed cleanup', async (t) => {
+  const dir = await recordDir(t), marker = marked(t);
+  const supervisor = await createChildSupervisor({ deadline: far(), sessionHandle: null, recordDir: dir });
+  const started = performance.now();
+  const result = await run(supervisor, node('escape', marker), 3000);
+  assert.ok(performance.now() - started < 1500, `bounded by the cleanup reserve, not the escaped process (${(performance.now() - started).toFixed(0)} ms)`);
+  assert.equal(result.status, 'exited'); assert.equal(result.cleanup, 'failed');
+  assert.equal(result.stdout, '{"decision":"allow"}');
+});
+
+test('a supervisor whose dispatcher is gone exits even while an escaped descendant holds the pipes', async (t) => {
+  const dir = await recordDir(t), marker = marked(t);
+  let supervisorProcess;
+  const supervisor = await createChildSupervisor({ deadline: far(), sessionHandle: null, recordDir: dir, spawnFn: (...args) => (supervisorProcess = spawn(...args)) });
+  void run(supervisor, node('escape-hang', marker), 10000);
+  await until(async () => (await records(dir)).length === 1 && (await readRecord(dir)).phase === 'active', { timeoutMs: 3000, what: 'admission' });
+  const { supervisor: own } = await readRecord(dir);
+  supervisorProcess.stdio[3].destroy();
+  await until(() => ops.probe(own).status === 'dead', { timeoutMs: 2500, what: 'supervisor exit despite held pipes' });
 });
 
 test('one supervisor serves sequential runs, rejects a concurrent one, and concurrent dispatches each keep their own', async (t) => {

@@ -16,7 +16,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cpus } from 'node:os';
 import { statistics } from './statistics.mjs';
-import { validateManifest, checkRetainedWork, runBaseline } from './baseline.mjs';
+import { validateManifest, checkRetainedWork, runBaseline, workLists } from './baseline.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -46,7 +46,9 @@ export function judgePilot(results, workload) {
   if (!migrated || migrated.baseline?.length !== n || migrated.candidate?.length !== n) { complete = false; failures.push(`migrated needs ${n} baseline and ${n} candidate samples`); }
   else {
     if ([...migrated.baseline, ...migrated.candidate].some((/** @type {any} */ s) => !s.ok)) failures.push('migrated has failed calls; none may be excluded');
-    if (migrated.candidate.some((/** @type {any} */ s) => s.supervisors !== 1)) failures.push('a candidate dispatch did not use exactly one supervisor');
+    const expected = w.subscribers.length;
+    if ([...migrated.baseline, ...migrated.candidate].some((/** @type {any} */ s) => s.invocations !== expected)) failures.push(`a sample ran other than ${expected} subscriber invocations`);
+    if (migrated.candidate.some((/** @type {any} */ s) => s.supervisors !== 1 || s.separateSupervisor !== true)) failures.push('a candidate dispatch did not run its subscribers under exactly one separate supervisor');
     const base = row('migrated baseline', migrated.baseline.map((/** @type {any} */ s) => s.elapsedMs)), cand = row('migrated candidate', migrated.candidate.map((/** @type {any} */ s) => s.elapsedMs));
     for (const [q, bound] of /** @type {[('p95'|'p99'|'max'), number][]} */ ([['p95', b.p95DeltaMs], ['p99', b.p99DeltaMs], ['max', b.maxDeltaMs]])) {
       if (cand[q] - base[q] > bound) failures.push(`migrated ${q} delta ${(cand[q] - base[q]).toFixed(1)} > ${bound} ms`);
@@ -58,6 +60,7 @@ export function judgePilot(results, workload) {
   else {
     row('no-subscriber deployed', none.deployed); row('no-subscriber candidate', none.candidate); row('no-subscriber native', none.native);
     if (none.candidateSupervisorStarts !== 0) failures.push('the empty candidate started a supervisor');
+    if (!Array.isArray(none.failures) || none.failures.length > 0) { complete = false; failures.push('a no-subscriber diagnostic row failed; the pilot is incomplete'); }
   }
   return { passed: complete && failures.length === 0, complete, failures, rows };
 }
@@ -65,11 +68,13 @@ export function judgePilot(results, workload) {
 // ---- fixture ----
 
 const PAYLOAD_BYTES = 1024;
-/** Every fixture body does the same work on both sides: read stdin, note its parent, reply. */
+/** Every fixture body does the same work on both sides: read stdin, note its parent's pid and command
+ * line (a shell builtin, no extra process), reply. */
+const note = 'IFS= read -r parent < /proc/$PPID/cmdline\necho "$PPID $parent" >> "$RELAY_PILOT_PPID_FILE"\n';
 const fixtureScripts = {
-  'relay-fixture-guard': '#!/bin/sh\ncat >/dev/null\necho "$PPID" >> "$RELAY_PILOT_PPID_FILE"\nprintf \'{"decision":"allow"}\'\n',
-  'relay-fixture-observer': '#!/bin/sh\ncat >/dev/null\necho "$PPID" >> "$RELAY_PILOT_PPID_FILE"\n',
-  'relay-fixture-native': '#!/bin/sh\ncat >/dev/null\necho "$PPID" >> "$RELAY_PILOT_PPID_FILE"\n',
+  'relay-fixture-guard': `#!/bin/sh\ncat >/dev/null\n${note}printf '{"decision":"allow"}'\n`,
+  'relay-fixture-observer': `#!/bin/sh\ncat >/dev/null\n${note}`,
+  'relay-fixture-native': `#!/bin/sh\ncat >/dev/null\n${note}`,
 };
 /** @param {string} path */
 const sha = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -140,7 +145,8 @@ async function measure(options) {
   let sample = 0;
   const env = (/** @type {string} */ state) => ({ PATH: `${bin}:/usr/bin:/bin`, HOME: home, RELAY_STATE_DIR: state, XDG_CONFIG_HOME: join(home, '.config'), XDG_STATE_HOME: join(home, '.local/state'),
     RELAY_PILOT_PPID_FILE: join(ppid, String(++sample)) });
-  const parents = (/** @type {string} */ file) => existsSync(file) ? new Set(readFileSync(file, 'utf8').split('\n').filter(Boolean)).size : 0;
+  // Each fixture body appends its parent pid: the lines count invocations, the distinct parents count supervisors.
+  const parentLines = (/** @type {string} */ file) => existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
   const deployedEntry = manifest.deployed.relayEntry;
   const relay = (/** @type {string} */ entry, /** @type {number} */ outer, /** @type {string} */ subs) => `'${node}' '${entry}' hook --harness claude-code --outer-ms ${outer} --subscribers '${join(config, subs)}' PreToolUse`;
   const composition = (/** @type {{name: string, role: string, command: string}[]} */ branches) => ({ ...manifest, branches: branches.map((b) => ({ name: b.name, role: b.role, argv: ['/bin/sh', '-c', b.command] })) });
@@ -148,11 +154,15 @@ async function measure(options) {
   const baselineEvent = composition([{ name: 'deployed-relay', role: 'deployed-relay', command: relay(deployedEntry, 600000, 'deployed.json') }, { name: 'turn-pause', role: 'native', command: join(bin, 'relay-fixture-native') }]);
   const candidateEvent = { ...manifest, baselineKind: 'native-only', deployed: null, branches: [{ name: 'candidate-relay', role: 'native', argv: ['/bin/sh', '-c', relay(join(candidate, 'bin/relay.js'), w.outerMs, 'candidate.json')] }] };
   const single = (/** @type {string} */ name, /** @type {string} */ command) => ({ ...manifest, baselineKind: 'native-only', deployed: null, branches: [{ name, role: 'native', argv: ['/bin/sh', '-c', command] }] });
-  checkRetainedWork(manifest, { baseline: ['deployed-relay:ops-guard', 'deployed-relay:familiar', 'turn-pause'], candidate: ['candidate:ops-guard', 'candidate:turn-pause', 'candidate:familiar'] });
+  const configOf = (/** @type {string} */ name) => JSON.parse(readFileSync(join(config, name), 'utf8'));
+  checkRetainedWork(manifest, workLists({ deployed: configOf('deployed.json'), candidate: configOf('candidate.json'), native: ['turn-pause'] }));
   /** @param {any} m @param {string} state */
   const event = async (m, state) => {
     const e = env(state), r = await runBaseline(m, { event: w.event, input: payload, env: e, cwd });
-    return { elapsedMs: r.elapsedMs, ok: r.statuses.every((s) => s === 'exited 0') && r.survivors.length === 0, statuses: r.statuses, survivors: r.survivors, supervisors: parents(e.RELAY_PILOT_PPID_FILE) };
+    const seen = parentLines(e.RELAY_PILOT_PPID_FILE);
+    // Supervised subscribers have the supervisor process as parent, never the relay hook process itself.
+    return { elapsedMs: r.elapsedMs, ok: r.statuses.every((s) => s === 'exited 0') && r.survivors.length === 0, statuses: r.statuses, survivors: r.survivors,
+      invocations: seen.length, supervisors: new Set(seen.map((line) => line.split(' ', 1)[0])).size, separateSupervisor: seen.length > 0 && seen.every((line) => line.includes('supervisor-process.js')) };
   };
   const loadLog = /** @type {Record<string, string>} */ ({ start: load() });
   // Case 1: fresh supervisors, each with one no-op child, timed through close.
@@ -196,7 +206,7 @@ async function measure(options) {
     const nativeOnly = single('claude-posttooluse', join(bin, 'relay-fixture-native'));
     const relayed = single('candidate-relay', `'${node}' '${join(candidate, 'bin/relay.js')}' hook --harness claude-code --outer-ms ${w.outerMs} --subscribers '${join(config, 'candidate-posttool.json')}' PostToolUse`);
     const sample = async (/** @type {any} */ m) => { const e = env(postState), r = await runBaseline({ ...m, event: 'PostToolUse' }, { event: 'PostToolUse', input: postPayload, env: e, cwd });
-      return { elapsedMs: r.elapsedMs, ok: r.statuses.every((x) => x === 'exited 0') && r.survivors.length === 0, statuses: r.statuses, supervisors: parents(e.RELAY_PILOT_PPID_FILE) }; };
+      return { elapsedMs: r.elapsedMs, ok: r.statuses.every((x) => x === 'exited 0') && r.survivors.length === 0, statuses: r.statuses, supervisors: new Set(parentLines(e.RELAY_PILOT_PPID_FILE).map((line) => line.split(' ', 1)[0])).size }; };
     for (let i = 0; i < warm + measured; i++) {
       const b = await sample(nativeOnly), c = await sample(relayed);
       if (i >= warm) { postTool.baseline.push(b); postTool.candidate.push(c); }

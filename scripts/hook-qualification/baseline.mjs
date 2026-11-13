@@ -59,13 +59,23 @@ export function checkRetainedWork(manifest, { baseline, candidate }) {
   }
 }
 
+/**
+ * The invocation lists each side actually runs: deployed relay subscribers and native branches for
+ * the baseline, candidate relay subscribers for the candidate, from the configurations themselves.
+ * @param {{deployed: {subscribers: {name: string}[]}|null, candidate: {subscribers: {name: string}[]}, native: string[]}} sides
+ */
+export function workLists({ deployed, candidate, native }) {
+  return { baseline: [...(deployed?.subscribers ?? []).map((s) => `deployed-relay:${s.name}`), ...native],
+    candidate: candidate.subscribers.map((s) => `candidate:${s.name}`) };
+}
+
 /** @param {number} pgid */
 const groupExists = (pgid) => { try { process.kill(-pgid, 0); return true; } catch (error) { return /** @type {any} */ (error).code === 'EPERM'; } };
 
 /**
  * Runs one event sample of the frozen composition.
  * @param {any} manifest @param {{event: string, input: string, env: NodeJS.ProcessEnv, cwd: string, drainMs?: number}} options
- * @returns {Promise<{elapsedMs: number, branches: {name: string, elapsedMs: number, status: string}[], statuses: string[], survivors: string[]}>}
+ * @returns {Promise<{elapsedMs: number, branches: {name: string, elapsedMs: number, status: string, pid: number|null}[], statuses: string[], survivors: string[]}>}
  */
 export async function runBaseline(manifest, { event, input, env, cwd, drainMs = 1000 }) {
   validateManifest(manifest, { harness: manifest.harness, event });
@@ -90,5 +100,5 @@ export async function runBaseline(manifest, { event, input, env, cwd, drainMs = 
   const elapsedMs = performance.now() - started;
   const survivors = results.filter((r) => r.pgid !== null && groupExists(r.pgid)).map((r) => r.name);
   for (const r of results) if (r.pgid !== null && groupExists(r.pgid)) { try { process.kill(-r.pgid, 'SIGKILL'); } catch {} }
-  return { elapsedMs, branches: results.map(({ name, elapsedMs: ms, status }) => ({ name, elapsedMs: ms, status })), statuses: results.map((r) => r.status), survivors };
+  return { elapsedMs, branches: results.map(({ name, elapsedMs: ms, status, pgid }) => ({ name, elapsedMs: ms, status, pid: pgid })), statuses: results.map((r) => r.status), survivors };
 }

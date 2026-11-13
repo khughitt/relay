@@ -19,6 +19,10 @@ switch (mode) {
   case 'hang-grandchild': grandchild(rest[0]); hang(); break;
   case 'overflow': process.stdout.write('x'.repeat(70000)); hang(); break;
   case 'fast': break;
+  // A descendant that leaves the subscriber's group (setsid) but keeps its pipes: unsupported, and
+  // relay must still finish within its cleanup reserve and report the escape.
+  case 'escape': spawn(process.execPath, ['-e', 'setInterval(() => {}, 60000)', rest[0]], { stdio: 'inherit', detached: true }).unref(); process.stdout.write('{"decision":"allow"}'); break;
+  case 'escape-hang': spawn(process.execPath, ['-e', 'setInterval(() => {}, 60000)', rest[0]], { stdio: 'inherit', detached: true }).unref(); hang(); break;
   case 'dispatcher': {
     // Acts as a dispatcher: starts a supervisor, admits one long-running subscriber with a
     // grandchild, and dies by SIGKILL either right after sending the run or once it is admitted.

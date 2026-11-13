@@ -47,9 +47,16 @@ export async function createChildSupervisor({ deadline, sessionHandle, recordDir
   // A supervisor that stops on its own (deadline, session or parent loss) reports closed before
   // anyone asks; remember it so a later close() does not wait for a frame already delivered.
   let closed = /** @type {Record<string, any>|null} */ (null);
+  // Acknowledged groups by invocation, kept from the frame stream so a run never waits for one.
+  /** @type {Map<number, Record<string, any>>} */
+  const admissions = new Map();
   const exited = new Promise((resolve) => child.once('exit', () => { gone = true; resolve(undefined); for (const w of waiters) w(null); waiters = []; }));
   child.once('error', (error) => { failed ??= error; gone = true; for (const w of waiters) w(null, error); waiters = []; });
-  readFrames(results, LIMITS.result, (frame) => { if (frame.type === 'closed' && frame.nonce === nonce) closed = frame; for (const w of [...waiters]) w(frame); }, (error) => { failed ??= error; for (const w of waiters) w(null, error); waiters = []; });
+  readFrames(results, LIMITS.result, (frame) => {
+    if (frame.nonce === nonce && frame.type === 'closed') closed = frame;
+    if (frame.nonce === nonce && frame.type === 'admitted') admissions.set(frame.n, frame);
+    for (const w of [...waiters]) w(frame);
+  }, (error) => { failed ??= error; for (const w of waiters) w(null, error); waiters = []; });
   /** Waits for the first frame accepted by match, or null when the supervisor is gone or the time is up. @param {(f: Record<string, any>) => boolean} match @param {number} until */
   const next = (match, until) => new Promise((resolve) => {
     if (gone) { resolve(null); return; }
@@ -87,11 +94,12 @@ export async function createChildSupervisor({ deadline, sessionHandle, recordDir
       if (broken !== null || gone) return { status: 'supervisor-failed', ...none, error: relayError('CONTAINMENT_FAILED', broken ?? 'the dispatch supervisor is gone'), cleanup: 'failed', timings: { runMs: 0, cleanupMs: 0 } };
       const id = ++n, sent = clock();
       const until = Math.min(childDeadline, sent + timeoutMs) + CLEANUP_MS + 50;
-      let admitted = /** @type {Record<string, any>|null} */ (null);
-      const admittedWait = next((f) => f.type === 'admitted' && f.n === id, until).then((f) => { admitted = f; });
       const resultWait = next((f) => (f.type === 'result' || f.type === 'error') && f.n === id, until);
       writeFrame(control, { type: 'run', nonce, n: id, argv, input, timeoutMs, deadlineNs: toNs(childDeadline, clock), env: childEnv, cwd: childCwd });
-      const frame = await resultWait; await admittedWait;
+      // A run that never spawned (spawn failure, expired deadline, refusal) answers without an admission.
+      const frame = await resultWait;
+      const admitted = admissions.get(id) ?? null;
+      admissions.delete(id);
       if (frame === null || frame.type === 'error') {
         const reason = String(frame?.error?.message ?? 'the dispatch supervisor stopped answering');
         broken = reason;

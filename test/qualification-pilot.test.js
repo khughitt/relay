@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { statistics } from '../scripts/hook-qualification/statistics.mjs';
-import { validateManifest, checkRetainedWork, runBaseline } from '../scripts/hook-qualification/baseline.mjs';
+import { validateManifest, checkRetainedWork, runBaseline, workLists } from '../scripts/hook-qualification/baseline.mjs';
 import { judgePilot } from '../scripts/hook-qualification/pilot.mjs';
 
 const workload = JSON.parse(readFileSync(new URL('../scripts/hook-qualification/workload.json', import.meta.url), 'utf8'));
@@ -20,15 +20,15 @@ function passing() {
   const event = (ms) => ({ elapsedMs: ms, ok: true });
   return {
     supervisorAlone: { samples: range(50, () => ({ startupMs: 50, cleanupMs: 5, combinedMs: 60, cleanup: 'complete' })) },
-    migrated: { baseline: range(200, () => event(100)), candidate: range(200, () => ({ ...event(150), supervisors: 1 })) },
-    noSubscriber: { deployed: range(200, () => 80), candidate: range(200, () => 85), native: range(200, () => 3), candidateSupervisorStarts: 0 },
+    migrated: { baseline: range(200, () => ({ ...event(100), invocations: 3 })), candidate: range(200, () => ({ ...event(150), supervisors: 1, invocations: 3, separateSupervisor: true })) },
+    noSubscriber: { deployed: range(200, () => 80), candidate: range(200, () => 85), native: range(200, () => 3), candidateSupervisorStarts: 0, failures: [] },
   };
 }
 
 test('the pilot judge passes only complete results inside every unchanged bound', () => {
   assert.equal(judgePilot(passing(), workload).passed, true);
   const p95GoodP99Bad = passing();
-  p95GoodP99Bad.migrated.candidate = range(200, (i) => ({ elapsedMs: i >= 196 ? 420 : 150, ok: true, supervisors: 1 }));
+  p95GoodP99Bad.migrated.candidate = range(200, (i) => ({ elapsedMs: i >= 196 ? 420 : 150, ok: true, supervisors: 1, invocations: 3, separateSupervisor: true }));
   const judged = judgePilot(p95GoodP99Bad, workload);
   assert.equal(judged.passed, false, 'a good p95 does not excuse a failing p99');
   assert.match(judged.failures.join('\n'), /p99/);
@@ -44,8 +44,14 @@ test('the pilot judge passes only complete results inside every unchanged bound'
   assert.equal(judgePilot(slowSupervisor, workload).passed, false);
   const dirty = passing(); dirty.supervisorAlone.samples[1].cleanup = 'failed';
   assert.equal(judgePilot(dirty, workload).passed, false);
-  const absolute = passing(); absolute.migrated.baseline = range(200, () => ({ elapsedMs: 900, ok: true })); absolute.migrated.candidate = range(200, () => ({ elapsedMs: 1001, ok: true, supervisors: 1 }));
+  const absolute = passing(); absolute.migrated.baseline = range(200, () => ({ elapsedMs: 900, ok: true, invocations: 3 })); absolute.migrated.candidate = range(200, () => ({ elapsedMs: 1001, ok: true, supervisors: 1, invocations: 3, separateSupervisor: true }));
   assert.match(judgePilot(absolute, workload).failures.join('\n'), /absolute/);
+  const skipped = passing(); skipped.migrated.candidate[5].invocations = 2;
+  assert.match(judgePilot(skipped, workload).failures.join('\n'), /invocations/, 'a sample that ran fewer subscribers fails');
+  const baselineSkipped = passing(); baselineSkipped.migrated.baseline[5].invocations = 1;
+  assert.equal(judgePilot(baselineSkipped, workload).passed, false);
+  const inline = passing(); inline.migrated.candidate[9].separateSupervisor = false;
+  assert.match(judgePilot(inline, workload).failures.join('\n'), /supervisor/, 'subscribers run by the relay process itself are not supervised');
 });
 
 test('no-subscriber diagnostics are required, start nothing, and add no numeric limit', () => {
@@ -54,6 +60,8 @@ test('no-subscriber diagnostics are required, start nothing, and add no numeric 
   assert.equal(judged.passed, false); assert.equal(judged.complete, false);
   const started = passing(); started.noSubscriber.candidateSupervisorStarts = 1;
   assert.equal(judgePilot(started, workload).passed, false, 'the empty candidate must start zero supervisors');
+  const broken = passing(); broken.noSubscriber.failures = [{ name: 'candidate', statuses: ['exited 1'] }];
+  assert.equal(judgePilot(broken, workload).complete, false, 'a failed diagnostic row leaves the pilot incomplete');
   const slow = passing(); slow.noSubscriber.candidate = range(200, () => 5000);
   assert.equal(judgePilot(slow, workload).passed, true, 'diagnostic quantiles never gate');
   assert.ok(judgePilot(slow, workload).rows.some((row) => row.case === 'no-subscriber candidate' && row.p95 === 5000));
@@ -93,6 +101,16 @@ test('retained subscriber work must be accounted exactly once on both sides', ()
   assert.throws(() => checkRetainedWork(m, { baseline: ['deployed-relay:ops-guard', 'deployed-relay:familiar', 'turn-pause'], candidate: ['candidate:turn-pause'] }), { code: 'BASELINE_INVALID' }, 'existing work dropped from the candidate');
   assert.throws(() => checkRetainedWork(m, { baseline: ['turn-pause'], candidate: ['candidate:ops-guard', 'candidate:turn-pause', 'candidate:familiar'] }), { code: 'BASELINE_INVALID' }, 'existing work credited only to the candidate');
   assert.throws(() => checkRetainedWork({ ...m, replacementMap: [...m.replacementMap, m.replacementMap[0]] }, { baseline: ['deployed-relay:ops-guard', 'deployed-relay:familiar', 'turn-pause'], candidate: ['candidate:ops-guard', 'candidate:turn-pause', 'candidate:familiar'] }), { code: 'BASELINE_INVALID' });
+});
+
+test('retained work lists come from the configurations and native branches actually run', () => {
+  const deployed = { schema: 1, subscribers: [{ name: 'ops-guard' }, { name: 'familiar' }] };
+  const candidate = { schema: 2, subscribers: [{ name: 'ops-guard' }, { name: 'turn-pause' }, { name: 'familiar' }] };
+  const lists = workLists({ deployed, candidate, native: ['turn-pause'] });
+  assert.deepEqual(lists, { baseline: ['deployed-relay:ops-guard', 'deployed-relay:familiar', 'turn-pause'], candidate: ['candidate:ops-guard', 'candidate:turn-pause', 'candidate:familiar'] });
+  checkRetainedWork(manifest(), lists);
+  const dropped = workLists({ deployed, candidate: { schema: 2, subscribers: [{ name: 'turn-pause' }] }, native: ['turn-pause'] });
+  assert.throws(() => checkRetainedWork(manifest(), dropped), { code: 'BASELINE_INVALID' });
 });
 
 test('a parallel baseline is timed on its critical path, never as a sum of branches', async () => {

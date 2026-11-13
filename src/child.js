@@ -94,11 +94,18 @@ export function runGroupLeader(argv, input, { deadline, timeoutMs, env, cwd, clo
     // Without the leader's identity the group cannot be bound to this invocation: never signal it.
     const contained = leader === null ? { cleanup: /** @type {'complete'|'failed'} */ (groupExists(pid) ? 'failed' : 'complete') }
       : await containGroup(pid, { leader, deadline: cleanupStart + cleanupMs, clock });
-    // With the group gone every writer has closed; a failed cleanup leaves holders, so stop reading.
-    if (contained.cleanup === 'failed') for (const stream of [child.stdout, child.stderr]) stream?.destroy();
+    // With the group gone every writer has closed. A failed cleanup leaves holders, and a descendant
+    // that left the group (unsupported) can hold the pipes too: wait no longer than the cleanup
+    // reserve, and report the latter as a failed cleanup rather than outliving the deadline.
+    let cleanup = contained.cleanup;
+    if (cleanup === 'complete') {
+      const held = await Promise.race([streamsClosed.then(() => false), new Promise((resolve) => setTimeout(() => resolve(true), Math.max(0, cleanupStart + cleanupMs - clock())))]);
+      if (held) cleanup = 'failed';
+    }
+    if (cleanup === 'failed') for (const stream of [child.stdout, child.stderr]) stream?.destroy();
     await streamsClosed;
     return { status, exitCode, signal, stdout: Buffer.concat(out.chunks).toString('utf8'), stderr: Buffer.concat(err.chunks).toString('utf8'),
-      ...(error === undefined ? {} : { error }), cleanup: contained.cleanup,
+      ...(error === undefined ? {} : { error }), cleanup,
       timings: { runMs: exitedAt - started, cleanupMs: clock() - cleanupStart } };
   })();
   return { done, abort: (why) => abort(why) };
