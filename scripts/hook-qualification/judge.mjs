@@ -176,7 +176,7 @@ export function qualifiedRows(qualification, target) {
   return [...events].filter(([, ok]) => ok).map(([event]) => event);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const files = process.argv.slice(2);
   if (!files.length) { process.stderr.write('usage: node judge.mjs RESULT.json...\n'); process.exit(2); }
   const workload = JSON.parse(readFileSync(new URL('./workload.json', import.meta.url), 'utf8'));

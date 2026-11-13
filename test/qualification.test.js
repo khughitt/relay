@@ -147,3 +147,12 @@ test('routes qualify independently: missing SubagentStop retry proof leaves Stop
   record.rows[0].retryFlag = { status: 'failed', evidence: ['the harness looped after a refusal'], owner: 'relay-123abc' };
   assert.equal(qualifiedRows(parseQualification(JSON.stringify(record)), target).includes('Stop'), false, 'false retry proof');
 });
+
+test('the qualification scripts import without an entry script path', async () => {
+  const { spawnSync } = await import('node:child_process');
+  for (const name of ['judge.mjs', 'run.mjs']) {
+    const url = new URL(`../scripts/hook-qualification/${name}`, import.meta.url).href;
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(url)});`], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: '/' } });
+    assert.equal(r.status, 0, `${name}: ${r.stderr}`);
+  }
+});

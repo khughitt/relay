@@ -442,7 +442,7 @@ async function main() {
   return failed ? 1 : 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try { process.exitCode = await main(); }
   catch (error) { process.stderr.write(`run.mjs: ${/** @type {Error} */ (error).message}\n`); process.exitCode = 2; }
 }
