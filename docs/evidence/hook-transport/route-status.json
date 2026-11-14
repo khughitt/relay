@@ -33,6 +33,545 @@
   "harnesses": [
     {
       "harness": "claude-code",
+      "version": "2.1.325",
+      "sessionMode": "interactive",
+      "platform": "linux",
+      "routes": [
+        {
+          "event": "SessionStart",
+          "migratingNatives": [
+            "claude-sessionstart",
+            "claude-provenance",
+            "claude-profile",
+            "capture-notice"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.SessionStart.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the live native payload decoded and reached its subscribers"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: additionalContext encoding delivered live"
+            ]
+          },
+          "liveDelivery": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: a 10,000-character notice context reached the model request intact; the observer received the event"
+            ]
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: no subscriber outlived a timed-out or killed relay"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "with every native line migrating, the 5-subscriber composition is not admitted at the frozen 20 s measurement budget, so it was never measured (the installed 600 s binding admits it; admission there is not latency evidence) (needs 8250 ms, 6334 ms fit); host-a pilot at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook error and proceeded; in both, no subscriber outlived relay and relay reap found nothing"
+            ]
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "UserPromptSubmit",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.UserPromptSubmit.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the live native payload decoded and reached its subscribers"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: decision block and additionalContext encodings honoured live"
+            ]
+          },
+          "liveDelivery": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: notice context reached the model request; a guard denial blocked the prompt (it reached no request); allowed prompts proceeded"
+            ]
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: no subscriber outlived a timed-out or killed relay"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "owner": "relay-d487c1",
+            "evidence": [
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
+              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+            ]
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook error and proceeded; in both, no subscriber outlived relay and relay reap found nothing"
+            ]
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "PreToolUse",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.PreToolUse.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the live native payload decoded and reached its subscribers"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: permissionDecision deny encoding honoured live"
+            ]
+          },
+          "liveDelivery": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: guard allow ran the Bash command after the native permission dialog; guard denial kept it from running and its reason reached the model as the tool_result"
+            ]
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: no subscriber outlived a timed-out or killed relay"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "owner": "relay-d487c1",
+            "evidence": [
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
+              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+            ]
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook error and proceeded; in both, no subscriber outlived relay and relay reap found nothing (fails open: the guarded tool call ran)"
+            ]
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "Notification:idle_prompt",
+          "migratingNatives": [],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.Notification.idle_prompt.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the live native payload decoded and reached its subscribers"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the observer received the event about 60 s after the turn ended"
+            ]
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: no subscriber outlived a timed-out or killed relay"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "owner": "relay-d487c1",
+            "evidence": [
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
+              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+            ]
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook error and proceeded; in both, no subscriber outlived relay and relay reap found nothing"
+            ]
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "Notification:permission_prompt",
+          "migratingNatives": [],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.Notification.permission_prompt.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the live native payload decoded and reached its subscribers"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the observer received the event while the native permission dialog waited"
+            ]
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: no subscriber outlived a timed-out or killed relay"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "owner": "relay-d487c1",
+            "evidence": [
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
+              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+            ]
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook error and proceeded; in both, no subscriber outlived relay and relay reap found nothing"
+            ]
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "Stop",
+          "migratingNatives": [
+            "claim-guard",
+            "harness-state-refresh",
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.Stop.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the live native payload decoded and reached its subscribers"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: decision block encoding honoured live (stop-retry probe)"
+            ]
+          },
+          "liveDelivery": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the guard allowed and the observer received the event (stopHookActive false)"
+            ]
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: no subscriber outlived a timed-out or killed relay"
+            ]
+          },
+          "latency": {
+            "status": "unavailable",
+            "evidence": [
+              "with every native line migrating, the 4-subscriber composition is not admitted at the frozen 20 s measurement budget, so it was never measured (the installed 600 s binding admits it; admission there is not latency evidence) (needs 6750 ms, 6334 ms fit); host-a pilot at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ],
+            "owner": "relay-d487c1"
+          },
+          "retryFlag": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: a missing guard command made relay refuse the first stop (stop_hook_active false); Claude Code retried once with stop_hook_active true, relay let it stop, and the session ended after two model requests with no loop"
+            ]
+          },
+          "outerFailure": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook error and proceeded; in both, no subscriber outlived relay and relay reap found nothing"
+            ]
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "tasks-e67608"
+          }
+        },
+        {
+          "event": "StopFailure",
+          "migratingNatives": [],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.StopFailure.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the live native payload decoded and reached its subscribers"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the observer received turn-error after the stub API error ended the turn"
+            ]
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: no subscriber outlived a timed-out or killed relay"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "owner": "relay-d487c1",
+            "evidence": [
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
+              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+            ]
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook error and proceeded; in both, no subscriber outlived relay and relay reap found nothing"
+            ]
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        },
+        {
+          "event": "SessionEnd",
+          "migratingNatives": [
+            "turn-pause"
+          ],
+          "status": "unqualified",
+          "decode": {
+            "status": "passed",
+            "evidence": [
+              "test/fixtures/hook-events/claude-code.SessionEnd.input.json at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the live native payload decoded and reached its subscribers"
+            ]
+          },
+          "nativeReply": {
+            "status": "passed",
+            "evidence": [
+              "reply encoding fixtures (test/hook-event.test.js, test/stop-recovery.test.js, test/notice.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "liveDelivery": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: the observer received the event on /exit"
+            ]
+          },
+          "failure": {
+            "status": "passed",
+            "evidence": [
+              "fixture failure replies (test/dispatch.test.js, test/stop-recovery.test.js) at 16cf7daeda3519d660faa5e41d52f8a552422925"
+            ]
+          },
+          "cleanup": {
+            "status": "passed",
+            "evidence": [
+              "test/child-containment.test.js at 16cf7daeda3519d660faa5e41d52f8a552422925",
+              "host=host-a timeout-with-grandchild condition: no survivor on Node 22 and 26",
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: no subscriber outlived a timed-out or killed relay"
+            ]
+          },
+          "latency": {
+            "status": "unknown",
+            "owner": "relay-d487c1",
+            "evidence": [
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
+              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+            ]
+          },
+          "retryFlag": {
+            "status": "not-applicable",
+            "evidence": []
+          },
+          "outerFailure": {
+            "status": "passed",
+            "evidence": [
+              "host-a live probe 2026-11-14, claude-code 2.1.325 interactive, relay aa56101bc45a68dd0c32ae80dffd3e777283968a; agent-driven TUI session against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.325-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook error and proceeded; in both, no subscriber outlived relay and relay reap found nothing"
+            ]
+          },
+          "policyEquivalence": {
+            "status": "unknown",
+            "evidence": [
+              "no owner replay of the migrated policy commands"
+            ],
+            "owner": "hq-a83688"
+          }
+        }
+      ],
+      "notInstalled": {
+        "PostToolUse": "stays native (plan amendment 1: native-only warm p95 delta 121-143 ms against +100)",
+        "PostToolUseFailure": "stays native (plan amendment 1)",
+        "SubagentStart": "decoder fixture only; no installer binding",
+        "SubagentStop": "decoder fixture only; no installer binding",
+        "PreCompact": "decoder fixture only; no installer binding",
+        "PostCompact": "decoder fixture only; no installer binding",
+        "PostModelSwitch": "decoder fixture only; no installer binding",
+        "owner": "relay-d487c1"
+      }
+    },
+    {
+      "harness": "claude-code",
       "version": "2.1.323",
       "sessionMode": "interactive",
       "platform": "linux",
