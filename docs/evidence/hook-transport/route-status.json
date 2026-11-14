@@ -148,8 +148,8 @@
             "status": "unknown",
             "owner": "relay-d487c1",
             "evidence": [
-              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
-              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block)",
+              "carry to 2.1.325 under the version-carry rule (hook transport design revision 6) not applied: host-b's hook wiring identity has not been rechecked against its frozen manifest (its settings read is refused over ssh, hq-9934f2), and the final runs repeat at the 0.5.0 release commit (relay-15cf7a)"
             ]
           },
           "retryFlag": {
@@ -214,8 +214,8 @@
             "status": "unknown",
             "owner": "relay-d487c1",
             "evidence": [
-              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
-              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block)",
+              "carry to 2.1.325 under the version-carry rule (hook transport design revision 6) not applied: host-b's hook wiring identity has not been rechecked against its frozen manifest (its settings read is refused over ssh, hq-9934f2), and the final runs repeat at the 0.5.0 release commit (relay-15cf7a)"
             ]
           },
           "retryFlag": {
@@ -277,8 +277,8 @@
             "status": "unknown",
             "owner": "relay-d487c1",
             "evidence": [
-              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
-              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block)",
+              "carry to 2.1.325 under the version-carry rule (hook transport design revision 6) not applied: host-b's hook wiring identity has not been rechecked against its frozen manifest (its settings read is refused over ssh, hq-9934f2), and the final runs repeat at the 0.5.0 release commit (relay-15cf7a)"
             ]
           },
           "retryFlag": {
@@ -340,8 +340,8 @@
             "status": "unknown",
             "owner": "relay-d487c1",
             "evidence": [
-              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
-              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block)",
+              "carry to 2.1.325 under the version-carry rule (hook transport design revision 6) not applied: host-b's hook wiring identity has not been rechecked against its frozen manifest (its settings read is refused over ssh, hq-9934f2), and the final runs repeat at the 0.5.0 release commit (relay-15cf7a)"
             ]
           },
           "retryFlag": {
@@ -471,8 +471,8 @@
             "status": "unknown",
             "owner": "relay-d487c1",
             "evidence": [
-              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
-              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block)",
+              "carry to 2.1.325 under the version-carry rule (hook transport design revision 6) not applied: host-b's hook wiring identity has not been rechecked against its frozen manifest (its settings read is refused over ssh, hq-9934f2), and the final runs repeat at the 0.5.0 release commit (relay-15cf7a)"
             ]
           },
           "retryFlag": {
@@ -536,8 +536,8 @@
             "status": "unknown",
             "owner": "relay-d487c1",
             "evidence": [
-              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block); the frozen judge keys latency to the harness version each host froze, and no host has frozen a 2.1.325 manifest",
-              "the runner launches no harness, so a remeasure or a reviewed version-carry rule is the user decision recorded on relay-d487c1"
+              "two-host latency passed for claude-code 2.1.323 at aa56101bc45a68dd0c32ae80dffd3e777283968a (that block)",
+              "carry to 2.1.325 under the version-carry rule (hook transport design revision 6) not applied: host-b's hook wiring identity has not been rechecked against its frozen manifest (its settings read is refused over ssh, hq-9934f2), and the final runs repeat at the 0.5.0 release commit (relay-15cf7a)"
             ]
           },
           "retryFlag": {

@@ -37,6 +37,17 @@ Measure on an otherwise idle host. A contested host gives unusable evidence and 
 
 For a host this session cannot run on, hand its operator the candidate commit, the fixture directory and this guide; the operator freezes that host's own manifest set from its own deployment, runs the pilot and the measurement on both runtimes, and returns the `OUT` directory. Its results join the judge beside this host's.
 
+## A new harness version
+
+The runner launches no harness, so a passed two-host result can carry to a later version of the same harness instead of being remeasured (design revision 6). The latency column of a row at version B, for the same session mode, platform, event and role and an outer budget no smaller than the measured one, may cite a result measured at version A only when all four conditions hold against that measurement's own frozen inputs, never against an earlier carry:
+
+1. **Relay commit.** The row's tested relay commit is the commit both hosts measured.
+2. **Hook wiring.** On each host, the event's native hook lines (commands, order, timeouts), the deployed relay artifact and its subscriber config are unchanged from that host's frozen manifest, checked against the settings-source and artifact identities the manifest recorded.
+3. **Scheduling.** How the harness runs matching hooks for the event (the judge's `schedules` kind, parallel for Claude Code) is re-verified for B, from its cited source or a live probe.
+4. **Input.** B's decoded-fixture check passes on the same fixtures the measurement replayed, and the frozen payload bound is unchanged.
+
+The carried check keeps the measured hosts' `evidence` lines and adds one line naming version A, the measured commit and how each condition was established. If any condition fails or cannot be established, latency stays `unknown` at B with an open owner until both hosts are remeasured. Never carry one host and remeasure the other. A carry covers latency only: every column that needs a live probe still needs one at B.
+
 ## Live native probes
 
 Fixture results never fill `liveDelivery`, `retryFlag`, `outerFailure` or a native context limit. Those columns need a live probe on the exact harness version and session mode, recorded with that version, mode, platform, the tested relay commit and the source (a transcript excerpt or the harness's own record). Each probe below is an ordinary human-driven interactive session: it starts no automated or metered run, needs the host-use grant that applies at the time, and installs relay only into a scratch configuration (a separate settings file or harness profile pointed at a scratch relay state directory), never the host's live hooks. A probe that cannot be run, or whose result is unclear, leaves its column `unknown` with an open owner; it is never inferred from a fixture.
