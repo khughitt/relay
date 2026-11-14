@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "title": "Hook transport route status",
-  "note": "No route is qualified. Rows follow the HookQualification check columns (docs/adapters.md, Route qualification) per harness, version and session mode on linux; \"unqualified\" rows name an open owner for each missing proof. Host labels are anonymized; raw samples stay in the plan workspace.",
+  "note": "No route is qualified. Rows follow the HookQualification check columns (docs/adapters.md, Route qualification) per harness, version and session mode on linux; \"unqualified\" rows name an open owner for each missing proof. Host labels are anonymized (host-a, host-b); raw samples stay in the plan workspace.",
   "tested": {
     "relayCommit": "16cf7daeda3519d660faa5e41d52f8a552422925",
     "workloadSha256": "9806b52ca2bf97d681eb9baee85c905b0b61fb3c948d2e2ce9738f263b99103f",
@@ -15,8 +15,20 @@
         "claude-code": "2.1.323",
         "codex": "0.168.0",
         "agy": "1.5.7"
+      },
+      "host-b": {
+        "node": [
+          "v22.23.2",
+          "v26.13.1"
+        ],
+        "claude-code": "2.1.304",
+        "agy": "1.4.12",
+        "codex": "not installed"
       }
-    }
+    },
+    "latencyCommit": "aa56101bc45a68dd0c32ae80dffd3e777283968a",
+    "hostBManifestSetSha256": "5eaddfc245661d2d5d97d4519a8bcc620be7f8d5a5f0a970e2c0fa113f148dc6",
+    "note": "relayCommit is the commit the decode, reply, failure and cleanup fixtures ran at; latencyCommit is the commit both hosts measured latency at. Each host froze its own manifest set from its own deployment; both deployments run the same settings blob and the same deployed relay 0.3.0 files."
   },
   "harnesses": [
     {
@@ -130,13 +142,15 @@
             ]
           },
           "latency": {
-            "status": "unknown",
+            "status": "passed",
             "evidence": [
-              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code UserPromptSubmit commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [8.3, 18.7] p99 delta [10.8, 84.2] max delta [15.6, 21.6] ms (absolute max [170.9, 304.9]); cold p99 delta [9.8, 2.9] ms; concurrent p99 delta [41.8, 30.7] ms; missing-command max [166.7, 220.3] ms; timeout max [1201.8, 1255.2] ms; supervisor-alone p99 [74.2, 72.6] ms",
-              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
-              "second host (europa) not run: package prepared; user or authorized operator action"
-            ],
-            "owner": "relay-d487c1"
+              "host=host-a outerMs=20000 runtime=v22.23.2 claude-code UserPromptSubmit commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 9.2 p99 delta 22.0 max delta 32.7 ms",
+              "host=host-a outerMs=20000 runtime=v26.5.0 claude-code UserPromptSubmit commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 5.7 p99 delta 16.9 max delta 71.3 ms",
+              "host=host-b outerMs=20000 runtime=v22.23.2 claude-code UserPromptSubmit commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 6.8 p99 delta 16.5 max delta -10.3 ms",
+              "host=host-b outerMs=20000 runtime=v26.13.1 claude-code UserPromptSubmit commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 4.7 p99 delta 6.4 max delta 3.3 ms",
+              "judge.mjs at aa56101bc45a68dd0c32ae80dffd3e777283968a: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence)",
+              "host-b manifests record claude-code 2.1.304 (host-a 2.1.323); the measurement launches no harness, and both hosts freeze the same settings blob"
+            ]
           },
           "retryFlag": {
             "status": "not-applicable",
@@ -196,13 +210,15 @@
             ]
           },
           "latency": {
-            "status": "unknown",
+            "status": "passed",
             "evidence": [
-              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code PreToolUse commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [7.9, 6.8] p99 delta [13.9, 120.7] max delta [17.6, 159.1] ms (absolute max [178, 326.9]); cold p99 delta [22.8, 16.4] ms; concurrent p99 delta [41.6, -44.4] ms; missing-command max [145.8, 133.4] ms; timeout max [1137.5, 1136.9] ms; supervisor-alone p99 [76.3, 108.8] ms",
-              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
-              "second host (europa) not run: package prepared; user or authorized operator action"
-            ],
-            "owner": "relay-d487c1"
+              "host=host-a outerMs=20000 runtime=v22.23.2 claude-code PreToolUse commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 28.5 p99 delta 1.4 max delta 44.1 ms",
+              "host=host-a outerMs=20000 runtime=v26.5.0 claude-code PreToolUse commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 74.9 p99 delta 121.0 max delta 186.7 ms",
+              "host=host-b outerMs=20000 runtime=v22.23.2 claude-code PreToolUse commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 13.1 p99 delta 9.8 max delta 0.8 ms",
+              "host=host-b outerMs=20000 runtime=v26.13.1 claude-code PreToolUse commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -4.4 p99 delta 3.6 max delta 9.5 ms",
+              "judge.mjs at aa56101bc45a68dd0c32ae80dffd3e777283968a: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence)",
+              "host-b manifests record claude-code 2.1.304 (host-a 2.1.323); the measurement launches no harness, and both hosts freeze the same settings blob"
+            ]
           },
           "retryFlag": {
             "status": "not-applicable",
@@ -260,13 +276,15 @@
             ]
           },
           "latency": {
-            "status": "unknown",
+            "status": "passed",
             "evidence": [
-              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code Notification:idle_prompt commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-9.1, -12.1] p99 delta [-10.5, -10.3] max delta [-11.4, -21.3] ms (absolute max [142.2, 136.9]); cold p99 delta [-12.6, 5.9] ms; concurrent p99 delta [-11.5, 20] ms; missing-command max [129.2, 123.9] ms; timeout max [1140.1, 1137.4] ms; supervisor-alone p99 [74.3, 69.1] ms",
-              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
-              "second host (europa) not run: package prepared; user or authorized operator action"
-            ],
-            "owner": "relay-d487c1"
+              "host=host-a outerMs=20000 runtime=v22.23.2 claude-code Notification:idle_prompt commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -3.9 p99 delta -1.9 max delta -8.8 ms",
+              "host=host-a outerMs=20000 runtime=v26.5.0 claude-code Notification:idle_prompt commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -6.8 p99 delta -8.9 max delta 29.6 ms",
+              "host=host-b outerMs=20000 runtime=v22.23.2 claude-code Notification:idle_prompt commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -4.0 p99 delta -0.5 max delta -32.0 ms",
+              "host=host-b outerMs=20000 runtime=v26.13.1 claude-code Notification:idle_prompt commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -10.9 p99 delta -1.7 max delta -3.0 ms",
+              "judge.mjs at aa56101bc45a68dd0c32ae80dffd3e777283968a: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence)",
+              "host-b manifests record claude-code 2.1.304 (host-a 2.1.323); the measurement launches no harness, and both hosts freeze the same settings blob"
+            ]
           },
           "retryFlag": {
             "status": "not-applicable",
@@ -324,13 +342,16 @@
             ]
           },
           "latency": {
-            "status": "unknown",
+            "status": "passed",
             "evidence": [
-              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code Notification:permission_prompt commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-9.8, -7.7] p99 delta [-10.1, -8.1] max delta [-11.5, -11.5] ms (absolute max [139.2, 137.6]); cold p99 delta [-11.7, -14.6] ms; concurrent p99 delta [-22.1, -11.7] ms; missing-command max [132, 122.7] ms; timeout max [1147, 1133.7] ms; supervisor-alone p99 [77.8, 73] ms",
-              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
-              "second host (europa) not run: package prepared; user or authorized operator action"
-            ],
-            "owner": "relay-d487c1"
+              "host=host-a outerMs=20000 runtime=v22.23.2 claude-code Notification:permission_prompt commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -9.0 p99 delta -47.7 max delta 44.6 ms",
+              "host=host-a outerMs=20000 runtime=v26.5.0 claude-code Notification:permission_prompt commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -7.0 p99 delta -7.9 max delta -10.9 ms",
+              "host=host-b outerMs=20000 runtime=v22.23.2 claude-code Notification:permission_prompt commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -6.8 p99 delta -3.8 max delta -4.3 ms",
+              "host=host-b outerMs=20000 runtime=v26.13.1 claude-code Notification:permission_prompt commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -7.1 p99 delta -11.8 max delta 41.6 ms",
+              "judge.mjs at aa56101bc45a68dd0c32ae80dffd3e777283968a: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence)",
+              "host-b manifests record claude-code 2.1.304 (host-a 2.1.323); the measurement launches no harness, and both hosts freeze the same settings blob",
+              "host-a v22.23.2 re-measured at load 2.6-3.9 after a contested first run (load 10-27 from other sessions) failed only the supervisor-alone p99 bound; the contested result is kept unedited beside the raw samples"
+            ]
           },
           "retryFlag": {
             "status": "not-applicable",
@@ -456,13 +477,15 @@
             ]
           },
           "latency": {
-            "status": "unknown",
+            "status": "passed",
             "evidence": [
-              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code StopFailure commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [-3.3, -10.8] p99 delta [-3.1, -8.8] max delta [-15.4, -9.5] ms (absolute max [190, 160.1]); cold p99 delta [-1.5, -6.8] ms; concurrent p99 delta [13.1, -30] ms; missing-command max [131.2, 126.9] ms; timeout max [1135.2, 1134] ms; supervisor-alone p99 [120.8, 73.4] ms",
-              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
-              "second host (europa) not run: package prepared; user or authorized operator action"
-            ],
-            "owner": "relay-d487c1"
+              "host=host-a outerMs=20000 runtime=v22.23.2 claude-code StopFailure commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 0.6 p99 delta -2.4 max delta -78.4 ms",
+              "host=host-a outerMs=20000 runtime=v26.5.0 claude-code StopFailure commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -5.7 p99 delta -5.0 max delta -4.7 ms",
+              "host=host-b outerMs=20000 runtime=v22.23.2 claude-code StopFailure commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -4.3 p99 delta -3.5 max delta 1.1 ms",
+              "host=host-b outerMs=20000 runtime=v26.13.1 claude-code StopFailure commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta -13.9 p99 delta -5.3 max delta -6.1 ms",
+              "judge.mjs at aa56101bc45a68dd0c32ae80dffd3e777283968a: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence)",
+              "host-b manifests record claude-code 2.1.304 (host-a 2.1.323); the measurement launches no harness, and both hosts freeze the same settings blob"
+            ]
           },
           "retryFlag": {
             "status": "not-applicable",
@@ -522,13 +545,16 @@
             ]
           },
           "latency": {
-            "status": "unknown",
+            "status": "passed",
             "evidence": [
-              "host=host-a outerMs=20000 runtime=v22.23.2,v26.5.0 claude-code SessionEnd commit=16cf7daeda3519d660faa5e41d52f8a552422925 baseline=deployed-relay-plus-native: every bound met; warm p95 delta [13.2, 0.8] p99 delta [65.7, 2.4] max delta [92.9, 2.9] ms (absolute max [260.5, 139.5]); cold p99 delta [69, 4.8] ms; concurrent p99 delta [17.9, 0.9] ms; missing-command max [143.7, 130.7] ms; timeout max [1201.8, 1145.4] ms; supervisor-alone p99 [90.4, 76.2] ms",
-              "host-a results carry candidate.dirty=true from a documentation-only edit during the run (runtime bytes identical to the tested commit); the judge refuses them as they stand",
-              "second host (europa) not run: package prepared; user or authorized operator action"
-            ],
-            "owner": "relay-d487c1"
+              "host=host-a outerMs=20000 runtime=v22.23.2 claude-code SessionEnd commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 2.7 p99 delta 5.8 max delta 5.9 ms",
+              "host=host-a outerMs=20000 runtime=v26.5.0 claude-code SessionEnd commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 1.5 p99 delta 5.0 max delta 8.0 ms",
+              "host=host-b outerMs=20000 runtime=v22.23.2 claude-code SessionEnd commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 13.0 p99 delta 16.1 max delta 1.9 ms",
+              "host=host-b outerMs=20000 runtime=v26.13.1 claude-code SessionEnd commit=aa56101bc45a68dd0c32ae80dffd3e777283968a baseline=deployed-relay-plus-native warm p95 delta 1.7 p99 delta 3.6 max delta 10.5 ms",
+              "judge.mjs at aa56101bc45a68dd0c32ae80dffd3e777283968a: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence)",
+              "host-b manifests record claude-code 2.1.304 (host-a 2.1.323); the measurement launches no harness, and both hosts freeze the same settings blob",
+              "host-a v22.23.2 re-measured at load 2.6-3.9 after a contested first run (load 10-27 from other sessions) failed only the supervisor-alone p99 bound; the contested result is kept unedited beside the raw samples"
+            ]
           },
           "retryFlag": {
             "status": "not-applicable",
