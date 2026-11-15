@@ -1,9 +1,17 @@
-import {spawn} from 'node:child_process';
-import {mkdirSync,writeFileSync,appendFileSync,lstatSync,existsSync,unlinkSync,realpathSync} from 'node:fs';
+import {spawn,execFileSync} from 'node:child_process';
+import {mkdirSync,writeFileSync,appendFileSync,lstatSync,existsSync,unlinkSync,realpathSync,createReadStream,statSync} from 'node:fs';
 import {join,dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {setTimeout as pause} from 'node:timers/promises';
 const fail=code=>{throw Error(code)},digest=x=>createHash('sha256').update(x).digest('hex');
+export async function verifyNativeBinary({codex,expected,env}) {
+ const hash=createHash('sha256');for await(const b of createReadStream(codex))hash.update(b);
+ const sha256=hash.digest('hex'),size=statSync(codex).size;
+ if(sha256!==expected.sha256||size!==expected.size)fail('binary-pin');
+ const version=execFileSync(codex,['--version'],{env,timeout:5000,encoding:'utf8',maxBuffer:16384}).trim();
+ if(version!=='codex-cli '+expected.version)fail('binary-version');
+ return {path:realpathSync(codex),version:expected.version,sha256,size};
+}
 export function probeEnvironment(privateDir) {
  const home=join(privateDir,'home');
  return {PATH:dirname(process.execPath)+':/usr/bin:/bin',HOME:home,CODEX_HOME:join(home,'.codex'),XDG_CONFIG_HOME:join(home,'config'),XDG_STATE_HOME:join(home,'state'),XDG_CACHE_HOME:join(home,'cache'),XDG_RUNTIME_DIR:join(privateDir,'run'),USER:'relay-probe',GIT_CONFIG_GLOBAL:'/dev/null',GIT_CONFIG_NOSYSTEM:'1'};

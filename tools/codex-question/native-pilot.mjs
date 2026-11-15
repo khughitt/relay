@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import {mkdirSync,writeFileSync,existsSync,unlinkSync,createReadStream,statSync} from 'node:fs';
+import {mkdirSync,writeFileSync,existsSync,unlinkSync,statSync} from 'node:fs';
 import {spawn,execFileSync} from 'node:child_process';
 import {join,dirname} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {randomUUID,createHash} from 'node:crypto';
+import {randomUUID} from 'node:crypto';
 import {setTimeout as pause} from 'node:timers/promises';
-import {startPrivateServer,probeEnvironment,scriptedConfig} from './private-server.mjs';
+import {startPrivateServer,probeEnvironment,scriptedConfig,verifyNativeBinary} from './private-server.mjs';
 import {connectRpc} from '../../src/serve/codex/rpc.js';
 import {startScriptedProvider,responseCreated,functionCall,assistantMessage,completed} from './provider.mjs';
 async function planTurn(rpc,threadId,presets){
@@ -27,10 +27,10 @@ async function request(op,fields){const r=await client.request(op,fields);assert
 async function entry(id){return (await request('get',{id})).entry}
 async function stopRelay(){if(!relay)return;relay.kill('SIGTERM');let timeout;const ended=await Promise.race([relayEnded,new Promise(resolve=>timeout=setTimeout(()=>resolve(null),7000))]);clearTimeout(timeout);if(!ended){relay.kill('SIGKILL');await relayEnded;throw Error('relay-cleanup-timeout')}assert.equal(ended.code,0,'relay graceful exit');}
 try{
- const hash=createHash('sha256');for await(const b of createReadStream(codex))hash.update(b);
- check('exact binary',hash.digest('hex')===expected.sha256&&statSync(codex).size===expected.size);
  for(const dir of [privateDir,env.HOME,env.CODEX_HOME,env.XDG_RUNTIME_DIR])mkdirSync(dir,{recursive:true,mode:0o700});
- const got=execFileSync(codex,['--version'],{env,timeout:5000,encoding:'utf8',maxBuffer:16384}).trim();check('exact CLI version',got==='codex-cli '+version);
+ try {await verifyNativeBinary({codex,expected:{...expected,version},env});}
+ catch(e){if(e.message==='binary-pin')check('exact binary',false);if(e.message==='binary-version'){check('exact binary',true);check('exact CLI version',false)}throw e;}
+ check('exact binary',true);check('exact CLI version',true);
  const question={questions:[{id:'color',header:'Color',question:'Choose a color',options:[{label:'Blue',description:'Blue option'},{label:'Red',description:'Red option'}]}]};
  const ask=(id,call)=>()=>[responseCreated(id),functionCall(call,'request_user_input',question),completed(id)],done=id=>()=>[responseCreated(id),assistantMessage(id+'m','Done.'),completed(id)];
  provider=await startScriptedProvider({signal:stop.signal,script:[ask('p1','call_production_1'),done('p2'),ask('p3','call_production_2'),done('p4')]});
