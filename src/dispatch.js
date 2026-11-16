@@ -12,6 +12,7 @@ import { loadSubscribers, loadSubscribersFrom, matchSubscribers, checkBudget, bu
 import { CLEANUP_MS, SUPERVISOR_STARTUP_MS as STARTUP_MS } from './child.js';
 import { discoverBoundaries, resolveExecutable, DISCOVERY_MS } from './executable.js';
 import { createProcessOps } from './bus/proc.js';
+import { prepareClaudeProvenance } from './provenance.js';
 import { join } from 'node:path';
 import * as fs from 'node:fs/promises';
 
@@ -270,6 +271,17 @@ async function dispatchOnce({ harness, nativeEvent, input, outerMs, subscribersP
     notices = matching.filter((subscriber) => subscriber.role === 'notice');
     observers = matching.filter((subscriber) => subscriber.role === 'observer');
   } catch (caught) { return fail(/** @type {import('./types.js').Failure} */ (caught)); }
+  // Built-in Claude provenance runs before any subscriber and independently of publication; its
+  // failures are advisory diagnostics. Subscriber children receive the same two variables.
+  let launchEnv = childEnv;
+  try {
+    const provenance = await bounded(() => prepareClaudeProvenance({ event, env: childEnv }), { clock, deadline: workDeadline }, 'provenance effects did not finish before the deadline');
+    diagnostics.push(...provenance.diagnostics);
+    if (provenance.values !== null) launchEnv = { ...childEnv, ...provenance.values };
+  } catch {
+    diagnostics.push(`PROVENANCE_WRITE_FAILED: ${nativeEvent} deadline`);
+    if (harness === 'claude-code') launchEnv = { ...childEnv, TASKS_AGENT: 'claude-code', TASKS_MODEL: '' };
+  }
   // The native session is optional evidence: without it, parent-pipe loss and the absolute
   // deadline still bound subscriber lifetime, so its absence never refuses admission.
   const sessionHandle = () => {
@@ -279,7 +291,7 @@ async function dispatchOnce({ harness, nativeEvent, input, outerMs, subscribersP
     if (handle === null) diagnostics.push('SESSION_HANDLE_UNAVAILABLE: native session ancestry is unavailable; parent-pipe loss and the absolute deadline bound subscriber lifetime');
     return handle;
   };
-  const { launch, close, started } = launcher({ cwd: event.cwd, invokingCwd, env: childEnv, clock, workDeadline, supervise, sessionHandle, diagnostics,
+  const { launch, close, started } = launcher({ cwd: event.cwd, invokingCwd, env: launchEnv, clock, workDeadline, supervise, sessionHandle, diagnostics,
     recordDir: () => { try { return join((paths ??= statePaths()).stateDir, 'children'); } catch { return null; } } });
   /** @type {import("./types.js").Output} */
   let outcome;

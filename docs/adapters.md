@@ -228,7 +228,7 @@ The harness ends at the first `/`; model ids may contain `/` or `:`. An empty ef
 | --- | --- | --- | --- | --- |
 | `codex` | verified | when the turn records it | rollout `turn_context` (`payload.model`, `payload.effort`) | the call's binding process (below) started after the turn's record |
 | `agy` | verified with readable ancestry and database access; sandbox limit below | when the generation carries a label with an effort; absent for subagents (probed) | conversation database `gen_metadata` | the generation that issued the call's step |
-| `claude-code` | from ops's provenance hook (`hooks/claude-provenance`, `TASKS_AGENT`), not through relay | not stamped today | SessionStart and PostModelSwitch payloads | none; follow-up |
+| `claude-code` | from relay's built-in hook effects ([Claude task provenance](#claude-task-provenance)), not through `relay model` | not stamped today | SessionStart and PostModelSwitch payloads | none: the env file is session-wide (follow-up relay-d519ef) |
 | `opencode`, pi | not assessed | not assessed | none | none |
 
 agy model identity requires readable process ancestry and access to the conversation database. On Linux with agy 1.5.2, a `--sandbox` probe returned `verified: false`, reason `not-under-agy` (relay exit `0`); the independent observer could not open the conversation database (exit `1`). This probe did not verify sandboxed model stamps.
@@ -280,6 +280,18 @@ The answer is `unbound-call` when the nearest `codex` ancestor started after the
 Hard failures use code `INVALID_INPUT` (thread ID not a lowercase UUIDv7), `INVALID_CONFIG` (relative `CODEX_HOME` or missing `HOME`), `IO_ERROR`, `PROCESS_UNREADABLE`, or `INVALID_ROLLOUT` (missing opening `session_meta`, corrupt JSON line in the scanned range, or malformed `turn_context`).
 
 **Clock requirement:** A caller is verified only while its binding process's start interval less 1 s lies after the latest `turn_context` timestamp. Between the binding process's start and the `relay model` invocation, the wall clock must move by less than 1 s against the boot clock.
+
+### Claude task provenance
+
+`relay hook --harness claude-code` sets the two variables `tasks` stamps from, `TASKS_AGENT` and `TASKS_MODEL` (`src/provenance.js`), before any subscriber runs and independently of registry publication. It sets nothing for any other harness, and never sets, clears or re-exports a session variable (`CLAUDE_CODE_SESSION_ID`, `TASKS_SESSION`, `CODEX_THREAD_ID` and the like).
+
+- **SessionStart** with a usable absolute `CLAUDE_ENV_FILE`: replaces `<scratchpad_dir>/tasks-model` with the event's `model` (a private temporary file renamed over it, mode `0600`), or removes it when the model is missing or outside the stamp grammar; then appends one export stanza to the env file, preserving its contents. The stanza reads the state at every shell command: a file whose whole content is one stamp-grammar line gives `TASKS_MODEL=<model>` and `TASKS_AGENT=claude-code/<model>`; an absent file gives `claude-code` and an empty model; an unreadable or invalid file gives the same plus one stderr line, `relay: tasks-model state is unreadable or invalid; model cleared`. File contents are read by `awk` under the C locale and never evaluated; paths are single-quoted. Without a scratchpad the stanza exports `claude-code` and an empty model. Without `CLAUDE_ENV_FILE` nothing persistent is written.
+- **PostModelSwitch**: replaces or removes only the scratchpad state from `to_model`; it never appends to the env file. The next shell command reads the new model.
+- **Subscriber children** of every Claude event get `TASKS_AGENT`/`TASKS_MODEL` from that event: the model of a SessionStart or PostModelSwitch, otherwise `claude-code` and an empty model, never an inherited stamp.
+
+Effects are advisory. A failed write adds `PROVENANCE_WRITE_FAILED: <event> <state-replace|state-remove|env-append|deadline> <errno>` to the hook's stderr and never changes its reply; a relative scratchpad or env-file path adds `PROVENANCE_INVALID_PATH: <event> <scratchpad|env-file>`. Diagnostics carry no path, model or payload text. When a replacement fails and the old state stays readable, shell commands keep the old model until a later startup or switch succeeds.
+
+Limits: the env file is session-wide, so a subagent running a different model sources the parent's stamp; that is not child-model evidence (relay-d519ef owns child-bound provenance). Effort is not stamped (ops-586742).
 
 ### agy
 

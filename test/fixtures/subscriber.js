@@ -24,6 +24,8 @@ switch (mode) {
   case 'slow': await new Promise((resolve) => setTimeout(resolve, Number(file))); out({ decision: 'allow' }); break;
   case 'record': writeFileSync(file, input); out({ decision: 'allow' }); break;
   case 'env': writeFileSync(file, process.env.RELAY_TEST_MARKER ?? ''); out({ decision: 'allow' }); break;
+  // The whole child environment, for provenance tests (fixture environments hold no credentials).
+  case 'env-json': writeFileSync(file, JSON.stringify(process.env)); if (process.argv[4] !== 'silent') out({ decision: 'allow' }); break;
   case 'argv': writeFileSync(file, JSON.stringify({ argv: process.argv.slice(4), cwd: process.cwd(), path: process.env.PATH })); out({ decision: 'allow' }); break;
   case 'notice': out({ context: `notice from ${file ?? 'fixture'}` }); break;
   case 'notice-empty': out({}); break;
