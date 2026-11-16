@@ -21,8 +21,9 @@ export function scriptedConfig({baseUrl,features={},mcp=null}) {
   (Object.keys(features).length?'[features]\n'+Object.entries(features).map(([k,v])=>{if(!/^[a-z_]+$/.test(k)||typeof v!=='boolean')fail('feature-shape');return `${k} = ${v}\n`}).join(''):'')+
   (mcp?'[mcp_servers.relay_fixture]\ndefault_tools_approval_mode = "prompt"\ncommand = '+JSON.stringify(mcp.command)+'\nargs = '+JSON.stringify(mcp.args)+'\n':'');
 }
-export async function startPrivateServer({codex,privateDir,configToml,signal}) {
- const env=probeEnvironment(privateDir);for(const dir of [privateDir,env.HOME,env.CODEX_HOME,env.XDG_RUNTIME_DIR])mkdirSync(dir,{recursive:true,mode:0o700});
+export async function startPrivateServer({codex,privateDir,configToml,signal,env:extra={}}) {
+ // `env` adds or replaces fixture keys (a shim PATH); the base stays the private allowlist.
+ const env={...probeEnvironment(privateDir),...extra};for(const dir of [privateDir,env.HOME,env.CODEX_HOME,env.XDG_RUNTIME_DIR])mkdirSync(dir,{recursive:true,mode:0o700});
  writeFileSync(join(env.CODEX_HOME,'config.toml'),configToml,{mode:0o600});
  const socketPath=join(privateDir,'run','app.sock'),namespacePath=join(realpathSync('/tmp'),'codex-daemon-'+process.geteuid());
  const physical=join(namespacePath,digest(Buffer.from(socketPath))),candidates=[physical,physical+'.lock'];

@@ -1,6 +1,7 @@
 import http from 'node:http';
 export const responseCreated = id => ({type:'response.created',response:{id}});
 export const functionCall = (callId,name,args,namespace) => ({type:'response.output_item.done',item:{type:'function_call',call_id:callId,name,arguments:typeof args==='string'?args:JSON.stringify(args),...(namespace===undefined?{}:{namespace})}});
+export const customToolCall = (callId,name,input,namespace) => ({type:'response.output_item.done',item:{type:'custom_tool_call',call_id:callId,name,input,...(namespace===undefined?{}:{namespace})}});
 export const assistantMessage = (id,text) => ({type:'response.output_item.done',item:{type:'message',role:'assistant',id,content:[{type:'output_text',text}]}});
 export const completed = id => ({type:'response.completed',response:{id,usage:{input_tokens:0,input_tokens_details:null,output_tokens:0,output_tokens_details:null,total_tokens:0}}});
 
@@ -19,7 +20,9 @@ export async function startScriptedProvider({script,signal,maxBodyBytes=8*1024*1
    if((body.tools??[]).some(t=>t?.namespace!=null&&typeof t.namespace!=='string'))return refuse(400,'shape');
    if((body.tools??[]).some(t=>t?.type==='namespace'&&(typeof t.name!=='string'||!Array.isArray(t.tools)||t.tools.some(c=>typeof c?.name!=='string'))))return refuse(400,'shape');
    const toolNames=(body.tools??[]).flatMap(t=>t?.type==='namespace'?t.tools.map(c=>({name:c.name,namespace:t.name})):typeof t?.name==='string'?[{name:t.name,namespace:t.namespace??null}]:[]);
-   const r={index,path,toolNames,inputTypes:(body.input??[]).map(i=>i?.type).filter(t=>typeof t==='string'),functionCallOutputs:(body.input??[]).filter(i=>i?.type==='function_call_output'&&typeof i.call_id==='string'&&typeof i.output==='string').map(i=>({callId:i.call_id,output:i.output})),userTexts:(body.input??[]).filter(i=>i?.type==='message'&&i.role==='user').map(i=>typeof i.content==='string'?i.content:Array.isArray(i.content)?i.content.map(c=>typeof c?.text==='string'?c.text:'').join(''):'')};
+   const r={index,path,toolNames,inputTypes:(body.input??[]).map(i=>i?.type).filter(t=>typeof t==='string'),functionCallOutputs:(body.input??[]).filter(i=>['function_call_output','custom_tool_call_output'].includes(i?.type)&&typeof i.call_id==='string'&&i.output!==undefined).map(i=>({callId:i.call_id,output:typeof i.output==='string'?i.output:JSON.stringify(i.output)})),
+   // Catalog models in code mode receive their tools as an input item, not in `tools`.
+   additionalTools:(body.input??[]).filter(i=>i?.type==='additional_tools'&&Array.isArray(i.tools)).flatMap(i=>i.tools.flatMap(t=>t?.type==='namespace'&&Array.isArray(t.tools)?t.tools.map(c=>({name:c?.name,type:c?.type,namespace:t.name})):[{name:t?.name,type:t?.type,namespace:null}])),model:typeof body.model==='string'?body.model:null,toolTypes:(body.tools??[]).map(t=>[t?.type??null,t?.name??t?.function?.name??null]),userTexts:(body.input??[]).filter(i=>i?.type==='message'&&i.role==='user').map(i=>typeof i.content==='string'?i.content:Array.isArray(i.content)?i.content.map(c=>typeof c?.text==='string'?c.text:'').join(''):'')};
    requests.push(r);
    if(step>=script.length){failure=new Error('script-exhausted');res.writeHead(500).end('script-exhausted');return}
    // A step returns its events, or {delayMs, events} to hold the response (abortable by close).
