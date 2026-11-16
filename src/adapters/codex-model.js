@@ -10,7 +10,7 @@ import { UUID_V7, SCAN_LIMIT, storeRoot, listDir, locateRollout, firstRecord, la
 /** The wall clock may move this much against the boot clock (docs/registry.md, "Start-time interval"). */
 export const CLOCK_ALLOWANCE_MS = 1000;
 
-/** @typedef {Pick<import("../types.js").ProcessOps, 'ancestors'|'recordOf'|'executableOf'|'startedAtMs'>} ModelOps */
+/** @typedef {Pick<import("../types.js").ProcessOps, 'ancestors'|'recordOf'|'executableOf'|'argvOf'|'startedAtMs'>} ModelOps */
 
 /** Step 9: where a call process's start interval falls against the turn's record.
  * @param {{lo: number, hi: number}} start @param {number} at @returns {'verified'|'earlier-turn'|'turn-boundary'} */
@@ -29,6 +29,25 @@ export function chainWithInit(ops, startPid) {
   return chain;
 }
 
+/** Step 5: the process whose start orders the call against the turn (docs/adapters.md, "Call
+ * binding"). Inside the sandbox the nearest `codex` is Codex's per-call `codex-linux-sandbox`
+ * helper, its pid namespace's init: it adopts orphans, so the row below it may be born later than
+ * the call, and the helper's own start binds instead. A namespace-init `codex` that is not that
+ * helper, or a `codex` that started after the row below it, cannot establish the call.
+ * @param {import("../types.js").ProcessRow[]} chain @param {number} index @param {Pick<ModelOps, 'argvOf'>} ops
+ * @returns {{row: import("../types.js").ProcessRow, what: string}|{unbound: string}} */
+export function bindingProcess(chain, index, ops) {
+  const codex = chain[index], below = chain[index - 1];
+  if (Number(codex.starttime) > Number(below.starttime))
+    return { unbound: `the nearest codex process (pid ${codex.pid}) started after the process below it (pid ${below.pid}), so it adopted that process` };
+  if (codex.pid !== 1 || codex.ppid !== 0) return { row: below, what: 'call process' };
+  let argv0;
+  try { argv0 = ops.argvOf(codex.pid)[0]; } catch { argv0 = undefined; }
+  if (typeof argv0 !== 'string' || argv0.split('/').at(-1) !== 'codex-linux-sandbox')
+    return { unbound: 'the nearest codex process is its namespace\'s init but not the sandbox helper, so it may have adopted this process' };
+  return { row: codex, what: 'sandbox helper of the call' };
+}
+
 /** @param {{env?: NodeJS.ProcessEnv, ops?: ModelOps, startPid?: number, timeZone?: string, list?: (dir: string) => string[]|null, scanLimit?: number}} [options]
  * @returns {import("../model-identity.js").ModelResult} */
 export function resolveCodexModel({ env = process.env, ops = createProcessOps(), startPid = process.pid, timeZone, list = listDir, scanLimit = SCAN_LIMIT } = {}) {
@@ -40,12 +59,15 @@ export function resolveCodexModel({ env = process.env, ops = createProcessOps(),
   source.thread = thread;
   const chain = chainWithInit(ops, startPid);
   const nearest = nearestHarness(chain, { executableOf: (pid) => ops.executableOf(pid) });
+  source.nearest = nearest?.harness ?? null;
   if (nearest === null || nearest.harness !== 'codex') {
     return unverified('codex', 'not-under-codex', nearest
       ? `the nearest harness process is ${nearest.harness} (pid ${chain[nearest.index].pid}), not codex`
       : 'no codex process among this process\'s ancestors', source);
   }
-  const call = chain[nearest.index - 1];
+  const binding = bindingProcess(chain, nearest.index, ops);
+  if ('unbound' in binding) return unverified('codex', 'unbound-call', binding.unbound, source);
+  const { row: call, what } = binding;
   const root = storeRoot(env);
   const found = locateRollout(root, thread, { timeZone, list });
   if (found.length === 0) return unverified('codex', 'no-rollout', `no rollout of thread ${thread} under ${root}`, source);
@@ -61,9 +83,9 @@ export function resolveCodexModel({ env = process.env, ops = createProcessOps(),
       : unverified('codex', 'no-turn-context', `${rollout} has no turn_context`, source);
   }
   const { model, effort, at } = turnFields(record);
-  const binding = bindTurn(ops.startedAtMs(call), at);
-  if (binding === 'earlier-turn') return unverified('codex', 'earlier-turn', `the call process (pid ${call.pid}) started before the latest turn's record at ${record.timestamp}`, source);
-  if (binding === 'turn-boundary') return unverified('codex', 'turn-boundary', `the call process (pid ${call.pid}) started too close to the latest turn's record at ${record.timestamp} to order them`, source);
+  const order = bindTurn(ops.startedAtMs(call), at);
+  if (order === 'earlier-turn') return unverified('codex', 'earlier-turn', `the ${what} (pid ${call.pid}) started before the latest turn's record at ${record.timestamp}`, source);
+  if (order === 'turn-boundary') return unverified('codex', 'turn-boundary', `the ${what} (pid ${call.pid}) started too close to the latest turn's record at ${record.timestamp} to order them`, source);
   return verified({ harness: 'codex', model, effort, source,
     effortDetail: `turn_context of thread ${thread} carries no effort` });
 }

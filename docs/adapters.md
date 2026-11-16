@@ -226,7 +226,7 @@ The harness ends at the first `/`; model ids may contain `/` or `:`. An empty ef
 
 | Harness | Model | Effort | Source | Binding to the call |
 | --- | --- | --- | --- | --- |
-| `codex` | verified | when the turn records it | rollout `turn_context` (`payload.model`, `payload.effort`) | call process start after the turn's record |
+| `codex` | verified | when the turn records it | rollout `turn_context` (`payload.model`, `payload.effort`) | the call's binding process (below) started after the turn's record |
 | `agy` | verified with readable ancestry and database access; sandbox limit below | when the generation carries a label with an effort; absent for subagents (probed) | conversation database `gen_metadata` | the generation that issued the call's step |
 | `claude-code` | from ops's provenance hook (`hooks/claude-provenance`, `TASKS_AGENT`), not through relay | not stamped today | SessionStart and PostModelSwitch payloads | none; follow-up |
 | `opencode`, pi | not assessed | not assessed | none | none |
@@ -247,13 +247,22 @@ Verified and unverified answers exit `0`; failures exit `1` with kind `model_fai
 
 ### Codex
 
-`relay model --harness codex` (`src/adapters/codex-model.js`, `src/adapters/codex-rollout.js`) reports which model a process running inside a Codex tool call is executing. It reads `CODEX_THREAD_ID`, locates `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*-<thread>.jsonl` (`$HOME/.codex` when `CODEX_HOME` is unset), verifies the opening `session_meta` line and the caller's nearest `codex` ancestor start-time interval, and reads the last `turn_context` within the final 64 MiB.
+`relay model --harness codex` (`src/adapters/codex-model.js`, `src/adapters/codex-rollout.js`) reports which model a process running inside a Codex tool call is executing. It reads `CODEX_THREAD_ID`, locates `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*-<thread>.jsonl` (`$HOME/.codex` when `CODEX_HOME` is unset), verifies the opening `session_meta` line, binds the call through the caller's nearest `codex` ancestor (below), and reads the last `turn_context` within the final 64 MiB.
 
-The stamp includes `@<effort>` when `turn_context.payload.effort` is a nonempty string. Otherwise effort is absent with `effortReason: "not-recorded"`. The thread and rollout locators are under `source`:
+The stamp includes `@<effort>` when `turn_context.payload.effort` is a nonempty string. Otherwise effort is absent with `effortReason: "not-recorded"`. The thread, nearest-harness and rollout locators are under `source`:
 
 ```json
-{"verified":true,"agent":"codex/gpt-6.1-sol@high","harness":"codex","model":"gpt-6.1-sol","effort":"high","effortReason":null,"reason":null,"source":{"thread":"<id>","rollout":"<path>"}}
+{"verified":true,"agent":"codex/gpt-6.1-sol@high","harness":"codex","model":"gpt-6.1-sol","effort":"high","effortReason":null,"reason":null,"source":{"thread":"<id>","nearest":"codex","rollout":"<path>"}}
 ```
+
+`source.nearest` names the caller's nearest harness ancestor as relay's process classifier names it: one of `codex`, `claude-code`, `agy` or `opencode`, or `null` when there is none. Every answer that reached the ancestry check carries it, verified or not; `no-thread` answers do not. The set is closed: adding a classifier name is a change to this contract. A caller such as `tasks` uses it to tell another harness started from a Codex shell (`not-under-codex` with that harness) from a process outside every harness (`not-under-codex` with `null`).
+
+**Call binding.** A verified answer needs a binding process that started no later than the original tool call the caller descends from; a later-born descendant alone never establishes a model. Inside Codex's sandbox (Linux, Codex 0.169.0) every tool call runs under its own `codex-linux-sandbox` helper: a `codex` process that is its pid namespace's init (pid 1, parent 0 as the caller sees it) and starts just before the command. That helper adopts the namespace's orphans, so the process directly below it may have been born after the call. The binding process is therefore:
+
+- the helper itself, when the nearest `codex` ancestor is pid 1 with parent 0 and its `argv[0]` basename is `codex-linux-sandbox`;
+- otherwise the process directly below the nearest `codex` ancestor (the harness process: `codex`, `codex exec`, `codex app-server`, or the TUI's managed app-server daemon, none of which was observed to adopt orphans).
+
+The answer is `unbound-call` when the nearest `codex` ancestor started after the process directly below it (it adopted that process), or when it is a namespace init that is not the sandbox helper or whose arguments cannot be read. A shell kept from an earlier turn keeps its earlier helper, so it resolves `earlier-turn`, as does a child it starts later.
 
 | `reason` | When unverified |
 | --- | --- |
@@ -263,13 +272,14 @@ The stamp includes `@<effort>` when `turn_context.payload.effort` is a nonempty 
 | `ambiguous-rollout` | More than one rollout file matches the thread ID. |
 | `no-turn-context` | The rollout file holds no `turn_context` entry. |
 | `scan-limit` | No `turn_context` appears within the last 64 MiB of the rollout file. |
-| `earlier-turn` | The call process started before the latest turn's `turn_context` timestamp. |
-| `turn-boundary` | The call process start interval is within 1 s of the `turn_context` timestamp and cannot be ordered deterministically. |
+| `unbound-call` | No binding process can be established: the nearest `codex` ancestor adopted the process below it, or is a namespace init other than the sandbox helper. `source.nearest` is `codex`. |
+| `earlier-turn` | The binding process started before the latest turn's `turn_context` timestamp. |
+| `turn-boundary` | The binding process start interval is within 1 s of the `turn_context` timestamp and cannot be ordered deterministically. |
 | `unstampable` | The recorded model or effort is outside the stamp grammar. |
 
 Hard failures use code `INVALID_INPUT` (thread ID not a lowercase UUIDv7), `INVALID_CONFIG` (relative `CODEX_HOME` or missing `HOME`), `IO_ERROR`, `PROCESS_UNREADABLE`, or `INVALID_ROLLOUT` (missing opening `session_meta`, corrupt JSON line in the scanned range, or malformed `turn_context`).
 
-**Clock requirement:** A caller is verified only while its call process's start interval less 1 s lies after the latest `turn_context` timestamp. Between the call process's start and the `relay model` invocation, the wall clock must move by less than 1 s against the boot clock.
+**Clock requirement:** A caller is verified only while its binding process's start interval less 1 s lies after the latest `turn_context` timestamp. Between the binding process's start and the `relay model` invocation, the wall clock must move by less than 1 s against the boot clock.
 
 ### agy
 

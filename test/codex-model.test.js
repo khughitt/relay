@@ -7,11 +7,15 @@ import { tempStore, threadAt, record, sessionMeta, turnContext } from './helpers
 
 const B = Date.parse('2026-10-17T10:00:00.000Z');
 const iso = (ms) => new Date(ms).toISOString();
-const row = (pid, ppid, comm) => ({ pid, ppid, comm, tty: null, starttime: '1', state: 'S' });
+const row = (pid, ppid, comm, starttime = '1') => ({ pid, ppid, comm, tty: null, starttime, state: 'S' });
 const UNDER_CODEX = [row(30, 20, 'node'), row(20, 10, 'bash'), row(10, 5, 'codex')];
-const fakeOps = ({ chain = UNDER_CODEX, init = null, start = { lo: B + 5000, hi: B + 5000 } } = {}) => ({
+/** `starts` gives a pid its own start interval; `argv` answers argvOf, which otherwise must not be read. */
+const fakeOps = ({ chain = UNDER_CODEX, init = null, start = { lo: B + 5000, hi: B + 5000 }, starts = {}, argv = {} } = {}) => ({
   ancestors: () => chain.map((r) => ({ ...r })), recordOf: (pid) => (pid === 1 ? init : null),
-  executableOf: () => { throw new Error('executable must not be read'); }, startedAtMs: () => start });
+  executableOf: () => { throw new Error('executable must not be read'); },
+  argvOf: (pid) => { if (!(pid in argv)) throw new Error(`argv of ${pid} must not be read`); return argv[pid]; },
+  startedAtMs: (r) => starts[r.pid] ?? start });
+const HELPER_ARGV = { 1: ['codex-linux-sandbox', '--sandbox-policy-cwd', '/w', '--command-cwd', '/w', '--', 'bash', '-lc', 'x'] };
 /** A store holding one rollout whose last turn ran gpt-6-astra and was recorded at `turnAt`. */
 const storeWith = (t, { turnAt = B, lines } = {}) => {
   const store = tempStore(t), thread = threadAt(B - 60_000);
@@ -41,14 +45,88 @@ test('chainWithInit appends pid 1 only when the walk ends under it', () => {
 });
 test('verified: the last turn_context of the thread, for a call process started in that turn', (t) => {
   const { env, thread, rollout } = storeWith(t);
-  assert.deepEqual(resolve(env, fakeOps()), { answer: { verified: true, agent: 'codex/gpt-6-astra@high', harness: 'codex', model: 'gpt-6-astra', effort: 'high', effortReason: null, reason: null, source: { thread, rollout } }, detail: null });
+  assert.deepEqual(resolve(env, fakeOps()), { answer: { verified: true, agent: 'codex/gpt-6-astra@high', harness: 'codex', model: 'gpt-6-astra', effort: 'high', effortReason: null, reason: null, source: { thread, nearest: 'codex', rollout } }, detail: null });
 });
-test('the sandbox: a codex at pid 1 is the harness and the process below it is the call', (t) => {
+test('the sandbox: a codex-linux-sandbox helper at pid 1 binds the call by its own start', (t) => {
   const { env } = storeWith(t);
-  const ops = fakeOps({ chain: [row(3, 2, 'node'), row(2, 1, 'bash')], init: row(1, 0, 'codex') });
+  const ops = fakeOps({ chain: [row(3, 2, 'node'), row(2, 1, 'bash')], init: row(1, 0, 'codex'), argv: HELPER_ARGV });
   assert.equal(resolve(env, ops, { startPid: 3 }).answer.agent, 'codex/gpt-6-astra@high');
   const host = fakeOps({ chain: [row(3, 2, 'node'), row(2, 1, 'bash')], init: row(1, 0, 'systemd') });
   assert.equal(resolve(env, host, { startPid: 3 }).answer.reason, 'not-under-codex');
+});
+test('a namespace-init codex that is not the sandbox helper cannot bind the call', (t) => {
+  const { env } = storeWith(t);
+  for (const argv of [{ 1: ['/usr/bin/codex', 'app-server'] }, { 1: [] }, {}]) {
+    const r = resolve(env, fakeOps({ chain: [row(3, 2, 'node'), row(2, 1, 'bash')], init: row(1, 0, 'codex'), argv }), { startPid: 3 });
+    assert.deepEqual([r.answer.verified, r.answer.reason, r.answer.source.nearest], [false, 'unbound-call', 'codex'], JSON.stringify(argv));
+  }
+});
+
+// Spec r10 "Call binding": turn A (old-model) at B - 30 s, turn B (new-model) at B.
+const twoTurns = (t) => storeWith(t, { lines: (id) => [sessionMeta(id), turnContext('old-model', iso(B - 30_000)), turnContext('new-model', iso(B))] });
+test('adopted later-born child never verifies a newer turn', (t) => {
+  const { env } = twoTurns(t);
+  // Turn A's helper (pid 1) started at B - 20 s; the old shell (pid 2, gone) after it; the
+  // child (pid 7) was born after turn B's record and is now adopted by the helper.
+  const adopted = resolve(env, fakeOps({ chain: [row(8, 7, 'node', '2600'), row(7, 1, 'sh', '2500')], init: row(1, 0, 'codex', '1000'), argv: HELPER_ARGV,
+    starts: { 1: { lo: B - 20_000, hi: B - 20_000 }, 7: { lo: B + 5000, hi: B + 5000 }, 8: { lo: B + 6000, hi: B + 6000 } } }), { startPid: 8 }).answer;
+  assert.equal(adopted.verified, false);
+  assert.ok(['earlier-turn', 'unbound-call'].includes(adopted.reason), adopted.reason);
+  assert.equal(adopted.source.nearest, 'codex');
+});
+test('an adopter that started after its child never verifies', (t) => {
+  const { env } = twoTurns(t);
+  // pid 1 started after the process directly below it: it cannot be that process's original helper.
+  const sandboxed = resolve(env, fakeOps({ chain: [row(8, 7, 'node', '2600'), row(7, 1, 'sh', '2500')], init: row(1, 0, 'codex', '2550'), argv: HELPER_ARGV,
+    starts: { 1: { lo: B + 5500, hi: B + 5500 } } }), { startPid: 8 }).answer;
+  assert.deepEqual([sandboxed.verified, sandboxed.reason, sandboxed.source.nearest], [false, 'unbound-call', 'codex']);
+  const harness = resolve(env, fakeOps({ chain: [row(30, 20, 'node', '2600'), row(20, 10, 'bash', '2500'), row(10, 5, 'codex', '2550')] })).answer;
+  assert.deepEqual([harness.verified, harness.reason, harness.source.nearest], [false, 'unbound-call', 'codex']);
+});
+test('fresh helper and shell in the turn still verify', (t) => {
+  const { env, thread, rollout } = twoTurns(t);
+  const control = resolve(env, fakeOps({ chain: [row(9, 2, 'node', '1320'), row(2, 1, 'bash', '1303')], init: row(1, 0, 'codex', '1300'), argv: HELPER_ARGV,
+    starts: { 1: { lo: B + 3000, hi: B + 3000 }, 2: { lo: B + 3030, hi: B + 3030 }, 9: { lo: B + 3200, hi: B + 3200 } } }), { startPid: 9 }).answer;
+  assert.equal(control.verified, true);
+  assert.equal(control.agent, 'codex/new-model@high');
+  assert.deepEqual(control.source, { thread, nearest: 'codex', rollout });
+});
+test('nearest names the other harness', (t) => {
+  const { env } = storeWith(t);
+  const r = resolve(env, fakeOps({ chain: [row(30, 20, 'node'), row(20, 10, 'claude'), row(10, 5, 'codex')] })).answer;
+  assert.deepEqual([r.reason, r.source.nearest], ['not-under-codex', 'claude-code']);
+  const agy = resolve(env, fakeOps({ chain: [row(30, 20, 'node'), row(20, 10, 'agy'), row(10, 5, 'codex')] })).answer;
+  assert.equal(agy.source.nearest, 'agy');
+});
+test('nearest is null without a harness', (t) => {
+  const { env, thread } = storeWith(t);
+  const r = resolve(env, fakeOps({ chain: [row(30, 20, 'node'), row(20, 2, 'bash')] })).answer;
+  assert.deepEqual([r.reason, r.source], ['not-under-codex', { thread, nearest: null }]);
+});
+test('no-thread has no nearest', (t) => {
+  const { env } = storeWith(t);
+  assert.deepEqual(resolve({ CODEX_HOME: env.CODEX_HOME }, fakeOps()).answer.source, {});
+});
+test('later unverified answers carry nearest codex', (t) => {
+  const { env, thread } = storeWith(t);
+  const near = (e, ops = fakeOps(), extra) => { const a = resolve(e, ops, extra).answer; return [a.reason, a.source.nearest]; };
+  assert.deepEqual(near(env, fakeOps({ start: { lo: B - 3000, hi: B - 2000 } })), ['earlier-turn', 'codex']);
+  assert.deepEqual(near(env, fakeOps({ start: { lo: B - 500, hi: B - 400 } })), ['turn-boundary', 'codex']);
+  assert.deepEqual(near({ ...env, CODEX_THREAD_ID: threadAt(B - 1) }), ['no-rollout', 'codex']);
+  const two = storeWith(t);
+  two.store.day(dayOf(two.thread, 'UTC'), two.thread, [sessionMeta(two.thread)], { stamp: '2026-10-17T07-00-00' });
+  assert.deepEqual(near(two.env), ['ambiguous-rollout', 'codex']);
+  const none = storeWith(t, { lines: (id) => [sessionMeta(id), record('event_msg', {})] });
+  assert.deepEqual(near(none.env), ['no-turn-context', 'codex']);
+  const pad = record('event_msg', { pad: 'z'.repeat(600) });
+  const far = storeWith(t, { lines: (id) => [sessionMeta(id), turnContext('m', iso(B)), pad, pad] });
+  assert.deepEqual(near(far.env, fakeOps(), { scanLimit: 1024 }), ['scan-limit', 'codex']);
+  assert.equal(thread.length, 36);
+});
+test('existing keys keep their order', (t) => {
+  const { env } = storeWith(t);
+  for (const answer of [resolve(env, fakeOps()).answer, resolve({}, fakeOps()).answer, resolve(env, fakeOps({ start: { lo: B - 3000, hi: B - 2000 } })).answer])
+    assert.deepEqual(Object.keys(answer), ['verified','agent','harness','model','effort','effortReason','reason','source']);
 });
 test('unverified reasons, each with its detail', (t) => {
   const { env, thread, rollout } = storeWith(t);
@@ -58,7 +136,7 @@ test('unverified reasons, each with its detail', (t) => {
   const claude = reason(env, fakeOps({ chain: [row(30, 20, 'node'), row(20, 10, 'claude'), row(10, 5, 'codex')] }));
   assert.equal(claude.answer.reason, 'not-under-codex'); assert.match(claude.detail ?? '', /claude-code/);
   assert.equal(reason(env, fakeOps({ chain: [row(30, 20, 'node'), row(20, 2, 'bash')] })).answer.reason, 'not-under-codex');
-  assert.deepEqual(reason({ ...env, CODEX_THREAD_ID: threadAt(B - 1) }).answer, { verified: false, agent: 'codex', harness: 'codex', model: null, effort: null, effortReason: null, reason: 'no-rollout', source: { thread: threadAt(B - 1) } });
+  assert.deepEqual(reason({ ...env, CODEX_THREAD_ID: threadAt(B - 1) }).answer, { verified: false, agent: 'codex', harness: 'codex', model: null, effort: null, effortReason: null, reason: 'no-rollout', source: { thread: threadAt(B - 1), nearest: 'codex' } });
   const early = reason(env, fakeOps({ start: { lo: B - 3000, hi: B - 2000 } }));
   assert.deepEqual([early.answer.reason, early.answer.source.rollout, early.answer.source.thread], ['earlier-turn', rollout, thread]);
   assert.equal(reason(env, fakeOps({ start: { lo: B - 500, hi: B - 400 } })).answer.reason, 'turn-boundary');

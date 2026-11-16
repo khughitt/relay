@@ -39,7 +39,7 @@ test('verified, as JSON and as the pretty agent line', { skip: LINUX }, (t) => {
   assert.equal(json.status, 0, json.stderr); assert.equal(json.stderr, '');
   const answer = JSON.parse(json.stdout);
   assert.deepEqual(Object.keys(answer), ['verified', 'agent', 'harness', 'model', 'effort', 'effortReason', 'reason', 'source']);
-  assert.deepEqual([answer.verified, answer.agent, answer.model, answer.effort, answer.source.thread, answer.reason], [true, 'codex/gpt-6-astra@high', 'gpt-6-astra', 'high', thread, null]);
+  assert.deepEqual([answer.verified, answer.agent, answer.model, answer.effort, answer.source.thread, answer.source.nearest, answer.reason], [true, 'codex/gpt-6-astra@high', 'gpt-6-astra', 'high', thread, 'codex', null]);
   const pretty = spawnSync(parent, ['model', '--harness', 'codex', '--pretty'], { encoding: 'utf8', env: cleanEnv(t, { codexHome: env.CODEX_HOME, thread, format: 'json' }) });
   assert.deepEqual([pretty.status, pretty.stdout, pretty.stderr], [0, 'codex/gpt-6-astra@high\n', '']);
   const plain = spawnSync(parent, ['model', '--harness', 'codex'], { encoding: 'utf8', env });
@@ -64,10 +64,28 @@ test('usage errors exit 2; help exits 0', (t) => {
   const help = direct(['model', '--help'], cleanEnv(t));
   assert.equal(help.status, 0); assert.match(help.stdout, /^Usage: relay model --harness codex/);
 });
-test('in a PID namespace whose pid 1 is codex, the real process helper verifies', { skip: LINUX }, (t) => {
-  const { env } = liveStore(t), parent = codexParent(t);
-  const r = spawnSync('unshare', ['--user', '--map-root-user', '--pid', '--fork', '--mount-proc', parent, 'model', '--harness', 'codex', '--json'], { encoding: 'utf8', env });
+/** pid 1 shaped like Codex's sandbox helper: comm `codex`, argv[0] `codex-linux-sandbox`, relay as its child. */
+function sandboxHelper(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-codex-helper-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const helper = path.join(dir, 'codex');
+  fs.symlinkSync('/bin/bash', helper);
+  return helper;
+}
+const unshare = (argv, env) => spawnSync('unshare', ['--user', '--map-root-user', '--pid', '--fork', '--mount-proc', ...argv], { encoding: 'utf8', env });
+test('in a PID namespace whose pid 1 is the sandbox helper, the real process helper verifies', { skip: LINUX }, (t) => {
+  const { env } = liveStore(t), helper = sandboxHelper(t);
+  // relay runs as a child (the trailing exit keeps bash from exec-ing it in place of pid 1).
+  const r = unshare(['/bin/bash', '-c', 'exec -a codex-linux-sandbox "$0" -c \'"$RELAY_NODE" "$RELAY_BIN" model --harness codex --json; exit $?\'', helper], env);
   assert.equal(r.error, undefined, `unshare must be runnable: ${r.error}`);
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(JSON.parse(r.stdout).agent, 'codex/gpt-6-astra@high');
+  const answer = JSON.parse(r.stdout);
+  assert.deepEqual([answer.agent, answer.source.nearest], ['codex/gpt-6-astra@high', 'codex']);
+});
+test('in a PID namespace whose pid 1 is another codex, the call is unbound', { skip: LINUX }, (t) => {
+  const { env } = liveStore(t), parent = codexParent(t);
+  const r = unshare([parent, 'model', '--harness', 'codex', '--json'], env);
+  assert.equal(r.status, 0, r.stderr);
+  const answer = JSON.parse(r.stdout);
+  assert.deepEqual([answer.verified, answer.reason, answer.source.nearest], [false, 'unbound-call', 'codex']);
 });

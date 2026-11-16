@@ -198,7 +198,7 @@ Registry, hook dispatch, installation, and model commands:
 - `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--qualification FILE --session-mode MODE] [--event NAME]... [--evidence FILE] [--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`
 - `relay pairs --harness claude-code|codex --target FILE`
 - `relay rollback --artifact FILE`
-- `relay model --harness codex|agy`
+- `relay model --harness codex|agy` (answers and reasons: [adapters.md](adapters.md#model-resolution); Codex answers carry `source.nearest` and may report `unbound-call`)
 - `relay --help`, `relay help [<command>]`, `relay <command> --help`, and `relay --version`
 
 Interaction commands (backed by `relay serve` over `$STATE/serve.sock`; see [questions.md](questions.md)):
