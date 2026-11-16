@@ -13,6 +13,22 @@ import termios
 import time
 
 spec = json.load(sys.stdin)
+# --input-script FILE: [{afterMs, text}], each typed at afterMs from start, then Enter 300 ms later
+# (a slower Enter keeps the TUI from reading text plus Enter as one paste).
+inputs = []
+if sys.argv[1:2] == ['--input-script'] and len(sys.argv) == 3:
+    with open(sys.argv[2]) as f:
+        inputs = json.load(f)
+    if not isinstance(inputs, list) or len(inputs) > 16 or not all(
+            isinstance(x, dict) and isinstance(x.get('afterMs'), int) and 0 <= x['afterMs'] <= 600000
+            and isinstance(x.get('text'), str) and 0 < len(x['text']) <= 4096 and '\r' not in x['text']
+            and '\n' not in x['text'] for x in inputs):
+        sys.exit('invalid input script')
+elif sys.argv[1:]:
+    sys.exit('usage: pty.py [--input-script FILE] < spec.json')
+pending = sorted(({'afterMs': x['afterMs'], 'text': x['text'], 'stage': 0} for x in inputs),
+                 key=lambda x: x['afterMs'])
+sent = []
 ctypes.CDLL(None).prctl(36, 1, 0, 0, 0)  # Linux child subreaper: reap grandchildren too.
 master, slave = os.openpty()
 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 45, 150, 0, 0))
@@ -48,6 +64,16 @@ with open(spec['output'], 'wb') as out:
                 if now - done_at > 1:
                     reason = 'turn-complete'
                     break
+            elapsed_ms = (now - started) * 1000
+            for item in pending:
+                if item['stage'] == 0 and elapsed_ms >= item['afterMs']:
+                    os.write(master, item['text'].encode())
+                    item['stage'], item['typedMs'] = 1, round(elapsed_ms)
+                elif item['stage'] == 1 and elapsed_ms >= item['typedMs'] + 300:
+                    os.write(master, b'\r')
+                    item['stage'] = 2
+                    sent.append({'afterMs': item['afterMs'], 'typedMs': item['typedMs'],
+                                 'enterMs': round(elapsed_ms)})
             if select.select([master], [], [], 0.05)[0]:
                 try:
                     data = os.read(master, 65536)
@@ -100,5 +126,5 @@ try:
 except ProcessLookupError:
     pass
 print(json.dumps({'reason': reason, 'code': child.returncode,
-                  'durationMs': round((time.monotonic() - started) * 1000),
+                  'durationMs': round((time.monotonic() - started) * 1000), 'inputs': sent,
                   'cleanup': {'ownedPids': [child.pid], 'survivors': survivors}}))

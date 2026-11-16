@@ -5,7 +5,7 @@ export const assistantMessage = (id,text) => ({type:'response.output_item.done',
 export const completed = id => ({type:'response.completed',response:{id,usage:{input_tokens:0,input_tokens_details:null,output_tokens:0,output_tokens_details:null,total_tokens:0}}});
 
 export async function startScriptedProvider({script,signal,maxBodyBytes=8*1024*1024}) {
- const requests=[]; let step=0, failure, closing;
+ const requests=[],delays=new Set(); let step=0, failure, closing;
  const server=http.createServer(async(req,res)=>{
   const path=req.url, index=requests.length;
   const refuse=(status,code)=>{requests.push({index,path,refused:code});req.resume();res.writeHead(status).end(code)};
@@ -19,16 +19,19 @@ export async function startScriptedProvider({script,signal,maxBodyBytes=8*1024*1
    if((body.tools??[]).some(t=>t?.namespace!=null&&typeof t.namespace!=='string'))return refuse(400,'shape');
    if((body.tools??[]).some(t=>t?.type==='namespace'&&(typeof t.name!=='string'||!Array.isArray(t.tools)||t.tools.some(c=>typeof c?.name!=='string'))))return refuse(400,'shape');
    const toolNames=(body.tools??[]).flatMap(t=>t?.type==='namespace'?t.tools.map(c=>({name:c.name,namespace:t.name})):typeof t?.name==='string'?[{name:t.name,namespace:t.namespace??null}]:[]);
-   const r={index,path,toolNames,inputTypes:(body.input??[]).map(i=>i?.type).filter(t=>typeof t==='string'),functionCallOutputs:(body.input??[]).filter(i=>i?.type==='function_call_output'&&typeof i.call_id==='string'&&typeof i.output==='string').map(i=>({callId:i.call_id,output:i.output}))};
+   const r={index,path,toolNames,inputTypes:(body.input??[]).map(i=>i?.type).filter(t=>typeof t==='string'),functionCallOutputs:(body.input??[]).filter(i=>i?.type==='function_call_output'&&typeof i.call_id==='string'&&typeof i.output==='string').map(i=>({callId:i.call_id,output:i.output})),userTexts:(body.input??[]).filter(i=>i?.type==='message'&&i.role==='user').map(i=>typeof i.content==='string'?i.content:Array.isArray(i.content)?i.content.map(c=>typeof c?.text==='string'?c.text:'').join(''):'')};
    requests.push(r);
    if(step>=script.length){failure=new Error('script-exhausted');res.writeHead(500).end('script-exhausted');return}
-   const events=await script[step++](r);
+   // A step returns its events, or {delayMs, events} to hold the response (abortable by close).
+   const reply=await script[step++](r),events=Array.isArray(reply)?reply:reply.events;
+   if(!Array.isArray(reply)&&reply.delayMs>0)await new Promise(resolve=>{const d={resolve};d.timer=setTimeout(()=>{delays.delete(d);resolve()},reply.delayMs);delays.add(d);});
+   if(closing){res.writeHead(503).end('closing');return}
    res.writeHead(200,{'content-type':'text/event-stream'});
    for(const event of events)res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
    res.end();
   }catch {failure??=new Error('provider-error');if(!res.headersSent)res.writeHead(500);res.end('provider-error')}
  });
- const stop=()=>closing??=new Promise(resolve=>{server.close(resolve);server.closeAllConnections()});
+ const stop=()=>closing??=new Promise(resolve=>{for(const d of delays){clearTimeout(d.timer);d.resolve()}server.close(resolve);server.closeAllConnections()});
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve)});
  signal?.addEventListener('abort',stop,{once:true});
  const port=server.address().port;
