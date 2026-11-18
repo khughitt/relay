@@ -81,21 +81,24 @@ test('an installed entry keeps its guard when the hook environment loses the con
 });
 test('survival limitation: the internal deadline refuses; an outer kill, missing node or startup error cannot',async t=>{
   const base=await tempState(t),p=layout(base),marker=processMarker();
+  const env={PATH:process.env.PATH??'',HOME:base.stateDir,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome};
   t.after(()=>reapMarked(marker));
   await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code'],argv:['node',fixture,'hang',marker],timeoutMs:80}]);
   // 5000 ms is about the smallest outer budget that admits one subscriber with its supervisor, discovery and cleanup reserves.
-  const started=performance.now(),r=hookRun(p,['--harness','claude-code','--outer-ms','5000','PreToolUse'],body);
+  const started=performance.now(),r=hookRun(p,['--harness','claude-code','--outer-ms','5000','PreToolUse'],body,{env});
   assert.equal(r.status,2);assert.match(r.stdout,/relay refused: GUARD_FAILED: guard g timeout/);assert.ok(performance.now()-started<5000,'refused inside the outer timeout');
   await noneMarked(marker); // relay's own deadline kills the guard
-  // The harness's own timeout discards everything relay would have said: no refusal exists.
-  const killed=hookRun(p,['--harness','claude-code','PreToolUse'],body,{timeout:200,killSignal:'SIGKILL'});
+  // The harness's own timeout discards everything relay would have said: keep the guard's internal
+  // timeout well past the outer kill so fast startup cannot finish and exit 2 before SIGKILL lands.
+  await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code'],argv:['node',fixture,'hang',marker],timeoutMs:10000}]);
+  const killed=hookRun(p,['--harness','claude-code','PreToolUse'],body,{env,timeout:200,killSignal:'SIGKILL'});
   assert.equal(killed.signal,'SIGKILL');assert.equal(killed.stdout,'');
-  await reapMarked(marker); // the outer kill orphans the guard relay had started
+  await noneMarked(marker); // supervisor containment stops any guard started before SIGKILL
   // A missing runtime fails before relay exists; the harness sees a spawn error, not a refusal.
-  const missing=spawnSync('/nonexistent/node',[cli.pathname,'hook','--harness','claude-code','PreToolUse'],{encoding:'utf8',input:body});
+  const missing=spawnSync('/nonexistent/node',[cli.pathname,'hook','--harness','claude-code','PreToolUse'],{encoding:'utf8',input:body,env});
   assert.equal(missing.error.code,'ENOENT');assert.ok(!missing.stdout);
   // A startup usage error exits 2 with no native refusal.
-  const usage=hookRun(p,['--harness','claude-code','--outer-ms','x','PreToolUse'],body);assert.equal(usage.status,2);assert.equal(usage.stdout,'');
+  const usage=hookRun(p,['--harness','claude-code','--outer-ms','x','PreToolUse'],body,{env});assert.equal(usage.status,2);assert.equal(usage.stdout,'');
 });
 test('the CLI returns inside the outer timeout while another writer holds the lock',async t=>{
   const base=await tempState(t),p=layout(base);

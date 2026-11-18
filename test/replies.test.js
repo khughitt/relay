@@ -21,7 +21,9 @@ test('parseReply accepts only the documented reply shape', () => {
 test('Claude and Codex share the standard decision model with exit 2 refusals', () => {
   for (const harness of ['claude-code', 'codex']) {
     const { encodeReply, replies } = adapterFor(harness);
-    const expected = harness === 'codex' ? ['PreToolUse', 'Stop', 'SubagentStop', 'UserPromptSubmit'] : ['PreToolUse', 'Stop', 'UserPromptSubmit'];
+    const expected = harness === 'codex'
+      ? ['PreToolUse', 'SessionStart', 'Stop', 'SubagentStop', 'UserPromptSubmit']
+      : ['PreToolUse', 'SessionStart', 'Stop', 'UserPromptSubmit'];
     assert.deepEqual(Object.keys(replies).sort(), expected);
     assert.deepEqual(encodeReply('PreToolUse', { decision: 'deny', reason: 'no' }), {
       stdout: '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"no"}}\n',
@@ -30,6 +32,8 @@ test('Claude and Codex share the standard decision model with exit 2 refusals', 
       stdout: '{"decision":"block","reason":"no"}\n', stderr: 'no\n', exitCode: 2 });
     assert.deepEqual(encodeReply('Stop', { decision: 'deny', reason: 'keep going' }), {
       stdout: '{"decision":"block","reason":"keep going"}\n', stderr: 'keep going\n', exitCode: 2 });
+    assert.deepEqual(encodeReply('SessionStart', { decision: 'allow', context: 'c' }), {
+      stdout: '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"c"}}\n', stderr: '', exitCode: 0 });
     assert.deepEqual(encodeReply('PreToolUse', { decision: 'allow', context: 'c' }), {
       stdout: '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"c"}}\n', stderr: '', exitCode: 0 });
     assert.deepEqual(encodeReply('UserPromptSubmit', { decision: 'allow', context: 'c' }), {
@@ -38,7 +42,7 @@ test('Claude and Codex share the standard decision model with exit 2 refusals', 
       assert.deepEqual(encodeReply(event, { decision: 'allow' }), { stdout: '', stderr: '', exitCode: 0 });
     }
     assert.throws(() => encodeReply('Stop', { decision: 'allow', context: 'c' }), { code: 'UNSUPPORTED_REPLY' });
-    assert.throws(() => encodeReply('SessionStart', { decision: 'allow', context: 'c' }), { code: 'UNSUPPORTED_REPLY' });
+    assert.throws(() => encodeReply('SessionEnd', { decision: 'allow', context: 'c' }), { code: 'UNSUPPORTED_REPLY' });
     assert.throws(() => encodeReply('SessionStart', { decision: 'deny', reason: 'no' }), { code: 'UNSUPPORTED_REPLY' });
     assert.throws(() => encodeReply('SessionEnd', { decision: 'deny', reason: 'no' }), { code: 'UNSUPPORTED_REPLY' });
     assert.equal(encodeReply('PreToolUse', { decision: 'deny', reason: 'no', context: 'c' }).stdout.includes('additionalContext'), false);
