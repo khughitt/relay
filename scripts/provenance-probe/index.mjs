@@ -243,7 +243,7 @@ export function itemPlan(def,{project,codexBin,tasks=false}) {
   case 3: return {turns:[{}],final:'1',waitFor:[exit('worker')],waitMs:40000,lanes:{1:{tool:'spawn_agent',args:{message:'Run worker probe step 1.',model:cases.WORKER_MODEL}},worker1:`${which}; ${dump('worker',1)}; ${relay('worker')}`}};
   // The job sleeps so it is reparented before it dumps its ancestry and asks relay.
   case 4: return {turns:[{}],final:'1',waitFor:[exit('job')],waitMs:20000,lanes:{1:`${which}; TASKS_MODEL=poisoned-model /usr/bin/setsid /bin/sh -c ${quote(`echo started >${file('job.started')}; sleep 3; ${dump('job',1)}; ${relay('job')}`)} </dev/null >/dev/null 2>&1 &`}};
-  case 5: return {turns:[{}],final:'1',waitFor:[exit('call')],waitMs:10000,lanes:{1:`${which}; ${relay('call')}`}};
+  case 5: return {turns:[{}],final:'1',waitFor:[exit('call')],waitMs:10000,lanes:{1:`${which}; ${dump('call',1)}; ${relay('call')}`}};
   case 6: return {turns:[{}],final:'1',waitFor:[exit('inner'),join(r,'inner-exec.exit')],waitMs:40000,lanes:{
    1:{tool:'exec_command',args:{cmd:`${which}; ${quote(codexBin)} exec --skip-git-repo-check -m ${cases.INNER_MODEL} 'Run inner probe step 1.' </dev/null >${file('inner-exec.out')} 2>&1; echo $? >${file('inner-exec.exit')}`,yield_time_ms:30000,max_output_tokens:2000}},
    inner1:`${dump('inner',1)}; ${relay('inner')}`}};
