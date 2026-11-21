@@ -201,6 +201,41 @@ test('a tasks case without the fixture shim is incomplete',()=>{
   assert.equal(cases.judgeItem(d,itemObs({tasks:{...tasks,add:{agent:'codex',warnings:['model unverified: earlier-turn']}}})).status,'failed');
 });
 
+test('a tasks case whose tasks add never ran is incomplete',()=>{
+  const r=cases.judgeItem(item('item-5'),itemObs({tasks:{add:null,done:null}}));
+  assert.deepEqual([r.status,r.reason],['incomplete','tasks-not-run']);
+  const limit=cases.judgeItem(item('item-4-sandboxed'),itemObs({contexts:[{at:turnAt,model:'mock-model',fileSystem:'restricted'}],answers:{},tasks:{add:null,done:null}}));
+  assert.equal(limit.status,'passed');assert.deepEqual(limit.recorded.add,null);
+});
+
+test('tasks cases run tasks add and done at the relay call, other items never do',()=>{
+  assert.equal(typeof probe.itemPlan,'function');
+  const at={1:'call',4:'job',5:'call',7:'late',9:'late'},shell=p=>JSON.stringify(p.lanes);
+  for(const def of cases.qualificationItems){
+    const plan=probe.itemPlan(def,{project:'/case/project',codexBin:'/codex',tasks:true});
+    if(!def.tasks){assert.doesNotMatch(shell(plan),/tasks -C/,def.id);continue;}
+    const label=at[def.item],s=shell(plan);
+    assert.match(s,new RegExp(`answer-${label}\\.exit.*tasks -C .*scratch-tasks.* add .*tasks-add-${label}\\.json`),def.id);
+    assert.match(s,new RegExp(`tasks -C .*scratch-tasks.* done .*tasks-done-${label}\\.json`),def.id);
+    assert.match(s,/TASKS_OWNER=probe/,def.id);
+  }
+  assert.doesNotMatch(shell(probe.itemPlan(item('item-5'),{project:'/case/project',codexBin:'/codex',tasks:false})),/tasks -C/);
+});
+
+test('collectTasks reads the add and done receipts and the written record',async t=>{
+  assert.equal(typeof probe.collectTasks,'function');
+  const dir=await root(t),put=(n,s)=>writeFile(join(dir,n),s);
+  assert.deepEqual(probe.collectTasks(dir,'call',()=>{throw Error('no show');}),{label:'call',add:null,done:null});
+  await put('tasks-add-call.json','{"id":"scr-123456","action":"created","warnings":["model unverified: earlier-turn"]}\n');await put('tasks-add-call.exit','0\n');
+  await put('tasks-done-call.json','{"id":"scr-123456","warnings":["model unverified: earlier-turn"]}\n');await put('tasks-done-call.exit','0\n');
+  const shown=[];
+  const got=probe.collectTasks(dir,'call',id=>{shown.push(id);return {agent:'codex',status:'done'};});
+  assert.deepEqual(shown,['scr-123456']);
+  assert.deepEqual(got,{label:'call',add:{exit:0,id:'scr-123456',agent:'codex',warnings:['model unverified: earlier-turn']},done:{exit:0,model:null,status:'done',warnings:['model unverified: earlier-turn']}});
+  const verified=probe.collectTasks(dir,'call',()=>({agent:'codex/mock-model@low',model:'mock-model',status:'done'}));
+  assert.deepEqual([verified.add.agent,verified.done.model],['codex/mock-model@low','mock-model']);
+});
+
 test('item 3 without a worker is unsupported and a parent model fails',()=>{
   const d=item('item-3');
   assert.equal(cases.judgeItem(d,itemObs({answers:{call:verifiedAnswer('mock-model')},undrivable:[{step:'worker',undrivable:'no-worker'}]})).status,'unsupported');

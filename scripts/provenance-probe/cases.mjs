@@ -150,9 +150,11 @@ function relaySide(def,o){
 function tasksSide(def,t){
  const add=t.add??{},done=t.done??{},warned=re=>(add.warnings??[]).some(w=>re.test(w));
  const bare=add.agent==='codex'&&!done.model;
+ if(def.variant==='sandbox-limit')return result('passed',undefined,{recorded:t});
+ if(!t.add)return result('incomplete','tasks-not-run');
  switch(def.item){
   case 1: return add.agent==='codex'&&(add.warnings??[]).length>0?result('passed'):result('failed','base-relay-not-degraded');
-  case 4: return def.variant==='sandbox-limit'?result('passed',undefined,{recorded:t}):bare&&warned(/no-harness/)?result('passed'):result('failed','tasks-not-bare-no-harness');
+  case 4: return bare&&warned(/no-harness/)?result('passed'):result('failed','tasks-not-bare-no-harness');
   case 5: return add.agent===`codex/${EXPECTED_MODEL}@low`&&done.model===EXPECTED_MODEL?result('passed'):result('failed','tasks-stamp-mismatch');
   case 7: return bare&&warned(/^model unverified: earlier-turn$/)?result('passed'):result('failed','tasks-not-bare-earlier-turn');
   case 9: return bare&&warned(/^model unverified: (earlier-turn|unbound-call)$/)?result('passed'):result('failed',add.agent===`codex/${SWITCHED_MODEL}@low`?'tasks-recorded-newer-model':'tasks-not-bare');

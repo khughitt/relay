@@ -201,13 +201,39 @@ async function observe({codex,def,input,dir,signal}) {
  save(join(dir,'observation.json'),observed);return observed;
 }
 
-/** Task 4: the commands one qualification item runs. Answers land in receipts/answer-<label>.json. */
-function itemPlan(def,{project,codexBin}) {
+/** The relay call label each tasks item files its scratch task at. */
+const TASKS_LABEL={1:'call',4:'job',5:'call',7:'late',9:'late'};
+
+/** What tasks wrote at one label: add's id, exit and warnings, the record's `agent`, and the
+ * completion's exit, warnings and the record's `model`. A label whose add never ran gives nulls. */
+export function collectTasks(receipts,label,show){
+ const read=n=>existsSync(join(receipts,n))?readFileSync(join(receipts,n),'utf8'):null;
+ const json=n=>{const t=read(n);if(t===null||!t.trim())return null;try{return JSON.parse(t);}catch{return {unparsed:t.slice(0,2000)};}};
+ const code=n=>{const t=read(n);return t===null?null:Number(t.trim());};
+ const add=json(`tasks-add-${label}.json`),fin=json(`tasks-done-${label}.json`);
+ if(code(`tasks-add-${label}.exit`)===null)return {label,add:null,done:null};
+ const record=typeof add?.id==='string'?show(add.id):null;
+ return {label,
+  add:{exit:code(`tasks-add-${label}.exit`),id:add?.id??null,agent:record?.agent??null,warnings:add?.warnings??[],...(add?.id?{}:{stdout:add,stderr:read(`tasks-add-${label}.err`)})},
+  done:fin||code(`tasks-done-${label}.exit`)!==null?{exit:code(`tasks-done-${label}.exit`),model:record?.model??null,status:record?.status??null,warnings:fin?.warnings??[],...(fin?.error?{error:fin.error}:{})}:null};
+}
+
+/** Task 4: the commands one qualification item runs. Answers land in receipts/answer-<label>.json.
+ * With `tasks`, a tasks item also files and completes one scratch task right after its relay call,
+ * in the same process, so tasks resolves through the same call (receipts/tasks-{add,done}-<label>). */
+export function itemPlan(def,{project,codexBin,tasks=false}) {
  const r=join(project,'receipts'),file=n=>quote(join(r,n));
  const dump=(point,step)=>`/usr/bin/python3 ${quote(join(project,'dump.py'))} ${point} ${step}`;
- const relay=label=>`relay model --harness codex --json >${file(`answer-${label}.json`)} 2>/dev/null; echo $? >${file(`answer-${label}.exit`)}`;
+ const tk=label=>{
+  const t=`TASKS_OWNER=probe tasks -C ${quote(join(project,'scratch-tasks'))}`,out=(verb,ext)=>file(`tasks-${verb}-${label}.${ext}`);
+  return `${t} add ${quote('probe '+label)} >${out('add','json')} 2>${out('add','err')}; echo $? >${out('add','exit')}; `
+   +`id=$(/usr/bin/python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['id'])" ${out('add','json')} 2>/dev/null) && `
+   +`${t} done "$id" probe >${out('done','json')} 2>${out('done','err')}; echo $? >${out('done','exit')}`;
+ };
+ const relay=label=>`relay model --harness codex --json >${file(`answer-${label}.json`)} 2>/dev/null; echo $? >${file(`answer-${label}.exit`)}${tasks&&def.tasks?'; '+tk(label):''}`;
  const which=`command -v relay >${file('which-relay')}; command -v tasks >${file('which-tasks')}`;
- const exit=label=>join(r,`answer-${label}.exit`);
+ // The last receipt a label writes: its tasks completion when tasks runs, otherwise relay's exit.
+ const exit=label=>join(r,tasks&&def.tasks?`tasks-done-${label}.exit`:`answer-${label}.exit`);
  const write={tool:'write_stdin',args:session=>({session_id:Number(session),chars:'\n',yield_time_ms:5000,max_output_tokens:2000})};
  const tty=cmd=>({tool:'exec_command',args:{cmd,tty:true,yield_time_ms:1000,max_output_tokens:2000}});
  const late9=tty(`${which}; /bin/sh -c ${quote(`read -r go; ( sleep 1; ${relay('late')}; exec ${dump('late',2)} ) </dev/null >/dev/null 2>&1 & exit 0`)}; sleep 30`);
@@ -216,12 +242,12 @@ function itemPlan(def,{project,codexBin}) {
   case 2: return {turns:[{},{model:cases.SWITCHED_MODEL}],final:'2',lanes:{1:`${which}; ${relay('early')}`,2:`${dump('late',2)}; ${relay('late')}`}};
   case 3: return {turns:[{}],final:'1',waitFor:[exit('worker')],waitMs:40000,lanes:{1:{tool:'spawn_agent',args:{message:'Run worker probe step 1.',model:cases.WORKER_MODEL}},worker1:`${which}; ${dump('worker',1)}; ${relay('worker')}`}};
   // The job sleeps so it is reparented before it dumps its ancestry and asks relay.
-  case 4: return {turns:[{}],final:'1',waitFor:[exit('job')],waitMs:10000,lanes:{1:`${which}; TASKS_MODEL=poisoned-model /usr/bin/setsid /bin/sh -c ${quote(`echo started >${file('job.started')}; sleep 3; ${dump('job',1)}; ${relay('job')}`)} </dev/null >/dev/null 2>&1 &`}};
-  case 5: return {turns:[{}],final:'1',lanes:{1:which}};
+  case 4: return {turns:[{}],final:'1',waitFor:[exit('job')],waitMs:20000,lanes:{1:`${which}; TASKS_MODEL=poisoned-model /usr/bin/setsid /bin/sh -c ${quote(`echo started >${file('job.started')}; sleep 3; ${dump('job',1)}; ${relay('job')}`)} </dev/null >/dev/null 2>&1 &`}};
+  case 5: return {turns:[{}],final:'1',waitFor:[exit('call')],waitMs:10000,lanes:{1:`${which}; ${relay('call')}`}};
   case 6: return {turns:[{}],final:'1',waitFor:[exit('inner'),join(r,'inner-exec.exit')],waitMs:40000,lanes:{
    1:{tool:'exec_command',args:{cmd:`${which}; ${quote(codexBin)} exec --skip-git-repo-check -m ${cases.INNER_MODEL} 'Run inner probe step 1.' </dev/null >${file('inner-exec.out')} 2>&1; echo $? >${file('inner-exec.exit')}`,yield_time_ms:30000,max_output_tokens:2000}},
    inner1:`${dump('inner',1)}; ${relay('inner')}`}};
-  case 7: return {turns:[{},{}],final:'2',waitFor:[exit('late')],waitMs:10000,lanes:{1:tty(`${which}; read -r line; ${dump('late',2)}; ${relay('late')}`),2:write}};
+  case 7: return {turns:[{},{}],final:'2',waitFor:[exit('late')],waitMs:20000,lanes:{1:tty(`${which}; read -r line; ${dump('late',2)}; ${relay('late')}`),2:write}};
   case 8: return {turns:[{}],final:'1',lanes:{1:`${which}; ${dump('call',1)}`},tuiInputs:[{afterMs:15000,text:`!${dump('escape',1)}; ${relay('escape')}`}],tuiDone:exit('escape')};
   // The nested turn-A shell exits after forking, so its child is adopted by the sandbox's pid 1
   // while the top-level shell (the helper's direct child) keeps the namespace alive.
@@ -242,10 +268,14 @@ async function observeItem({codex,def,input,dir,signal,shim}) {
  const env={...probeEnvironment(dir),...fixture};
  for(const p of [env.HOME,env.CODEX_HOME,env.XDG_RUNTIME_DIR])mkdirSync(p,{recursive:true,mode:0o700});
  copyFileSync(fileURLToPath(new URL('./dump.py',import.meta.url)),join(project,'dump.py'));
- const plan=itemPlan(def,{project,codexBin:codex}),done=join(dir,'turn-done');
+ const tasks=!!(def.tasks&&shim.tasks),scratch=join(project,'scratch-tasks');
+ // tasks reads its registry under the private HOME; nothing registered on the host is touched.
+ const tasksEnv={PATH:fixture.PATH,HOME:env.HOME,XDG_STATE_HOME:fixture.XDG_STATE_HOME,TASKS_OWNER:'probe'};
+ const plan=itemPlan(def,{project,codexBin:codex,tasks}),done=join(dir,'turn-done');
  let provider;const observed={item:def.item,driver:def.driver,sandboxed:def.sandboxed,complete:false,cleanup:{ownedPids:[],survivors:[]},expectModel:cases.EXPECTED_MODEL,tasks:null};
  const waits=async s=>{const t0=Date.now();for(const f of plan.waitFor??[])await waitFor(f,Math.max(0,(plan.waitMs??0)-(Date.now()-t0)),s);};
  try {
+  if(tasks){mkdirSync(scratch,{mode:0o700});save(join(dir,'tasks-init.json'),JSON.parse(execFileSync(shim.tasks,['init','--prefix','scr'],{cwd:scratch,env:tasksEnv,encoding:'utf8'})));}
   provider=await startScriptedProvider({signal,script:createLaneScript({lanes:plan.lanes,dir,final:plan.final})});
   assertPrivateProvider({baseUrl:provider.baseUrl,requiresAuth:false});
   const base=def.sandboxed?privatePolicy(input,dir):{config:{approval_policy:'never',sandbox_mode:'danger-full-access',features:input.features,shell_environment_policy:input.shell_environment_policy},map:[]};
@@ -270,7 +300,7 @@ async function observeItem({codex,def,input,dir,signal,shim}) {
  const rows=rollouts.flatMap(p=>readFileSync(p,'utf8').split('\n').filter(Boolean).map(x=>JSON.parse(x)));
  observed.rollouts=rollouts;observed.sessions=rows.filter(x=>x.type==='session_meta').map(x=>({id:x.payload?.id,source:x.payload?.source,cliVersion:x.payload?.cli_version}));
  observed.contexts=rows.filter(x=>x.type==='turn_context').map(x=>({...turnFields(x),timestamp:x.timestamp,approval:x.payload?.approval_policy,profile:x.payload?.permission_profile?.type??null,fileSystem:x.payload?.permission_profile?.file_system?.type??null}));
- observed.dumps=files(receipts,'.json').filter(p=>!/\/answer-/.test(p)).map(p=>JSON.parse(readFileSync(p,'utf8')));
+ observed.dumps=files(receipts,'.json').filter(p=>!/\/(answer|tasks)-[^/]+$/.test(p)).map(p=>JSON.parse(readFileSync(p,'utf8')));
  observed.answers={};
  for(const p of files(receipts,'.json').filter(p=>/\/answer-[^/]+\.json$/.test(p))){
   const label=p.match(/answer-([^/]+)\.json$/)[1],text=readFileSync(p,'utf8');
@@ -279,6 +309,11 @@ async function observeItem({codex,def,input,dir,signal,shim}) {
  }
  const read=n=>existsSync(join(receipts,n))?readFileSync(join(receipts,n),'utf8').trim()||null:null;
  observed.shim={dir:shimDir,relay:read('which-relay'),tasks:read('which-tasks')};
+ if(tasks){
+  const show=id=>JSON.parse(execFileSync(shim.tasks,['-C',scratch,'show',id],{cwd:scratch,env:tasksEnv,encoding:'utf8'})).task;
+  try{observed.tasks={...collectTasks(receipts,TASKS_LABEL[def.item],show),registry:join(env.HOME,'.config','tasks','projects.toml'),scratch};}
+  catch(e){observed.tasks=null;observed.tasksError=e.message;}
+ }
  observed.jobStarted=existsSync(join(receipts,'job.started'));
  observed.innerExit=read('inner-exec.exit');
  observed.undrivable=files(dir,'.json').filter(p=>/\/undrivable-[^/]+\.json$/.test(p)).map(p=>JSON.parse(readFileSync(p,'utf8')));
