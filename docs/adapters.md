@@ -228,8 +228,19 @@ The harness ends at the first `/`; model ids may contain `/` or `:`. An empty ef
 | --- | --- | --- | --- | --- |
 | `codex` | verified | when the turn records it | rollout `turn_context` (`payload.model`, `payload.effort`) | the call's binding process (below) started after the turn's record |
 | `agy` | verified with readable ancestry and database access; sandbox limit below | when the generation carries a label with an effort; absent for subagents (probed) | conversation database `gen_metadata` | the generation that issued the call's step |
-| `claude-code` | from relay's built-in hook effects ([Claude task provenance](#claude-task-provenance)), not through `relay model` | not stamped today | SessionStart and PostModelSwitch payloads | none: the env file is session-wide (follow-up relay-d519ef) |
+| `claude-code` | from relay's built-in hook effects ([Claude task provenance](#claude-task-provenance)), not through `relay model` | not stamped (ops-586742) | SessionStart and PostModelSwitch payloads | none: the env file is session-wide (follow-up relay-d519ef) |
 | `opencode`, pi | not assessed | not assessed | none | none |
+
+### Task provenance
+
+`tasks` stamps a task's top-level `agent` (at creation) and `model` (at completion) in the [stamp grammar](#model-resolution). How each harness supplies them:
+
+| Harness | Route | Limits | Owner of the gap |
+| --- | --- | --- | --- |
+| `codex` | Stamp-time resolution inside `tasks`: when `CODEX_THREAD_ID` is set, `tasks` runs `relay model --harness codex --json` once, bounded to 2 s, and records the verified stamp. Otherwise it records bare `codex` with a `model unverified: <reason>` (or `model resolver …`) warning. Relay sets no provenance variable for Codex. Qualified natively at Codex 0.171.0 | A command typed in the TUI (`!` escape) is bound like a tool call and takes the latest turn's model; between a `/model` switch and the next turn that is the previous model. A shell that outlives its turn, and its later children, resolve `earlier-turn` and stamp bare `codex`. Another harness started from a Codex shell keeps its own stamp only when the environment carries a matching one; otherwise it is stamped with its bare harness and `other-harness`. Inside the workspace-write sandbox an orphan is adopted by the sandbox helper and resolves through [call binding](#codex) (`unbound-call` or `earlier-turn`), never `no-harness` and never a model newer than its original call's. A relay that predates `source.nearest` degrades to bare `codex` with a warning | — |
+| `claude-code` | relay's built-in hook effects ([Claude task provenance](#claude-task-provenance)) export `TASKS_AGENT`/`TASKS_MODEL` to shell commands and Claude subscriber children | Effects are advisory: a failed write leaves the previous state and adds a diagnostic, never a hook failure. The env file is session-wide, so a subagent on another model gets the parent's stamp. Effort is not stamped | relay-d519ef (per-child model), ops-586742 (effort) |
+| `agy` | none: `tasks` records whatever `TASKS_AGENT` holds, usually bare `agy` | `relay model --harness agy` resolves models but nothing stamps from it automatically | relay-486502 |
+| `opencode`, pi | none | no model resolution | relay-34289a (OpenCode) |
 
 agy model identity requires readable process ancestry and access to the conversation database. On Linux with agy 1.5.2, a `--sandbox` probe returned `verified: false`, reason `not-under-agy` (relay exit `0`); the independent observer could not open the conversation database (exit `1`). This probe did not verify sandboxed model stamps.
 
@@ -257,7 +268,7 @@ The stamp includes `@<effort>` when `turn_context.payload.effort` is a nonempty 
 
 `source.nearest` names the caller's nearest harness ancestor as relay's process classifier names it: one of `codex`, `claude-code`, `agy` or `opencode`, or `null` when there is none. Every answer that reached the ancestry check carries it, verified or not; `no-thread` answers do not. The set is closed: adding a classifier name is a change to this contract. A caller such as `tasks` uses it to tell another harness started from a Codex shell (`not-under-codex` with that harness) from a process outside every harness (`not-under-codex` with `null`).
 
-**Call binding.** A verified answer needs a binding process that started no later than the original tool call the caller descends from; a later-born descendant alone never establishes a model. Inside Codex's sandbox (Linux, Codex 0.169.0) every tool call runs under its own `codex-linux-sandbox` helper: a `codex` process that is its pid namespace's init (pid 1, parent 0 as the caller sees it) and starts just before the command. That helper adopts the namespace's orphans, so the process directly below it may have been born after the call. The binding process is therefore:
+**Call binding.** A verified answer needs a binding process that started no later than the original tool call the caller descends from; a later-born descendant alone never establishes a model. Inside Codex's sandbox (Linux; observed at Codex 0.169.0, qualified again at 0.171.0) every tool call runs under its own `codex-linux-sandbox` helper: a `codex` process that is its pid namespace's init (pid 1, parent 0 as the caller sees it) and starts just before the command. That helper adopts the namespace's orphans, so the process directly below it may have been born after the call. The binding process is therefore:
 
 - the helper itself, when the nearest `codex` ancestor is pid 1 with parent 0 and its `argv[0]` basename is `codex-linux-sandbox`;
 - otherwise the process directly below the nearest `codex` ancestor (the harness process: `codex`, `codex exec`, `codex app-server`, or the TUI's managed app-server daemon, none of which was observed to adopt orphans).
