@@ -57,6 +57,9 @@ export async function createChildSupervisor({ deadline, sessionHandle, recordDir
     if (frame.nonce === nonce && frame.type === 'admitted') admissions.set(frame.n, frame);
     for (const w of [...waiters]) w(frame);
   }, (error) => { failed ??= error; for (const w of waiters) w(null, error); waiters = []; });
+  // 'exit' can fire before the result pipe is drained, so an admission frame the supervisor wrote
+  // just before it died may still be unread when the waiters are released with null.
+  const drained = new Promise((resolve) => { if (results.destroyed) resolve(undefined); else results.once('close', () => resolve(undefined)); });
   /** Waits for the first frame accepted by match, or null when the supervisor is gone or the time is up. @param {(f: Record<string, any>) => boolean} match @param {number} until */
   const next = (match, until) => new Promise((resolve) => {
     if (gone) { resolve(null); return; }
@@ -98,6 +101,9 @@ export async function createChildSupervisor({ deadline, sessionHandle, recordDir
       writeFrame(control, { type: 'run', nonce, n: id, argv, input, timeoutMs, deadlineNs: toNs(childDeadline, clock), env: childEnv, cwd: childCwd });
       // A run that never spawned (spawn failure, expired deadline, refusal) answers without an admission.
       const frame = await resultWait;
+      if (frame === null) {
+        let timer; await Promise.race([drained, new Promise((resolve) => { timer = setTimeout(resolve, CLEANUP_MS); })]); clearTimeout(timer);
+      }
       const admitted = admissions.get(id) ?? null;
       admissions.delete(id);
       if (frame === null || frame.type === 'error') {
