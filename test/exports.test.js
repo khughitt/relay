@@ -26,3 +26,16 @@ test('root validateHandle rejects malformed handles and starts as public input e
     assert.throws(() => relay.validateHandle(value), { code: 'INVALID_INPUT' });
   }
 });
+
+test('root notice reply parser and context combiner are the ones dispatch uses', async () => {
+  const dispatchFailure = await import('../src/dispatch-failure.js');
+  assert.equal(relay.parseNoticeReply, dispatchFailure.parseNoticeReply);
+  assert.equal(relay.combineContext, dispatchFailure.combineContext);
+  assert.deepEqual(relay.parseNoticeReply('{}'), {});
+  assert.deepEqual(relay.parseNoticeReply('{"context":"hi"}'), { context: 'hi' });
+  // The guard parser's shape is not a notice reply.
+  assert.throws(() => relay.parseNoticeReply('{"decision":"allow"}'), { code: 'INVALID_REPLY' });
+  assert.throws(() => relay.parseNoticeReply(JSON.stringify({ context: 'x'.repeat(relay.CONTEXT_LIMIT + 1) })), { code: 'INVALID_REPLY' });
+  assert.deepEqual(relay.combineContext(['g'], ['n'.repeat(relay.CONTEXT_LIMIT - 2), 'dropped']).dropped, [1]);
+  assert.throws(() => relay.combineContext(['g'.repeat(relay.CONTEXT_LIMIT + 1)], []), { code: 'UNSUPPORTED_REPLY' });
+});

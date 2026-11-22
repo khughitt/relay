@@ -125,6 +125,10 @@ withLock<T>(lockPath: string, fn: () => Promise<T>, options?: ClockOptions & {
 validateHandle(value: unknown): Handle;
 parsePayload(raw: string | Buffer, nativeEvent: string): Record<string, any>;
 whoami(options?: WhoamiOptions): Promise<WhoamiResult>;
+
+// R4 named root exports (src/index.js):
+parseNoticeReply(text: string, options?: { limit?: number }): { context?: string };
+combineContext(guardContexts: string[], noticeContexts: string[], options?: { limit?: number }): { context?: string; dropped: number[] };
 ```
 
 `normalizeEvent` and `applyEvent` keep the schema-1 registry `Event`. Subscribers receive the schema-2 `HookEvent` instead: `normalizeHookEvent` decodes every event an adapter's `hookEvents` table lists, `registryEventFor` returns the registry `Event` an event publishes (or `null` for policy metadata such as `PostToolUse`) and accepts only an object `normalizeHookEvent` returned, and `projectEnvelope` builds one subscriber's stdin. `HookEvent`, `Fact`, `RegistryAccess` and `SubscriberEnvelope` are defined in [adapters.md](adapters.md#hook-events).
@@ -153,6 +157,8 @@ fields: fatal UTF-8 JSON object decoding, nonempty `session_id`, absolute `cwd`,
 matching event name when supplied, and `tool_name`/`tool_input` for `PreToolUse`.
 It shares `readNativeInput`'s 4 MiB limit (`INPUT_TOO_LARGE`) and rejects malformed
 input with `INVALID_INPUT`.
+
+`parseNoticeReply` and `combineContext` are the notice reply rules dispatch applies ([adapters.md](adapters.md#notice-protocol)), exported so a bridge that runs notices outside `relay hook` parses and combines them identically. `parseReply` is the guard parser and refuses a notice reply. `parseNoticeReply` accepts exactly `{}` (returning `{}`) or `{"context": text}` with text that is neither empty nor whitespace only and at most `limit` (default `CONTEXT_LIMIT`) characters; anything else, including invalid JSON, throws `INVALID_REPLY`. `combineContext` joins guard contexts, then notice contexts, each in the order given, with newlines under `limit` (JavaScript string length): guard contexts that together exceed it throw `UNSUPPORTED_REPLY`, and a notice context that no longer fits is skipped whole, its index into `noticeContexts` listed in `dropped`. `context` is absent when nothing was kept.
 
 `whoami()` resolves to the same schema-1 result as the CLI for `resolved`,
 `outside` and `unresolved`. Where the CLI returns `failed` and exits 1, the API

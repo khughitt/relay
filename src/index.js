@@ -7,6 +7,7 @@ export { readNativeInput, parsePayload } from './adapters/payload.js';
 export { createProcessOps } from './bus/proc.js';
 export { readSnapshot, readSnapshotFor, listAgents, applyEvent, reapRegistry } from './bus/transaction.js';
 export { CONTEXT_LIMIT, parseReply } from './adapters/reply.js';
+export { parseNoticeReply, combineContext } from './dispatch-failure.js';
 export { validateSubscribers, loadSubscribers, matchSubscribers, budgetFor, checkBudget } from './subscribers.js';
 export { dispatchHook, reconcile } from './dispatch.js';
 export { withLock } from './bus/lock.js';

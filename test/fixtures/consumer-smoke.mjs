@@ -13,7 +13,7 @@ import * as plugin from 'relay/opencode';
 import * as qualification from 'relay/qualification';
 
 const EXPORTS = ['STATES', 'paths', 'adapterFor', 'normalizeEvent', 'normalizeHookEvent', 'registryEventFor', 'projectEnvelope', 'readNativeInput', 'createProcessOps', 'readSnapshot', 'readSnapshotFor', 'listAgents',
-  'applyEvent', 'reapRegistry', 'CONTEXT_LIMIT', 'parseReply', 'validateSubscribers', 'loadSubscribers', 'matchSubscribers', 'budgetFor',
+  'applyEvent', 'reapRegistry', 'CONTEXT_LIMIT', 'parseReply', 'parseNoticeReply', 'combineContext', 'validateSubscribers', 'loadSubscribers', 'matchSubscribers', 'budgetFor',
   'checkBudget', 'dispatchHook', 'reconcile', 'withLock', 'validateHandle', 'parsePayload', 'whoami'].sort();
 assert.deepEqual(Object.keys(relay).sort(), EXPORTS);
 const packageRoot = new URL('../', import.meta.resolve('relay'));
