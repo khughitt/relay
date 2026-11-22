@@ -92,6 +92,20 @@ export const qualificationItems=[
 const result=(status,reason,extra={})=>({status,...(reason===undefined?{}:{reason}),...extra});
 const dumpOf=(o,point)=>(o.dumps??[]).find(d=>d.point===point);
 const verifiedAs=(a,model)=>a?.verified===true&&a.model===model&&a.source?.nearest==='codex';
+/** The dump of each verified item's call: its call process must start at least MARGIN_MS after its turn's record. */
+const FRESH_DUMP={1:'call',2:'late',3:'worker',5:'call',6:'inner'};
+/** A relay side that passed stays passed only when the dump shows a fresh call; its margins are kept. */
+function freshCall(def,o,relay){
+ const point=FRESH_DUMP[def.item];
+ if(point===undefined||relay.status!=='passed')return relay;
+ const d=dumpOf(o,point);
+ if(!d||!Array.isArray(d.chain)||d.chain.length===0)return result('incomplete','no-call-dump');
+ if(d.clkTck!==100)return result('incomplete','clock-ticks');
+ const {margins}=measure(d,o.contexts);
+ return margins.freshMs>=MARGIN_MS?{...relay,margins}:result('incomplete','fresh-margin-short',{margins});
+}
+/** The adopted child's row has the sandbox helper (its namespace's codex init) as its parent. */
+const adoptedBy=(child,adopter)=>child?.ppid===1&&adopter?.comm==='codex'&&adopter.isNamespaceInit===true;
 
 /** The relay side of an item: the resolver's answer and the process evidence. */
 function relaySide(def,o){
@@ -112,7 +126,8 @@ function relaySide(def,o){
   }
   case 4: {
    const d=dumpOf(o,'job');
-   if(def.variant==='sandbox-limit')return result('passed',undefined,{recorded:{answer:a.job??null,dumped:!!d,started:o.jobStarted??null}});
+   // A known limit: what happened is recorded, never judged.
+   if(def.variant==='sandbox-limit')return result('recorded',undefined,{recorded:{answer:a.job??null,dumped:!!d,started:o.jobStarted??null,tasks:o.tasks??null}});
    if(!d||!Array.isArray(d.chain)||d.chain.some(r=>r.comm==='codex'))return result('incomplete','reparenting-unconfirmed');
    if(!a.job)return result('incomplete','no-answer');
    return a.job.verified===false&&a.job.source?.nearest===null?result('passed'):result('failed',a.job.verified?'verified-reparented':`nearest-${a.job.source?.nearest}`);
@@ -133,12 +148,15 @@ function relaySide(def,o){
   case 8: return a.escape?result('passed',undefined,{recorded:{verified:a.escape.verified,reason:a.escape.reason,model:a.escape.model,nearest:a.escape.source?.nearest??null}}):result('incomplete','no-answer');
   case 9: {
    if(a.late?.verified)return result('failed','verified-newer-model');
-   const d=dumpOf(o,'late');
+   // The adopted child dumps itself after its relay call (`late`), and a child it forks dumps the
+   // ancestry before the call (`late-before`): adoption must hold on both sides of the call.
+   const d=dumpOf(o,'late'),pre=dumpOf(o,'late-before');
    if(!d)return result('unsupported','adopted-child-not-observed');
-   const adopter=d.chain?.[1];
-   if(d.ppid!==1||adopter?.comm!=='codex'||!adopter.isNamespaceInit)return result('unsupported','no-adoption-evidence');
+   if(!adoptedBy(d,d.chain?.[1]))return result('unsupported','no-adoption-evidence');
    if(!a.late)return result('incomplete','no-answer');
    if(a.late.source?.nearest!=='codex')return result('unsupported',`nearest-${a.late.source?.nearest}`);
+   if(!pre)return result('incomplete','no-pre-call-dump');
+   if(pre.chain?.[1]?.pid!==d.pid||!adoptedBy(pre.chain[1],pre.chain[2]))return result('unsupported','no-adoption-evidence-before-call');
    if(!['earlier-turn','unbound-call'].includes(a.late.reason))return result('failed',`unverified-${a.late.reason}`);
    const lag=startInterval(d,d.uptime).lo-(o.contexts.filter(c=>c.at<=d.uptime.wallBeforeMs).at(-1)?.at??Infinity);
    return lag>=MARGIN_MS?result('passed',undefined,{margins:{childLagMs:lag}}):result('incomplete','child-lag-margin-short',{margins:{childLagMs:lag}});
@@ -150,7 +168,6 @@ function relaySide(def,o){
 function tasksSide(def,t){
  const add=t.add??{},done=t.done??{},warned=re=>(add.warnings??[]).some(w=>re.test(w));
  const bare=add.agent==='codex'&&!done.model;
- if(def.variant==='sandbox-limit')return result('passed',undefined,{recorded:t});
  if(!t.add)return result('incomplete','tasks-not-run');
  switch(def.item){
   case 1: return add.agent==='codex'&&(add.warnings??[]).length>0?result('passed'):result('failed','base-relay-not-degraded');
@@ -161,19 +178,22 @@ function tasksSide(def,t){
   default: return result('incomplete','no-tasks-judge');
  }
 }
-/** @returns {{status:'passed'|'failed'|'unsupported'|'incomplete',reason?:string,relaySide?:string}} */
+/** `recorded` is a known limit's outcome: settled, but neither a pass nor a failure.
+ * @returns {{status:'passed'|'failed'|'unsupported'|'incomplete'|'recorded',reason?:string,relaySide?:string}} */
 export function judgeItem(def,o){
  if(!o?.complete)return result('incomplete','driver-incomplete');
  if(o.cleanup?.survivors?.length!==0)return result('incomplete','survivors');
  if(!o.contexts?.length)return result('incomplete','no-turn-context');
  if(o.contexts.some(c=>(c.fileSystem==='restricted')!==def.sandboxed))return result('incomplete','sandbox-mismatch');
- const relay=relaySide(def,o);
+ // Every item's answer must come from the case's fixture relay; tasks items also need its tasks.
+ const shim=o.shim,inShim=p=>typeof p==='string'&&typeof shim?.dir==='string'&&p.startsWith(shim.dir+'/');
+ if(!inShim(shim?.relay))return result('incomplete','no-fixture-shim');
+ const relay=freshCall(def,o,relaySide(def,o));
  if(relay.status!=='passed'||!def.tasks)return relay;
  // The relay side's evidence (margins, recorded values) stays on every tasks outcome.
  const {status:_s,reason:_r,...evidence}=relay,carry={relaySide:'passed',...evidence};
  if(!o.tasks)return {...result('incomplete','tasks-pending'),...carry};
- const shim=o.shim,inShim=p=>typeof p==='string'&&typeof shim?.dir==='string'&&p.startsWith(shim.dir+'/');
- if(!inShim(shim?.relay)||!inShim(shim?.tasks))return {...result('incomplete','no-fixture-shim'),...carry};
+ if(!inShim(shim?.tasks))return {...result('incomplete','no-fixture-shim'),...carry};
  const t=tasksSide(def,o.tasks);
  return {...t,...carry,...(t.recorded?{recorded:t.recorded}:{})};
 }

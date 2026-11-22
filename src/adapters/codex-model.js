@@ -1,6 +1,6 @@
 // @ts-check
 // Which model a Codex tool call's turn runs, read from the thread's own rollout.
-// See docs/adapters.md ("Codex model resolution", steps 1-10).
+// See docs/adapters.md ("Model resolution", "Codex").
 import { relayError } from '../protocol.js';
 import { verified, unverified } from '../model-identity.js';
 import { createProcessOps } from '../bus/proc.js';
@@ -12,7 +12,8 @@ export const CLOCK_ALLOWANCE_MS = 1000;
 
 /** @typedef {Pick<import("../types.js").ProcessOps, 'ancestors'|'recordOf'|'executableOf'|'argvOf'|'startedAtMs'>} ModelOps */
 
-/** Step 9: where a call process's start interval falls against the turn's record.
+/** Where a call process's start interval falls against the turn's record (docs/adapters.md,
+ * "Codex", the `earlier-turn` and `turn-boundary` reasons and "Clock requirement").
  * @param {{lo: number, hi: number}} start @param {number} at @returns {'verified'|'earlier-turn'|'turn-boundary'} */
 export function bindTurn({ lo, hi }, at) {
   if (lo - CLOCK_ALLOWANCE_MS >= at) return 'verified';
@@ -29,7 +30,7 @@ export function chainWithInit(ops, startPid) {
   return chain;
 }
 
-/** Step 5: the process whose start orders the call against the turn (docs/adapters.md, "Call
+/** The process whose start orders the call against the turn (docs/adapters.md, "Call
  * binding"). Inside the sandbox the nearest `codex` is Codex's per-call `codex-linux-sandbox`
  * helper, its pid namespace's init: it adopts orphans, so the row below it may be born later than
  * the call, and the helper's own start binds instead. A namespace-init `codex` that is not that

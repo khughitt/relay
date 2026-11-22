@@ -103,3 +103,37 @@ test('a failed provenance write is an advisory diagnostic and subscribers still 
   const env = await childEnv(w.seen('o'));
   assert.deepEqual([env.TASKS_AGENT, env.TASKS_MODEL], ['claude-code/new', 'new']);
 });
+
+test('provenance runs only for claude-code events', async (t) => {
+  const p = await tempPaths(t), w = world(t);
+  await writeSubscribers(p, [sub('g', 'guard', ['before-tool'], w.seen('g'))]);
+  let calls = 0;
+  const provenance = async () => { calls++; throw new Error('provenance must not run'); };
+  const raw = JSON.stringify({ session_id: 'sess', cwd: w.cwd, tool_name: 'Bash', tool_input: { command: 'echo hi' } });
+  const r = await dispatchHook({ harness: 'codex', nativeEvent: 'PreToolUse', input: Readable.from([Buffer.from(raw)]) }, { paths: p, applyOptions: local, env: w.env, invokingCwd: w.cwd, provenance });
+  assert.deepEqual([r.exitCode, r.stderr, calls], [0, '', 0]);
+});
+
+test('an unexpected provenance error is labelled apart from the deadline', async (t) => {
+  const p = await tempPaths(t), w = world(t);
+  await writeSubscribers(p, [sub('g', 'guard', ['before-tool'], w.seen('g'))]);
+  const raw = JSON.stringify({ session_id: 'sess', cwd: w.cwd, tool_name: 'Bash', tool_input: { command: 'echo hi' } });
+  const provenance = async () => { throw new TypeError('bug'); };
+  const r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'PreToolUse', input: Readable.from([Buffer.from(raw)]) }, { paths: p, applyOptions: local, env: w.env, invokingCwd: w.cwd, provenance });
+  assert.deepEqual([r.exitCode, r.stderr], [0, 'PROVENANCE_WRITE_FAILED: PreToolUse unexpected\n']);
+  const env = await childEnv(w.seen('g'));
+  assert.deepEqual([env.TASKS_AGENT, env.TASKS_MODEL], ['claude-code', '']);
+});
+
+test('a hung provenance write ends at its own budget and leaves the rest of the deadline to subscribers', async (t) => {
+  const p = await tempPaths(t), w = world(t);
+  await writeSubscribers(p, [sub('g', 'guard', ['before-tool'], w.seen('g'))]);
+  const raw = JSON.stringify({ session_id: 'sess', cwd: w.cwd, tool_name: 'Bash', tool_input: { command: 'echo hi' } });
+  const provenance = () => new Promise(() => {});
+  const began = performance.now();
+  const r = await dispatchHook({ harness: 'claude-code', nativeEvent: 'PreToolUse', input: Readable.from([Buffer.from(raw)]), outerMs: 30000 }, { paths: p, applyOptions: local, env: w.env, invokingCwd: w.cwd, provenance });
+  assert.deepEqual([r.exitCode, r.stderr], [0, 'PROVENANCE_WRITE_FAILED: PreToolUse deadline\n']);
+  assert.ok(performance.now() - began < 10000, 'provenance did not consume the whole work deadline');
+  const env = await childEnv(w.seen('g'));
+  assert.deepEqual([env.TASKS_AGENT, env.TASKS_MODEL], ['claude-code', '']);
+});

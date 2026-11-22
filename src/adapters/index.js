@@ -19,7 +19,7 @@ export function hookEventOf(adapter, nativeEvent) {
   return adapter.hookEvents[nativeEvent];
 }
 // The nearest process any adapter recognises, skipping index zero (the caller itself).
-// See docs/adapters.md ("Codex model resolution", step 3).
+// See docs/adapters.md ("Model resolution", "Codex", `source.nearest`).
 /** @param {import("../types.js").ProcessRow[]} chain @param {{executableOf: (pid: number) => string}} ops @returns {{harness: string, index: number}|null} */
 export function nearestHarness(chain, ops) {
   for (let index = 1; index < chain.length; index++) {

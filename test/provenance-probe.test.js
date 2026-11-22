@@ -34,6 +34,7 @@ test('resume refuses any changed evidence identity and never erases a failed att
   await writeFile(join(dir,'receipt.json'),JSON.stringify({identity,id:'one',status:'failed'}));
   assert.deepEqual(probe.receiptSelection([{identity,id:'one',status:'passed'}],identity,['one','two']),['two']);
   assert.deepEqual(probe.receiptSelection([{identity,id:'one',status:'observed'},{identity,id:'two',status:'incomplete'}],identity,['one','two']),['two']);
+  assert.deepEqual(probe.receiptSelection([{identity,id:'one',status:'recorded'}],identity,['one','two']),['two']);
   assert.throws(()=>probe.receiptSelection([{identity,id:'one',status:'failed'}],identity,['one']),/failed-attempt/);
   for(const key of Object.keys(identity))assert.throws(()=>probe.receiptSelection([{identity,id:'one',status:'passed'}],{...identity,[key]:'changed'},['one']),/identity/);
 });
@@ -152,6 +153,8 @@ const unverifiedAnswer=(reason,nearest)=>({verified:false,agent:'codex',harness:
 const helperChain=(ppid=1)=>[{pid:9,ppid,start:3000,comm:'python3',exe:'/usr/bin/python3',argv:['python3'],pidNamespace:'pid:[1]',isNamespaceInit:false},{pid:1,ppid:0,start:1000,comm:'codex',exe:'/codex',argv:['codex-linux-sandbox'],pidNamespace:'pid:[1]',isNamespaceInit:true}];
 const itemObs=(over={})=>({complete:true,cleanup:{survivors:[]},contexts:[{at:turnAt,model:'mock-model',fileSystem:'restricted'},{at:turnAt+10000,model:'model-b',fileSystem:'restricted'}],answers:{},dumps:[],shim:{dir:SHIM,relay:`${SHIM}/relay`,tasks:`${SHIM}/tasks`},tasks:null,...over});
 const item=id=>cases.qualificationItems.find(x=>x.id===id);
+/** A dump whose call (the row below the sandbox helper) started `marginMs` after the turn at `turn`. */
+const callDump=(point,step,marginMs=2000,turn=turnAt)=>{const wall=turn+marginMs+100;return {...helperChain()[0],point,step,chain:helperChain(),clkTck:100,uptime:{wallBeforeMs:wall,uptimeText:'30.10 0.00',wallAfterMs:wall}};};
 
 test('qualification items cover the spec items 1-9',()=>{
   assert.deepEqual([...new Set(cases.qualificationItems.map(x=>x.item))].sort(),[1,2,3,4,5,6,7,8,9]);
@@ -161,7 +164,7 @@ test('qualification items cover the spec items 1-9',()=>{
 
 test('item 1 passes only on a verified answer with the session model and nearest codex',()=>{
   const d=item('item-1-app-server');
-  assert.equal(cases.judgeItem(d,itemObs({answers:{call:verifiedAnswer('mock-model')}})).status,'passed');
+  assert.equal(cases.judgeItem(d,itemObs({answers:{call:verifiedAnswer('mock-model')},dumps:[callDump('call',1)]})).status,'passed');
   assert.equal(cases.judgeItem(d,itemObs({answers:{call:unverifiedAnswer('earlier-turn','codex')}})).status,'failed');
   assert.equal(cases.judgeItem(d,itemObs({answers:{call:verifiedAnswer('mock-model','t','claude-code')}})).status,'failed');
   assert.equal(cases.judgeItem(d,itemObs()).status,'incomplete');
@@ -195,17 +198,17 @@ test('item 9 without adoption evidence is unsupported',()=>{
 test('a tasks case without the fixture shim is incomplete',()=>{
   const tasks={add:{agent:'codex/mock-model@low',warnings:[]},done:{model:'mock-model',warnings:[]}};
   const d=item('item-5');
-  assert.equal(cases.judgeItem(d,itemObs({tasks})).status,'passed');
+  assert.equal(cases.judgeItem(d,itemObs({tasks,dumps:[callDump('call',1)]})).status,'passed');
   for(const shim of [{dir:SHIM,relay:`${SHIM}/relay`,tasks:'/usr/bin/tasks'},{dir:SHIM,relay:'/usr/bin/relay',tasks:`${SHIM}/tasks`},null])
     assert.equal(cases.judgeItem(d,itemObs({tasks,shim})).status,'incomplete',JSON.stringify(shim));
-  assert.equal(cases.judgeItem(d,itemObs({tasks:{...tasks,add:{agent:'codex',warnings:['model unverified: earlier-turn']}}})).status,'failed');
+  assert.equal(cases.judgeItem(d,itemObs({tasks:{...tasks,add:{agent:'codex',warnings:['model unverified: earlier-turn']}},dumps:[callDump('call',1)]})).status,'failed');
 });
 
 test('a tasks case whose tasks add never ran is incomplete',()=>{
-  const r=cases.judgeItem(item('item-5'),itemObs({tasks:{add:null,done:null}}));
+  const r=cases.judgeItem(item('item-5'),itemObs({tasks:{add:null,done:null},dumps:[callDump('call',1)]}));
   assert.deepEqual([r.status,r.reason],['incomplete','tasks-not-run']);
   const limit=cases.judgeItem(item('item-4-sandboxed'),itemObs({contexts:[{at:turnAt,model:'mock-model',fileSystem:'restricted'}],answers:{},tasks:{add:null,done:null}}));
-  assert.equal(limit.status,'passed');assert.deepEqual(limit.recorded.add,null);
+  assert.equal(limit.status,'recorded');assert.deepEqual(limit.recorded.tasks.add,null);
 });
 
 test('tasks cases run tasks add and done at the relay call, other items never do',()=>{
@@ -239,15 +242,15 @@ test('collectTasks reads the add and done receipts and the written record',async
 test('item 3 without a worker is unsupported and a parent model fails',()=>{
   const d=item('item-3');
   assert.equal(cases.judgeItem(d,itemObs({answers:{call:verifiedAnswer('mock-model')},undrivable:[{step:'worker',undrivable:'no-worker'}]})).status,'unsupported');
-  assert.equal(cases.judgeItem(d,itemObs({answers:{worker:verifiedAnswer(cases.WORKER_MODEL,'t-worker')}})).status,'passed');
+  assert.equal(cases.judgeItem(d,itemObs({answers:{worker:verifiedAnswer(cases.WORKER_MODEL,'t-worker')},dumps:[callDump('worker',1)]})).status,'passed');
   assert.equal(cases.judgeItem(d,itemObs({answers:{worker:verifiedAnswer('mock-model','t-worker')}})).status,'failed');
   assert.equal(cases.judgeItem(d,itemObs({answers:{worker:verifiedAnswer(cases.WORKER_MODEL,'t-parent')},parentThread:'t-parent'})).status,'failed');
 });
 
 test('items 2 and 6 verify the switched and inner models; item 8 is recorded',()=>{
-  assert.equal(cases.judgeItem(item('item-2'),itemObs({answers:{late:verifiedAnswer('model-b')}})).status,'passed');
+  assert.equal(cases.judgeItem(item('item-2'),itemObs({answers:{late:verifiedAnswer('model-b')},dumps:[callDump('late',2,2000,turnAt+10000)]})).status,'passed');
   assert.equal(cases.judgeItem(item('item-2'),itemObs({answers:{late:verifiedAnswer('mock-model')}})).status,'failed');
-  const inner=itemObs({answers:{inner:verifiedAnswer('inner-model','t-inner')},parentThread:'t-parent',contexts:[{at:turnAt,model:'mock-model',fileSystem:null}]});
+  const inner=itemObs({answers:{inner:verifiedAnswer('inner-model','t-inner')},parentThread:'t-parent',contexts:[{at:turnAt,model:'mock-model',fileSystem:null}],dumps:[callDump('inner',1)]});
   assert.equal(cases.judgeItem(item('item-6'),inner).status,'passed');
   assert.equal(cases.judgeItem(item('item-6'),{...inner,answers:{inner:verifiedAnswer('inner-model','t-parent')}}).status,'failed');
   const escape=cases.judgeItem(item('item-8'),itemObs({answers:{escape:unverifiedAnswer('earlier-turn','codex')}}));
@@ -267,4 +270,50 @@ test('a code-mode worker gets its shell step through the custom exec tool',async
   await send({tools:[],input:[tools,user('Run worker probe step 1.'),{type:'custom_tool_call_output',call_id:'probe-call-worker1',output:'Script completed'}]});
   assert.equal(await readFile(join(dir,'turn-done'),'utf8'),'done');
   assert.deepEqual(p.requests[0].additionalTools,[{name:'exec',type:'custom',namespace:'functions'}]);
+});
+
+test('every qualification item needs the fixture relay, tasks items also the fixture tasks',()=>{
+  const outside={dir:SHIM,relay:'/usr/bin/relay',tasks:`${SHIM}/tasks`};
+  const r=cases.judgeItem(item('item-1-app-server'),itemObs({answers:{call:verifiedAnswer('mock-model')},dumps:[callDump('call',1)],shim:outside}));
+  assert.deepEqual([r.status,r.reason],['incomplete','no-fixture-shim']);
+  assert.equal(cases.judgeItem(item('item-1-app-server'),itemObs({answers:{call:verifiedAnswer('mock-model')},dumps:[callDump('call',1)],shim:null})).status,'incomplete');
+});
+
+test('items 1, 2, 3, 5 and 6 need a call that started at least the margin after its turn',()=>{
+  const verified={1:['call',1,'mock-model'],2:['late',2,'model-b'],3:['worker',1,cases.WORKER_MODEL],5:['call',1,'mock-model'],6:['inner',1,'inner-model']};
+  const tasks={add:{agent:'codex/mock-model@low',warnings:[]},done:{model:'mock-model',warnings:[]}};
+  for(const def of cases.qualificationItems.filter(d=>[1,2,3,5,6].includes(d.item))){
+    const [point,step,model]=verified[def.item],label=def.item===2?'late':point,turn=def.item===2?turnAt+10000:turnAt;
+    const thread=def.item===3?'t-worker':def.item===6?'t-inner':'t-parent';
+    const fileSystem=def.sandboxed?'restricted':null,contexts=[{at:turnAt,model:'mock-model',fileSystem},{at:turnAt+10000,model:'model-b',fileSystem}];
+    const obs=dumps=>itemObs({answers:{[label]:verifiedAnswer(model,thread)},parentThread:'t-parent',contexts,dumps,tasks:def.id==='item-1-base-relay'?{add:{agent:'codex',warnings:['model unverified: no-harness']},done:{}}:tasks});
+    const ok=cases.judgeItem(def,obs([callDump(point,step,2000,turn)]));
+    assert.equal(ok.status,'passed',def.id);assert.ok(ok.margins.freshMs>=cases.MARGIN_MS,def.id);
+    const short=cases.judgeItem(def,obs([callDump(point,step,1000,turn)]));
+    assert.deepEqual([short.status,short.reason],['incomplete','fresh-margin-short'],def.id);
+    assert.deepEqual([cases.judgeItem(def,obs([])).status,cases.judgeItem(def,obs([])).reason],['incomplete','no-call-dump'],def.id);
+  }
+});
+
+test('item 9 dumps the adopted child before and after its relay call',()=>{
+  const s=JSON.stringify(probe.itemPlan(item('item-9'),{project:'/case/project',codexBin:'/codex',tasks:false}).lanes);
+  const before=s.indexOf(' late-before 2;'),call=s.indexOf('answer-late.json'),after=s.indexOf(' late 2 )');
+  assert.ok(before>=0&&call>before&&after>call,s);
+});
+
+test('item 9 passes only with adoption shown before and after the call',()=>{
+  const d=item('item-9'),answers={late:unverifiedAnswer('earlier-turn','codex')};
+  const wall=turnAt+10000+2200,uptime={wallBeforeMs:wall,uptimeText:'30.10 0.00',wallAfterMs:wall};
+  const child={pid:9,ppid:1,start:3000,comm:'sh',isNamespaceInit:false},helper={pid:1,ppid:0,start:1000,comm:'codex',isNamespaceInit:true};
+  const after={point:'late',step:2,...child,chain:[child,helper],clkTck:100,uptime};
+  const pre=(parent)=>({point:'late-before',step:2,pid:12,ppid:9,chain:[{pid:12,ppid:9,start:3100,comm:'python3'},parent,helper],clkTck:100,uptime});
+  const tasks={add:{agent:'codex',warnings:['model unverified: earlier-turn']},done:{}};
+  const ok=cases.judgeItem(d,itemObs({answers,dumps:[pre(child),after],tasks}));
+  assert.equal(ok.status,'passed',JSON.stringify(ok));
+  const missing=cases.judgeItem(d,itemObs({answers,dumps:[after],tasks}));
+  assert.deepEqual([missing.status,missing.reason],['incomplete','no-pre-call-dump']);
+  const notYet=cases.judgeItem(d,itemObs({answers,dumps:[pre({...child,ppid:5}),after],tasks}));
+  assert.deepEqual([notYet.status,notYet.reason],['unsupported','no-adoption-evidence-before-call']);
+  const other=cases.judgeItem(d,itemObs({answers,dumps:[pre({...child,pid:10}),after],tasks}));
+  assert.deepEqual([other.status,other.reason],['unsupported','no-adoption-evidence-before-call']);
 });

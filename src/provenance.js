@@ -11,6 +11,9 @@ import { randomUUID } from 'node:crypto';
 import { verified } from './model-identity.js';
 
 export const STATE_FILE = 'tasks-model';
+/** relay hook gives these effects at most this long (within its work deadline), so a hung write
+ * cannot starve notices, registry publication or observers. */
+export const PROVENANCE_MS = 500;
 const HARNESS = 'claude-code';
 const BARE = Object.freeze({ TASKS_AGENT: HARNESS, TASKS_MODEL: '' });
 const READER_DIAGNOSTIC = 'relay: tasks-model state is unreadable or invalid; model cleared';
@@ -62,6 +65,21 @@ async function writeState(dir, model, io) {
   catch (error) { await io.unlink(temp).catch(() => {}); return `state-replace ${codeOf(error)}`; }
 }
 
+/** Whether `path` is a nonempty file whose last byte is not a newline, so an appended stanza
+ * would join its last line. An absent file needs none.
+ * @param {string} path @param {typeof fsp} io */
+async function lacksFinalNewline(path, io) {
+  let handle;
+  try { handle = await io.open(path, 'r'); }
+  catch (error) { if (codeOf(error) === 'ENOENT') return false; throw error; }
+  try {
+    const { size } = await handle.stat();
+    if (size === 0) return false;
+    const { buffer } = await handle.read(Buffer.alloc(1), 0, 1, size - 1);
+    return buffer[0] !== 0x0a;
+  } finally { await handle.close(); }
+}
+
 /**
  * @param {{event: import('./types.js').HookEvent, env: NodeJS.ProcessEnv}} input
  * @param {{io?: typeof fsp}} [options]
@@ -89,7 +107,10 @@ export async function prepareClaudeProvenance({ event, env }, { io = fsp } = {})
     record(await writeState(scratch.value, model, io));
     exports = readerExports(join(scratch.value, STATE_FILE));
   } else if (scratch?.status === 'invalid') diagnostics.push(`PROVENANCE_INVALID_PATH: ${nativeEvent} scratchpad`);
-  try { await io.appendFile(envFile, exports.map((line) => `${line}\n`).join(''), { mode: 0o600 }); }
+  try {
+    const lead = await lacksFinalNewline(envFile, io) ? '\n' : '';
+    await io.appendFile(envFile, lead + exports.map((line) => `${line}\n`).join(''), { mode: 0o600 });
+  }
   catch (error) { record(`env-append ${codeOf(error)}`); }
   return { values: valuesFor(model), diagnostics };
 }

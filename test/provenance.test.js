@@ -64,6 +64,21 @@ test('startup appends one stanza and preserves existing env-file content', async
   assert.equal(sourced(w).model, 'm');
 });
 
+test('startup starts its stanza on a new line when the env file lacks a final newline', async (t) => {
+  const w = world(t);
+  writeFileSync(w.envFile, 'export OTHER=1');
+  await prepare(claude('SessionStart', { model: 'm', scratchpad_dir: w.scratch }), { CLAUDE_ENV_FILE: w.envFile });
+  const text = readFileSync(w.envFile, 'utf8');
+  assert.ok(text.startsWith('export OTHER=1\nTASKS_MODEL=;'), text);
+  assert.equal(sourced(w).model, 'm');
+  // A terminated or empty file gets no blank line.
+  for (const before of ['', 'export OTHER=1\n']) {
+    writeFileSync(w.envFile, before);
+    await prepare(claude('SessionStart', { model: 'm', scratchpad_dir: w.scratch }), { CLAUDE_ENV_FILE: w.envFile });
+    assert.ok(readFileSync(w.envFile, 'utf8').startsWith(`${before}TASKS_MODEL=;`), JSON.stringify(before));
+  }
+});
+
 test('a model switch updates the state and the next command follows, without touching the env file', async (t) => {
   const w = world(t);
   await prepare(claude('SessionStart', { model: 'a', scratchpad_dir: w.scratch }), { CLAUDE_ENV_FILE: w.envFile });

@@ -12,7 +12,7 @@ import { loadSubscribers, loadSubscribersFrom, matchSubscribers, checkBudget, bu
 import { CLEANUP_MS, SUPERVISOR_STARTUP_MS as STARTUP_MS } from './child.js';
 import { discoverBoundaries, resolveExecutable, DISCOVERY_MS } from './executable.js';
 import { createProcessOps } from './bus/proc.js';
-import { prepareClaudeProvenance } from './provenance.js';
+import { prepareClaudeProvenance, PROVENANCE_MS } from './provenance.js';
 import { join } from 'node:path';
 import * as fs from 'node:fs/promises';
 
@@ -188,7 +188,7 @@ async function runNotices(notices, event, { clock, workDeadline, launch, since }
 }
 
 /** @typedef {(argv: string[], input: string, options: any) => Promise<import("./types.js").ChildResult>} Runner */
-/** @typedef {{clock?: () => number, loadConfig?: typeof loadSubscribers, loadConfigFrom?: typeof loadSubscribersFrom, run?: Runner, supervise?: Supervise, apply?: typeof applyEvent, readInput?: typeof readNativeInput, applyOptions?: import("./types.js").RegistryOptions, paths?: import("./types.js").Paths, env?: NodeJS.ProcessEnv, invokingCwd?: string, launched?: import('node:child_process').ChildProcess|null}} DispatchDeps */
+/** @typedef {{clock?: () => number, loadConfig?: typeof loadSubscribers, loadConfigFrom?: typeof loadSubscribersFrom, run?: Runner, supervise?: Supervise, apply?: typeof applyEvent, readInput?: typeof readNativeInput, applyOptions?: import("./types.js").RegistryOptions, paths?: import("./types.js").Paths, env?: NodeJS.ProcessEnv, invokingCwd?: string, provenance?: typeof prepareClaudeProvenance, launched?: import('node:child_process').ChildProcess|null}} DispatchDeps */
 /** @typedef {{harness: string, nativeEvent: string, input: import("node:stream").Readable, outerMs?: number, subscribersPath?: string|null}} DispatchRequest */
 // A supervisor started early by `relay hook` (deps.launched) is adopted by the first subscriber, or
 // released unused before the reply.
@@ -271,16 +271,21 @@ async function dispatchOnce({ harness, nativeEvent, input, outerMs, subscribersP
     notices = matching.filter((subscriber) => subscriber.role === 'notice');
     observers = matching.filter((subscriber) => subscriber.role === 'observer');
   } catch (caught) { return fail(/** @type {import('./types.js').Failure} */ (caught)); }
-  // Built-in Claude provenance runs before any subscriber and independently of publication; its
-  // failures are advisory diagnostics. Subscriber children receive the same two variables.
+  // Built-in Claude provenance runs before any subscriber and independently of publication, within
+  // its own slice of the work deadline so a hung write cannot hold the rest; its failures are
+  // advisory diagnostics. Subscriber children of Claude events receive the same two variables.
   let launchEnv = childEnv;
-  try {
-    const provenance = await bounded(() => prepareClaudeProvenance({ event, env: childEnv }), { clock, deadline: workDeadline }, 'provenance effects did not finish before the deadline');
-    diagnostics.push(...provenance.diagnostics);
-    if (provenance.values !== null) launchEnv = { ...childEnv, ...provenance.values };
-  } catch {
-    diagnostics.push(`PROVENANCE_WRITE_FAILED: ${nativeEvent} deadline`);
-    if (harness === 'claude-code') launchEnv = { ...childEnv, TASKS_AGENT: 'claude-code', TASKS_MODEL: '' };
+  if (harness === 'claude-code') {
+    const prepare = deps.provenance ?? prepareClaudeProvenance;
+    try {
+      const provenance = await bounded(() => prepare({ event, env: childEnv }), { clock, deadline: Math.min(workDeadline, clock() + PROVENANCE_MS) }, 'provenance effects did not finish within their budget');
+      diagnostics.push(...provenance.diagnostics);
+      if (provenance.values !== null) launchEnv = { ...childEnv, ...provenance.values };
+    } catch (caught) {
+      const timedOut = /** @type {{code?: unknown}} */ (caught)?.code === 'DEADLINE_EXCEEDED';
+      diagnostics.push(`PROVENANCE_WRITE_FAILED: ${nativeEvent} ${timedOut ? 'deadline' : 'unexpected'}`);
+      launchEnv = { ...childEnv, TASKS_AGENT: 'claude-code', TASKS_MODEL: '' };
+    }
   }
   // The native session is optional evidence: without it, parent-pipe loss and the absolute
   // deadline still bound subscriber lifetime, so its absence never refuses admission.

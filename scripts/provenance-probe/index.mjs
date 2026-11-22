@@ -24,7 +24,7 @@ export function receiptSelection(receipts,identity,ids) {
   if(JSON.stringify(r.identity)!==JSON.stringify(identity))fail('receipt-identity-mismatch');
   if(r.status==='failed')fail('failed-attempt-requires-disposition');
  }
- return ids.filter(id=>!receipts.some(r=>r.id===id&&['passed','observed','unsupported'].includes(r.status)));
+ return ids.filter(id=>!receipts.some(r=>r.id===id&&['passed','observed','unsupported','recorded'].includes(r.status)));
 }
 function toml(object,prefix=[]) {
  let text=prefix.length?'['+prefix.map(x=>JSON.stringify(x)).join('.')+']\n':'';
@@ -236,7 +236,7 @@ export function itemPlan(def,{project,codexBin,tasks=false}) {
  const exit=label=>join(r,tasks&&def.tasks?`tasks-done-${label}.exit`:`answer-${label}.exit`);
  const write={tool:'write_stdin',args:session=>({session_id:Number(session),chars:'\n',yield_time_ms:5000,max_output_tokens:2000})};
  const tty=cmd=>({tool:'exec_command',args:{cmd,tty:true,yield_time_ms:1000,max_output_tokens:2000}});
- const late9=tty(`${which}; /bin/sh -c ${quote(`read -r go; ( sleep 1; ${relay('late')}; exec ${dump('late',2)} ) </dev/null >/dev/null 2>&1 & exit 0`)}; sleep 30`);
+ const late9=tty(`${which}; /bin/sh -c ${quote(`read -r go; ( sleep 1; ${dump('late-before',2)}; ${relay('late')}; exec ${dump('late',2)} ) </dev/null >/dev/null 2>&1 & exit 0`)}; sleep 30`);
  switch(def.item){
   case 1: return {turns:[{}],final:'1',lanes:{1:`${which}; ${dump('call',1)}; ${relay('call')}`}};
   case 2: return {turns:[{},{model:cases.SWITCHED_MODEL}],final:'2',lanes:{1:`${which}; ${relay('early')}`,2:`${dump('late',2)}; ${relay('late')}`}};
@@ -250,7 +250,8 @@ export function itemPlan(def,{project,codexBin,tasks=false}) {
   case 7: return {turns:[{},{}],final:'2',waitFor:[exit('late')],waitMs:20000,lanes:{1:tty(`${which}; read -r line; ${dump('late',2)}; ${relay('late')}`),2:write}};
   case 8: return {turns:[{}],final:'1',lanes:{1:`${which}; ${dump('call',1)}`},tuiInputs:[{afterMs:15000,text:`!${dump('escape',1)}; ${relay('escape')}`}],tuiDone:exit('escape')};
   // The nested turn-A shell exits after forking, so its child is adopted by the sandbox's pid 1
-  // while the top-level shell (the helper's direct child) keeps the namespace alive.
+  // while the top-level shell (the helper's direct child) keeps the namespace alive. The child
+  // dumps a forked process's ancestry before its relay call and its own after it.
   case 9: return def.driver==='tui'
    ?{turns:[{},{}],final:'2',lanes:{1:late9,2:write},tuiInputs:[{afterMs:15000,text:'Run probe step 2.'}],tuiDone:join(r,'late-2.done')}
    :{turns:[{},{model:cases.SWITCHED_MODEL}],final:'2',waitFor:[join(r,'late-2.done')],waitMs:15000,lanes:{1:late9,2:write}};
@@ -356,7 +357,7 @@ export async function runProvenanceProbe({codex,expected,codeRoot,out,policy,cas
    if(observation){result.cleanup.ownedPids.push(...observation.cleanup.ownedPids);result.cleanup.survivors.push(...observation.cleanup.survivors);}
    if(observation?.cleanup.survivors.length){result.status='incomplete';result.reason='survivors';return result;}
   }
-  const settled=mode==='qualify'?['passed','failed','unsupported']:['observed'];
+  const settled=mode==='qualify'?['passed','failed','unsupported','recorded']:['observed'];
   result.status=pending.length<=6&&result.cases.every(x=>settled.includes(x.status))?(mode==='qualify'?'settled':'observed'):'incomplete';
  }catch(e){result.reason=e.message;}
  finally{clearTimeout(outer);signal?.removeEventListener('abort',abort);}
