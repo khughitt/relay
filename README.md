@@ -72,7 +72,7 @@ Shipped in the package tarball:
 
 Contributor and developer guides in the repository (not shipped in the npm tarball):
 
-- `docs/test-execution-policy.md` — Local `.tt.toml` policy (`automatic_broad = false`), focused checks, and hosted CI verification.
+- `docs/test-execution-policy.md` — Project-stage defaults, focused checks, and hosted CI verification.
 - `docs/runbooks/hook-install-rollback.md` — Hook installation, rollback, schema-2 activation, and Codex worker row rollout.
 - `docs/runbooks/hook-qualification.md` — Route qualification runner, latency judge, and per-host evidence procedure.
 - `docs/runbooks/answer-route-probes.md` — Claude Code answer-route capability probes and Codex lifecycle probes.
@@ -86,7 +86,7 @@ MIT — see [LICENSE](LICENSE).
 
 ## Development checks
 
-Routine broad local checks are disabled by `.tt.toml` (`automatic_broad = false`) after [accepted hosted Node 22/26 verification](https://github.com/khughitt/relay/actions/runs/41063297144). Run focused tests and mandatory hygiene while working, and force the full gate when required:
+Relay's registered pre-release stage skips routine broad local checks by default. Run focused tests and mandatory hygiene while working, and force the full gate when required:
 
 ```sh
 just check-hygiene

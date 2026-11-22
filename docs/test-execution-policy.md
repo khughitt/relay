@@ -2,23 +2,26 @@
 
 Type: guide; document types 1.
 
-Routine broad local verification is disabled by the committed .tt.toml after
-[accepted hosted verification](https://github.com/khughitt/relay/actions/runs/41063297144)
-on Node 22 and 26: each ran 784 tests, all passed, zero reported skips and zero
-excluded modules. Runtime tests and package exports are unchanged. The activation
-push is checked by the same forced workflow.
+Relay's registered pre-release stage skips routine broad local verification by
+default. The original switch to hosted broad verification followed a run on
+Node 22 and 26. Each job passed all 784 tests with zero reported skips and zero
+excluded modules. [Accepted hosted run](https://github.com/khughitt/relay/actions/runs/41063297144)
 
 Use `just test-one <file>` or `just test-one --test-name-pattern '<regex>' <file>`
 while implementing. Arguments pass intact to Node. Fast and full targets both
 run the entire npm test script; there is no affected-test selector.
 
-The invoking code checkout's Git root supplies .tt.toml. Detached task records
-and neighboring checkouts supply no execution policy. With automatic_broad=false,
-the exact broad targets are test, test-fast and
-check-code. Focused tests and mandatory hygiene still run. Invalid policy fails;
-a recorded skip has null outcomes and is never a test pass or timing sample.
+A valid `.tt.toml` at the invoking checkout's Git root overrides the stage
+default. Without that file, the test wrapper uses the registered stage reported
+by `tasks where`. A detached records directory can declare the project's stage.
+The override file belongs at the code checkout's Git root.
 
-`just check-hygiene` runs ops-check and tasks check. `just check-code` runs strict
+The pre-release default skips `test`, `test-fast`, and `check-code`. Focused tests
+and mandatory hygiene still run. An invalid policy file or an invalid stage
+needed to resolve the default produces an error. A recorded skip has null
+outcomes and counts as neither a test pass nor a timing sample.
+
+`just check-hygiene` runs ops-check, ops-docs check, and tasks check. `just check-code` runs strict
 TypeScript checking including test/types contracts. `just check` composes both;
 `just gate` adds the full suite. Both hooks always run hygiene before requesting
 broad children. Their timing series now covers hygiene only; compare neither
@@ -59,7 +62,9 @@ sysctl configuration and must never be run on development or self-hosted machine
 The initial hosted setup and bounded activation pushes were explicitly approved;
 additional publishing or hosted invocations outside that grant need authorization.
 
-Rollback sets automatic_broad=true and restores local broad cadence. Record the
+To restore routine broad checks while relay is pre-release, add a `.tt.toml`
+override at the checkout root with `automatic_broad = true` and
+`broad_targets = ["test", "test-fast", "check-code"]`. Record the
 landed enabled revision/time on the adoption task; old timing samples do not
 establish a fresh latency failure. Disabled obligations are retired explicitly,
 never reported as performance-verified.

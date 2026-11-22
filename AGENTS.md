@@ -23,7 +23,7 @@ Code follows `tools/code-organization.md`.
 - Use `just test-one <file>` or `just test-one --test-name-pattern "<regex>" <file>` while working; arguments pass intact to `node --test`.
 - Run fresh focused checks for changed behavior and `just check-hygiene` (`ops-check`, `ops-docs check`, and `tasks check`) before committing or integrating.
 - After editing `identity.toml`, `README.md`, or `AGENTS.md`, run `just docs` (`python3 tools/ops-docs write`) so the generated identity and family blocks stay synchronized.
-- The invoking code root's `.tt.toml` (`automatic_broad = false`) disables routine broad local checks (`test`, `test-fast`, `check-code`); a missing policy file means enabled. Do not rerun broad targets solely for a commit or gate. Policy skips are not passing tests.
+- Relay's registered pre-release stage skips routine broad local checks (`test`, `test-fast`, `check-code`) by default. A valid `.tt.toml` at the invoking checkout's Git root overrides the stage default. Do not rerun broad targets solely for a commit or gate. Policy skips are not passing tests.
 - Use `just test-full` to force the full test suite, and `TT_FORCE=1 just check` to force strict `tsc --checkJs --noEmit` across `src/`, `bin/`, and `test/types/`. Read `docs/test-execution-policy.md` for current activation state and coverage gaps. Fast and full commands intentionally run the same suite.
 - Test the Node 22 floor as well as the development runtime. The suite includes a local tarball install/CLI smoke test (`test/pack.test.js`) and real Linux IPC/process tests.
 - Before removing a worktree, harvest its timing logs with `tt-report`.

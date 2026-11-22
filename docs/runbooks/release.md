@@ -14,8 +14,8 @@ Run every step from the main checkout. Name the gh account on every gh command
 
 1. **Gate.** Run `TT_FORCE=1 just gate` on the development runtime and on the Node 22
    floor (`PATH="<node 22 bin>:$PATH" TT_FORCE=1 just gate`). Both must pass. Without
-   `TT_FORCE=1`, the committed `.tt.toml` skips the suite and the type check, and a skip
-   is not a gate count.
+   `TT_FORCE=1`, relay's pre-release stage default skips the suite and the type check.
+   Count only checks that ran.
 2. **Fix the release commit.** Set `REL=$(git rev-parse HEAD)` and write it in a task note
    with both gate counts. Every later step uses `REL`, never a moving `main`.
 3. **Privacy review.** Run the commands below over `REL`'s history. Every result must
