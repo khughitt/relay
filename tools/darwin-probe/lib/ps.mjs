@@ -33,8 +33,7 @@ export function capture(pid, label) {
   // truncated args form is recorded (args_truncated) but does not gate `truncated`.
   return { pid, label, forms: out, truncated: out.row.truncated || out.comm.truncated, args_truncated: out.args.truncated };
 }
-// D9 keeps only what recognition needs, so no argument text of a user's session leaves the
-// Mac; D7 applies the same strip to every hook invocation's captures for the same reason.
+// D9 keeps only what recognition needs, so no argument text of a user's session leaves the Mac.
 export function stripCapture(c) {
   const { relay, columns, ww, ...facts } = c.forms.args ?? {};
   return { ...c, forms: { ...c.forms, args: facts } };

@@ -15,13 +15,7 @@ KEEP=
 cleanup() {
   if [ -f "$ROOT/pids" ]; then while read -r pid; do kill -s KILL -- "$pid" 2>/dev/null || true; done < "$ROOT/pids"; fi
   if [ -n "$KEEP" ]; then
-    # A killed guard probe (D7) leaves its 0600 copy of a harness login under the root.
-    if find "$ROOT" -type f \( -name auth.json -o -name .credentials.json \) -exec rm -f -- {} +; then
-      scrub="credential copies removed"
-    else
-      scrub="could not remove every credential copy: find $ROOT -name auth.json -o -name .credentials.json"
-    fi
-    echo "the probe's working directory is kept at $ROOT; it is unredacted ($scrub), so do not send it" >&2 || true
+    echo "the probe's working directory is kept at $ROOT; it is unredacted, so do not send it" >&2 || true
   else rm -rf "$ROOT"; fi
 }
 trap cleanup EXIT
@@ -30,8 +24,7 @@ trap cleanup EXIT
 # check below; the root is removed on the way out unless node ended abnormally.
 trap : INT TERM HUP
 echo "Please close OpenCode (if it is running) for the duration of the probe."
-echo "If you use Claude Code, have the output of \`claude setup-token\` ready: the probe may ask for it at the start."
-# Idle sleep would expire the probe's deadlines and drop the live harness sessions' network.
+# Idle sleep would expire the probe's deadlines and drop OpenCode's server connection.
 # caffeinate -w exits with this shell.
 if [ "$(uname -s)" = Darwin ]; then caffeinate -i -w $$ & fi
 code=0

@@ -42,13 +42,13 @@ export function packDependencies(relay, dest) {
   });
 }
 const files = (dir) => readdirSync(dir).flatMap((n) => { const p = join(dir, n); return statSync(p).isDirectory() ? files(p) : [p]; });
-export async function build({ relay, ops, out }) {
-  assertClean(relay); assertClean(ops);
+export async function build({ relay, out }) {
+  assertClean(relay);
   const short = git(['rev-parse', '--short', 'HEAD'], relay), name = `relay-darwin-probe-${short}`;
   const stage = mkdtempSync(join(tmpdir(), 'dpb-'));
   try {
     const top = join(stage, name); mkdirSync(join(top, 'expected'), { recursive: true });
-    const relayCommit = gitBundle(relay, join(top, 'relay.bundle')), opsCommit = gitBundle(ops, join(top, 'ops.bundle'));
+    const relayCommit = gitBundle(relay, join(top, 'relay.bundle'));
     const tarball = execFileSync('npm', ['pack', '--silent', '--pack-destination', top], { cwd: relay, encoding: 'utf8' }).trim().split('\n').pop();
     const dependencyTarballs = packDependencies(relay, top);
     cpSync(join(relay, 'tools/darwin-probe'), join(top, 'probe'), { recursive: true });
@@ -60,7 +60,7 @@ export async function build({ relay, ops, out }) {
       const clone = cloneBundle(join(top, 'relay.bundle'), join(root, 'relay'), relayCommit, root);
       writeFileSync(join(top, 'expected/d6.json'), JSON.stringify(await replay({ root, env: isolatedEnv(root), t, clone }), null, 2));
     } finally { await t.killAll(); rmSync(root, { recursive: true, force: true }); }
-    const manifest = { schema: 1, relay_commit: relayCommit, ops_commit: opsCommit, tarball, dependency_tarballs: dependencyTarballs, opencode_pinned: '2.0.15', created: new Date().toISOString(),
+    const manifest = { schema: 1, relay_commit: relayCommit, tarball, dependency_tarballs: dependencyTarballs, opencode_pinned: '2.0.15', created: new Date().toISOString(),
       files: Object.fromEntries(files(top).map((p) => [relative(top, p), createHash('sha256').update(readFileSync(p)).digest('hex')])) };
     writeFileSync(join(top, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     mkdirSync(out, { recursive: true });
@@ -70,8 +70,7 @@ export async function build({ relay, ops, out }) {
   } finally { rmSync(stage, { recursive: true, force: true }); }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
-  const { values } = parseArgs({ options: { ops: { type: 'string' }, out: { type: 'string', default: 'dist' } } });
-  if (!values.ops) { process.stderr.write('--ops <ops checkout> is required\n'); process.exit(2); }
-  const { tarball } = await build({ relay: process.cwd(), ops: resolve(values.ops), out: values.out });
+  const { values } = parseArgs({ options: { out: { type: 'string', default: 'dist' } } });
+  const { tarball } = await build({ relay: process.cwd(), out: values.out });
   process.stdout.write(`${tarball}\n`);
 }
