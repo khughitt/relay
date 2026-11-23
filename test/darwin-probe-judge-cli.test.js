@@ -23,18 +23,14 @@ test('a pipe in a detail is escaped so it cannot split the table row', () => {
   assert.ok(renderSection(r, v).includes('| D1 | release | pass | failed: a\\|b |'));
 });
 
-// The CLI end to end, as a child process: a results tarball built here, an ops repository
-// holding bin/relay-guard-probe, a cwd with the runbook, and TMPDIR pointed at an empty
-// directory so the extraction directory's cleanup is observable.
+// The CLI end to end, as a child process: a results tarball built here, a cwd with the
+// runbook, and TMPDIR pointed at an empty directory so the extraction directory's cleanup is
+// observable.
 const CLI = fileURLToPath(new URL('../tools/darwin-probe/judge-cli.mjs', import.meta.url));
 const RUNBOOK = '# Darwin live probe\n\n## Attempts\n';
 function scene(t, { mutate = () => {}, runbook = true } = {}) {
   const base = mkdtempSync(join(tmpdir(), 'dpj-test-')); t.after(() => rmSync(base, { recursive: true, force: true }));
-  const ops = join(base, 'ops'), g = (...a) => execFileSync('git', ['-C', ops, '-c', 'user.email=p@example.invalid', '-c', 'user.name=p', ...a], { encoding: 'utf8' }).trim();
-  mkdirSync(join(ops, 'bin'), { recursive: true }); execFileSync('git', ['init', '-q', ops]);
-  writeFileSync(join(ops, 'bin/relay-guard-probe'), 'def proven(summary, evidence):\n    return True\n');
-  g('add', '.'); g('commit', '-qm', 'probe');
-  const r = passingResults({ platform: 'linux' }); r.manifest.ops_commit = g('rev-parse', 'HEAD');
+  const r = passingResults({ platform: 'linux' });
   const v = judge(r), files = { 'manifest.json': r.manifest, 'verdict.raw.json': v, 'verdict.redacted.json': v,
     ...Object.fromEntries(Object.values(r.stages).map((s) => [`stages/${s.id}.json`, s])) };
   mutate(files);
@@ -43,8 +39,8 @@ function scene(t, { mutate = () => {}, runbook = true } = {}) {
   const tarball = join(base, 'results.tar.gz'); execFileSync('tar', ['czf', tarball, '-C', res, '.']);
   const cwd = join(base, 'cwd'), tmp = join(base, 'tmp'); mkdirSync(tmp); mkdirSync(join(cwd, 'docs/runbooks'), { recursive: true });
   if (runbook) writeFileSync(join(cwd, 'docs/runbooks/darwin-probe.md'), RUNBOOK);
-  const run = (args = ['--tarball', tarball, '--ops', ops]) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', env: { ...process.env, TMPDIR: tmp } });
-  return { run, cwd, tmp, ops, tarball };
+  const run = (args = ['--tarball', tarball]) => spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: 'utf8', env: { ...process.env, TMPDIR: tmp } });
+  return { run, cwd, tmp, tarball };
 }
 const oneLine = (r) => { assert.equal(r.stderr.trim().split('\n').length, 1, r.stderr); assert.doesNotMatch(r.stderr, /\n\s+at /); };
 test('a clean tarball is judged, recorded, and leaves no extraction directory', (t) => {
@@ -65,7 +61,7 @@ for (const [name, opts, status, pattern] of [
   ['no runbook in the cwd', { runbook: false }, 2, /docs\/runbooks\/darwin-probe\.md not found/],
   ['a missing verdict file', { mutate: (f) => { f['verdict.raw.json'] = undefined; } }, 1, /verdict\.raw\.json/],
   ['a malformed verdict file', { mutate: (f) => { f['verdict.raw.json'] = { schema: 1 }; } }, 1, /verdict\.raw\.json is malformed/],
-  ['an older results schema', { mutate: (f) => { f['manifest.json'] = { ...f['manifest.json'], schema: 0 }; } }, 1, /schema 0/],
+  ['an older results schema', { mutate: (f) => { f['manifest.json'] = { ...f['manifest.json'], schema: 1 }; } }, 1, /schema 1 is not 2/],
   ['a missing manifest', { mutate: (f) => { f['manifest.json'] = undefined; } }, 1, /manifest\.json/],
 ]) {
   test(`${name} fails with one line (exit ${status}) and leaves no extraction directory`, (t) => {
@@ -76,11 +72,10 @@ for (const [name, opts, status, pattern] of [
 test('operator mistakes in the arguments and environment fail with one line and exit 2', (t) => {
   const s = scene(t);
   for (const [args, pattern] of [
-    [['--ops', s.ops], /usage/],
-    [['--tarball', s.tarball], /usage/],
-    [['--tarball', s.tarball, '--ops', s.ops, '--bogus'], /bogus/],
-    [['--tarball', join(s.cwd, 'nope.tar.gz'), '--ops', s.ops], /tarball not found/],
-    [['--tarball', s.tarball, '--ops', join(s.cwd, 'no-ops')], /bin\/relay-guard-probe/],
+    [[], /usage/],
+    [['--tarball', s.tarball, '--ops', s.cwd], /ops/],
+    [['--tarball', s.tarball, '--bogus'], /bogus/],
+    [['--tarball', join(s.cwd, 'nope.tar.gz')], /tarball not found/],
   ]) {
     const r = s.run(args);
     assert.equal(r.status, 2, `${args}: ${r.stderr}`); oneLine(r); assert.match(r.stderr, pattern);

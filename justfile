@@ -115,30 +115,27 @@ hook-pre-push-fast:
     just check-code
     just test-fast
 
-# Build the Darwin probe bundle from clean relay and ops checkouts (docs/runbooks/darwin-probe.md).
-darwin-bundle ops:
-    node tools/darwin-probe/bundle.mjs --ops {{ops}}
+# Build the Darwin probe bundle from a clean relay checkout (docs/runbooks/darwin-probe.md).
+darwin-bundle:
+    node tools/darwin-probe/bundle.mjs
 
-# Unpack a bundle, clone both Git bundles, and run the ops guard preflight from the unpacked copies.
+# Unpack a bundle, verify its manifest hashes, and clone its relay bundle at the recorded commit.
 darwin-bundle-check tarball:
     #!/bin/sh
     set -eu
     d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
     tar xzf "{{tarball}}" -C "$d"; b=$(echo "$d"/relay-darwin-probe-*)
-    git clone -q "$b/relay.bundle" "$d/relay"; git clone -q "$b/ops.bundle" "$d/ops"
-    mkdir -p "$d/out"
-    for h in claude-code codex; do
-      command -v "$( [ "$h" = claude-code ] && echo claude || echo codex )" >/dev/null || continue
-      python3 "$d/ops/bin/relay-guard-probe" --harness "$h" --relay "$d/relay/bin/relay.js" --guard "$d/ops/hooks/relay-guard" --out "$d/out" --skip-live >/dev/null
-      python3 - "$d/out/$h/results.json" <<'PY'
-    import json, sys
-    r = json.load(open(sys.argv[1]))["replay"]
-    assert "additionalContext" in r["clean"]["reply"], r
-    assert r["attribution"]["exit"] == 2 and '"deny"' in r["attribution"]["reply"], r
-    print("preflight ok:", sys.argv[1].split("/")[-2])
-    PY
-    done
+    node --input-type=module -e '
+    import { readFileSync } from "node:fs";
+    import { join } from "node:path";
+    import { cloneBundle, verifyManifest } from "./tools/darwin-probe/probe.mjs";
+    const [b, d] = process.argv.slice(1), m = JSON.parse(readFileSync(join(b, "manifest.json"), "utf8"));
+    const bad = verifyManifest(b, m);
+    if (bad.length) { console.error(`bundle files changed: ${bad.join(", ")}`); process.exit(1); }
+    cloneBundle(join(b, "relay.bundle"), join(d, "relay"), m.relay_commit, d);
+    console.log(`bundle ok: relay ${m.relay_commit}`);
+    ' "$b" "$d"
 
 # Judge a returned results tarball and write docs/runbooks/darwin-probe.md and darwin-evidence.json.
-darwin-judge tarball ops:
-    node tools/darwin-probe/judge-cli.mjs --tarball {{tarball}} --ops {{ops}}
+darwin-judge tarball:
+    node tools/darwin-probe/judge-cli.mjs --tarball {{tarball}}

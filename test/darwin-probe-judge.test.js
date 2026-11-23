@@ -7,8 +7,6 @@ const mutate = (f) => { const r = structuredClone(passingResults()); f(r); retur
 test('a complete passing Darwin run passes the release', () => {
   const v = judge(passingResults());
   assert.equal(v.release, 'pass');
-  assert.equal(v.cutover['claude-code'], 'pass');
-  assert.equal(v.cutover.codex, 'absent');
   assert.equal(v.cutover.opencode, 'absent');
 });
 test('a Linux smoke run never reports a release pass', () => {
@@ -53,10 +51,14 @@ test('a missing or errored release stage makes the release incomplete', () => {
   assert.equal(mutate((r) => { r.stages.D5 = { id: 'D5', status: 'error', reason: 'boom', observations: {} }; }).release, 'incomplete');
 });
 test('cutover evidence never changes the release', () => {
-  const v = mutate((r) => { r.stages.D7.observations['claude-code'].proven = false; r.stages.D8.observations.hook_path.denied = false; });
+  const v = mutate((r) => { r.stages.D8.observations.hook_path.denied = false; });
   assert.equal(v.release, 'pass');
-  assert.equal(v.cutover['claude-code'], 'fail');
   assert.equal(v.cutover['launchd-path'], 'fail');
+});
+test('no check or cutover verdict needs a live guard run', () => {
+  const v = judge(passingResults());
+  assert.deepEqual(Object.keys(v.cutover), ['opencode', 'launchd-path']);
+  assert.deepEqual(Object.keys(v.checks), ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D8', 'ISO']);
 });
 test('findings are reported: host drift, unset HostName, zombie, comm kind', () => {
   const v = mutate((r) => { r.stages.D0.observations.hosts.end.os = 'Mac-B.local'; });
@@ -74,8 +76,6 @@ test('requirements the first draft missed each fail on their own', () => {
   const iso = mutate((r) => { r.manifest.isolation.changed = ['.config/relay']; });
   assert.equal(iso.checks.ISO.verdict, 'fail'); assert.equal(iso.release, 'fail');
   assert.equal(mutate((r) => { r.stages.D6.observations = { replies: [], hang: [] }; }).checks.D6.verdict, 'fail');
-  const trunc = mutate((r) => { r.stages.D7.observations['claude-code'].hook.truncated = true; });
-  assert.equal(trunc.checks.D7w.verdict, 'fail'); assert.equal(trunc.release, 'fail');
 });
 test('partial observations are an error verdict, never a throw', () => {
   const v = mutate((r) => { r.stages.D0.observations.hosts.end = null; delete r.stages.D6.observations.hang; });
@@ -92,8 +92,6 @@ test('verdicts never carry stage text', () => {
 });
 test('execution failures are distinct from absent harnesses', () => {
   assert.equal(mutate((r) => { r.stages.D7b = { id: 'D7b', status: 'error', reason: 'boom', observations: {} }; }).cutover.opencode, 'error');
-  assert.equal(mutate((r) => { r.stages.D7.observations.codex = { status: 'skipped', reason: 'no credentials' }; }).cutover.codex, 'skipped');
-  assert.equal(mutate((r) => { r.stages.D7 = { id: 'D7', status: 'error', reason: 'boom', observations: {} }; }).cutover['claude-code'], 'error');
 });
 test('D7b fails its cutover when the plugin is rejected or the version is not the pinned one', () => {
   const ran = (o) => mutate((r) => { r.stages.D7b = { id: 'D7b', status: 'ran', observations: { version: '2.0.15', version_match: true, install: { exit: 0 },
@@ -116,9 +114,4 @@ test('a missing or errored 50-agent measurement is a finding and never decides D
   }
   // n10 still gates: an errored n10 is not a pass.
   assert.notEqual(mutate((r) => { r.stages.D5.observations.cost.n10 = { error: 'x' }; }).checks.D5.verdict, 'pass');
-});
-test('a login the guard probe wrote back passes ISO with a finding', () => {
-  const v = mutate((r) => { r.manifest.isolation.written_back = ['.codex/auth.json']; });
-  assert.equal(v.checks.ISO.verdict, 'pass');
-  assert.ok(v.checks.ISO.findings.some((f) => f.includes('.codex/auth.json') && f.includes('wrote back')), JSON.stringify(v.checks.ISO));
 });

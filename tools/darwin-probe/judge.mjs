@@ -66,14 +66,6 @@ const rules = {
 };
 const guarded = (fn, o) => { try { return fn(o); } catch { return { verdict: 'error', detail: 'malformed observations', findings: [] }; } };
 
-function cutoverHarness(stage, name) {
-  if (!stage) return 'missing';
-  if (stage.status !== 'ran') return stage.status === 'absent' ? 'absent' : stage.status === 'skipped' ? 'skipped' : 'error';
-  const o = stage.observations[name];
-  if (!o) return 'error';
-  if (o.status !== 'ran') return o.status === 'absent' ? 'absent' : o.status === 'skipped' ? 'skipped' : 'error';
-  try { return o.preflight.allow && o.preflight.deny && o.proven === true && o.handle.ok === true ? 'pass' : 'fail'; } catch { return 'error'; }
-}
 function cutoverOpencode(stage) {
   if (!stage) return 'missing';
   if (stage.status !== 'ran') return stage.status === 'absent' ? 'absent' : stage.status === 'skipped' ? 'skipped' : 'error';
@@ -82,14 +74,6 @@ function cutoverOpencode(stage) {
     return o.version_match && o.install.exit === 0 && o.request.status === 200 && o.request.directory_match && o.plugin_log === 'loaded' && o.appeared
       && o.agent.count === 1 && o.agent.scope === 'process' && o.agent.matches_server && o.after.gone ? 'pass' : 'fail';
   } catch { return 'error'; }
-}
-// Confirmed truncation in a live hook's own ancestry is the spec's item-1 defect and blocks
-// the release like D4's constructed chain; no live evidence leaves D4 as the width check.
-function liveWidth(stage) {
-  const ran = stage?.status === 'ran' ? Object.entries(stage.observations).filter(([, o]) => o?.status === 'ran' && o.hook) : [];
-  const cut = ran.filter(([, o]) => o.hook.truncated === true).map(([h]) => h);
-  if (!ran.length) return { verdict: 'pass', detail: 'no live hook ancestry recorded; D4 carries the width check', findings: [] };
-  return result(cut.length === 0, cut.length ? `ps truncated live hook ancestry for ${cut.join(', ')} (spec item 1)` : 'live hook ancestry read in full');
 }
 
 export function judge(results) {
@@ -106,15 +90,11 @@ export function judge(results) {
   const changed = results.manifest.isolation?.changed, duringD9 = results.manifest.isolation?.changed_during_d9 ?? [];
   // D9 invites the user's own live sessions, which may write their config; the gating reading
   // is taken before it, and what changed afterwards is reported only.
-  const writtenBack = results.manifest.isolation?.written_back ?? [];
-  const d9Findings = [...(duringD9.length ? [`changed while D9 sampled live sessions (not gated): ${duringD9.join(', ')}`] : []),
-    ...(writtenBack.length ? [`the guard probe wrote back a refreshed login (ops-4130ea; not gated): ${writtenBack.join(', ')}`] : [])];
+  const d9Findings = duringD9.length ? [`changed while D9 sampled live sessions (not gated): ${duringD9.join(', ')}`] : [];
   checks.ISO = { class: 'release', ...(Array.isArray(changed) ? result(changed.length === 0, changed.length ? `live paths changed: ${changed.join(', ')}` : 'no live path changed', d9Findings)
     : { verdict: 'error', detail: 'isolation fingerprints missing', findings: [] }) };
-  checks.D7w = { class: 'release', ...liveWidth(results.stages.D7) };
   const d8 = results.stages.D8?.status === 'ran' ? results.stages.D8.observations.hook_path : null;
-  const cutover = { 'claude-code': cutoverHarness(results.stages.D7, 'claude-code'), codex: cutoverHarness(results.stages.D7, 'codex'),
-    opencode: cutoverOpencode(results.stages.D7b), 'launchd-path': d8 ? (d8.denied === true ? 'pass' : 'fail') : 'error' };
+  const cutover = { opencode: cutoverOpencode(results.stages.D7b), 'launchd-path': d8 ? (d8.denied === true ? 'pass' : 'fail') : 'error' };
   const verdicts = Object.values(checks).map((c) => c.verdict);
   const release = results.manifest.allow_linux ? 'smoke'
     : verdicts.some((v) => !['pass', 'fail'].includes(v)) ? 'incomplete'

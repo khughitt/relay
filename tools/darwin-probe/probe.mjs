@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { accessSync, constants, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, hostname, tmpdir, userInfo } from 'node:os';
-import { basename, delimiter, dirname, join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
-import { credentialWrites, fingerprint, isolatedEnv, isolationOf, prepareRoot, stageLog, tracker, writeStage } from './lib/context.mjs';
-import { ask } from './lib/tty.mjs';
+import { fingerprint, isolatedEnv, isolationOf, prepareRoot, stageLog, tracker, writeStage } from './lib/context.mjs';
 import { pythonAtLeast } from './stages/d0-env.mjs';
 import { judge } from './judge.mjs';
 import { collectHosts, redactFile, redactionMap, redactValue } from './redact.mjs';
 
-const STAGES = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D7b', 'D8', 'D9'];
-const MODULES = { D0: 'd0-env', D1: 'd1-package', D2: 'd2-suite', D3: 'd3-identity', D4: 'd4-table', D5: 'd5-registry', D6: 'd6-dispatch', D7: 'd7-guard', D7b: 'd7b-opencode', D8: 'd8-launchd', D9: 'd9-ambient' };
+const STAGES = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7b', 'D8', 'D9'];
+const MODULES = { D0: 'd0-env', D1: 'd1-package', D2: 'd2-suite', D3: 'd3-identity', D4: 'd4-table', D5: 'd5-registry', D6: 'd6-dispatch', D7b: 'd7b-opencode', D8: 'd8-launchd', D9: 'd9-ambient' };
 // A validation failure the user should see as one line, not a stack trace.
 class ProbeError extends Error {}
 const die = (message) => { throw new ProbeError(message); };
@@ -71,26 +70,21 @@ export function loadResults(dir) {
 export function packResults(dir, dest) {
   execFileSync('tar', ['czf', dest, '--numeric-owner', '--no-xattrs', '-C', dir, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
 }
-// The spec's refusal: no credential file and no token leaves the Mac. A hit names the files.
+// The spec's refusal: no credential file leaves the Mac. A hit names the files.
 const CREDENTIAL_FILES = ['.credentials.json', 'auth.json'];
-// Codex's login holds JWTs (id and access tokens), which D7's harness output heads could carry;
-// the header segment of any JWT starts with base64url '{"', i.e. eyJ.
+// Harness logins hold JWTs (Codex's id and access tokens); the header segment of any JWT starts
+// with base64url '{"', i.e. eyJ.
 const JWT = /eyJ[\w-]{8,}\.eyJ[\w-]{8,}\.[\w-]{16,}/;
-export function credentialHits(dir, token) {
-  return walkFiles(dir).filter((file) => { const text = readFileSync(file);
-    return CREDENTIAL_FILES.includes(basename(file)) || (!!token && text.includes(token)) || JWT.test(text.toString('latin1')); })
+export function credentialHits(dir) {
+  return walkFiles(dir).filter((file) => CREDENTIAL_FILES.includes(basename(file)) || JWT.test(readFileSync(file).toString('latin1')))
     .map((file) => relative(dir, file));
 }
 // The scan covers the raw results as well as the redacted copy that is packed.
-export const packingHits = (raw, out, token) => [...new Set([...credentialHits(raw, token), ...credentialHits(out, token)])].sort();
+export const packingHits = (raw, out) => [...new Set([...credentialHits(raw), ...credentialHits(out)])].sort();
 // The probe's own crash (an uncaught exception, or a failure while packing): run keeps the root,
 // which may hold unpacked results. Node's default for an uncaught exception is 1, which run
 // reads as a normal refusal and removes the root.
 export const CRASHED = 70;
-const onPath = (name) => (process.env.PATH ?? '').split(delimiter).some((dir) => { try { accessSync(join(dir, name), constants.X_OK); return true; } catch { return false; } });
-// A real `claude setup-token` token is ~100 characters. Anything much shorter is a stray key
-// press, and scanning the results for it would refuse to pack an otherwise good run.
-const MIN_TOKEN = 20;
 
 async function main() {
   const { values } = parseArgs({ options: { bundle: { type: 'string' }, root: { type: 'string' }, 'allow-linux': { type: 'boolean' }, stages: { type: 'string' }, 'self-test-hang': { type: 'boolean' }, 'self-test-tag': { type: 'string' } } });
@@ -115,39 +109,31 @@ async function main() {
     try { execFileSync('xcode-select', ['-p'], { stdio: 'ignore' }); }
     catch { die('the Xcode Command Line Tools are required: run xcode-select --install'); }
   }
-  // The ops guard probe (D7), relay's cli-surface test (D2) and D0 need python3 >= 3.11; the
+  // relay's cli-surface test (D2) and D0 need python3 >= 3.11; the
   // Command Line Tools' /usr/bin/python3 is 3.9. Refuse now rather than ten minutes in.
   const py = spawnSync('python3', ['--version'], { encoding: 'utf8', timeout: 10000 });
   const pyVersion = py.error ? '' : `${py.stdout ?? ''}${py.stderr ?? ''}`.trim().split('\n')[0];
   if (!pythonAtLeast(pyVersion, [3, 11])) die(`python3 >= 3.11 is required (found ${pyVersion || 'none'}); install one, e.g. brew install python`);
   const home = homedir();
-  // Asked once, before any stage, so the user is not interrupted mid-run. The token lives in
-  // ctx.token only: never ctx.env, a log, an observation or the results (scanned before packing).
-  let token = null;
-  if (platform === 'darwin' && wanted.includes('D7') && onPath('claude') && !existsSync(join(home, '.claude/.credentials.json'))) {
-    token = await ask('Claude Code keeps its login in the Keychain. Run `claude setup-token` in another terminal and paste the token (Enter skips Claude): ', { hidden: true }) || null;
-    if (token && token.length < MIN_TOKEN) { process.stderr.write(`${token.length} characters is too short for a token; Claude Code will be skipped\n`); token = null; }
-  }
   const t = tracker(root), raw = join(root, 'results'), out = join(root, 'out');
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   let manifest;
-  if (selfTest) manifest = { relay_commit: null, ops_commit: null, files: {} };
+  if (selfTest) manifest = { relay_commit: null, files: {} };
   else { try { manifest = JSON.parse(readFileSync(join(bundle, 'manifest.json'), 'utf8')); } catch (error) { die(`bundle manifest unreadable: ${firstLine(error.message)}`); } }
   const tampered = verifyManifest(bundle, manifest);
   if (tampered.length) die(`bundle files changed: ${tampered.join(', ')}`);
-  const ctx = { root, results: raw, bundle, env: isolated, t, platform, ambient, token, tarball: manifest.tarball && join(bundle, manifest.tarball),
+  const ctx = { root, results: raw, bundle, env: isolated, t, platform, ambient, tarball: manifest.tarball && join(bundle, manifest.tarball),
     dependencyTarballs: (manifest.dependency_tarballs ?? []).map((f) => join(bundle, f)) };
   if (!selfTest) {
-    try {
-      ctx.clone = cloneBundle(join(bundle, 'relay.bundle'), join(root, 'relay'), manifest.relay_commit, root);
-      ctx.opsClone = cloneBundle(join(bundle, 'ops.bundle'), join(root, 'ops'), manifest.ops_commit, root);
-    } catch (error) { die(`clone failed: ${firstLine(error.message)}`); }
+    try { ctx.clone = cloneBundle(join(bundle, 'relay.bundle'), join(root, 'relay'), manifest.relay_commit, root); }
+    catch (error) { die(`clone failed: ${firstLine(error.message)}`); }
   }
   const before = fingerprint(home), ran = [];
   // D9 invites the user to open live sessions, which may write their own config; the gating
   // "after" reading is taken just before it (D9 only reads), and later changes are a finding.
   let beforeD9 = null;
-  const record = { schema: 1, relay_commit: manifest.relay_commit, ops_commit: manifest.ops_commit, opencode_pinned: '2.0.15',
+  // Schema 2: D7 (the ops guard run), its D7w check and the claude-code and codex cutover rows are gone.
+  const record = { schema: 2, relay_commit: manifest.relay_commit, opencode_pinned: '2.0.15',
     allow_linux: platform !== 'darwin', platform, started: new Date().toISOString(), requested_stages: values.stages ? wanted : null, stages: ran, isolation: {} };
   mkdirSync(raw, { recursive: true });
   const d0mod = await import('./stages/d0-env.mjs');
@@ -163,8 +149,7 @@ async function main() {
       const d0 = JSON.parse(readFileSync(d0path, 'utf8'));
       if (d0.status === 'ran' && !d0.observations?.hosts?.end) { try { writeStage(raw, 'D0', await d0mod.finish(ctx, d0)); } catch (error) { ctx.log?.(`D0 finish: ${error.message}`); } }
     }
-    const d7path = join(raw, 'stages/D7.json'), d7 = existsSync(d7path) ? JSON.parse(readFileSync(d7path, 'utf8')) : undefined;
-    Object.assign(record, { finished: new Date().toISOString(), isolation: isolationOf(before, beforeD9, fingerprint(home), credentialWrites(d7)), interrupted: signalCode ?? null });
+    Object.assign(record, { finished: new Date().toISOString(), isolation: isolationOf(before, beforeD9, fingerprint(home)), interrupted: signalCode ?? null });
     writeFileSync(join(raw, 'manifest.json'), `${JSON.stringify(record, null, 2)}\n`);
     const results = loadResults(raw);
     // Seed the host list with the machine's own name too: collectHosts only sees hosts a
@@ -182,7 +167,7 @@ async function main() {
     // Build under the root and rename into the bundle directory last, so an interrupt during
     // packing never leaves a truncated tarball where the user would find it. `--numeric-owner`
     // keeps the Mac account's user and group name out of every archive header.
-    const hits = packingHits(raw, out, ctx.token);
+    const hits = packingHits(raw, out);
     if (hits.length) {
       process.stderr.write(`refusing to pack: credential material in ${hits.join(', ')}\n`);
       refused = true; process.exitCode = 1; return;

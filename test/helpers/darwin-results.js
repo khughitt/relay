@@ -6,8 +6,8 @@ export function passingResults({ platform = 'darwin' } = {}) {
     pretool: { ms: 120, exit: 0, stderr: '', allow: true, retained: true },
     sessionend: { ms: 180, exit: 0, stderr: '', ending_absent: true, revision_delta: 1, others_retained: true } });
   return {
-    manifest: { schema: 1, relay_commit: 'a'.repeat(40), ops_commit: 'b'.repeat(40), opencode_pinned: '2.0.15',
-      allow_linux: platform !== 'darwin', platform, stages: ['D0','D1','D2','D3','D4','D5','D6','D7','D7b','D8','D9'],
+    manifest: { schema: 2, relay_commit: 'a'.repeat(40), opencode_pinned: '2.0.15',
+      allow_linux: platform !== 'darwin', platform, stages: ['D0','D1','D2','D3','D4','D5','D6','D7b','D8','D9'],
       isolation: { changed: [] }, redaction: { files: {} } },
     stages: {
       D0: { id: 'D0', status: 'ran', observations: {
@@ -43,10 +43,6 @@ export function passingResults({ platform = 'darwin' } = {}) {
       D6: { id: 'D6', status: 'ran', observations: {
         replies: ['claude-code','codex'].flatMap((h) => ['allow','deny','hang'].map((g) => ({ harness: h, guard: g, exit: g === 'allow' ? 0 : 2, stdout: '{}', expected_exit: g === 'allow' ? 0 : 2, expected_stdout: '{}', match: true }))),
         hang: [{ harness: 'claude-code', ms: 2110, budget_ms: 2000, survivors: [] }, { harness: 'codex', ms: 2105, budget_ms: 2000, survivors: [] }] } },
-      D7: { id: 'D7', status: 'ran', observations: {
-        'claude-code': { status: 'ran', credentials: 'token', preflight: { allow: true, deny: true }, proven: true,
-          hook: { invocations: 3, truncated: false }, handle: { agents: 3, matched: 3, ok: true } },
-        codex: { status: 'absent', reason: 'codex not installed' } } },
       D7b: { id: 'D7b', status: 'absent', reason: 'opencode not installed', observations: {} },
       D8: { id: 'D8', status: 'ran', observations: {
         reap: { exit: 0, kept: ['codex:q2','codex:q3'], expected_kept: ['codex:q2','codex:q3'], handles_unchanged: true },
