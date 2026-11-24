@@ -16,6 +16,27 @@ How to produce the latency evidence a HookQualification row's `latency` check ne
 
    Each host freezes its own manifest from its own deployment; never reuse another host's manifest or deployed identity.
 
+### Freeze a Claude Code Stop or SessionStart manifest
+
+Prepare the fixture programs with `run.mjs --prepare` and keep the route inputs together in a private scratch directory. Use a schema-1 set containing one route template. Keep its session mode, schedule evidence, payload, branch definitions, replacement map, candidate config digest and no-subscriber config names. The template uses `fixture: "fixture"` and includes a `deployed-relay` branch. Put the normalized schema-2 candidate and empty configs beside the template, along with `deployed-stop.json` or `deployed-sessionstart.json`, which substitutes fixture commands for the selected deployed subscribers. Keep the original config bytes for each input so the candidate digest matches.
+
+From the measurement host, give the freezer a saved snapshot of the active settings and either of these settings records.
+
+- `--settings-identity FILE` reuses a frozen `settings` record with `repository: "hq"`, `commit`, `path` (relative to hq), `blob` and `liveSha256`. An optional `from` names the earlier capture. The freezer checks the snapshot digest, hq HEAD, the committed blob and the cleanliness of that path. It reads the saved snapshot directly.
+- `--settings-source FILE` uses an operator capture. If the host's settings are unavailable over SSH, its operator saves the active settings bytes and a separate text file containing the resolved absolute source path within their hq checkout. The freezer checks that the source maps to a clean committed path and records the snapshot digest and the checkout identity. Use the snapshot and source from the same capture.
+
+```sh
+node scripts/hook-qualification/run.mjs --prepare --output PREPARED
+node scripts/hook-qualification/freeze.mjs \
+  --snapshot CAPTURE --settings-identity IDENTITY --hq HQ_CHECKOUT \
+  --version HARNESS_VERSION --template ROUTE_TEMPLATE \
+  --fixture PREPARED/fixture --output NEW_BUNDLE
+```
+
+Use `stop-manifest.json` or `sessionstart-manifest.json` in the new bundle as the pilot's manifest set. The freezer prints its SHA-256 and keeps the deployed package, raw config and package hash list beside it. The bundle is local to the capture host, with fixture configs written as 0600 in a 0700 directory. Use a new bundle directory for each capture.
+
+The route map uses the observed handler order and refuses a changed matcher, command shape or composition. For SessionStart, one `claude-sessionstart` handler maps to the halt, stale-lore and index-repair fixture branches in that order. They run in parallel under the existing qualification schedule, preserving the conservative baseline from the SessionStart timing proof. Extend the map and supply a matching template and configs when adding a route or changing its native composition. The manual manifest format above also supports routes outside this map.
+
 ## Pilot, then measure
 
 Run every command from a checkout at the candidate commit, once with Node 22 and once with the development runtime:
@@ -35,7 +56,7 @@ Measure on an otherwise idle host. A contested host gives unusable evidence and 
 
 ## Another host
 
-For a host this session cannot run on, hand its operator the candidate commit, the fixture directory and this guide; the operator freezes that host's own manifest set from its own deployment, runs the pilot and the measurement on both runtimes, and returns the `OUT` directory. Its results join the judge beside this host's.
+For a host this session cannot run on, hand its operator the candidate commit, the route template, fixture config inputs and this guide. The operator captures that host's own settings and deployment, prepares and freezes the fixture bundle, runs the pilot and the measurement on both runtimes, and returns the `OUT` directory. Its results join the judge beside this host's.
 
 ## A new harness version
 
