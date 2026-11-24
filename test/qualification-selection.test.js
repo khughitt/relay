@@ -252,6 +252,26 @@ test('fractional timeout boundaries are exact to one nanosecond', (t) => {
   assert.equal(runWithOffset('past-timeout', 5000500001n).status, 1);
 });
 
+test('scientific and sub-nanosecond timeout values have integer cutoffs', (t) => {
+  // Break caught: exponent notation and fractional nanoseconds must not make valid timeout payloads unmatchable.
+  const verify = (name, timeout, debugMs, offset, expectedStatus) => {
+    const run = verdictRun(t, name, { sleep: 8 });
+    const expected = readJson(join(run, 'expected-entries.json'));
+    expected.Stop[2].timeout = timeout;
+    writeJson(join(run, 'expected-entries.json'), expected);
+    for (const file of ['debug-1.log', 'debug-2.log']) writeFileSync(join(run, file), `hooks baseline Stop 2 8] timed out after ${debugMs}ms\n`);
+    const latest = readdirSync(join(run, 'payloads')).filter((name) => name.startsWith('Stop-2-')).sort().at(-1);
+    const stamp = BigInt(latest.match(/Stop-2-(\d+)\.json$/)[1]) + offset;
+    renameSync(join(run, 'payloads', latest), join(run, 'payloads', `Stop-2-${stamp}.json`));
+    const result = invoke(dirname(run), ['verdict', '--sleep', '8', run]);
+    assert.equal(result.status, expectedStatus, result.stderr || result.stdout);
+  };
+  verify('exponent-timeout-exact', 1e-7, '0.0001', 100n, 0);
+  verify('exponent-timeout-past', 1e-7, '0.0001', 101n, 1);
+  verify('fractional-nanosecond-exact', 5.0000000001, '5000.0000001', 5000000000n, 0);
+  verify('fractional-nanosecond-past', 5.0000000001, '5000.0000001', 5000000001n, 1);
+});
+
 test('the verdict uses recorder-log order rather than payload mtimes', (t) => {
   // Break caught: archive metadata must not change which Stop belongs to startup or resume.
   const run = verdictRun(t, 'equal-mtimes');

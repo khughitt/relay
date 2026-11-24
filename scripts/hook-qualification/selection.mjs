@@ -68,6 +68,31 @@ function nanoseconds(text) {
   return BigInt(match[1]) * 1000000000n + BigInt((match[2] ?? '').padEnd(9, '0'));
 }
 
+function durationParts(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
+  const match = /^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/.exec(String(value));
+  return match ? { integer: match[1], fraction: match[2] ?? '', exponent: Number(match[3] ?? 0) } : null;
+}
+
+function timeoutNanoseconds(value) {
+  const parts = durationParts(value);
+  if (!parts) return null;
+  const scale = 9 - parts.fraction.length + parts.exponent, digits = BigInt(`${parts.integer}${parts.fraction}`);
+  return scale >= 0 ? digits * 10n ** BigInt(scale) : digits / 10n ** BigInt(-scale);
+}
+
+function timeoutMilliseconds(value) {
+  const parts = durationParts(value);
+  if (!parts) return null;
+  const digits = `${parts.integer}${parts.fraction}`, point = parts.integer.length + parts.exponent + 3;
+  const text = point <= 0 ? `0.${'0'.repeat(-point)}${digits}`
+    : point >= digits.length ? `${digits}${'0'.repeat(point - digits.length)}`
+      : `${digits.slice(0, point)}.${digits.slice(point)}`;
+  const [whole, fraction] = text.split('.');
+  const normalizedWhole = whole.replace(/^0+(?=\d)/, '') || '0', normalizedFraction = (fraction ?? '').replace(/0+$/, '');
+  return normalizedFraction ? `${normalizedWhole}.${normalizedFraction}` : normalizedWhole;
+}
+
 function logs(runDir) {
   const text = readFileSync(join(runDir, 'selection.log'), 'utf8');
   const lines = text.split('\n');
@@ -111,7 +136,7 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
     for (const payload of payloadRecords) {
       const entry = (expected[payload.event] ?? []).find((item) => item.index === payload.index);
       const timesOut = sleep > 0 && entry && entry.timeout !== undefined && entry.timeout !== null && entry.timeout < sleep;
-      const timeoutNs = timesOut ? nanoseconds(String(entry.timeout)) : null;
+      const timeoutNs = timesOut ? timeoutNanoseconds(entry.timeout) : null;
       let candidates = records.filter((r) => r.event === payload.event && r.index === payload.index && r.what === 'start');
       if (payload.pid !== null) candidates = candidates.filter((r) => r.pid === payload.pid);
       candidates = candidates.filter((start) => {
@@ -161,10 +186,10 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
         }
         let entryGood = expectedIndices.has(index) && startRecords.length === 2 && endRecords.length === expectedEnds && payloadGood;
         if (timesOut) {
-          const evidence = `${side} ${event} ${index} ${sleep}] timed out after ${entry.timeout * 1000}ms`;
+          const evidence = `${side} ${event} ${index} ${sleep}] timed out after ${timeoutMilliseconds(entry.timeout)}ms`;
           const eachTurn = debug.every((text) => text.includes(evidence));
           entryGood &&= eachTurn;
-          if (eachTurn) checks.push(`${event} ${index} timed out after ${entry.timeout * 1000}ms`);
+          if (eachTurn) checks.push(`${event} ${index} timed out after ${timeoutMilliseconds(entry.timeout)}ms`);
         }
         good &&= entryGood;
         counts[index] = `${startRecords.length} start/${endRecords.length} end/${invocations.length} payloads`;
