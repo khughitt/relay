@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
-import { readFile, access } from 'node:fs/promises';
+import { readFile, access, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dispatchHook } from '../src/dispatch.js';
@@ -105,4 +105,17 @@ test('private input echoed to stderr or malformed stdout never reaches diagnosti
   const observerEcho = await hook(p, { nativeEvent: 'UserPromptSubmit' });
   assert.equal(observerEcho.stderr.includes(secret), false, 'a private-field observer stderr is suppressed');
   assert.match(observerEcho.stderr, /^plain: observer noise$/m, 'an ordinary observer keeps its stderr');
+});
+
+test('a SessionStart whose event cwd is missing or a file runs no notice and returns no context', async (t) => {
+  const p = await tempPaths(t), file = join(CWD, 'cwd-is-a-file');
+  await writeFile(file, '');
+  await writeSubscribers(p, [strip(notice('n', 'notice', { extra: ['n'] }))]);
+  for (const [cwd, code] of [[join(CWD, 'gone'), 'REPOSITORY_UNREADABLE'], [file, 'SPAWN-FAILED']]) {
+    const r = await hook(p, { body: JSON.stringify({ session_id: 'sess', cwd, source: 'startup' }) });
+    // gitContext is stubbed, so publication succeeds here; a real dispatch also fails registry identity (GIT_ERROR) and exits 1.
+    assert.equal(r.exitCode, 0, r.stderr);
+    assert.equal(r.stdout.includes('additionalContext'), false, cwd);
+    assert.match(r.stderr, new RegExp(`^NOTICE_FAILED: n SessionStart ${code} `, 'm'), cwd);
+  }
 });
