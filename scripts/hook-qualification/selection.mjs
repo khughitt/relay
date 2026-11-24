@@ -6,10 +6,10 @@
 //   node selection.mjs map MANIFEST_SET BASELINE_RUN CANDIDATE_RUN EVENT
 // The recorder subcommand is invoked by the harness, not by operators.
 import { createHash } from 'node:crypto';
-import { appendFileSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseArgs } from 'node:util';
+import { isDeepStrictEqual, parseArgs } from 'node:util';
 import { commandWords } from './hook-settings.mjs';
 
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -78,7 +78,15 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
     const records = logs(runDir);
     const side = records[0]?.side;
     requireThat(side, `${runDir}: the selection log has no recorder side`);
-    const debug = sleep > 0 ? ['debug-1.log', 'debug-2.log'].map((file) => { try { return readFileSync(join(runDir, file), 'utf8'); } catch { return ''; } }).join('\n') : '';
+    const debug = sleep > 0 ? ['debug-1.log', 'debug-2.log'].map((file) => { try { return readFileSync(join(runDir, file), 'utf8'); } catch { return ''; } }) : [];
+    const payloadDir = join(runDir, 'payloads');
+    const payloadRecords = readdirSync(payloadDir).flatMap((file) => {
+      const match = /^(SessionStart|Stop)-(\d+)-/.exec(file);
+      if (!match || !file.endsWith('.json')) return [];
+      const path = join(payloadDir, file);
+      return [{ event: match[1], index: Number(match[2]), path, time: statSync(path).mtimeMs, value: readJson(path) }];
+    });
+    const resumeTime = Math.min(...payloadRecords.filter((r) => r.event === 'SessionStart' && r.value.source === 'resume').map((r) => r.time));
     const checks = [];
     for (const event of ['SessionStart', 'Stop']) {
       const entries = expected[event];
@@ -91,27 +99,34 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
         const entry = entries.find((item) => item.index === index);
         const starts = records.filter((r) => r.event === event && r.index === index && r.what === 'start').length;
         const ends = records.filter((r) => r.event === event && r.index === index && r.what === 'end').length;
+        const invocations = payloadRecords.filter((r) => r.event === event && r.index === index);
+        let payloadGood = invocations.length === 2;
+        if (event === 'SessionStart') {
+          payloadGood &&= invocations.filter((r) => r.value.source === 'startup').length === 1
+            && invocations.filter((r) => r.value.source === 'resume').length === 1;
+        } else {
+          payloadGood &&= invocations.filter((r) => r.time < resumeTime).length === 1
+            && invocations.filter((r) => r.time > resumeTime).length === 1;
+        }
         const timesOut = sleep > 0 && entry && entry.timeout !== undefined && entry.timeout !== null && entry.timeout < sleep;
         const expectedEnds = timesOut ? 0 : 2;
-        let entryGood = expectedIndices.has(index) && starts === 2 && ends === expectedEnds;
+        let entryGood = expectedIndices.has(index) && starts === 2 && ends === expectedEnds && payloadGood;
         if (timesOut) {
           const evidence = `${side} ${event} ${index} ${sleep}] timed out after ${entry.timeout * 1000}ms`;
-          const occurrences = debug.split(evidence).length - 1;
-          entryGood &&= occurrences >= 2;
-          if (occurrences >= 2) checks.push(`${event} ${index} timed out after ${entry.timeout * 1000}ms`);
+          const eachTurn = debug.every((text) => text.includes(evidence));
+          entryGood &&= eachTurn;
+          if (eachTurn) checks.push(`${event} ${index} timed out after ${entry.timeout * 1000}ms`);
         }
         good &&= entryGood;
-        counts[index] = `${starts} start/${ends} end`;
+        counts[index] = `${starts} start/${ends} end/${invocations.length} payloads`;
       }
       good &&= [...fired].every((index) => expectedIndices.has(index));
       ok &&= good;
       checks.push(`${event} expected ${JSON.stringify([...expectedIndices])} ${JSON.stringify(counts)} ${good ? 'PASS' : 'FAIL'}`);
     }
-    const payloads = readdirSync(join(runDir, 'payloads')).filter((file) => file.startsWith('SessionStart-') && file.endsWith('.json')).sort().map((file) => {
-      const value = readJson(join(runDir, 'payloads', file));
-      return { source: value.source ?? null, bytes: readFileSync(join(runDir, 'payloads', file)).byteLength,
-        extra: Object.keys(value).filter((key) => !['cwd', 'hook_event_name', 'session_id', 'source', 'transcript_path'].includes(key)).sort() };
-    });
+    const payloads = payloadRecords.filter((r) => r.event === 'SessionStart').sort((a, b) => a.time - b.time).map((r) => ({
+      source: r.value.source ?? null, bytes: readFileSync(r.path).byteLength,
+      extra: Object.keys(r.value).filter((key) => !['cwd', 'hook_event_name', 'session_id', 'source', 'transcript_path'].includes(key)).sort() }));
     reports.push({ runDir, checks, payloads });
   }
   return { ok, reports };
@@ -126,7 +141,8 @@ const same = (left, right) => JSON.stringify([...left].sort()) === JSON.stringif
 export function mapSelection({ manifest, baselineRun, candidateRun, event }) {
   const set = readJson(manifest), route = (set.manifests ?? [set]).find((item) => item.event === event);
   requireThat(route, `${manifest}: no ${event} manifest`);
-  const entries = (run) => (readJson(join(run, 'expected-entries.json'))[event] ?? []).map((item) => ({ name: entryName(item), timeout: item.timeout }));
+  const entries = (run) => (readJson(join(run, 'expected-entries.json'))[event] ?? []).map((item) => ({
+    name: entryName(item), timeout: item.timeout ?? null, matcher: item.matcher ?? null, command: item.command }));
   const baseline = entries(baselineRun), candidate = entries(candidateRun);
   const mapping = {};
   for (const branch of route.branches) {
@@ -138,7 +154,12 @@ export function mapSelection({ manifest, baselineRun, candidateRun, event }) {
   const missingReplacements = (route.replacementMap ?? []).map((item) => item.baseline)
     .filter((name) => typeof name === 'string' && !name.includes(':') && !branchNames.has(name));
   const baselineGood = same(baseline.map((entry) => entry.name), Object.keys(mapping)) && missingReplacements.length === 0;
-  const candidateGood = same(candidate.map((entry) => entry.name), ['relay', ...retained]);
+  const retainedGood = retained.every((name) => {
+    const before = baseline.filter((entry) => entry.name === name), after = candidate.filter((entry) => entry.name === name);
+    return before.length === 1 && after.length === 1
+      && ['command', 'matcher', 'timeout'].every((key) => isDeepStrictEqual(before[0][key], after[0][key]));
+  });
+  const candidateGood = same(candidate.map((entry) => entry.name), ['relay', ...retained]) && retainedGood;
   return { ok: baselineGood && candidateGood,
     baseline: { entries: baseline, mapping, ok: baselineGood },
     candidate: { entries: candidate, expected: ['relay', ...retained], ok: candidateGood } };
@@ -155,7 +176,9 @@ async function main() {
     if (command === 'run') {
       requireThat(['interactive', 'print'].includes(values.mode), 'run needs --mode interactive or print');
       const { runClaudeTurns } = await import('./live.mjs');
-      await runClaudeTurns({ runDir: result.runDir, mode: values.mode, claude: values.claude, sleep: Number(values.sleep ?? 0) });
+      await runClaudeTurns({ runDir: result.runDir, mode: values.mode, claude: values.claude, label: values.side,
+        replies: [{ text: 'selection first turn done' }, { text: 'selection resumed turn done' }, { text: 'unexpected third answer' }],
+        sleep: Number(values.sleep ?? 0) });
     }
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return 0;

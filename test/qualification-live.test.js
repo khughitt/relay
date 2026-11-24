@@ -30,6 +30,35 @@ test('the shared local stub serves scripted replies and captures requests withou
   assert.ok(readdirSync(join(runDir, 'requests')).filter((file) => file.includes('POST_v1_messages')).length >= 2);
 });
 
+test('a stub that never becomes ready is killed and reaped before startup fails', async (t) => {
+  // Break caught: readiness rejection without child cleanup leaves pipes, IPC and a live stub behind.
+  const runDir = scratch(t);
+  const module = join(runDir, 'never-ready.mjs');
+  writeFileSync(module, "import { writeFileSync } from 'node:fs'; import { join } from 'node:path'; writeFileSync(join(process.argv[3], 'stub.pid'), String(process.pid)); setInterval(() => {}, 1000);");
+  const { startStubModel } = await import(pathToFileURL(join(root, 'scripts/hook-qualification/live.mjs')).href);
+  let stub, error;
+  try { stub = await startStubModel({ runDir, replies: [{ text: 'never used' }], stubModule: module, readyTimeoutMs: 250 }); }
+  catch (caught) { error = caught; }
+  if (stub) await stub.stop();
+  assert.ok(error, 'readiness must fail instead of returning a usable stub');
+  const pid = Number(readFileSync(join(runDir, 'requests', 'stub.pid'), 'utf8'));
+  assert.throws(() => process.kill(pid, 0), /ESRCH/);
+});
+
+test('the shared driver accepts a caller label and arbitrary stub reply programs', async (t) => {
+  // Break caught: reading selection's probe.json and hardcoding text replies blocks the other live probes.
+  const runDir = scratch(t);
+  mkdirSync(join(runDir, 'home/.claude'), { recursive: true });
+  mkdirSync(join(runDir, 'work'), { recursive: true });
+  const fake = join(runDir, 'fake-claude.mjs');
+  writeFileSync(fake, "#!/usr/bin/env node\nif (process.argv.includes('--version')) console.log('fake'); else console.log(JSON.stringify({session_id:'generic'}));\n", { mode: 0o755 });
+  const replies = [{ tool: 'Bash', input: { command: 'true' } }, { error: 529 }];
+  const { runClaudeTurns } = await import(pathToFileURL(join(root, 'scripts/hook-qualification/live.mjs')).href);
+  const result = await runClaudeTurns({ runDir, mode: 'print', claude: fake, label: 'generic-probe', replies });
+  assert.equal(result.label, 'generic-probe');
+  assert.deepEqual(JSON.parse(readFileSync(join(runDir, 'script.json'), 'utf8')), replies);
+});
+
 test('selection run shares the print-mode driver and emits verdict-compatible recorder evidence', (t) => {
   // Break caught: a second selection-only session driver can drift from the reusable live-probe path.
   const dir = scratch(t);
@@ -42,7 +71,7 @@ if (process.argv.includes('--version')) { console.log('9.9.9-fake'); process.exi
 const settings = JSON.parse(readFileSync(join(process.env.CLAUDE_CONFIG_DIR, 'settings.json'), 'utf8'));
 for (const event of ['SessionStart', 'Stop']) {
   for (const group of settings.hooks[event] ?? []) for (const hook of group.hooks) {
-    const payload = JSON.stringify({ session_id: 'fake-session', hook_event_name: event, source: 'startup', cwd: process.cwd() });
+    const payload = JSON.stringify({ session_id: 'fake-session', hook_event_name: event, source: process.argv.includes('--resume') ? 'resume' : 'startup', cwd: process.cwd() });
     const result = spawnSync('/bin/sh', ['-c', hook.command], { input: payload, env: { PATH: process.env.PATH, HOME: process.env.HOME }, encoding: 'utf8' });
     if (result.status !== 0) { process.stderr.write(result.stderr); process.exit(1); }
   }

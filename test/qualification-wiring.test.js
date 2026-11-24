@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,7 +13,7 @@ const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const childEnv = (home) => ({ PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: home,
   GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_OPTIONAL_LOCKS: '0' });
 
-function fixture(t) {
+function fixture(t, host = hostname()) {
   const dir = mkdtempSync(join(tmpdir(), 'relay-wiring-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const env = childEnv(dir);
@@ -63,12 +63,13 @@ function fixture(t) {
   const files = ['bin/relay.js', 'package.json', 'src/index.js'];
   const listing = files.map((file) => `${sha(readFileSync(join(installed, file)))}  ${file}\n`).join('');
   const manifestFile = join(dir, 'stop-manifest.json');
-  const manifest = { host: 'host-a', event: 'Stop', version: '2.1.331', mode: 'interactive',
+  const manifest = { host, event: 'Stop', version: '2.1.331', mode: 'interactive',
     settings: { repository: 'hq', commit: git('rev-parse', 'HEAD'), path: relative, blob: git('rev-parse', `HEAD:${relative}`), liveSha256: sha(readFileSync(snapshot)) },
     deployed: { packageSha256: sha(listing), configSha256: sha(configBytes), outerMs: 600000 } };
-  writeFileSync(manifestFile, JSON.stringify({ schema: 1, host: 'host-a', manifests: [manifest] }));
-  const check = () => run(process.execPath, [wiring, '--hq', repo, '--snapshot', snapshot, manifestFile]);
-  return { check, config, manifestFile };
+  writeFileSync(manifestFile, JSON.stringify({ schema: 1, host, manifests: [manifest] }));
+  const invoke = (file) => run(process.execPath, [wiring, '--hq', repo, '--snapshot', snapshot, file]);
+  const check = () => invoke(manifestFile);
+  return { check, invoke, config, manifestFile, dir };
 }
 
 test('wiring accepts filtered live state and verifies every frozen deployment identity', (t) => {
@@ -81,6 +82,19 @@ test('wiring accepts filtered live state and verifies every frozen deployment id
   assert.match(result.stdout, /blob hooks table = snapshot hooks table: PASS/);
   assert.match(result.stdout, /relay line outer budget: PASS/);
   assert.match(result.stdout, /ALL PASS/);
+});
+
+test('wiring refuses a foreign host label and an empty manifest set', (t) => {
+  // Break caught: two passing reports produced on one host must not be attributable to two measurement hosts.
+  const f = fixture(t, 'a-different-host');
+  const mismatch = f.check();
+  assert.equal(mismatch.status, 1);
+  assert.match(mismatch.stdout, /executing hostname: FAIL/);
+  const empty = join(f.dir, 'empty.json');
+  writeFileSync(empty, '{"schema":1,"host":"a-different-host","manifests":[]}');
+  const emptyResult = f.invoke(empty);
+  assert.notEqual(emptyResult.status, 0);
+  assert.doesNotMatch(emptyResult.stdout, /ALL PASS/);
 });
 
 test('wiring fails closed when the installed subscriber composition changed', (t) => {

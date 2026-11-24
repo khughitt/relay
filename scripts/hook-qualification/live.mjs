@@ -22,12 +22,12 @@ export function liveEnvironment({ home, port, path = '/usr/bin:/bin', terminal =
   };
 }
 
-export async function startStubModel({ runDir, replies }) {
+export async function startStubModel({ runDir, replies, stubModule = STUB, readyTimeoutMs = 5000 }) {
   const root = resolve(runDir), requests = join(root, 'requests');
   mkdirSync(requests, { recursive: true, mode: 0o700 });
   const script = join(root, 'script.json');
   writeFileSync(script, `${JSON.stringify(replies, null, 2)}\n`, { mode: 0o600 });
-  const child = spawn(process.execPath, [STUB, '0', requests, script], {
+  const child = spawn(process.execPath, [stubModule, '0', requests, script], {
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: { PATH: '/usr/bin:/bin', HOME: root, LANG: 'C.UTF-8' },
   });
@@ -38,7 +38,7 @@ export async function startStubModel({ runDir, replies }) {
   let stopResolved;
   const stopped = new Promise((done) => { stopResolved = done; });
   const ready = new Promise((resolveReady, reject) => {
-    const timer = setTimeout(() => reject(new Error(`stub did not listen: ${stderr || stdout}`)), 5000);
+    const timer = setTimeout(() => reject(new Error(`stub did not listen: ${stderr || stdout}`)), readyTimeoutMs);
     child.stdout.on('data', () => {
       const match = /listening (\d+)/.exec(stdout);
       if (match) { clearTimeout(timer); resolveReady(Number(match[1])); }
@@ -46,18 +46,20 @@ export async function startStubModel({ runDir, replies }) {
     child.once('error', (error) => { clearTimeout(timer); reject(error); });
     child.once('exit', (code) => { clearTimeout(timer); reject(new Error(`stub exited ${code}: ${stderr}`)); });
   });
-  const port = await ready;
-  return {
-    port,
-    async stop() {
-      if (child.exitCode !== null || child.signalCode !== null) { stopResolved(); return stopped; }
-      child.kill('SIGTERM');
-      await Promise.race([exited, delay(3000)]);
-      if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await exited; }
-      stopResolved();
-      return stopped;
-    },
+  const stop = async () => {
+    if (child.exitCode !== null || child.signalCode !== null) { stopResolved(); return stopped; }
+    child.kill('SIGTERM');
+    await Promise.race([exited, delay(3000)]);
+    if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await exited; }
+    stopResolved();
+    return stopped;
   };
+  try {
+    return { port: await ready, stop };
+  } catch (error) {
+    await stop();
+    throw error;
+  }
 }
 
 function harnessPath(value) {
@@ -68,14 +70,14 @@ function harnessPath(value) {
 }
 
 /** Run one startup session and one resumed session against a private Claude Code home. */
-export async function runClaudeTurns({ runDir, mode, claude, sleep = 0,
+export async function runClaudeTurns({ runDir, mode, claude, label, replies, sleep = 0,
   firstPrompt = 'selection first', resumePrompt = 'selection resumed',
   firstAnswer = 'selection first turn done', resumedAnswer = 'selection resumed turn done',
   model = 'claude-haiku-5-5', timeoutMs = 120000 }) {
+  requireThat(typeof label === 'string' && label.length > 0, 'runClaudeTurns needs a caller-supplied label');
+  requireThat(Array.isArray(replies) && replies.length > 0, 'runClaudeTurns needs a caller-supplied stub reply program');
   const root = resolve(runDir), home = join(root, 'home'), work = join(root, 'work');
-  const side = JSON.parse(readFileSync(join(root, 'probe.json'), 'utf8')).side;
   const executable = harnessPath(claude);
-  const replies = [{ text: firstAnswer }, { text: resumedAnswer }, { text: 'unexpected third answer' }];
   const stub = await startStubModel({ runDir: root, replies });
   const active = new Set();
   let aborted = null, tmuxCleanup = null;
@@ -133,7 +135,7 @@ export async function runClaudeTurns({ runDir, mode, claude, sleep = 0,
       const session = await printTurn(1, firstPrompt, null);
       await printTurn(2, resumePrompt, session);
     } else if (mode === 'interactive') {
-      const socketDir = mkdtempSync(join(tmpdir(), 'rqs-')), socket = join(socketDir, 'tmux.sock'), session = `selection-${side}`;
+      const socketDir = mkdtempSync(join(tmpdir(), 'rqs-')), socket = join(socketDir, 'tmux.sock'), session = label.replace(/[^A-Za-z0-9_-]/g, '-');
       const tmuxEnv = { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: root, LANG: 'C.UTF-8' };
       const tmux = (args, timeout = 10000) => run('tmux', ['-S', socket, ...args], { cwd: root, env: tmuxEnv, timeout });
       tmuxCleanup = () => { spawnSync('tmux', ['-S', socket, 'kill-server'], { env: tmuxEnv }); };
@@ -177,7 +179,7 @@ export async function runClaudeTurns({ runDir, mode, claude, sleep = 0,
       throw new Error(`unknown mode ${mode}`);
     }
     driver('done');
-    return { runDir: root, mode, claude: executable, version: readFileSync(join(root, 'claude-version.txt'), 'utf8').trim() };
+    return { runDir: root, mode, label, claude: executable, version: readFileSync(join(root, 'claude-version.txt'), 'utf8').trim() };
   } finally {
     process.removeListener('SIGINT', onInt); process.removeListener('SIGTERM', onTerm);
     if (tmuxCleanup) tmuxCleanup();

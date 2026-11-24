@@ -6,6 +6,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { basename, dirname, isAbsolute, normalize, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
@@ -31,11 +32,14 @@ export function checkWiring({ hq, snapshot, manifests }) {
   requireThat(git(repo, ['rev-parse', '--show-toplevel']) === repo, '--hq must name the hq checkout root');
   const snapshotBytes = readFileSync(snapshot);
   const snapshotValue = JSON.parse(snapshotBytes.toString('utf8'));
+  const executingHost = hostname();
   const reports = [];
   let ok = true;
   for (const file of manifests) {
     const set = JSON.parse(readFileSync(file, 'utf8'));
-    for (const manifest of set.manifests ?? [set]) {
+    const manifests = set.manifests ?? [set];
+    requireThat(Array.isArray(manifests) && manifests.length > 0, `${file}: the manifest set names no routes`);
+    for (const manifest of manifests) {
       const settings = manifest.settings, deployed = manifest.deployed;
       requireThat(settings?.repository === 'hq' && deployed, `${file}: the route needs hq settings and a deployed baseline`);
       const path = settings.path;
@@ -48,6 +52,8 @@ export function checkWiring({ hq, snapshot, manifests }) {
       const binding = deployedRelayBinding(blobValue.hooks, manifest.event);
       const installed = dirname(dirname(binding.entry));
       const checks = [
+        ['executing hostname', executingHost, manifest.host],
+        ['manifest set hostname', set.host ?? manifest.host, manifest.host],
         ['hq HEAD', head, settings.commit],
         ['settings blob', blob, settings.blob],
         ['filtered live file = index (git diff --quiet)', git(repo, ['diff', '--quiet', '--', path], true), true],

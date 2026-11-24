@@ -70,12 +70,12 @@ The runner launches no harness, so each host's installed harness version and the
 
 #### Committed support-check commands
 
-Run the decoder from the measured relay checkout. Each positional argument is a manifest set, optionally followed by `=` and the original prepared fixture directory. Use the `fixture` value from that run's `prepare.json` whenever an archived bundle has moved: fixture-relative `cwd` bytes are part of the timed input. Without the override, the tool resolves `manifest.fixture` beside the set file, as the runner does for an unmoved bundle.
+Run the decoder from a checkout containing this reviewed tooling; a historical measured checkout may predate `decode.mjs`. Pass the measured relay checkout explicitly as `--candidate` so normalization uses the measured code, and pass the exact workload file used by that measurement. Each positional argument is a manifest set, optionally followed by `=` and the fixture directory the runner actually used: `resolve(dirname(ORIGINAL_MANIFEST_SET), manifest.fixture)`. Use that override whenever an archived bundle has moved, because fixture-relative `cwd` bytes are part of the timed input. Do not substitute a `prepare.json` output path merely because it exists: the original manifest may have been frozen elsewhere, and `prepare.json` alone does not establish the runner's manifest-resolved fixture. Without the override, the tool resolves `manifest.fixture` beside the set file, as the runner does for an unmoved bundle.
 
 ```sh
 node scripts/hook-qualification/decode.mjs \
-  --candidate MEASURED_CHECKOUT --workload scripts/hook-qualification/workload.json \
-  HOST_A_SET=HOST_A_ORIGINAL_FIXTURE HOST_B_SET=HOST_B_ORIGINAL_FIXTURE > decode-timed-inputs.json
+  --candidate MEASURED_CHECKOUT --workload MEASURED_WORKLOAD \
+  HOST_A_SET=HOST_A_MEASUREMENT_FIXTURE HOST_B_SET=HOST_B_MEASUREMENT_FIXTURE > decode-timed-inputs.json
 ```
 
 The schema-1 report records each timed input's original `cwd`, total and padded byte counts, and normalized `kind`, `cwd`, `identity`, `facts` and `private` fields. An invalid decoded field, such as the padded relative `scratchpadDir`, is retained explicitly. A normalization exception produces an error entry and a nonzero exit. Use the decoded objects as the expected-event evidence; do not recreate the padding in another script.
@@ -87,9 +87,9 @@ node scripts/hook-qualification/wiring.mjs \
   --hq HQ_CHECKOUT --snapshot FROZEN_SETTINGS HOST_MANIFEST_SET... > wiring-HOST.out
 ```
 
-This verifies hq HEAD and the settings blob, the filtered live-to-index and index-to-HEAD diffs, snapshot and blob hooks-table identity, the installed package listing and subscriber config digests, and the relay entry's outer budget. It does not read or name the harness settings link, `git status` or a raw live-settings hash, and uses `GIT_OPTIONAL_LOCKS=0`. Run it read-only on the other host through the ordinary authorized SSH route. The settings-link `readlink -f` check, when required, is a separate operator command rather than part of this tool.
+This verifies a nonempty manifest set, that the executing hostname equals each set's and manifest's recorded host, hq HEAD and the settings blob, the filtered live-to-index and index-to-HEAD diffs, snapshot and blob hooks-table identity, the installed package listing and subscriber config digests, and the relay entry's outer budget. It does not read or name the harness settings link, `git status` or a raw live-settings hash, and uses `GIT_OPTIONAL_LOCKS=0`. Run it read-only on the other host through the ordinary authorized SSH route. The settings-link `readlink -f` check, when required, is a separate operator command rather than part of this tool.
 
-For the selection probe, use a private run directory for each side and mode. The `run` command writes the expected entries before starting the harness, replaces every command in the input settings' `hooks` table while preserving its event/group/matcher/timeout structure, and loads only that hook table into the scratch home. Plugin-provided hooks and non-hook settings are not part of this check. `live.mjs` supplies the shared private-home, stub-model and two-turn driver used by this probe and the other live qualification probes; do not add a selection-specific second driver.
+For the selection probe, use a private run directory for each side and mode. The `run` command writes the expected entries before starting the harness, replaces every command in the input settings' `hooks` table while preserving its event/group/matcher/timeout structure, and loads only that hook table into the scratch home. Plugin-provided hooks and non-hook settings are not part of this check. `live.mjs` supplies the shared private-home, stub-model and two-turn driver used by this probe and the other live qualification probes; callers provide the run label and arbitrary stub reply program (text, tool call or API error), not a selection `probe.json`. Do not add a selection-specific second driver.
 
 ```sh
 umask 077
@@ -111,7 +111,7 @@ node scripts/hook-qualification/selection.mjs map MANIFEST_SET \
 
 Set `BASELINE_SETTINGS` and `CANDIDATE_SETTINGS` to the two frozen settings files; the loop chooses the appropriate one for each side. `CLAUDE` is the exact candidate binary; omit `--claude` to resolve `claude` on PATH. Every run starts one session and one prompt, then resumes it with another prompt, using a local stub model and an allowlisted environment with no real credential. Interactive mode uses a private tmux server and no live desktop windows. The normal applicable host-use approval is still required before launching the real harness; the tools and their fixture tests do not grant it. No metered API request is made.
 
-The verdict compares each event's actual entry indices with `expected-entries.json`: SessionStart fires once at startup and once at resume, and Stop once on each turn. Missing and additional entries fail. `map` then checks every baseline and retained-candidate branch through the manifest's branch names (or an explicit branch `settingsEntry`), including one-to-many splits such as `claude-sessionstart.*`, and checks native references in `replacementMap`.
+The verdict compares each event's actual entry indices and raw recorder payloads with `expected-entries.json`: every SessionStart entry has one `source: startup` and one `source: resume` payload, and every Stop entry has one payload before and one after the resumed session starts. Missing, additional or repeated-in-one-turn entries fail. `map` then checks every baseline and retained-candidate branch through the manifest's branch names (or an explicit branch `settingsEntry`), including one-to-many splits such as `claude-sessionstart.*`, checks native references in `replacementMap`, and requires retained candidate entries to keep the baseline command, matcher and timeout exactly.
 
 For the timing variant, choose a sleep longer than a configured short timeout and shorter than the timeout values you need to show completing (8 s distinguishes the recorded 5 s `turn-pause` entry from the 600 s and default entries):
 
@@ -122,7 +122,7 @@ node scripts/hook-qualification/selection.mjs run \
 node scripts/hook-qualification/selection.mjs verdict --sleep 8 "$RUNS/baseline-MODE-sleep8"
 ```
 
-The timing verdict requires recorder starts and ends for longer/default entries and both turns, plus the harness debug log's exact timeout diagnostic (for example `timed out after 5000ms`) for each short entry. It exercises the short timeout exactly; longer/default entries establish only a lower bound, not their exact expiry. `null` and absent timeout fields both mean the harness default.
+The timing verdict requires recorder starts and ends for longer/default entries on both turns, plus each turn's own harness debug log carrying the exact timeout diagnostic (for example `timed out after 5000ms`) for each short entry. Two diagnostics from one turn cannot stand in for the other turn. It exercises the short timeout exactly; longer/default entries establish only a lower bound, not their exact expiry. `null` and absent timeout fields both mean the harness default.
 
 Payload size and list lengths are benchmark parameters: a passed row qualifies the binding's transport cost as timed on the benchmark, and install enforces no payload limit. The row keeps the measured hosts' `evidence` lines and adds the expected decoded event, the candidate digest and one line per host naming its recorded version and mode and how each condition was established. Those per-host support lines must not use the `host=` token: install reads every `host=` line as a measured result and requires its `outerMs=`. If any condition fails or cannot be established for either host, latency stays `unknown` with an open owner until both hosts are remeasured. Never support one host and remeasure the other. Support covers latency only: every column that needs a live probe still needs one at the exact version and mode.
 

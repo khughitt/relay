@@ -52,16 +52,20 @@ test('decode.mjs rebuilds and normalizes the exact timed Stop payload', (t) => {
   const result = report.results[0];
   assert.equal(result.host, 'host-a');
   assert.equal(result.event, 'Stop');
-  assert.equal(result.cwd, join(dir, 'fixture', 'cwd'));
+  const expectedCwd = join(dir, 'fixture', 'cwd');
+  const expectedPadding = 1024 - Buffer.byteLength(JSON.stringify({ cwd: expectedCwd, ...payload,
+    session_crons: [{ ...payload.session_crons[0], prompt: '' }] }));
+  assert.ok(expectedPadding > 0);
+  assert.equal(result.cwd, expectedCwd);
   assert.equal(result.bytes, 1024);
   assert.deepEqual(result.padField, ['session_crons', 0, 'prompt']);
-  assert.equal(result.paddedBytes, 720);
+  assert.equal(result.paddedBytes, expectedPadding);
   assert.equal(result.decoded.kind, 'turn-end');
   assert.equal(result.decoded.cwd, result.cwd);
   assert.deepEqual(result.decoded.identity, { status: 'valid', value: { agentId: 'claude-code:sess', sessionId: 'sess' } });
   assert.deepEqual(result.decoded.facts.stopHookActive, { status: 'valid', value: false });
   assert.equal(result.decoded.private.backgroundTasks.value.length, 2);
-  assert.equal(result.decoded.private.sessionCrons.value[0].prompt.length, 720);
+  assert.equal(result.decoded.private.sessionCrons.value[0].prompt.length, expectedPadding);
 });
 
 test('decode.mjs accepts the original prepared fixture when an archived manifest moved', (t) => {

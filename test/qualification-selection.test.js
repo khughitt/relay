@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,12 +65,20 @@ function verdictRun(t, name, { sleep = 0, timeoutEvidence = true } = {}) {
   });
   const lines = [];
   let clock = 100;
-  const record = (event, index, what) => { lines.push(`baseline ${event} ${index} ${1000 + index} ${what} ${clock += 1}`); };
+  const record = (event, index, what, turn) => {
+    clock += 1;
+    if (what === 'start') writeJson(join(dir, 'payloads', `${event}-${index}-${clock}.json`), {
+      cwd: '/work', hook_event_name: event, session_id: 's',
+      ...(event === 'SessionStart' ? { source: turn === 0 ? 'startup' : 'resume', transcript_path: '/t', model: 'm' }
+        : { stop_hook_active: false, background_tasks: [], session_crons: [] }),
+    });
+    lines.push(`baseline ${event} ${index} ${1000 + index} ${what} ${clock}`);
+  };
   for (let turn = 0; turn < 2; turn++) {
-    record('SessionStart', 0, 'start'); record('SessionStart', 0, 'end');
+    record('SessionStart', 0, 'start', turn); record('SessionStart', 0, 'end', turn);
     for (const index of [0, 1, 2]) {
-      record('Stop', index, 'start');
-      if (!sleep || index !== 2) record('Stop', index, 'end');
+      record('Stop', index, 'start', turn);
+      if (!sleep || index !== 2) record('Stop', index, 'end', turn);
     }
   }
   mkdirSync(dir, { recursive: true });
@@ -80,8 +88,6 @@ function verdictRun(t, name, { sleep = 0, timeoutEvidence = true } = {}) {
     writeFileSync(join(dir, 'debug-1.log'), debug);
     writeFileSync(join(dir, 'debug-2.log'), debug);
   }
-  mkdirSync(join(dir, 'payloads'), { recursive: true });
-  writeJson(join(dir, 'payloads/SessionStart-0-1.json'), { cwd: '/work', hook_event_name: 'SessionStart', session_id: 's', source: 'startup', transcript_path: '/t', model: 'm' });
   return dir;
 }
 
@@ -110,6 +116,30 @@ test('the timing variant requires the configured short timeout to fire and long 
   const refused = invoke(dirname(bad), ['verdict', '--sleep', '8', bad]);
   assert.equal(refused.status, 1);
   assert.match(refused.stdout, /Stop .*FAIL/);
+});
+
+test('the selection verdict requires the resume matcher, not two startup payloads', (t) => {
+  // Break caught: two first-turn invocations must not satisfy startup plus resume coverage.
+  const run = verdictRun(t, 'missing-resume');
+  for (const file of readdirSync(join(run, 'payloads')).filter((name) => name.startsWith('SessionStart-'))) {
+    const path = join(run, 'payloads', file), value = readJson(path);
+    value.source = 'startup';
+    writeJson(path, value);
+  }
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /SessionStart .*FAIL/);
+});
+
+test('the timing verdict needs the short-timeout diagnostic in each turn log', (t) => {
+  // Break caught: two diagnostics from turn one do not establish the timeout on the resumed turn.
+  const run = verdictRun(t, 'timeout-one-turn', { sleep: 8 });
+  const debug = readFileSync(join(run, 'debug-1.log'), 'utf8');
+  writeFileSync(join(run, 'debug-1.log'), debug.repeat(2));
+  writeFileSync(join(run, 'debug-2.log'), '');
+  const result = invoke(dirname(run), ['verdict', '--sleep', '8', run]);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /Stop .*FAIL/);
 });
 
 const entry = (index, command, timeout) => ({ index, command, timeout });
@@ -151,4 +181,9 @@ test('the manifest mapping accounts for split baseline branches and candidate re
     { name: 'deployed-relay', role: 'deployed-relay' }, { name: 'turn-pause', role: 'native', migrates: false },
   ] }] });
   assert.equal(invoke(dirname(baseStop), ['map', stopManifest, baseStop, candStop, 'Stop']).status, 0);
+  const candidateEntries = readJson(join(candStop, 'expected-entries.json'));
+  candidateEntries.Stop[1].timeout = 600;
+  writeJson(join(candStop, 'expected-entries.json'), candidateEntries);
+  assert.equal(invoke(dirname(baseStop), ['map', stopManifest, baseStop, candStop, 'Stop']).status, 1,
+    'a retained hook must retain its original timeout as well as its basename');
 });
