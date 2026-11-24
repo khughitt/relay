@@ -38,7 +38,8 @@ async function closable(t, ctx) {
   const conn = await connectSocket(ctx.socketPath); t.after(() => conn.close());
   const now = Date.now(), sentinel = questionMessage({ createdAt: now,
     body: { expiresAt: now + 3_600_000, native: { harness: 'claude-code', sessionId: 's1', callId: 'toolu_sentinel' } } });
-  assert.equal((await conn.request('ask', { message: sentinel, waiter: HANDLE, handback: false })).ok, true);
+  const reply = await conn.request('ask', { message: sentinel, waiter: HANDLE, handback: false });
+  assert.deepEqual([reply.ok, reply.entry?.state], [true, 'pending']);
   return { conn, sentinel, async close() {
     const seen = nextCall(ctx.inbox, 'askerGone', (id) => id === sentinel.id);
     conn.close(); await seen;

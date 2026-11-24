@@ -247,6 +247,8 @@ export function createProcessOps({ platform = process.platform, readText = (p) =
   // Darwin's lstart is the recorded wall-clock start, truncated to the second.
   /** @param {import("../types.js").ProcessRow} row @returns {{lo: number, hi: number}} */
   const startedAtMs = (row) => {
+    if (typeof row.starttime !== 'string' || !/^[0-9]+$/.test(row.starttime))
+      throw relayError('PROCESS_UNREADABLE', 'invalid process start');
     const start = Number(row.starttime);
     if (!Number.isSafeInteger(start)) throw relayError('PROCESS_UNREADABLE', 'process start out of range');
     if (platform === 'darwin') return { lo: start * 1000, hi: start * 1000 + 999 };

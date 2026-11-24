@@ -51,13 +51,14 @@ export function bindingProcess(chain, index, ops) {
 
 /** @param {{env?: NodeJS.ProcessEnv, ops?: ModelOps, startPid?: number, timeZone?: string, list?: (dir: string) => string[]|null, scanLimit?: number}} [options]
  * @returns {import("../model-identity.js").ModelResult} */
-export function resolveCodexModel({ env = process.env, ops = createProcessOps(), startPid = process.pid, timeZone, list = listDir, scanLimit = SCAN_LIMIT } = {}) {
+export function resolveCodexModel({ env = process.env, ops: processOps, startPid = process.pid, timeZone, list = listDir, scanLimit = SCAN_LIMIT } = {}) {
   /** @type {Record<string, unknown>} */
   const source = {};
   const thread = env.CODEX_THREAD_ID;
   if (!thread) return unverified('codex', 'no-thread', 'CODEX_THREAD_ID is not set; only a Codex tool call carries it');
   if (!UUID_V7.test(thread)) throw relayError('INVALID_INPUT', 'CODEX_THREAD_ID is not a lowercase UUIDv7');
   source.thread = thread;
+  const ops = processOps ?? createProcessOps();
   const chain = chainWithInit(ops, startPid);
   const nearest = nearestHarness(chain, { executableOf: (pid) => ops.executableOf(pid) });
   source.nearest = nearest?.harness ?? null;

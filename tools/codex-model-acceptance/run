@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Live acceptance for `relay model` (see docs/adapters.md, "Codex model resolution").
-# Usage: run exec <outdir>  |  run tui start|say|keys|pane|stop <outdir> [text]
+# Usage: run exec <outdir>  |  run tui <outdir> start|say|keys|pane|stop [text]
 # Every Codex here runs in a scratch work directory; the TUI runs in a private, detached tmux server.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)

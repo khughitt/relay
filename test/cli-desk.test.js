@@ -12,6 +12,7 @@ import { expectAnswers } from '../src/routes/index.js';
 import { parseValues, runInbox, runPresence } from '../src/cli/desk.js';
 import { runCli } from './helpers/cli-interaction.js';
 import { HANDLE, NOW, questionMessage, answerMessage } from './helpers/interaction.js';
+import { until } from './helpers/wait.js';
 
 const worker = new URL('./fixtures/serve-worker.js', import.meta.url).pathname;
 const waiterFile = new URL('./fixtures/socket-waiter.js', import.meta.url).pathname;
@@ -87,12 +88,10 @@ test('undeliverable output includes the saved answer and recorded reason', { tim
   const answer = await runInbox({ action: 'answer', args: [q.id, 'q1=o2'], socketPath });
   await asker.next((m) => m.type === 'state' && m.entry.state === 'answered');
   asker.child.kill('SIGKILL'); await asker.exited;
-  let result;
-  for (let i = 0; i < 20; i++) {
-    result = await runInbox({ action: 'show', args: [q.id], socketPath });
-    if (result.json.entry.state === 'undeliverable') break;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
+  const result = await until(async () => {
+    const current = await runInbox({ action: 'show', args: [q.id], socketPath });
+    return current.json.entry.state === 'undeliverable' ? current : null;
+  }, { what: 'the saved answer to become undeliverable' });
   assert.equal(result.json.entry.answer.id, answer.json.entry.answer.id);
   assert.match(result.text, /reason: asker-gone/);
   assert.match(result.text, /"answerId"/);

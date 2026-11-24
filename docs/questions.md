@@ -118,7 +118,7 @@ Detached questions (`native: null`, `from: { kind: 'agent', ... }`, `to: { kind:
 
 `defer` releases a handback route (`pending -> released`); otherwise it leaves `pending` with `presentation: 'desktop'`. Asker loss or reaching `expiresAt` while an answer is saved (`state: 'answered'`) transitions to `undeliverable`. A retry with the saved `answerId` returns the entry in every answer-holding state; a competing answer or defer fails with `ALREADY_ANSWERED` (returning the winning entry), and withdrawal after answer fails with `ANSWERED`. An `artifactRevision` mismatch logs a `refusal:STALE` attempt row before returning `STALE` with the expected revision.
 
-`relay serve` is the sole inbox writer (`src/interaction/store.js`). Startup `fsync`s `$STATE`, `$STATE/inbox`, and writable same-uid ancestors, allocates monotonic sequence numbers in `inbox/seq` before publishing entries, prunes terminal entries older than 30 days at startup and daily (measured from `updatedAt`; taking an `undeliverable` answer restarts its 30-day window), and quarantines invalid durable entries in `inbox/rejected/`.
+`relay serve` is the sole inbox writer (`src/interaction/store.js`). Startup `fsync`s `$STATE`, `$STATE/inbox`, and every writable ancestor whose child on the state path is owned by the service UID. This includes `/` for a root service with a root-owned child on that path. The service allocates monotonic sequence numbers in `inbox/seq` before publishing entries, prunes terminal entries older than 30 days at startup and daily (measured from `updatedAt`; taking an `undeliverable` answer restarts its 30-day window), and quarantines invalid durable entries in `inbox/rejected/`.
 
 ## Local socket protocol
 
@@ -126,7 +126,7 @@ Detached questions (`native: null`, `from: { kind: 'agent', ... }`, `to: { kind:
 
 | `op` | Fields | Result / pushes / errors |
 | --- | --- | --- |
-| `ask` | `message` (question), `waiter` (`Handle \| null`), `handback` (`boolean`) | Detached asks require `waiter: null` and `handback: false`, always return `entry`, and create no waiter subscription. Native asks return `passthrough: true` while `here`, or `entry` with later `{type: "state", entry}` pushes. Expiry is clamped to `createdAt + 7d` (detached) or `createdAt + 23h` (Claude Code). Identical resends with the same waiter return the saved entry; a resend of an existing native question whose `waiter` handle does not match the recorded waiter fails with `NOT_WAITER`, and reusing an existing entry ID with different question content fails with `ID_CONFLICT`. |
+| `ask` | `message` (question), `waiter` (`Handle \| null`), `handback` (`boolean`) | Detached asks require `waiter: null` and `handback: false`, always return `entry`, and create no waiter subscription. Codex native asks on this socket fail with `UNSUPPORTED_ROUTE` in either presence mode. On supported native routes a new ask returns `passthrough: true` while `here`, or `entry` with later `{type: "state", entry}` pushes. Expiry is clamped to `createdAt + 7d` (detached) or `createdAt + 23h` (Claude Code). Identical resends with the same waiter return the saved entry; a resend of an existing native question whose `waiter` handle does not match the recorded waiter fails with `NOT_WAITER`, and reusing an existing entry ID with different question content fails with `ID_CONFLICT`. |
 | `handed` | `id`, `waiter` (`Handle`) | `entry`; only the recorded waiter may take the answer (`NOT_WAITER` otherwise); replay is idempotent. |
 | `take` | `id` (question UUID) | `entry`; consumes a detached `answered` or `undeliverable` question, or returns its `consumed` entry unchanged. |
 | `confirm` | `harness`, `callId`, `observed` (native answers map) | `entry`. |
@@ -153,7 +153,7 @@ Every path, including static assets, is guarded:
 
 | Method and path | Request / response |
 | --- | --- |
-| `GET /v1/inbox?since=<seq>` | `{seq, entries}`; `since` must be plain decimal digits (`400 INVALID_INPUT` otherwise). |
+| `GET /v1/inbox?since=<seq>` | `{seq, entries}`; `since` must be a nonnegative safe integer in canonical decimal form, with no sign or leading zeros (`400 INVALID_INPUT` otherwise). |
 | `GET /v1/inbox/<id>` | `{entry}`, including terminal entries (`404 NOT_FOUND` if absent). |
 | `POST /v1/inbox/<id>/answer` | `AnswerBody` -> `200 {entry}`, or `409 {error: {code, message}, entry}` plus winning `answer` or expected `revision`. |
 | `POST /v1/inbox/<id>/defer` | `DeferBody` -> `200 {entry}`, or `409 {error: {code, message}, entry}`. |

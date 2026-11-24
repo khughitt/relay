@@ -259,3 +259,8 @@ test('an unreadable or malformed uptime, or an unsafe start, is PROCESS_UNREADAB
   assert.throws(() => withText(() => { throw Object.assign(new Error('denied'), { code: 'EACCES' }); }).startedAtMs(startRow('1')), { code: 'PROCESS_UNREADABLE' });
   assert.throws(() => withText(() => '1.00 0.00\n').startedAtMs(startRow('9007199254740993')), { code: 'PROCESS_UNREADABLE' });
 });
+test('start interval rejects missing and non-decimal process starts', () => {
+  const ops = createProcessOps({ platform: 'darwin' });
+  for (const start of ['', null, ' ', '-1', '1e2', '0x10'])
+    assert.throws(() => ops.startedAtMs(startRow(start)), { code: 'PROCESS_UNREADABLE' }, JSON.stringify(start));
+});

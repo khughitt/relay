@@ -15,7 +15,7 @@ export async function until(check, { timeoutMs = 10000, intervalMs = 10, what = 
 // Resolves at the first call of object[method] whose arguments satisfy match, with those arguments
 // and the call's result. The call itself runs unchanged, and the original method is restored at
 // that call. Services look their inbox's methods up at call time, so this shows when a request has
-// reached the inbox.
+// reached the inbox. Use one active nextCall per method.
 export function nextCall(object, method, match = () => true) {
   const original = object[method];
   return new Promise((resolve) => {

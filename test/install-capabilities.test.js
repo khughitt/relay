@@ -28,6 +28,18 @@ test('guard bindings require passed refusal and context probes at the configured
     evidence: parseEvidence(evidence([probe('refuse'), probe('context')])), }), { evidence: { harness: 'codex', version: '0.154.0' } });
 });
 
+test('the missing probe diagnostic shows Claude route guidance only for Claude Code', () => {
+  const bindings = [{ event: 'PreToolUse', outerMs: 30000 }];
+  for (const harness of ['claude-code', 'codex']) {
+    assert.throws(() => validateCapabilities({ harness, subscribers: subscribers({ ...guard, harnesses: [harness] }), bindings }), (error) => {
+      assert.equal(error.code, 'UNSUPPORTED_BINDING');
+      assert.ok(error.message.includes(`missing capability probe (${harness},PreToolUse,refuse)`));
+      assert.equal(error.message.includes('docs/runbooks/inbox-service.md'), harness === 'claude-code');
+      return true;
+    });
+  }
+});
+
 test('observation-only bindings need no evidence and guards cannot target OpenCode', () => {
   assert.deepEqual(validateCapabilities({ harness: 'codex', subscribers: subscribers(), bindings: [{ event: 'SessionStart', outerMs: 60000 }] }), { evidence: null });
   assert.throws(() => validateCapabilities({ harness: 'opencode', subscribers: { subscribers: [{ ...guard, harnesses: ['opencode'] }] },
