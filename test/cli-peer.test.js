@@ -37,6 +37,16 @@ test('open, join, send from standard input, wait and close', { timeout: 30000 },
   assert.match((await run(p, L, ['show', TASK])).stdout, /closed by codex:reviewer: done\nlead claude-code:lead\nreviewer codex:reviewer\n$/);
 });
 
+test('every session command emits one JSON value under --json', { timeout: 30000 }, async (t) => {
+  const p = await tempState(t); await serveCli(t, p);
+  for (const [id, args, code] of [[L, ['open', TASK], 0], [R, ['join', TASK], 0], [L, ['send', TASK, '--file', '-'], 0], [R, ['wait', TASK], 0],
+    [R, ['wait', TASK, '--timeout-ms', '20'], 5], [R, ['close', TASK], 0], [L, ['wait', TASK], 0], [L, ['wait', TASK], 3]]) {
+    const r = await run(p, id, [...args, '--json'], 'text');
+    assert.equal(r.code, code, `${args}: ${r.stderr}`);
+    assert.doesNotThrow(() => JSON.parse(r.stdout), r.stdout);
+  }
+});
+
 test('usage errors exit 2 and a missing service is named', { timeout: 30000 }, async (t) => {
   const p = await tempState(t);
   for (const args of [[], ['open'], ['open', TASK, 'extra'], ['send', TASK], ['wait', TASK, '--timeout-ms', '0'], ['open', 'not a task'], ['send', TASK, '--from', 'user'], ['bogus', TASK]]) {
