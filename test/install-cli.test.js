@@ -59,6 +59,25 @@ test('install reads the subscriber file with the runtime checks and writes its p
   assert.equal(relative.code, 1); assert.match(relative.err, /INVALID_CONFIG: subscriber config path must be absolute/);
 });
 
+test('plain Claude install reports malformed dispatch and ask hooks without changing the target', async (t) => {
+  const s = await scratch(t);
+  const args = ['install', '--harness', 'claude-code', '--subscribers', s.file, '--target', s.target, ...await s.q('claude-code')];
+  const ask = { hooks: [{ type: 'command', command: 'relay ask --harness claude-code PostToolUse' }] };
+  for (const [hooks, message] of [
+    [{ SessionStart: {} }, 'hooks.SessionStart must be an array'],
+    [{ PostToolUse: {} }, 'hooks.PostToolUse must be an array'],
+    [{ PostToolUse: null }, 'hooks.PostToolUse must be an array'],
+    [{ PostToolUse: [ask, ask] }, 'duplicate relay ask writer for PostToolUse'],
+  ]) {
+    const text = JSON.stringify({ hooks });
+    await writeFile(s.target, text);
+    const result = await install(args);
+    assert.equal(result.code, 1, result.out);
+    assert.equal(JSON.parse(result.err).error.detail, `INVALID_CONFIG: ${message}`);
+    assert.equal(await readFile(s.target, 'utf8'), text);
+  }
+});
+
 test('install refuses a subscriber file the hook would refuse at runtime', async (t) => {
   const s = await scratch(t);
   const cases = [

@@ -14,7 +14,7 @@ import { tempState } from './helpers/fixture.js';
 import { spawnLines } from './helpers/spawn-lines.js';
 import { connectSocket } from '../src/serve/client.js';
 import { uuid } from './helpers/interaction.js';
-import { until } from './helpers/wait.js';
+import { nextCall, settledYet, until } from './helpers/wait.js';
 
 const worker = new URL('./fixtures/serve-worker.js', import.meta.url).pathname;
 const hook = new URL('./fixtures/ask-hook.js', import.meta.url).pathname;
@@ -265,12 +265,12 @@ test('a decline is handed and confirmed like an answer', { timeout: 30000 }, asy
 
 test('the hook cannot return stdout before the handed acknowledgement', { timeout: 30000 }, async (t) => {
   const p = await tempState(t), socketPath = join(p.stateDir, 'serve.sock');
-  let release, reached;
-  const hit = new Promise((resolve) => { reached = resolve; });
-  t.after(() => release?.());
+  let release;
+  const hold = new Promise((resolve) => { release = resolve; });
+  t.after(release);
   const io = { ...fs, rename: async (from, to) => {
     if (to.endsWith('.json') && JSON.parse(await readFile(from, 'utf8')).state === 'handed') {
-      reached(); await new Promise((resolve) => { release = resolve; });
+      await hold;
     }
     return fs.rename(from, to);
   } };
@@ -279,12 +279,14 @@ test('the hook cannot return stdout before the handed acknowledgement', { timeou
   const server = await serveSocket({ inbox, socketPath, processOps: createProcessOps(), log: () => {} });
   t.after(() => server.close());
   const client = await connectSocket(socketPath); t.after(() => client.close());
-  let finished = false;
-  const running = runAsk({ nativeEvent: 'PreToolUse', stdin: Readable.from([pre()]), socketPath, env: { RELAY_STATE_DIR: p.stateDir } }).then((r) => { finished = true; return r; });
+  const running = runAsk({ nativeEvent: 'PreToolUse', stdin: Readable.from([pre()]), socketPath, env: { RELAY_STATE_DIR: p.stateDir } });
   const e = await entryFor(client);
-  await client.request('answer', { message: answer(e) });
-  await hit;
-  try { await new Promise((resolve) => setTimeout(resolve, 50)); assert.equal(finished, false); }
+  const handed = nextCall(inbox, 'handed', (id) => id === e.id);
+  try {
+    assert.equal((await client.request('answer', { message: answer(e) })).ok, true);
+    await handed;
+    assert.equal(await settledYet(running), false);
+  }
   finally { release(); }
   assert.equal(JSON.parse((await running).stdout).hookSpecificOutput.permissionDecision, 'allow');
 });

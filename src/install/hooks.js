@@ -83,7 +83,7 @@ export function versionWarnings({ nodeBin, relayBin }) {
 // budget in milliseconds. A profile that is not a positive whole second cannot be written.
 /** @param {number} outerMs */
 export function timeoutSeconds(outerMs) {
-  if (!Number.isInteger(outerMs) || outerMs < 1000 || outerMs % 1000 !== 0) throw new Error(`outer timeout must be positive whole seconds in milliseconds: ${outerMs}`);
+  if (!Number.isInteger(outerMs) || outerMs < 1000 || outerMs % 1000 !== 0) throw relayError('INVALID_CONFIG', `outer timeout must be positive whole seconds in milliseconds: ${outerMs}`);
   return outerMs / 1000;
 }
 /** @param {string} value @param {string|undefined} matcher @param {number} outerMs */
@@ -91,7 +91,7 @@ const entry = (value, matcher, outerMs) => ({ ...(matcher === undefined ? {} : {
 
 /** @param {string} harness @returns {import("../types.js").Binding[]} */
 export function bindingsFor(harness) {
-  if (!Object.hasOwn(table, harness)) throw new Error(`unsupported hook harness: ${harness}`);
+  if (!Object.hasOwn(table, harness)) throw relayError('UNSUPPORTED_BINDING', `unsupported hook harness: ${harness}`);
   return table[harness].map(([event, matcher, outerMs = 600000]) => ({ event, matcher, outerMs }));
 }
 
@@ -116,26 +116,27 @@ function parseHooks(text) {
   const errors = /** @type {import("jsonc-parser").ParseError[]} */ ([]), value = parse(text, errors, { allowTrailingComma: true });
   if (errors.length || value === null || typeof value !== 'object' || Array.isArray(value)
     || (value.hooks !== undefined && (value.hooks === null || typeof value.hooks !== 'object' || Array.isArray(value.hooks)))) {
-    throw new Error(`malformed hooks JSONC${errors.length ? `: ${errors.map(error => printParseErrorCode(error.error)).join(', ')}` : ''}`);
+    throw relayError('INVALID_CONFIG', `malformed hooks JSONC${errors.length ? `: ${errors.map(error => printParseErrorCode(error.error)).join(', ')}` : ''}`);
   }
 }
 
 /** @param {import("../types.js").HookPlan} options */
 export function planHooks({ text, harness, relayBin, subscribersPath, nodeBin = process.execPath, retireFamiliar = false, bindings = bindingsFor(harness) }) {
-  if (typeof subscribersPath !== 'string' || !isAbsolute(subscribersPath)) throw new Error('subscriber path must be absolute');
-  if (typeof nodeBin !== 'string' || !isAbsolute(nodeBin)) throw new Error('node path must be absolute');
+  if (typeof subscribersPath !== 'string' || !isAbsolute(subscribersPath)) throw relayError('INVALID_CONFIG', 'subscriber path must be absolute');
+  if (typeof nodeBin !== 'string' || !isAbsolute(nodeBin)) throw relayError('INVALID_CONFIG', 'node path must be absolute');
   parseHooks(text);
   let output = text;
   for (const binding of bindings) {
-    const key = nativeKey(binding.event), existing = parse(output).hooks?.[key] ?? [];
-    if (!Array.isArray(existing)) throw new Error(`hooks.${key} must be an array`);
+    const key = nativeKey(binding.event);
+    const { [key]: existing = [] } = parse(output).hooks ?? {};
+    if (!Array.isArray(existing)) throw relayError('INVALID_CONFIG', `hooks.${key} must be an array`);
     /** @param {any} item */
     const same = item => item?.matcher === binding.matcher && Array.isArray(item.hooks) && item.hooks.length === 1
       && item.hooks[0]?.type === 'command' && typeof item.hooks[0].command === 'string';
     const matched = existing.filter(same), owned = matched.filter(item => relay(item.hooks[0].command, harness, binding.event));
-    if (owned.length > 1) throw new Error(`duplicate relay writer for ${binding.event}`);
+    if (owned.length > 1) throw relayError('INVALID_CONFIG', `duplicate relay writer for ${binding.event}`);
     const old = matched.find(item => familiar(item.hooks[0].command, binding.event));
-    if (old && !retireFamiliar) throw new Error(`familiar writer for ${binding.event} requires --retire familiar`);
+    if (old && !retireFamiliar) throw relayError('INVALID_CONFIG', `familiar writer for ${binding.event} requires --retire familiar`);
     const next = existing.filter(item => item !== owned[0] && item !== old);
     next.push(entry(command(nodeBin, relayBin, harness, binding.event, binding.outerMs, subscribersPath), binding.matcher, binding.outerMs));
     const edits = modify(output, ['hooks', key], next, { formattingOptions: { insertSpaces: true, tabSize: 2 } });
@@ -176,16 +177,16 @@ const askOwned = (value, harness, event) => new RegExp(`^(?:${executable} )?${ex
 // that no longer supports a binding takes it out on the next plan.
 /** @param {{text: string, harness: string, relayBin: string, nodeBin?: string, rows: import("../types.js").Binding[]}} options */
 export function planRouteHooks({ text, harness, relayBin, nodeBin = process.execPath, rows }) {
-  if (typeof nodeBin !== 'string' || !isAbsolute(nodeBin) || !isAbsolute(relayBin)) throw new Error('node and relay paths must be absolute');
+  if (typeof nodeBin !== 'string' || !isAbsolute(nodeBin) || !isAbsolute(relayBin)) throw relayError('INVALID_CONFIG', 'node and relay paths must be absolute');
   parseHooks(text);
   let output = text;
   for (const event of ROUTE_EVENTS) {
     const row = rows.find((r) => r.event === event) ?? null;
-    const existing = parse(output).hooks?.[event] ?? [];
-    if (!Array.isArray(existing)) throw new Error(`hooks.${event} must be an array`);
+    const { [event]: existing = [] } = parse(output).hooks ?? {};
+    if (!Array.isArray(existing)) throw relayError('INVALID_CONFIG', `hooks.${event} must be an array`);
     const owned = existing.filter((item) => Array.isArray(item?.hooks) && item.hooks.length === 1
       && typeof item.hooks[0]?.command === 'string' && askOwned(item.hooks[0].command, harness, event));
-    if (owned.length > 1) throw new Error(`duplicate relay ask writer for ${event}`);
+    if (owned.length > 1) throw relayError('INVALID_CONFIG', `duplicate relay ask writer for ${event}`);
     if (!row && owned.length === 0) continue;
     const next = existing.filter((item) => item !== owned[0]);
     if (row) next.push(entry(askCommand(nodeBin, relayBin, harness, event, row.handback === true), row.matcher, row.outerMs));

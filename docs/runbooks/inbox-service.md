@@ -177,15 +177,22 @@ The 30 days run from the last durable change. Taking an undeliverable answer
 restarts that window; repeated take does not. Once pruned, take returns NOT_FOUND.
 Older relay versions can quarantine entries with take/refusal histories; use a
 version that understands these entries rather than downgrading against the store.
+On upgrade from versions that accepted uppercase UUIDs, startup quarantines
+entries with uppercase UUID text and can quarantine pending replacements whose
+predecessor failed validation. A stored Claude Code question whose expiry exceeds
+`createdAt + 23 h` can still load, but resending it returns `ID_CONFLICT` because
+the resend is clamped. Versions predating the `answered → undeliverable` expiry
+transition can quarantine entries with that history.
 
 `STORE_FAILED` stops the service after a failed durable write; restart reconciles
 what reached disk before accepting clients. Startup syncs every directory on the
 configured absolute state path that can hold a link relay created, including
 recursively created directories and links left by interrupted initialization: the
 state directory, the inbox, and each ancestor whose child on the path is owned by the
-service's uid and which that uid may write. An ancestor relay could not have written
-into, such as another user's 0711 directory, is never opened. A sync failure refuses
-startup.
+service's uid and which that uid may write. A non-root service skips ancestors
+it cannot write, such as another user's 0711 directory. A root service treats
+each ancestor as writable and syncs `/` if its child on the state path is
+root-owned. A sync failure refuses startup.
 Every acknowledged write is durable.
 Preserve `inbox/seq`, entries, rejected files and presence during recovery; never
 reset the counter or treat a published answer as rolled back.

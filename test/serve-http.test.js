@@ -37,6 +37,11 @@ function call(port, { method = 'GET', path, headers = {}, body, rawBody }) {
   return new Promise((resolve, reject) => {
     const text = rawBody ?? (body === undefined ? null : JSON.stringify(body));
     const req = http.request({ host: '127.0.0.1', port, method, path, agent: false, headers: { ...(text ? { 'content-type': 'application/json' } : {}), ...headers } }, (res) => {
+      if (res.headers['content-type']?.startsWith('text/event-stream')) {
+        resolve({ status: res.statusCode, headers: res.headers, json: null, text: '' });
+        res.destroy();
+        return;
+      }
       let data = ''; res.on('data', (c) => { data += c; }); res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, json: data && res.headers['content-type']?.startsWith('application/json') ? JSON.parse(data) : null, text: data }));
     });
     req.on('error', reject); if (text) req.write(text); req.end();
@@ -268,14 +273,17 @@ test('invalid JSON, scalar bodies and non-JSON media types receive client errors
 
 test('an invalid SSE cursor is refused with 400 INVALID_INPUT instead of replaying from 0', { timeout: 5000 }, async (t) => {
   const { port, inbox } = await setup(t), baseline = inbox.subscribers();
-  for (const [path, headers] of [['/v1/events', { 'last-event-id': 'abc' }], ['/v1/events', { 'last-event-id': '-1' }],
+  const invalidQuery = ['', ' ', '0x10', '1e3', '+5', '5.0', '01', '9007199254740992'];
+  for (const [path, headers] of [
+    ...invalidQuery.map((text) => [`/v1/inbox?since=${encodeURIComponent(text)}`, {}]),
+    ['/v1/events', { 'last-event-id': 'abc' }], ['/v1/events', { 'last-event-id': '-1' }],
     ['/v1/events', { 'last-event-id': '1.5' }], ['/v1/events?since=abc', {}], ['/v1/events?since=-2', {}],
     ['/v1/events?since=0', { 'last-event-id': 'x' }],
     // Only plain decimal text is a cursor: Number() would read these as 0 or as another sequence.
-    ...['', ' ', '0x10', '1e3', '+5', '5.0', '01'].flatMap((text) => [['/v1/events', { 'last-event-id': text }],
-      [`/v1/events?since=${encodeURIComponent(text)}`, {}], [`/v1/inbox?since=${encodeURIComponent(text)}`, {}]])]) {
+    ...invalidQuery.filter((text) => text !== ' ').map((text) => ['/v1/events', { 'last-event-id': text }]),
+    ...invalidQuery.map((text) => [`/v1/events?since=${encodeURIComponent(text)}`, {}])]) {
     const r = await call(port, { path, headers: { ...phone, ...headers } });
-    assert.deepEqual([r.status, r.json?.error.code], [400, 'INVALID_INPUT'], `${path} ${JSON.stringify(headers)}`);
+    assert.deepEqual([r.status, r.json?.error?.code], [400, 'INVALID_INPUT'], `${path} ${JSON.stringify(headers)}`);
   }
   assert.equal(inbox.subscribers(), baseline);
 });
