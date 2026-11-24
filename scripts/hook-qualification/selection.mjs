@@ -62,11 +62,21 @@ function recordSelection(argv) {
   appendFileSync(join(runDir, 'selection.log'), line('end'), { mode: 0o600 });
 }
 
+function nanoseconds(text) {
+  const match = /^(\d+)(?:\.(\d{1,9}))?$/.exec(text ?? '');
+  if (!match) return null;
+  return BigInt(match[1]) * 1000000000n + BigInt((match[2] ?? '').padEnd(9, '0'));
+}
+
 function logs(runDir) {
   const text = readFileSync(join(runDir, 'selection.log'), 'utf8');
   return text.split('\n').filter(Boolean).map((line, ordinal) => {
-    const [side, event, index, pid, what, time] = line.split(' ');
-    return { side, event, index: Number(index), pid: Number(pid), what, time: Number(time), ordinal };
+    const parts = line.split(' ');
+    const [side, event, indexText, pidText, what, timestamp] = parts;
+    const index = Number(indexText), pid = Number(pidText), timeNs = nanoseconds(timestamp);
+    const valid = parts.length === 6 && Boolean(side && event && /^\d+$/.test(indexText ?? '') && /^\d+$/.test(pidText ?? '')
+      && Number.isSafeInteger(index) && index >= 0 && Number.isSafeInteger(pid) && pid > 0 && ['start', 'end'].includes(what) && timeNs !== null);
+    return { side, event, index, pid, what, timeNs, ordinal, valid };
   });
 }
 
@@ -80,19 +90,21 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
     requireThat(side, `${runDir}: the selection log has no recorder side`);
     const debug = sleep > 0 ? ['debug-1.log', 'debug-2.log'].map((file) => { try { return readFileSync(join(runDir, file), 'utf8'); } catch { return ''; } }) : [];
     const payloadDir = join(runDir, 'payloads');
-    const malformedPayloads = [];
+    const malformedPayloads = [], payloadFormats = new Set();
     const payloadRecords = readdirSync(payloadDir).flatMap((file) => {
-      const match = /^(SessionStart|Stop)-(\d+)-(\d+)(?:-(\d+))?\.json$/.exec(file);
-      const stamp = match ? Number(match[3]) : NaN;
-      const archive = match && match[4] === undefined && stamp >= 1e15;
-      const current = match && match[4] !== undefined && stamp >= 1e11 && stamp < 1e15;
+      const match = /^([A-Za-z][A-Za-z0-9:_]*)-(\d+)-(\d+)(?:-(\d+))?\.json$/.exec(file);
+      const stamp = match ? BigInt(match[3]) : -1n;
+      const archive = match && match[4] === undefined && stamp >= 1000000000000000n;
+      const current = match && match[4] !== undefined && stamp >= 100000000000n && stamp < 1000000000000000n;
       if (!match || (!archive && !current)) {
-        if (/^(SessionStart|Stop)-/.test(file)) malformedPayloads.push(file);
+        malformedPayloads.push(file);
         return [];
       }
-      const time = archive ? stamp / 1e9 : stamp / 1e3;
+      payloadFormats.add(archive ? 'archive' : 'current');
+      if (!['SessionStart', 'Stop'].includes(match[1])) return [];
       const path = join(payloadDir, file);
-      return [{ event: match[1], index: Number(match[2]), pid: match[4] ? Number(match[4]) : null, time, path, value: readJson(path), start: null }];
+      return [{ event: match[1], index: Number(match[2]), pid: match[4] ? Number(match[4]) : null,
+        timeNs: archive ? stamp : stamp * 1000000n, path, value: readJson(path), start: null }];
     });
     for (const payload of payloadRecords) {
       const entry = (expected[payload.event] ?? []).find((item) => item.index === payload.index);
@@ -100,25 +112,30 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
       let candidates = records.filter((r) => r.event === payload.event && r.index === payload.index && r.what === 'start');
       if (payload.pid !== null) candidates = candidates.filter((r) => r.pid === payload.pid);
       candidates = candidates.filter((start) => {
-        if (payload.time < start.time) return false;
+        if (payload.timeNs < start.timeNs) return false;
         const end = records.find((r) => r.event === payload.event && r.index === payload.index && r.pid === start.pid && r.what === 'end');
-        if (end) return payload.time <= end.time;
-        return timesOut ? payload.time <= start.time + entry.timeout : true;
+        if (end) return payload.timeNs <= end.timeNs;
+        return timesOut ? payload.timeNs <= start.timeNs + BigInt(Math.round(entry.timeout * 1000)) * 1000000n : true;
       });
       if (candidates.length === 1) payload.start = candidates[0];
     }
     const resumeOrder = Math.min(...payloadRecords.filter((r) => r.event === 'SessionStart' && r.value.source === 'resume' && r.start).map((r) => r.start.ordinal));
-    const checks = malformedPayloads.map((file) => `malformed payload filename ${file} FAIL`);
-    ok &&= malformedPayloads.length === 0;
+    const checks = [
+      ...malformedPayloads.map((file) => `malformed payload filename ${file} FAIL`),
+      ...(payloadFormats.size > 1 ? [`mixed payload formats ${JSON.stringify([...payloadFormats])} FAIL`] : []),
+      ...records.filter((record) => !record.valid).map((record) => `invalid recorder record at ordinal ${record.ordinal} FAIL`),
+    ];
+    ok &&= malformedPayloads.length === 0 && payloadFormats.size === 1 && records.every((record) => record.valid);
     for (const event of ['SessionStart', 'Stop']) {
       const entries = expected[event];
       requireThat(Array.isArray(entries), `${runDir}: expected entries lack ${event}`);
       const expectedIndices = new Set(entries.map((entry) => entry.index));
       const fired = new Set(records.filter((r) => r.event === event && r.what === 'start').map((r) => r.index));
+      const ended = new Set(records.filter((r) => r.event === event && r.what === 'end').map((r) => r.index));
       const payloadIndices = new Set(payloadRecords.filter((r) => r.event === event).map((r) => r.index));
       let good = true;
       const counts = {};
-      for (const index of new Set([...expectedIndices, ...fired, ...payloadIndices])) {
+      for (const index of new Set([...expectedIndices, ...fired, ...ended, ...payloadIndices])) {
         const entry = entries.find((item) => item.index === index);
         const startRecords = records.filter((r) => r.event === event && r.index === index && r.what === 'start');
         const endRecords = records.filter((r) => r.event === event && r.index === index && r.what === 'end');
@@ -150,11 +167,12 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
         counts[index] = `${startRecords.length} start/${endRecords.length} end/${invocations.length} payloads`;
       }
       good &&= [...fired].every((index) => expectedIndices.has(index));
+      good &&= [...ended].every((index) => expectedIndices.has(index));
       good &&= [...payloadIndices].every((index) => expectedIndices.has(index));
       ok &&= good;
       checks.push(`${event} expected ${JSON.stringify([...expectedIndices])} ${JSON.stringify(counts)} ${good ? 'PASS' : 'FAIL'}`);
     }
-    const payloads = payloadRecords.filter((r) => r.event === 'SessionStart').sort((a, b) => a.time - b.time).map((r) => ({
+    const payloads = payloadRecords.filter((r) => r.event === 'SessionStart').sort((a, b) => a.timeNs < b.timeNs ? -1 : a.timeNs > b.timeNs ? 1 : 0).map((r) => ({
       source: r.value.source ?? null, bytes: readFileSync(r.path).byteLength,
       extra: Object.keys(r.value).filter((key) => !['cwd', 'hook_event_name', 'session_id', 'source', 'transcript_path'].includes(key)).sort() }));
     reports.push({ runDir, checks, payloads });

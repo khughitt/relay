@@ -173,6 +173,58 @@ test('the verdict rejects an archived payload timestamped after its recorder end
   assert.equal(result.status, 1);
 });
 
+test('the verdict rejects malformed payload names beyond the usual prefix', (t) => {
+  // Break caught: an unrecognized evidence file must not disappear merely because its separator is malformed.
+  const run = verdictRun(t, 'malformed-separator');
+  writeJson(join(run, 'payloads', 'Stop.copy.json'), {});
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
+});
+
+test('the verdict rejects mixed archive and current payload formats', (t) => {
+  // Break caught: treating one PID-less current file as archived bypasses the current run's PID requirement.
+  const run = verdictRun(t, 'mixed-formats');
+  const latest = readdirSync(join(run, 'payloads')).filter((name) => name.startsWith('Stop-0-')).sort().at(-1);
+  const stamp = BigInt(latest.match(/Stop-0-(\d+)\.json$/)[1]) / 1000000n;
+  renameSync(join(run, 'payloads', latest), join(run, 'payloads', `Stop-0-${stamp}-1100.json`));
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
+});
+
+test('the verdict rejects an invalid recorder timestamp', (t) => {
+  // Break caught: NaN comparisons must not make a missing start timestamp satisfy a lower bound.
+  const run = verdictRun(t, 'invalid-log-time');
+  const logs = readFileSync(join(run, 'selection.log'), 'utf8').split('\n').map((line) => {
+    if (!line.startsWith('baseline Stop 0 1100 start ')) return line;
+    return line.split(' ').slice(0, -1).join(' ');
+  });
+  writeFileSync(join(run, 'selection.log'), logs.join('\n'));
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
+});
+
+test('the verdict rejects an unexpected end-only index', (t) => {
+  // Break caught: an end record outside the expected entry set must not be ignored merely because its start is absent.
+  const run = verdictRun(t, 'unexpected-end');
+  writeFileSync(join(run, 'selection.log'), 'baseline Stop 99 9999 end 1760000200\n', { flag: 'a' });
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
+});
+
+test('the archive time window is exact to one nanosecond', (t) => {
+  // Break caught: float rounding must not turn a one-nanosecond post-end payload into a boundary match.
+  const boundaryRun = verdictRun(t, 'exact-end');
+  const latest = readdirSync(join(boundaryRun, 'payloads')).filter((name) => name.startsWith('Stop-0-')).sort().at(-1);
+  const stamp = BigInt(latest.match(/Stop-0-(\d+)\.json$/)[1]);
+  renameSync(join(boundaryRun, 'payloads', latest), join(boundaryRun, 'payloads', `Stop-0-${stamp + 1000000000n}.json`));
+  assert.equal(invoke(dirname(boundaryRun), ['verdict', boundaryRun]).status, 0);
+  const pastRun = verdictRun(t, 'past-end');
+  const pastLatest = readdirSync(join(pastRun, 'payloads')).filter((name) => name.startsWith('Stop-0-')).sort().at(-1);
+  const pastStamp = BigInt(pastLatest.match(/Stop-0-(\d+)\.json$/)[1]);
+  renameSync(join(pastRun, 'payloads', pastLatest), join(pastRun, 'payloads', `Stop-0-${pastStamp + 1000000001n}.json`));
+  assert.equal(invoke(dirname(pastRun), ['verdict', pastRun]).status, 1);
+});
+
 test('the verdict uses recorder-log order rather than payload mtimes', (t) => {
   // Break caught: archive metadata must not change which Stop belongs to startup or resume.
   const run = verdictRun(t, 'equal-mtimes');
