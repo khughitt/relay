@@ -64,10 +64,10 @@ function verdictRun(t, name, { sleep = 0, timeoutEvidence = true } = {}) {
     ],
   });
   const lines = [];
-  let clock = 100;
+  let clock = 1760000000;
   const record = (event, index, what, turn) => {
     clock += 1;
-    if (what === 'start') writeJson(join(dir, 'payloads', `${event}-${index}-${clock}.json`), {
+    if (what === 'start') writeJson(join(dir, 'payloads', `${event}-${index}-${BigInt(clock) * 1000000000n}.json`), {
       cwd: '/work', hook_event_name: event, session_id: 's',
       ...(event === 'SessionStart' ? { source: turn === 0 ? 'startup' : 'resume', transcript_path: '/t', model: 'm' }
         : { stop_hook_active: false, background_tasks: [], session_crons: [] }),
@@ -136,11 +136,41 @@ test('the verdict rejects a payload whose PID is not in the recorder log', (t) =
   const run = verdictRun(t, 'wrong-payload-pid');
   const files = readdirSync(join(run, 'payloads')).filter((name) => name.startsWith('Stop-0-')).sort();
   const latest = files.at(-1), source = join(run, 'payloads', latest);
-  const wrong = source.replace(/\.json$/, '-999999.json');
+  const stamp = BigInt(latest.match(/Stop-0-(\d+)\.json$/)[1]) / 1000000n;
+  const wrong = join(run, 'payloads', `Stop-0-${stamp}-999999.json`);
   renameSync(source, wrong);
   const result = invoke(dirname(run), ['verdict', run]);
   assert.equal(result.status, 1);
   assert.match(result.stdout, /Stop .*FAIL/);
+});
+
+test('the verdict rejects a malformed duplicate payload filename', (t) => {
+  // Break caught: silently skipping SessionStart/Stop-looking files can hide duplicate evidence.
+  const run = verdictRun(t, 'malformed-duplicate');
+  const latest = readdirSync(join(run, 'payloads')).filter((name) => name.startsWith('Stop-0-')).sort().at(-1);
+  writeJson(join(run, 'payloads', `${latest}.copy.json`), readJson(join(run, 'payloads', latest)));
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
+});
+
+test('the verdict reserves PID-less filenames for the nanosecond archive format', (t) => {
+  // Break caught: stripping a current PID suffix must not turn current evidence into an accepted archive.
+  const run = verdictRun(t, 'pidless-current');
+  const latest = readdirSync(join(run, 'payloads')).filter((name) => name.startsWith('Stop-0-')).sort().at(-1);
+  const stamp = BigInt(latest.match(/Stop-0-(\d+)\.json$/)[1]) / 1000000n;
+  renameSync(join(run, 'payloads', latest), join(run, 'payloads', `Stop-0-${stamp}.json`));
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
+});
+
+test('the verdict rejects an archived payload timestamped after its recorder ended', (t) => {
+  // Break caught: closest-in-time matching must not credit bytes written after the invocation completed.
+  const run = verdictRun(t, 'post-end-payload');
+  const latest = readdirSync(join(run, 'payloads')).filter((name) => name.startsWith('Stop-0-')).sort().at(-1);
+  const stamp = BigInt(latest.match(/Stop-0-(\d+)\.json$/)[1]) + 1100000000n;
+  renameSync(join(run, 'payloads', latest), join(run, 'payloads', `Stop-0-${stamp}.json`));
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
 });
 
 test('the verdict uses recorder-log order rather than payload mtimes', (t) => {

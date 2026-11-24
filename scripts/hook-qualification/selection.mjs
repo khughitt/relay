@@ -80,22 +80,36 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
     requireThat(side, `${runDir}: the selection log has no recorder side`);
     const debug = sleep > 0 ? ['debug-1.log', 'debug-2.log'].map((file) => { try { return readFileSync(join(runDir, file), 'utf8'); } catch { return ''; } }) : [];
     const payloadDir = join(runDir, 'payloads');
+    const malformedPayloads = [];
     const payloadRecords = readdirSync(payloadDir).flatMap((file) => {
       const match = /^(SessionStart|Stop)-(\d+)-(\d+)(?:-(\d+))?\.json$/.exec(file);
-      if (!match) return [];
-      const stamp = Number(match[3]);
-      const time = stamp >= 1e15 ? stamp / 1e9 : stamp >= 1e11 ? stamp / 1e3 : stamp;
+      const stamp = match ? Number(match[3]) : NaN;
+      const archive = match && match[4] === undefined && stamp >= 1e15;
+      const current = match && match[4] !== undefined && stamp >= 1e11 && stamp < 1e15;
+      if (!match || (!archive && !current)) {
+        if (/^(SessionStart|Stop)-/.test(file)) malformedPayloads.push(file);
+        return [];
+      }
+      const time = archive ? stamp / 1e9 : stamp / 1e3;
       const path = join(payloadDir, file);
       return [{ event: match[1], index: Number(match[2]), pid: match[4] ? Number(match[4]) : null, time, path, value: readJson(path), start: null }];
     });
     for (const payload of payloadRecords) {
+      const entry = (expected[payload.event] ?? []).find((item) => item.index === payload.index);
+      const timesOut = sleep > 0 && entry && entry.timeout !== undefined && entry.timeout !== null && entry.timeout < sleep;
       let candidates = records.filter((r) => r.event === payload.event && r.index === payload.index && r.what === 'start');
       if (payload.pid !== null) candidates = candidates.filter((r) => r.pid === payload.pid);
-      const nearest = candidates.map((start) => ({ start, distance: Math.abs(start.time - payload.time) })).sort((a, b) => a.distance - b.distance);
-      if (nearest.length && nearest[0].distance <= 2 && (nearest.length === 1 || nearest[1].distance > nearest[0].distance)) payload.start = nearest[0].start;
+      candidates = candidates.filter((start) => {
+        if (payload.time < start.time) return false;
+        const end = records.find((r) => r.event === payload.event && r.index === payload.index && r.pid === start.pid && r.what === 'end');
+        if (end) return payload.time <= end.time;
+        return timesOut ? payload.time <= start.time + entry.timeout : true;
+      });
+      if (candidates.length === 1) payload.start = candidates[0];
     }
     const resumeOrder = Math.min(...payloadRecords.filter((r) => r.event === 'SessionStart' && r.value.source === 'resume' && r.start).map((r) => r.start.ordinal));
-    const checks = [];
+    const checks = malformedPayloads.map((file) => `malformed payload filename ${file} FAIL`);
+    ok &&= malformedPayloads.length === 0;
     for (const event of ['SessionStart', 'Stop']) {
       const entries = expected[event];
       requireThat(Array.isArray(entries), `${runDir}: expected entries lack ${event}`);
