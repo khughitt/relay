@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const wiring = join(root, 'scripts/hook-qualification/wiring.mjs');
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const childEnv = (home) => ({ PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: home,
   GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_OPTIONAL_LOCKS: '0' });
 
@@ -95,6 +96,17 @@ test('wiring refuses a foreign host label and an empty manifest set', (t) => {
   const emptyResult = f.invoke(empty);
   assert.notEqual(emptyResult.status, 0);
   assert.doesNotMatch(emptyResult.stdout, /ALL PASS/);
+});
+
+test('wiring requires the manifest set wrapper to name its host explicitly', (t) => {
+  // Break caught: falling back from a missing set host to the route host loses the set identity condition.
+  const f = fixture(t);
+  const set = readJson(f.manifestFile);
+  delete set.host;
+  writeFileSync(f.manifestFile, JSON.stringify(set));
+  const result = f.check();
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /manifest set hostname: FAIL/);
 });
 
 test('wiring fails closed when the installed subscriber composition changed', (t) => {

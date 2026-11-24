@@ -53,7 +53,7 @@ export function checkWiring({ hq, snapshot, manifests }) {
       const installed = dirname(dirname(binding.entry));
       const checks = [
         ['executing hostname', executingHost, manifest.host],
-        ['manifest set hostname', set.host ?? manifest.host, manifest.host],
+        ['manifest set hostname', Array.isArray(set.manifests) ? set.host ?? null : manifest.host, manifest.host],
         ['hq HEAD', head, settings.commit],
         ['settings blob', blob, settings.blob],
         ['filtered live file = index (git diff --quiet)', git(repo, ['diff', '--quiet', '--', path], true), true],

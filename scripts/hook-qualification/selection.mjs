@@ -6,7 +6,7 @@
 //   node selection.mjs map MANIFEST_SET BASELINE_RUN CANDIDATE_RUN EVENT
 // The recorder subcommand is invoked by the harness, not by operators.
 import { createHash } from 'node:crypto';
-import { appendFileSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
@@ -64,9 +64,9 @@ function recordSelection(argv) {
 
 function logs(runDir) {
   const text = readFileSync(join(runDir, 'selection.log'), 'utf8');
-  return text.split('\n').filter(Boolean).map((line) => {
+  return text.split('\n').filter(Boolean).map((line, ordinal) => {
     const [side, event, index, pid, what, time] = line.split(' ');
-    return { side, event, index: Number(index), pid: Number(pid), what, time: Number(time) };
+    return { side, event, index: Number(index), pid: Number(pid), what, time: Number(time), ordinal };
   });
 }
 
@@ -81,36 +81,51 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
     const debug = sleep > 0 ? ['debug-1.log', 'debug-2.log'].map((file) => { try { return readFileSync(join(runDir, file), 'utf8'); } catch { return ''; } }) : [];
     const payloadDir = join(runDir, 'payloads');
     const payloadRecords = readdirSync(payloadDir).flatMap((file) => {
-      const match = /^(SessionStart|Stop)-(\d+)-/.exec(file);
-      if (!match || !file.endsWith('.json')) return [];
+      const match = /^(SessionStart|Stop)-(\d+)-(\d+)(?:-(\d+))?\.json$/.exec(file);
+      if (!match) return [];
+      const stamp = Number(match[3]);
+      const time = stamp >= 1e15 ? stamp / 1e9 : stamp >= 1e11 ? stamp / 1e3 : stamp;
       const path = join(payloadDir, file);
-      return [{ event: match[1], index: Number(match[2]), path, time: statSync(path).mtimeMs, value: readJson(path) }];
+      return [{ event: match[1], index: Number(match[2]), pid: match[4] ? Number(match[4]) : null, time, path, value: readJson(path), start: null }];
     });
-    const resumeTime = Math.min(...payloadRecords.filter((r) => r.event === 'SessionStart' && r.value.source === 'resume').map((r) => r.time));
+    for (const payload of payloadRecords) {
+      let candidates = records.filter((r) => r.event === payload.event && r.index === payload.index && r.what === 'start');
+      if (payload.pid !== null) candidates = candidates.filter((r) => r.pid === payload.pid);
+      const nearest = candidates.map((start) => ({ start, distance: Math.abs(start.time - payload.time) })).sort((a, b) => a.distance - b.distance);
+      if (nearest.length && nearest[0].distance <= 2 && (nearest.length === 1 || nearest[1].distance > nearest[0].distance)) payload.start = nearest[0].start;
+    }
+    const resumeOrder = Math.min(...payloadRecords.filter((r) => r.event === 'SessionStart' && r.value.source === 'resume' && r.start).map((r) => r.start.ordinal));
     const checks = [];
     for (const event of ['SessionStart', 'Stop']) {
       const entries = expected[event];
       requireThat(Array.isArray(entries), `${runDir}: expected entries lack ${event}`);
       const expectedIndices = new Set(entries.map((entry) => entry.index));
       const fired = new Set(records.filter((r) => r.event === event && r.what === 'start').map((r) => r.index));
+      const payloadIndices = new Set(payloadRecords.filter((r) => r.event === event).map((r) => r.index));
       let good = true;
       const counts = {};
-      for (const index of new Set([...expectedIndices, ...fired])) {
+      for (const index of new Set([...expectedIndices, ...fired, ...payloadIndices])) {
         const entry = entries.find((item) => item.index === index);
-        const starts = records.filter((r) => r.event === event && r.index === index && r.what === 'start').length;
-        const ends = records.filter((r) => r.event === event && r.index === index && r.what === 'end').length;
+        const startRecords = records.filter((r) => r.event === event && r.index === index && r.what === 'start');
+        const endRecords = records.filter((r) => r.event === event && r.index === index && r.what === 'end');
         const invocations = payloadRecords.filter((r) => r.event === event && r.index === index);
-        let payloadGood = invocations.length === 2;
+        const timesOut = sleep > 0 && entry && entry.timeout !== undefined && entry.timeout !== null && entry.timeout < sleep;
+        const expectedEnds = timesOut ? 0 : 2;
+        let payloadGood = invocations.length === 2 && invocations.every((r) => r.start)
+          && startRecords.every((start) => invocations.some((r) => r.start === start));
+        for (const invocation of invocations) {
+          if (!invocation.start) { payloadGood = false; continue; }
+          const correspondingEnds = records.filter((r) => r.event === event && r.index === index && r.what === 'end' && r.pid === invocation.start.pid).length;
+          if (correspondingEnds !== (timesOut ? 0 : 1)) payloadGood = false;
+        }
         if (event === 'SessionStart') {
           payloadGood &&= invocations.filter((r) => r.value.source === 'startup').length === 1
             && invocations.filter((r) => r.value.source === 'resume').length === 1;
         } else {
-          payloadGood &&= invocations.filter((r) => r.time < resumeTime).length === 1
-            && invocations.filter((r) => r.time > resumeTime).length === 1;
+          payloadGood &&= invocations.filter((r) => r.start?.ordinal < resumeOrder).length === 1
+            && invocations.filter((r) => r.start?.ordinal > resumeOrder).length === 1;
         }
-        const timesOut = sleep > 0 && entry && entry.timeout !== undefined && entry.timeout !== null && entry.timeout < sleep;
-        const expectedEnds = timesOut ? 0 : 2;
-        let entryGood = expectedIndices.has(index) && starts === 2 && ends === expectedEnds && payloadGood;
+        let entryGood = expectedIndices.has(index) && startRecords.length === 2 && endRecords.length === expectedEnds && payloadGood;
         if (timesOut) {
           const evidence = `${side} ${event} ${index} ${sleep}] timed out after ${entry.timeout * 1000}ms`;
           const eachTurn = debug.every((text) => text.includes(evidence));
@@ -118,9 +133,10 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
           if (eachTurn) checks.push(`${event} ${index} timed out after ${entry.timeout * 1000}ms`);
         }
         good &&= entryGood;
-        counts[index] = `${starts} start/${ends} end/${invocations.length} payloads`;
+        counts[index] = `${startRecords.length} start/${endRecords.length} end/${invocations.length} payloads`;
       }
       good &&= [...fired].every((index) => expectedIndices.has(index));
+      good &&= [...payloadIndices].every((index) => expectedIndices.has(index));
       ok &&= good;
       checks.push(`${event} expected ${JSON.stringify([...expectedIndices])} ${JSON.stringify(counts)} ${good ? 'PASS' : 'FAIL'}`);
     }

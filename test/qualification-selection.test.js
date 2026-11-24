@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,7 +72,7 @@ function verdictRun(t, name, { sleep = 0, timeoutEvidence = true } = {}) {
       ...(event === 'SessionStart' ? { source: turn === 0 ? 'startup' : 'resume', transcript_path: '/t', model: 'm' }
         : { stop_hook_active: false, background_tasks: [], session_crons: [] }),
     });
-    lines.push(`baseline ${event} ${index} ${1000 + index} ${what} ${clock}`);
+    lines.push(`baseline ${event} ${index} ${1000 + turn * 100 + index} ${what} ${clock}`);
   };
   for (let turn = 0; turn < 2; turn++) {
     record('SessionStart', 0, 'start', turn); record('SessionStart', 0, 'end', turn);
@@ -129,6 +129,26 @@ test('the selection verdict requires the resume matcher, not two startup payload
   const result = invoke(dirname(run), ['verdict', run]);
   assert.equal(result.status, 1);
   assert.match(result.stdout, /SessionStart .*FAIL/);
+});
+
+test('the verdict rejects a payload whose PID is not in the recorder log', (t) => {
+  // Break caught: counting unmatched payloads independently can credit a foreign invocation.
+  const run = verdictRun(t, 'wrong-payload-pid');
+  const files = readdirSync(join(run, 'payloads')).filter((name) => name.startsWith('Stop-0-')).sort();
+  const latest = files.at(-1), source = join(run, 'payloads', latest);
+  const wrong = source.replace(/\.json$/, '-999999.json');
+  renameSync(source, wrong);
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /Stop .*FAIL/);
+});
+
+test('the verdict uses recorder-log order rather than payload mtimes', (t) => {
+  // Break caught: archive metadata must not change which Stop belongs to startup or resume.
+  const run = verdictRun(t, 'equal-mtimes');
+  for (const file of readdirSync(join(run, 'payloads'))) utimesSync(join(run, 'payloads', file), 1000000000, 1000000000);
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });
 
 test('the timing verdict needs the short-timeout diagnostic in each turn log', (t) => {
