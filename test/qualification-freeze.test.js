@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -86,7 +86,7 @@ function setup(t, event, kind, matcher, nativeHooks) {
   const freeze = (identityOption = '--settings-identity', identityPath = identityFile) => run(process.execPath, [freezer,
     '--snapshot', snapshot, '--template', template, '--hq', repo, '--version', '2.1.331',
     '--fixture', join(fixtureOutput, 'fixture'), '--output', output, identityOption, identityPath]);
-  return { output, settings, snapshot, sourceFile, identity, freeze, write, snapshotOf, hooks, configSha, deployedName, root, git };
+  return { output, settings, snapshot, sourceFile, identity, freeze, write, snapshotOf, hooks, configSha, deployedName, entry, git };
 }
 
 const stop = [['~/ops/claim-guard --harness claude-code', ['claim-guard']],
@@ -135,4 +135,13 @@ test('refuses stale settings evidence and drift in the captured composition', (t
   f.write(f.snapshot, f.snapshotOf(f.hooks.slice(1)));
   assert.match(f.freeze().stderr, /settings identity.*does not match/);
   assert.match(f.freeze('--settings-source', f.sourceFile).stderr, /native composition/);
+});
+
+test('refuses a capture whose deployed package lacks the relay entry', (t) => {
+  const f = setup(t, 'Stop', 'turn-end', undefined, stop);
+  unlinkSync(f.entry);
+  const result = f.freeze();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /deployed package is missing bin\/relay\.js/);
+  assert.equal(existsSync(f.output), false);
 });

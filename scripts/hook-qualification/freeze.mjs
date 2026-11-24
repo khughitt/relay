@@ -109,6 +109,7 @@ function packageFiles(root) {
 function capturePackage(source, target) {
   requireThat(lstatSync(join(source, 'package.json')).isFile(), 'deployed package.json must be a regular file');
   const files = packageFiles(source);
+  requireThat(files.includes(join('bin', 'relay.js')), 'deployed package is missing bin/relay.js');
   const listing = files.map((file) => {
     const original = join(source, file), copy = join(target, file);
     mkdirSync(dirname(copy), { recursive: true });
