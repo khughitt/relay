@@ -107,6 +107,19 @@ function prepare(out, workload) {
 
 // ---- inputs ----
 
+/** Build the native payload this runner times, including its working directory and frozen padding.
+ * The decoder replay imports this same function so support evidence cannot drift from the measurement.
+ * @param {any} manifest @param {{fixture: string, payloadBytes: number}} options */
+export function buildTimedInput(manifest, { fixture, payloadBytes }) {
+  const cwd = typeof manifest.payload.cwd === 'string' ? manifest.payload.cwd : join(fixture, 'cwd');
+  const base = { cwd, ...structuredClone(manifest.payload) }, path = manifest.padField ?? [];
+  if (!path.length) return { cwd, input: JSON.stringify(base), padField: path, paddedBytes: 0 };
+  const parent = path.slice(0, -1).reduce((/** @type {any} */ object, /** @type {string|number} */ key) => object[key], base), field = path.at(-1);
+  parent[field] = '';
+  parent[field] = 'x'.repeat(Math.max(0, payloadBytes - Buffer.byteLength(JSON.stringify(base))));
+  return { cwd, input: JSON.stringify(base), padField: path, paddedBytes: Buffer.byteLength(parent[field]) };
+}
+
 /** @param {string[]} argv */
 function parse(argv) {
   /** @type {Record<string, any>} */
@@ -232,17 +245,8 @@ async function runRoute(options) {
     candidate: Object.fromEntries(candidateSubscribers.subscribers.map((/** @type {any} */ s) => [`candidate:${s.name}`, programOf(s.argv[0])])),
   };
   const expected = { baseline: lists.baseline.length, candidate: lists.candidate.length };
-  // A native payload of the declared size for this event, in the fixture's own working directory
-  // unless the manifest names one.
-  const cwd = typeof manifest.payload.cwd === 'string' ? manifest.payload.cwd : join(fixture, 'cwd');
-  const payload = (() => {
-    const base = { cwd, ...structuredClone(manifest.payload) }, path = manifest.padField ?? [];
-    if (!path.length) return JSON.stringify(base);
-    const parent = path.slice(0, -1).reduce((/** @type {any} */ o, /** @type {string} */ k) => o[k], base), field = path.at(-1);
-    parent[field] = '';
-    parent[field] = 'x'.repeat(Math.max(0, q.payloadBytes - Buffer.byteLength(JSON.stringify(base))));
-    return JSON.stringify(base);
-  })();
+  // A native payload of the declared size for this event, built once for the runner and decoder replay.
+  const { cwd, input: payload } = buildTimedInput(manifest, { fixture, payloadBytes: q.payloadBytes });
   /** @param {any} m @param {string} state @param {'baseline'|'candidate'} side */
   const sample = async (m, state, side) => {
     const e = env(state), r = await runBaseline(m, { event, input: payload, env: e, cwd, capture: true });

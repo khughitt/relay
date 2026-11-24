@@ -1,12 +1,14 @@
 // Freeze one host's observed route and prepared synthetic fixtures for the qualification runner.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, cpSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 import { matchSubscribers, validateSubscribers } from '../../src/subscribers.js';
 import { checkRetainedWork, validateManifest, workLists } from './baseline.mjs';
+import { packageFiles, packageListing } from './deployment.mjs';
+import { commandWords } from './hook-settings.mjs';
 
 const harness = 'claude-code';
 const routes = new Map([
@@ -49,14 +51,6 @@ function settingsIdentity(options, snapshot) {
   return typeof frozen.from === 'string' ? { ...settings, identityFrom: frozen.from } : settings;
 }
 
-// Recognize the simple command syntax emitted by the settings generator without evaluating a shell.
-function commandWords(command) {
-  const line = command.trim();
-  const words = [...line.matchAll(/('[^'\r\n]+'|[A-Za-z0-9_./~:-]+)(?:[ \t]+|$)/gy)];
-  requireThat(words.length && words.map(([matched]) => matched).join('') === line, 'unsupported hook command syntax');
-  return words.map(([, word]) => word.startsWith("'") ? word.slice(1, -1) : word);
-}
-
 function composition(snapshot, event, route) {
   const entries = snapshot.hooks?.[event];
   requireThat(Array.isArray(entries) && entries.length, `settings have no ${event} hooks`);
@@ -93,21 +87,7 @@ function composition(snapshot, event, route) {
   return { deployed, ordered };
 }
 
-function packageFiles(root) {
-  const files = ['package.json'];
-  for (const dir of ['bin', 'src']) {
-    requireThat(lstatSync(join(root, dir)).isDirectory(), `deployed package ${dir} must be a directory`);
-    for (const entry of readdirSync(join(root, dir), { recursive: true, withFileTypes: true })) {
-      const file = relative(root, join(entry.parentPath, entry.name));
-      requireThat(entry.isDirectory() || (entry.isFile() && !file.includes('\n')), `unsupported deployed package entry ${file}`);
-      if (entry.isFile()) files.push(file);
-    }
-  }
-  return files.sort();
-}
-
 function capturePackage(source, target) {
-  requireThat(lstatSync(join(source, 'package.json')).isFile(), 'deployed package.json must be a regular file');
   const files = packageFiles(source);
   requireThat(files.includes(join('bin', 'relay.js')), 'deployed package is missing bin/relay.js');
   const listing = files.map((file) => {
@@ -116,7 +96,7 @@ function capturePackage(source, target) {
     copyFileSync(original, copy);
     return `${sha(readFileSync(copy))}  ${file}\n`;
   }).join('');
-  const current = packageFiles(source).map((file) => `${sha(readFileSync(join(source, file)))}  ${file}\n`).join('');
+  const current = packageListing(source);
   requireThat(current === listing, 'the deployed package changed during capture');
   return listing;
 }
