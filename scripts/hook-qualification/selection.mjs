@@ -70,7 +70,9 @@ function nanoseconds(text) {
 
 function logs(runDir) {
   const text = readFileSync(join(runDir, 'selection.log'), 'utf8');
-  return text.split('\n').filter(Boolean).map((line, ordinal) => {
+  const lines = text.split('\n');
+  if (lines.at(-1) === '') lines.pop();
+  return lines.map((line, ordinal) => {
     const parts = line.split(' ');
     const [side, event, indexText, pidText, what, timestamp] = parts;
     const index = Number(indexText), pid = Number(pidText), timeNs = nanoseconds(timestamp);
@@ -109,13 +111,14 @@ export function judgeSelection(runDirs, { sleep = 0 } = {}) {
     for (const payload of payloadRecords) {
       const entry = (expected[payload.event] ?? []).find((item) => item.index === payload.index);
       const timesOut = sleep > 0 && entry && entry.timeout !== undefined && entry.timeout !== null && entry.timeout < sleep;
+      const timeoutNs = timesOut ? nanoseconds(String(entry.timeout)) : null;
       let candidates = records.filter((r) => r.event === payload.event && r.index === payload.index && r.what === 'start');
       if (payload.pid !== null) candidates = candidates.filter((r) => r.pid === payload.pid);
       candidates = candidates.filter((start) => {
         if (payload.timeNs < start.timeNs) return false;
         const end = records.find((r) => r.event === payload.event && r.index === payload.index && r.pid === start.pid && r.what === 'end');
         if (end) return payload.timeNs <= end.timeNs;
-        return timesOut ? payload.timeNs <= start.timeNs + BigInt(Math.round(entry.timeout * 1000)) * 1000000n : true;
+        return timesOut ? timeoutNs !== null && payload.timeNs <= start.timeNs + timeoutNs : true;
       });
       if (candidates.length === 1) payload.start = candidates[0];
     }

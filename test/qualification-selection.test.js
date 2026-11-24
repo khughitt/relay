@@ -225,6 +225,33 @@ test('the archive time window is exact to one nanosecond', (t) => {
   assert.equal(invoke(dirname(pastRun), ['verdict', pastRun]).status, 1);
 });
 
+test('the verdict rejects an interior blank recorder line', (t) => {
+  // Break caught: filtering empty lines can hide malformed evidence instead of validating every record.
+  const run = verdictRun(t, 'blank-log-line');
+  const logs = readFileSync(join(run, 'selection.log'), 'utf8').split('\n');
+  logs.splice(1, 0, '');
+  writeFileSync(join(run, 'selection.log'), logs.join('\n'));
+  const result = invoke(dirname(run), ['verdict', run]);
+  assert.equal(result.status, 1);
+});
+
+test('fractional timeout boundaries are exact to one nanosecond', (t) => {
+  // Break caught: rounding to whole milliseconds must not move the configured 5.0005-second timeout.
+  const runWithOffset = (name, offset) => {
+    const run = verdictRun(t, name, { sleep: 8 });
+    const expected = readJson(join(run, 'expected-entries.json'));
+    expected.Stop[2].timeout = 5.0005;
+    writeJson(join(run, 'expected-entries.json'), expected);
+    for (const file of ['debug-1.log', 'debug-2.log']) writeFileSync(join(run, file), 'hooks baseline Stop 2 8] timed out after 5000.5ms\n');
+    const latest = readdirSync(join(run, 'payloads')).filter((name) => name.startsWith('Stop-2-')).sort().at(-1);
+    const stamp = BigInt(latest.match(/Stop-2-(\d+)\.json$/)[1]) + offset;
+    renameSync(join(run, 'payloads', latest), join(run, 'payloads', `Stop-2-${stamp}.json`));
+    return invoke(dirname(run), ['verdict', '--sleep', '8', run]);
+  };
+  assert.equal(runWithOffset('exact-timeout', 5000500000n).status, 0);
+  assert.equal(runWithOffset('past-timeout', 5000500001n).status, 1);
+});
+
 test('the verdict uses recorder-log order rather than payload mtimes', (t) => {
   // Break caught: archive metadata must not change which Stop belongs to startup or resume.
   const run = verdictRun(t, 'equal-mtimes');
