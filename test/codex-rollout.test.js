@@ -14,10 +14,11 @@ test('a fixture thread id is a UUIDv7 and names its own day', () => {
   assert.deepEqual(dayOf(thread, 'UTC'), ['2026', '10', '17']);
   assert.deepEqual(dayOf(thread, 'America/New_York'), ['2026', '10', '16']);
 });
-test('storeRoot: CODEX_HOME when set and absolute, else HOME/.codex; anything else is INVALID_CONFIG', () => {
+test('storeRoot: empty or unset CODEX_HOME uses HOME/.codex, nonempty paths must be absolute', () => {
   assert.equal(storeRoot({ CODEX_HOME: '/x/codex', HOME: '/h' }), '/x/codex');
   assert.equal(storeRoot({ HOME: '/h' }), path.join('/h', '.codex'));
-  for (const env of [{ CODEX_HOME: 'rel' }, { CODEX_HOME: '' }, {}, { HOME: '' }, { HOME: 'rel' }])
+  assert.equal(storeRoot({ CODEX_HOME: '', HOME: '/h' }), path.join('/h', '.codex'));
+  for (const env of [{ CODEX_HOME: 'rel' }, { CODEX_HOME: '' }, { CODEX_HOME: ' ', HOME: '/h' }, {}, { HOME: '' }, { HOME: 'rel' }])
     assert.throws(() => storeRoot(env), { code: 'INVALID_CONFIG' }, JSON.stringify(env));
 });
 test('locateRollout lists only the day directory when it holds the rollout', (t) => {

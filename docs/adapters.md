@@ -258,9 +258,9 @@ Verified and unverified answers exit `0`; failures exit `1` with kind `model_fai
 
 ### Codex
 
-`relay model --harness codex` (`src/adapters/codex-model.js`, `src/adapters/codex-rollout.js`) reports which model a process running inside a Codex tool call is executing. It reads `CODEX_THREAD_ID`, locates `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*-<thread>.jsonl` (`$HOME/.codex` when `CODEX_HOME` is unset), verifies the opening `session_meta` line, binds the call through the caller's nearest `codex` ancestor (below), and reads the last `turn_context` within the final 64 MiB.
+`relay model --harness codex` (`src/adapters/codex-model.js`, `src/adapters/codex-rollout.js`) reports which model a process running inside a Codex tool call is executing. It reads `CODEX_THREAD_ID` and looks for `sessions/YYYY/MM/DD/rollout-*-<thread>.jsonl` under `$CODEX_HOME`, using `$HOME/.codex` when `CODEX_HOME` is empty or unset. If the thread's day directory yields no match, Relay scans the store's session day directories and `archived_sessions`. It verifies the opening `session_meta` line, binds the call through the caller's nearest `codex` ancestor (below), and reads the last `turn_context` within the final 64 MiB.
 
-The stamp includes `@<effort>` when `turn_context.payload.effort` is a nonempty string. Otherwise effort is absent with `effortReason: "not-recorded"`. The thread, nearest-harness and rollout locators are under `source`:
+The stamp includes `@<effort>` when `turn_context.payload.effort` is a nonempty string. A verified answer without recorded effort has `effort: null` and `effortReason: "not-recorded"`. Unverified answers have `model: null` and `effort: null`. The `source` object includes the thread and rollout path as far as resolution reached.
 
 ```json
 {"verified":true,"agent":"codex/gpt-6.1-sol@high","harness":"codex","model":"gpt-6.1-sol","effort":"high","effortReason":null,"reason":null,"source":{"thread":"<id>","nearest":"codex","rollout":"<path>"}}
@@ -288,7 +288,7 @@ The answer is `unbound-call` when the nearest `codex` ancestor started after the
 | `turn-boundary` | The binding process start interval is within 1 s of the `turn_context` timestamp and cannot be ordered deterministically. |
 | `unstampable` | The recorded model or effort is outside the stamp grammar. |
 
-Hard failures use code `INVALID_INPUT` (thread ID not a lowercase UUIDv7), `INVALID_CONFIG` (relative `CODEX_HOME` or missing `HOME`), `IO_ERROR`, `PROCESS_UNREADABLE`, or `INVALID_ROLLOUT` (missing opening `session_meta`, corrupt JSON line in the scanned range, or malformed `turn_context`).
+Hard failures include `INVALID_INPUT` (thread ID is not a lowercase UUIDv7), `INVALID_CONFIG` (relative `CODEX_HOME`, or no absolute `HOME` for the default store), `IO_ERROR`, `PROCESS_UNREADABLE`, `PROCESS_UNAVAILABLE`, `DEADLINE_EXCEEDED`, and `INVALID_ROLLOUT` (missing opening `session_meta`, corrupt JSON line in the scanned range, or malformed `turn_context`). Filesystem reads can also surface Node error codes.
 
 **Clock requirement:** A caller is verified only while its binding process's start interval less 1 s lies after the latest `turn_context` timestamp. Between the binding process's start and the `relay model` invocation, the wall clock must move by less than 1 s against the boot clock.
 

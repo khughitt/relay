@@ -49,7 +49,8 @@ test('verified: the last turn_context of the thread, for a call process started 
 });
 test('the sandbox: a codex-linux-sandbox helper at pid 1 binds the call by its own start', (t) => {
   const { env } = storeWith(t);
-  const ops = fakeOps({ chain: [row(3, 2, 'node'), row(2, 1, 'bash')], init: row(1, 0, 'codex'), argv: HELPER_ARGV });
+  const ops = fakeOps({ chain: [row(3, 2, 'node'), row(2, 1, 'bash')], init: row(1, 0, 'codex'), argv: HELPER_ARGV,
+    starts: { 1: { lo: B + 2000, hi: B + 2000 }, 2: { lo: B + 500, hi: B + 500 } } });
   assert.equal(resolve(env, ops, { startPid: 3 }).answer.agent, 'codex/gpt-6-astra@high');
   const host = fakeOps({ chain: [row(3, 2, 'node'), row(2, 1, 'bash')], init: row(1, 0, 'systemd') });
   assert.equal(resolve(env, host, { startPid: 3 }).answer.reason, 'not-under-codex');
@@ -106,6 +107,12 @@ test('nearest is null without a harness', (t) => {
 test('no-thread has no nearest', (t) => {
   const { env } = storeWith(t);
   assert.deepEqual(resolve({ CODEX_HOME: env.CODEX_HOME }, fakeOps()).answer.source, {});
+});
+test('no-thread does not require a supported process platform', (t) => {
+  const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+  t.after(() => Object.defineProperty(process, 'platform', descriptor));
+  Object.defineProperty(process, 'platform', { value: 'freebsd' });
+  assert.equal(resolveCodexModel({ env: {} }).answer.reason, 'no-thread');
 });
 test('later unverified answers carry nearest codex', (t) => {
   const { env, thread } = storeWith(t);

@@ -11,13 +11,13 @@ const BLOCK = 64 * 1024;
 const NEWLINE = 0x0a;
 const ISO_UTC = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z$/;
 
-/** The store: CODEX_HOME when set, else HOME/.codex. Each must be absolute. @param {NodeJS.ProcessEnv} env */
+/** The store: nonempty CODEX_HOME, else HOME/.codex. Each must be absolute. @param {NodeJS.ProcessEnv} env */
 export function storeRoot(env) {
-  if (env.CODEX_HOME !== undefined) {
+  if (env.CODEX_HOME) {
     if (!isAbsolute(env.CODEX_HOME)) throw relayError('INVALID_CONFIG', 'CODEX_HOME must be an absolute path');
     return env.CODEX_HOME;
   }
-  if (!env.HOME || !isAbsolute(env.HOME)) throw relayError('INVALID_CONFIG', 'CODEX_HOME is unset and HOME is not an absolute path');
+  if (!env.HOME || !isAbsolute(env.HOME)) throw relayError('INVALID_CONFIG', 'CODEX_HOME is empty or unset and HOME is not an absolute path');
   return join(env.HOME, '.codex');
 }
 
