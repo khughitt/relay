@@ -177,6 +177,7 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
     const { cmd, rest } = routed;
     cmdName = cmd.path.join('-');
     if (cmdName === 'inbox' && !(rest.length === 1 && hasHelp(rest))) throw usage('inbox requires one of list, ask, take, show, answer, defer, withdraw');
+    if (cmdName === 'peer' && !(rest.length === 1 && hasHelp(rest))) throw usage('peer requires one of open, join, send, wait, show, close');
     if (hasHelp(rest)) { await emit(stdout, helpText(cmd)); return 0; }
 
     // Protocol rows (hook, ask) print only the harness reply, so RELAY_FORMAT does not apply:
@@ -289,6 +290,19 @@ export async function main(rawArgs, { list = listAgents, whoami = async () => (a
         socketPath: await socketPathOf(paths().stateDir) });
       await emit(stdout, mode === 'json' ? `${JSON.stringify(r.json)}\n` : r.text);
       return 0;
+    }
+    if (cmd.path[0] === 'peer') {
+      const action = cmd.path[1], args = /** @type {string[]} */ ([]), f = flags(rest, cmd, args);
+      if (args.length !== 1) throw usage(`peer ${action} takes exactly one task id`);
+      if (action === 'send' && !f['--file']) throw usage('peer send requires --file PATH, or - for standard input');
+      const timeoutMs = f['--timeout-ms'];
+      if (timeoutMs !== undefined && !/^[1-9][0-9]{0,8}$/.test(timeoutMs)) throw usage('--timeout-ms must be a positive integer below 1000000000');
+      const { runPeer } = await import('../src/cli/peer.js'), { createProcessOps } = await import('../src/bus/proc.js'), { readSnapshot } = await import('../src/bus/transaction.js');
+      const registry = paths();
+      return await runPeer({ action, taskId: args[0], file: f['--file'], id: f['--id'], text: f['--reason'], timeoutMs: timeoutMs === undefined ? undefined : Number(timeoutMs),
+        socketPath: await socketPathOf(registry.stateDir), whoami, processOps: createProcessOps(), stdin,
+        readAgents: async () => (await readSnapshot({ paths: registry }))?.agents ?? {},
+        write: async (r) => emit(stdout, mode === 'json' ? `${JSON.stringify(r.json)}\n` : r.text) });
     }
     if (cmdName === 'presence') {
       if (rest.length > 1 || (rest.length && !['here', 'away'].includes(rest[0]))) throw usage('presence takes only here or away');

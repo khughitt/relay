@@ -2,7 +2,7 @@
 
 Type: guide, data model; document types 1.
 
-`relay` provides normalized agent lifecycle observation, a host-local live-agent registry (`agents.json`), a hook guard and observer dispatcher, and a durable interaction inbox (`relay serve`, `relay ask`, `relay inbox`, `relay presence`). Direct `applyEvent` performs no policy check; `dispatchHook` runs configured guards before optional enrichment and registry publication and retains their decision when observation fails. No live hooks or plugins are registered by installing the package alone.
+`relay` provides normalized agent lifecycle observation, a host-local live-agent registry (`agents.json`), a hook guard and observer dispatcher, and a durable interaction inbox (`relay serve`, `relay ask`, `relay inbox`, `relay presence`, `relay peer`). Direct `applyEvent` performs no policy check; `dispatchHook` runs configured guards before optional enrichment and registry publication and retains their decision when observation fails. No live hooks or plugins are registered by installing the package alone.
 
 Runtime floor: Node >=22, ES modules, Node built-ins. No install lifecycle scripts. The one runtime dependency, `jsonc-parser`, is installed by npm with `relay` and used only by `relay install`.
 
@@ -224,6 +224,12 @@ Interaction commands (backed by `relay serve` over `$STATE/serve.sock`; see [que
 | `relay inbox answer ID ITEM=VALUE... [--surface cli\|terminal]` | Supply every item's value (`ITEM=true`/`false`, `ITEM=o1`, `ITEM=o1,o2`, `ITEM=other:text`, `ITEM=text:text`). Surface defaults to `cli`; `terminal` records an answer relayed through the session. |
 | `relay inbox answer ID --decline [--surface cli\|terminal]` | Decline, with no values. |
 | `relay inbox defer ID` / `relay inbox withdraw ID [--reason user\|asker]` | Defer to desktop/native UI, or withdraw (default `user`). Asker withdrawal uses the question's agent as sender and the user as recipient. |
+| `relay peer open TASK` | Open a run on a task, with this session as lead. Repeating it returns the same run; another live session's run is refused with `RUN_EXISTS`. |
+| `relay peer join TASK` | Join the task's run as its reviewer. The first other session to join holds the role for the life of the run (`ROLE_TAKEN`). |
+| `relay peer send TASK --file PATH [--id UUID]` | Send the peer up to 2,000 characters from a file, or `-` for standard input. The sender is the calling session. Repeating a send with the same `--id` and text saves it once. |
+| `relay peer wait TASK [--timeout-ms N]` | Block until the peer's next unread message (or, for the lead, the join), print it and exit 0. Other endings: 3 run closed or expired, 4 peer confirmed dead, 5 timeout. Default 50 minutes. Messages already saved are delivered before any ending. |
+| `relay peer show TASK` | The task's run and who holds each role. |
+| `relay peer close TASK [--reason TEXT]` | End the run for both sides. A member may, and so may the user from a terminal outside any agent session. |
 | `relay presence [here\|away]` | Read/set durable presence; `here` is the initial default. |
 | `relay install --harness claude-code --subscribers FILE --target FILE --evidence FILE --with ask [--qualification FILE --session-mode MODE] [--apply --artifact FILE]` | Plan/apply the evidence-gated route. Without `--qualification` (and without `--event`) it writes the ask route alone and leaves every dispatch entry as it was; with it, beside the qualified dispatch routes. A full Claude install (no `--event`) reconciles the route: without `--with ask` it removes relay's own `ask` entries. An install of selected events leaves every `ask` entry as it was unless `--with ask` names the route. |
 
@@ -241,7 +247,7 @@ Which routes can qualify today, and what each still lacks, is in [adapters.md](a
 {"error":{"kind":"list_failed","detail":"CORRUPT_STATE: cannot read registry JSON"}}
 ```
 
-or, outside `--json`, `relay: <detail>` on stderr. A CLI usage error (an unknown command, `relay inbox` alone without a subcommand, or a missing or invalid argument) exits `2` with one line on stderr naming the problem. The CLI exits explicitly once its reply is flushed so a filesystem operation past the deadline is abandoned.
+or, outside `--json`, `relay: <detail>` on stderr. A CLI usage error (an unknown command, `relay inbox` or `relay peer` alone without a subcommand, or a missing or invalid argument) exits `2` with one line on stderr naming the problem. The CLI exits explicitly once its reply is flushed so a filesystem operation past the deadline is abandoned.
 
 ### Registry consumers: `relay list --json`
 
@@ -369,7 +375,7 @@ Storage, process, lock, dispatch, install, and model error codes:
 - `AGY_CLASSIFICATION_UNAVAILABLE` (appears only as a diagnostic on `agy` registry mutations when conversation classification is unavailable or capped, never as a thrown error)
 - `INVALID_ROLLOUT`, `INVALID_RECORD`, `UNSUPPORTED_RUNTIME` (agy model resolution requires SQLite support in the running Node)
 
-Interaction error codes (`relay serve`, `relay ask`, `relay inbox`, `relay presence`; see [questions.md](questions.md#failure-modes)):
+Interaction error codes (`relay serve`, `relay ask`, `relay inbox`, `relay presence`, `relay peer`; see [questions.md](questions.md#failure-modes)):
 
 | Codes | Meaning |
 | --- | --- |
@@ -378,6 +384,8 @@ Interaction error codes (`relay serve`, `relay ask`, `relay inbox`, `relay prese
 | `STALE`, `INVALID_ANSWER`, `LOCAL_ONLY` | Revision mismatch, invalid item values, or remote authorization answer. |
 | `NOT_WAITER`, `NOT_ANSWERED`, `NOT_HANDED`, `NOT_SUPERSEDABLE` | Route ownership or transition precondition failed. |
 | `ID_CONFLICT`, `NOT_FOUND`, `NOT_A_QUESTION` | Conflicting message identity, missing entry/native call, or wrong entry kind. |
+| `NO_RUN`, `RUN_EXISTS`, `RUN_CLOSED`, `RUN_EXPIRED`, `NO_PEER`, `PEER_GONE`, `NOT_A_MEMBER`, `ROLE_TAKEN`, `SAME_SESSION` | `relay peer`: the task's run, or this session's place in it, does not allow the command. |
+| `NO_SESSION`, `WORKER_SESSION`, `UNSUPPORTED_HARNESS`, `SESSION_GONE`, `MESSAGE_TOO_LONG`, `NOT_A_NOTICE` | `relay peer`: no agent session, a worker thread, an unsupported harness, a wait outliving its session, text over 2,000 characters; `seen` on a question. |
 | `INVALID_MESSAGE`, `INVALID_INPUT`, `INVALID_REQUEST`, `UNKNOWN_OP` | Invalid message, native input/presence/cursor, socket frame, or operation. |
 | `SERVE_RUNNING`, `SERVE_UNAVAILABLE`, `STORE_FAILED` | Existing live service, unavailable socket, or failed durable write requiring restart. |
 | `INVALID_CONFIG`, `INVALID_ENTRY`, `HARNESS_UNAVAILABLE`, `UNSUPPORTED_ROUTE`, `UNEXPECTED_STATE` | Invalid configuration (including a `serve.sock` path over the platform limit) or durable entry, failed harness version probe, or unsupported route/state. |
