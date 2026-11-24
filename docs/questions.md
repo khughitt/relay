@@ -2,7 +2,7 @@
 
 Type: protocol, data model; document types 1.
 
-`relay serve` maintains a durable interaction inbox under `$STATE/inbox/`, exposed over a private Unix domain socket (`$STATE/serve.sock`), the CLI (`relay ask`, `relay inbox`, `relay presence`), and an optional guarded loopback/Tailscale HTTP surface. No root package export is added for interaction modules; the packaged JSON Schema is `schemas/interaction/message.schema.json` and the shipped operator runbook is [`inbox-service.md`](runbooks/inbox-service.md). See [api.md](api.md) for CLI summaries and error codes.
+`relay serve` maintains a durable interaction inbox under `$STATE/inbox/`, exposed over a private Unix domain socket (`$STATE/serve.sock`), the CLI (`relay ask`, `relay inbox`, `relay presence`, `relay peer`), and an optional guarded loopback/Tailscale HTTP surface. No root package export is added for interaction modules; the packaged JSON Schema is `schemas/interaction/message.schema.json` and the shipped operator runbook is [`inbox-service.md`](runbooks/inbox-service.md). See [api.md](api.md) for CLI summaries and error codes.
 
 ## Messages and entries
 
@@ -132,12 +132,34 @@ Detached questions (`native: null`, `from: { kind: 'agent', ... }`, `to: { kind:
 | `confirm` | `harness`, `callId`, `observed` (native answers map) | `entry`. |
 | `answer` / `defer` / `withdraw` | `message` of the matching kind | `entry`; socket withdrawal permits only `'user'` and `'asker'` reasons. |
 | `notify` | `message` (notice) | `entry`; identical resend returns the saved notice, and any different content under that ID fails with `ID_CONFLICT`. |
+| `seen` | `id` (notice UUID) | `entry`; marks a notice read (idempotent), `NOT_A_NOTICE` for a question. `relay peer wait` uses it as the reader's place. |
 | `list` | optional `since` and `states` | `{seq, entries}`: nonterminal entries plus terminal entries changed after `since`, filtered by `states`. |
 | `get` | `id` | `entry`, including terminal entries (`NOT_FOUND` if absent). |
 | `presence.get` / `presence.set` | none / `mode` (`'here' \| 'away'`) | `presence`. |
 | `watch` | optional `since` (default `0`) | Replays `{type: "entry", entry}` changes after `since`, subscribes atomically, returns `{seq}`, and streams live `entry` and `presence` pushes. |
 
 Restart grants recorded waiters 10 s to reattach before confirmed-dead waiter sweeps withdraw pending questions or mark saved answers `undeliverable`. Detached `ask` messages validate party direction, route, and `createdAt <= serviceNow + 1000` (`INVALID_MESSAGE` otherwise) before replay lookup.
+
+## Peer runs
+
+A peer run joins two agent sessions on one task. It is a fold of notices in creation order, each entry's first log sequence (`src/peer/index.js`), with no store of its own. An entry's own `seq` moves when it is marked seen and orders nothing here. A run's notices carry `context.taskId` and the title `peer/1 <run uuid> <kind>`; all share the run's `expiresAt`, 7 days after it opens.
+
+| Kind | `from` -> `to` | Text | Effect |
+| --- | --- | --- | --- |
+| `open` | lead -> itself | `{"process": Handle}` | Starts a run, if the task has no open one. |
+| `join` | reviewer -> lead | `{"process": Handle}` | Binds the first other session to join as reviewer, for the life of the run. |
+| `message` | either member -> the other | the message, 1 to 2,000 characters | Delivered to the other member and then marked seen. |
+| `close` | a member, the user, or a session replacing a lead that is gone -> a member | the reason | Ends the run. |
+
+A notice that does not fit the run when it was created is ignored: another run's, a third session's join or message, one to the wrong party, or a message from the user. The fold cannot check that a lead was gone, so it takes any `close` of the current run; the command posts one only for the parties above.
+
+A delivery is written out before it is marked, so an interruption repeats a message with the same `seq` and `id`. Run one `wait` per session at a time: two at once can both print a message. Replacing a run leaves its unread messages undelivered. Readers therefore see only the bound peer.
+
+`from` is asserted by the client, under the same same-user trust as the rest of the socket. `relay peer` always sets it from `whoami`, and the fold refuses what the roles do not allow, so a mistake cannot pass one session's words off as the peer's or the user's. A process of the same user that writes the socket directly can still forge a member's notice. `close` from outside any agent session counts as the user's; a process detached from a Claude Code, Codex or agy session is refused because it still carries that session's variables. A pi session sets none, so its detached process is not recognized.
+
+A peer is gone only when its bound process is confirmed dead and the registry shows its session in no live process. Unknown liveness, including a row with no process, never ends a run. A session replaced inside a live process (Claude Code `/clear`, Codex `/new`) is not seen as gone: its peer times out, and the user ends the run with `relay peer close`. When an open run's lead is gone, another session may open a new run, which first closes the old one.
+
+Peer notices are ordinary inbox entries. `relay inbox list` shows them; the phone adapter receives notices and does not show them.
 
 ## HTTP protocol and guard
 
@@ -196,6 +218,8 @@ For `relay ask`, an `undeliverable` entry (including one replayed on waiter reat
 | `STALE`, `INVALID_ANSWER`, `LOCAL_ONLY` | Artifact revision mismatch (`refusal:STALE` logged), invalid item values, or remote authorization answer. |
 | `NOT_WAITER`, `NOT_ANSWERED`, `NOT_HANDED`, `NOT_SUPERSEDABLE` | Waiter handle mismatch on `ask`/`handed`, pending `take`, or transition precondition failure. |
 | `ID_CONFLICT`, `NOT_FOUND`, `NOT_A_QUESTION` | Conflicting message content for an existing ID, missing entry/call, or wrong entry kind. |
+| `NO_RUN`, `RUN_EXISTS`, `RUN_CLOSED`, `RUN_EXPIRED`, `NO_PEER`, `PEER_GONE`, `NOT_A_MEMBER`, `ROLE_TAKEN`, `SAME_SESSION` | `relay peer`: the task's run, or this session's place in it, does not allow the command. |
+| `NO_SESSION`, `WORKER_SESSION`, `UNSUPPORTED_HARNESS`, `SESSION_GONE`, `MESSAGE_TOO_LONG`, `NOT_A_NOTICE` | `relay peer`: no agent session, a worker thread, an unsupported harness, a wait outliving its session, text over 2,000 characters; `seen` on a question. |
 | `INVALID_MESSAGE`, `INVALID_INPUT`, `INVALID_REQUEST`, `UNKNOWN_OP` | Invalid message schema/party/timestamp, duplicate `AskUserQuestion` prompt text, invalid cursor/presence, or malformed socket frame. |
 | `SERVE_RUNNING`, `SERVE_UNAVAILABLE`, `STORE_FAILED` | Existing live `relay serve`, unavailable `$STATE/serve.sock`, or failed durable write requiring restart. |
 | `INVALID_CONFIG`, `INVALID_ENTRY`, `HARNESS_UNAVAILABLE`, `UNSUPPORTED_ROUTE`, `UNEXPECTED_STATE` | Invalid serve configuration, corrupt durable entry, failed harness probe, or unsupported route/state. |

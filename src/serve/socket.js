@@ -109,6 +109,13 @@ export async function serveSocket({ inbox, socketPath, processOps, reattachMs = 
       return inbox.withdraw(m.correlationId, m);
     },
     notify: (req) => inbox.notify(kind(validateMessage(req.message), 'notice')),
+    seen: async (req) => {
+      if (!isUuid(req.id)) throw relayError('INVALID_MESSAGE', 'seen needs a notice UUID');
+      const entry = inbox.get(req.id);
+      if (!entry) return { entry: null, error: { code: 'NOT_FOUND' } };
+      if (entry.kind !== 'notice') return { entry, error: { code: 'NOT_A_NOTICE' } };
+      return inbox.seen(req.id);
+    },
     list: (req) => inbox.snapshot({ since: req.since, states: req.states }),
     get: async (req) => {
       const { entries } = await inbox.snapshot({ since: 0 });

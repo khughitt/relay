@@ -75,6 +75,11 @@
  * @typedef {{handback:boolean,waiter:Handle|null,connector?:never,terminal?:never}|{handback:true,connector:CodexOwner,terminal:boolean,waiter?:never}} QuestionRoute
  * @typedef {EntryFrame & {kind: 'question', question: QuestionMessage, state: QuestionState, presentation: 'inbox'|'desktop', route: QuestionRoute, answer: AnswerMessage|null, handedAt: number|null, observed: NativeAnswers|null, withdrawal: {reason: string}|null, supersededBy: string|null, messages: {at: number, message: Message}[], observations: {at: number, surface: string, answers: NativeAnswers}[]}} QuestionEntry
  * @typedef {EntryFrame & {kind: 'notice', notice: NoticeMessage, state: 'active'|'expired', seen: boolean}} NoticeEntry
+ * @typedef {'open'|'join'|'message'|'close'} PeerKind
+ * @typedef {'lead'|'reviewer'} PeerRole
+ * @typedef {NoticeEntry & {seq: number}} PeerEntry
+ * @typedef {{agentId: string, process: Handle}} PeerMember
+ * @typedef {{id: string, taskId: string, lead: PeerMember, reviewer: PeerMember|null, state: 'open'|'closed'|'expired', expiresAt: number, closed: {by: string, reason: string, seq: number}|null, notices: {seq: number, id: string, kind: 'join'|'message', from: string, to: string, text: string, at: number, seen: boolean}[]}} PeerRun
  * @typedef {Omit<QuestionEntry,'route'> & {route:{handback:boolean,waiter:Handle|null}}} PublicQuestionEntry
  * @typedef {PublicQuestionEntry|NoticeEntry} PublicEntry
  * @typedef {PublicEntry & {seq:number}} PublicStoredEntry
@@ -118,7 +123,7 @@ export {};
 /**
  * The private socket is JSON on the wire; callers get an operation's response shape.
  * @typedef {PublicQuestionEntry & {answer: AnswerMessage}} AnsweredEntry
- * @typedef {{ask: {entry: PublicQuestionEntry, passthrough?: false}|{passthrough: true, entry?: never}, handed: {entry: AnsweredEntry}, take: {entry: AnsweredEntry}, confirm: {entry: PublicQuestionEntry}, answer: {entry: PublicQuestionEntry}, defer: {entry: PublicQuestionEntry}, withdraw: {entry: PublicQuestionEntry}, notify: {entry: NoticeEntry}, list: {seq: number, entries: PublicStoredEntry[]}, get: {entry: PublicStoredEntry}, 'presence.get': {presence: {mode: string, updatedAt: number}}, 'presence.set': {presence: {mode: string, updatedAt: number}}, watch: {seq: number}}} SocketResponses
+ * @typedef {{ask: {entry: PublicQuestionEntry, passthrough?: false}|{passthrough: true, entry?: never}, handed: {entry: AnsweredEntry}, take: {entry: AnsweredEntry}, confirm: {entry: PublicQuestionEntry}, answer: {entry: PublicQuestionEntry}, defer: {entry: PublicQuestionEntry}, withdraw: {entry: PublicQuestionEntry}, notify: {entry: NoticeEntry}, seen: {entry: NoticeEntry}, list: {seq: number, entries: PublicStoredEntry[]}, get: {entry: PublicStoredEntry}, 'presence.get': {presence: {mode: string, updatedAt: number}}, 'presence.set': {presence: {mode: string, updatedAt: number}}, watch: {seq: number}}} SocketResponses
  * @typedef {{ok: false, error: Refusal & {message: string}, entry?: PublicEntry|null, passthrough?: never}} SocketFailure
  * @typedef {{type: 'state', entry: PublicQuestionEntry}|{type:'entry',entry:PublicEntry}|{type:'presence',presence:{mode:string,updatedAt:number}}} SocketPush
  */

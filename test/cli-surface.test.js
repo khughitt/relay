@@ -160,8 +160,10 @@ test('every command without a declared output row emits one JSON value under --j
   const file = path.join(p.stateDir, 'detached.json'); fs.writeFileSync(file, JSON.stringify(q));
   assert.equal(runCli(p, ['inbox', 'ask', '--file', file]).status, 0);
   assert.equal(runCli(p, ['inbox', 'answer', q.id, 'q1=o1']).status, 0);
-  const args = { 'inbox ask': ['--file', file], 'inbox take': [q.id], 'inbox show': [id], 'inbox answer': [id, 'q1=o1'], 'inbox defer': [id], model: ['--harness', 'codex'] };
-  const candidates = COMMANDS.filter((cmd) => !cmd.protocol && !cmd.output && cmd.path.join(' ') !== 'inbox withdraw')
+  const args = { 'inbox ask': ['--file', file], 'inbox take': [q.id], 'inbox show': [id], 'inbox answer': [id, 'q1=o1'], 'inbox defer': [id], model: ['--harness', 'codex'], 'peer show': ['relay-1bf40b'] };
+  // The other peer commands need an agent session: test/cli-peer.test.js checks their JSON.
+  const sessionOnly = (/** @type {{path: string[]}} */ cmd) => cmd.path[0] === 'peer' && cmd.path[1] !== 'show';
+  const candidates = COMMANDS.filter((cmd) => !cmd.protocol && !cmd.output && cmd.path.join(' ') !== 'inbox withdraw' && !sessionOnly(cmd))
     .sort((a, b) => Number(a.path.join(' ') === 'inbox answer') - Number(b.path.join(' ') === 'inbox answer'));
   assert.ok(candidates.length > 0, 'expected at least one plain command row');
   for (const cmd of candidates) {
