@@ -108,13 +108,13 @@ export function projectToolCall(toolCall) {
     input: name === 'run_command' && object(args) && typeof args.CommandLine === 'string' ? { command: args.CommandLine } : object(args) ? args : {} };
 }
 const ops = () => createProcessOps();
-/** @type {import("../types.js").Adapter["isHarness"]} */
+/** @param {import("../types.js").ProcessRow} row */
 export const isHarness = (row) => row.comm === 'agy';
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveSessionPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
-  return nearestSessionPid(ancestors(startPid), { isHarness: (row) => isHarness(row, { executableOf: () => '' }) });
+  return nearestSessionPid(ancestors(startPid), { isHarness });
 }
 /** @param {import("../types.js").AncestryOptions} [options] */
 export function resolveTerminalPid({ startPid = process.pid, ancestors = (pid) => ops().ancestors(pid) } = {}) {
-  return nearestTerminalPid(ancestors(startPid), (row) => row.comm === 'agy');
+  return nearestTerminalPid(ancestors(startPid), isHarness);
 }

@@ -53,6 +53,8 @@ type Adapter = {
   reduceState(level: State | null, previous?: State | null,
     context?: { background?: { agents: number; other: number } }): State | null;
   backgroundOf?(data: Record<string, unknown>, nativeEvent: string): { agents: number; other: number } | null | undefined; // Claude Code only
+  nativeFields?(data: Record<string, unknown>, nativeEvent: string): Record<string, unknown>;
+  failureExitCode?: 0 | 1;
   resolveSessionPid(options?: { startPid?: number; ancestors?: (pid: number) => ProcessRow[];
     executableOf?: (pid: number) => string; argvOf?: (pid: number) => string[] }): number | null;
   resolveTerminalPid(options?: { startPid?: number; ancestors?: (pid: number) => ProcessRow[];
@@ -202,7 +204,7 @@ Registry, hook dispatch, installation, and model commands:
 - `relay list`
 - `relay whoami`
 - `relay reap [--outer-ms N]`
-- `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT` (`NAME` may be `agy`; `install` does not accept `agy`)
+- `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT` (`NAME` may be `agy`; both `install` and `ask` refuse `agy`)
 - `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--qualification FILE --session-mode MODE] [--event NAME]... [--evidence FILE] [--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`
 - `relay pairs --harness claude-code|codex --target FILE`
 - `relay rollback --artifact FILE`

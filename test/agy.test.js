@@ -18,6 +18,7 @@ test('agy translates each event', () => {
   assert.equal(pre.kind, 'before-tool');
   assert.equal(pre.tool.name, 'Bash');
   assert.equal(pre.tool.command, fixture('PreToolUse').toolCall.args.CommandLine);
+  assert.deepEqual(pre.tool.input, { command: pre.tool.command });
   assert.equal(run('Stop', { ...fixture('Stop'), executionNum: 0 }).stopHookActive, false);
   assert.equal(run('Stop', { ...fixture('Stop'), executionNum: 1 }).stopHookActive, true);
   assert.equal(Object.hasOwn(run('Stop', (({ executionNum, ...r }) => r)(fixture('Stop'))), 'stopHookActive'), false);
@@ -44,10 +45,12 @@ test('agy payload refusals', () => {
   const stop = fixture('Stop'), pre = fixture('PreToolUse');
   const without = (o, k) => { const c = { ...o }; delete c[k]; return c; };
   bad('Stop', without(stop, 'conversationId')); bad('Stop', { ...stop, conversationId: 5 });
+  bad('Stop', { ...stop, conversationId: '' });
   bad('Stop', without(stop, 'workspacePaths'));
-  for (const workspacePaths of [[], ['relative'], ['/a\u0000b']]) bad('Stop', { ...stop, workspacePaths });
+  for (const workspacePaths of ['/work/project', [], ['relative'], ['/a\u0000b']]) bad('Stop', { ...stop, workspacePaths });
   for (const executionNum of [-1, 1.5, '0']) bad('Stop', { ...stop, executionNum });
   bad('PreToolUse', without(pre, 'toolCall')); bad('PreToolUse', { ...pre, toolCall: null }); bad('PreToolUse', { ...pre, toolCall: 'x' });
+  bad('PreToolUse', { ...pre, toolCall: { ...pre.toolCall, name: 5 } });
 });
 
 test('agy translation does not mutate input', () => {
