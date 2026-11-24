@@ -105,7 +105,8 @@
               "host=host-b outerMs=30000 runtime=v26.13.1 claude-code SessionStart commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 11.5 p99 delta 24.2 max delta 27.0 ms",
               "judge.mjs at 1f1c28da62e7867caf3acaddf16ba13079a37e85: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence); two-host-judge and timing report attached to relay-d487c1 as sessionstart-two-host-judge.json and sessionstart-two-host-timing-report.md",
               "measured at outerMs 30000 under plan amendment 2 (records 1ac7bf7ccd7da3aebe47d192d69d54459e17aa0b, relay/docs/plans/2026-11-12-hook-transport-plan-amendment-2.md, user-accepted), no larger than this row's 600000; the native claude-sessionstart hook ran as three parallel baseline branches, which can only make the baseline faster and the delta gates stricter (ruling on relay-d487c1)",
-              "host-b manifests record claude-code 2.1.304 (host-a 2.1.331); the measurement launches no harness"
+              "host-b manifests record claude-code 2.1.304 (host-a 2.1.331); the measurement launches no harness",
+              "all four lines measured the interactive fixture (each host's manifest records mode interactive); they stand for this interactive row only"
             ]
           },
           "retryFlag": {
@@ -115,13 +116,15 @@
           "outerFailure": {
             "status": "passed",
             "evidence": [
-              "host-a live probe 2026-11-24, claude-code 2.1.331 interactive, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code reported the timeout, discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook failure and proceeded; in both, no subscriber outlived relay and relay reap found nothing"
+              "host-a live probe 2026-11-24, claude-code 2.1.331 interactive, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: hanging subscribers on every route: harness timeout lowered to 3 s: the session transcript records hook_cancelled for SessionStart, UserPromptSubmit, PreToolUse and Stop and Claude Code proceeded; relay killed by SIGTERM while waiting: the transcript records hook_non_blocking_error for the same hooks and Claude Code proceeded; in both, the guarded Bash command ran, no subscriber outlived relay and relay reap found nothing"
             ]
           },
           "policyEquivalence": {
             "status": "unknown",
             "evidence": [
-              "hq's isolated replay passed each donor-2 policy comparison; its full-composition observations failed only on familiar ownership, which the live composition above proves; hq-ab3121 judges whether that completes the owner's equivalence"
+              "per role: observer (familiar, unchanged from the deployed relay line) and the notices lore-stale-notice, git-index-repair, lore-profile-notice and mindful-capture-notice: owner hq-a83688; notice tasks-halt-notice: owner tasks-d41ccb",
+              "hq's owner replay (hq 23e546e9, isolated interactive fixtures) passed its 19 per-policy rows (capture, index repair, profile, stale and harness-state-refresh; no halt or claim-guard rows); hq-ab3121 closed 2026-11-24 ruling that Task 7's full-composition requirement is met for the Claude bindings by the live composition above and that per-policy equivalence stays those 19 rows; hq-a83688 has not recorded them as this row's policyEquivalence",
+              "tasks-e67608 (closed 2026-11-15) replayed 194 claim-guard and halt-notice fixture cases through relay's decoder at an earlier relay commit (records tasks docs/notes/2026-11-15-task-hook-replay-results.md; component evidence with declared old/new outcome changes); whether it stands for these rows is open with tasks-d41ccb"
             ],
             "owner": "hq-a83688"
           }
@@ -185,7 +188,8 @@
               "host=host-b outerMs=20000 runtime=v22.23.2 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 11.3 p99 delta 7.5 max delta 5.4 ms",
               "host=host-b outerMs=20000 runtime=v26.13.1 claude-code Stop commit=1f1c28da62e7867caf3acaddf16ba13079a37e85 baseline=deployed-relay-plus-native warm p95 delta 9.4 p99 delta 12.3 max delta 9.7 ms",
               "judge.mjs at 1f1c28da62e7867caf3acaddf16ba13079a37e85: passed on host-a and host-b, each on Node 22 and a development runtime, against its own deployed composition (synthetic fixtures; transport evidence); native turn-pause ran as the same fixture branch on both sides; two-host-judge and timing report attached to relay-d487c1 as stop-two-host-judge.json and stop-two-host-timing-report.md",
-              "host-b manifests record claude-code 2.1.304 (host-a 2.1.331); the measurement launches no harness"
+              "host-b manifests record claude-code 2.1.304 (host-a 2.1.331); the measurement launches no harness",
+              "all four lines measured the interactive fixture (each host's manifest records mode interactive); they stand for this interactive row only"
             ]
           },
           "retryFlag": {
@@ -197,15 +201,18 @@
           "outerFailure": {
             "status": "passed",
             "evidence": [
-              "host-a live probe 2026-11-24, claude-code 2.1.331 interactive, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: harness timeout lowered to 3 s with a hanging subscriber: Claude Code reported the timeout, discarded the hook output and proceeded; relay killed by SIGTERM while waiting: Claude Code reported a non-blocking hook failure and proceeded; in both, no subscriber outlived relay and relay reap found nothing"
+              "host-a live probe 2026-11-24, claude-code 2.1.331 interactive, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: hanging subscribers on every route: harness timeout lowered to 3 s: the session transcript records hook_cancelled for SessionStart, UserPromptSubmit, PreToolUse and Stop and Claude Code proceeded; relay killed by SIGTERM while waiting: the transcript records hook_non_blocking_error for the same hooks and Claude Code proceeded; in both, the guarded Bash command ran, no subscriber outlived relay and relay reap found nothing"
             ]
           },
           "policyEquivalence": {
             "status": "unknown",
             "evidence": [
-              "tasks-claim-guard's equivalence is owned by tasks-e67608 and harness-state-refresh's by hq-a83688; the live composition above shows both ran without failure, which is not an owner replay"
+              "per role: guard tasks-claim-guard: owner tasks-d41ccb (the owner shown); observer familiar (unchanged from the deployed relay line) and harness-state-refresh: owner hq-a83688",
+              "tasks-e67608 (closed 2026-11-15) replayed 194 claim-guard and halt-notice fixture cases through relay's decoder at an earlier relay commit (records tasks docs/notes/2026-11-15-task-hook-replay-results.md; component evidence with declared old/new outcome changes); whether it stands for these rows is open with tasks-d41ccb",
+              "hq's owner replay (hq 23e546e9, isolated interactive fixtures) passed its 19 per-policy rows (capture, index repair, profile, stale and harness-state-refresh; no halt or claim-guard rows); hq-ab3121 closed 2026-11-24 ruling that Task 7's full-composition requirement is met for the Claude bindings by the live composition above and that per-policy equivalence stays those 19 rows; hq-a83688 has not recorded them as this row's policyEquivalence",
+              "the live composition above shows every Stop subscriber ran without failure, which is not an owner replay"
             ],
-            "owner": "tasks-e67608"
+            "owner": "tasks-d41ccb"
           }
         }
       ]
@@ -217,7 +224,7 @@
       "platform": "linux",
       "relayCommit": "1f1c28da62e7867caf3acaddf16ba13079a37e85",
       "configDigest": "19b427ac306aa5eb1dfeff24a00c89d28db4eef76c14aa106e02c8e7d01eb14b",
-      "note": "Rows for the hq donor-2 Claude composition at relay v0.5.0: relayCommit is the commit every check here ran at, configDigest the donor-2 subscriber file the rows target (the latency fixture is its normalized composition; the live probes use synthetic subscriber files). Turn-pause stays a native Stop line. The 2.1.331 live probes also passed on UserPromptSubmit, PreToolUse, both Notifications, StopFailure and SessionEnd (claude-live-probes-2.1.331-report.md); their latency was measured at aa56101bc45a68dd0c32ae80dffd3e777283968a (claude-code 2.1.323 block) and does not carry to this commit, so those rows are not written here.",
+      "note": "Rows for the hq donor-2 Claude composition at relay v0.5.0: relayCommit is the commit every check here ran at, configDigest the donor-2 subscriber file the rows target (the live probes use synthetic subscriber files). Turn-pause stays a native Stop line. Print-mode probes at 2.1.331 covered SessionStart, Stop and SessionEnd only; rows for other routes are not written.",
       "routes": [
         {
           "event": "SessionStart",
@@ -245,7 +252,7 @@
             "status": "passed",
             "evidence": [
               "test/fixtures/hook-events/claude-code.SessionStart.input.json at 1f1c28da62e7867caf3acaddf16ba13079a37e85",
-              "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: the live native payload decoded and reached its subscribers"
+              "host-a live probe 2026-11-24, claude-code 2.1.331 print, relay 1f1c28da62e7867caf3acaddf16ba13079a37e85; agent-driven session in a loopback-only network namespace against a local stub model (no model service); report attached to relay-d487c1 as claude-live-probes-2.1.331-report.md: the live native payload decoded and reached its notice subscriber"
             ]
           },
           "nativeReply": {
@@ -295,7 +302,9 @@
           "policyEquivalence": {
             "status": "unknown",
             "evidence": [
-              "hq's isolated replay passed each donor-2 policy comparison; its full-composition observations failed only on familiar ownership, which the live composition above proves; hq-ab3121 judges whether that completes the owner's equivalence"
+              "per role: observer (familiar, unchanged from the deployed relay line) and the notices lore-stale-notice, git-index-repair, lore-profile-notice and mindful-capture-notice: owner hq-a83688; notice tasks-halt-notice: owner tasks-d41ccb",
+              "hq's owner replay (hq 23e546e9, isolated interactive fixtures) passed its 19 per-policy rows (capture, index repair, profile, stale and harness-state-refresh; no halt or claim-guard rows); hq-ab3121 closed 2026-11-24 ruling that Task 7's full-composition requirement is met for the Claude bindings by the live composition above and that per-policy equivalence stays those 19 rows; hq-a83688 has not recorded them as this row's policyEquivalence; it records no noninteractive (-p) assurance",
+              "tasks-e67608 (closed 2026-11-15) replayed 194 claim-guard and halt-notice fixture cases through relay's decoder at an earlier relay commit (records tasks docs/notes/2026-11-15-task-hook-replay-results.md; component evidence with declared old/new outcome changes); whether it stands for these rows is open with tasks-d41ccb"
             ],
             "owner": "hq-a83688"
           }
@@ -372,9 +381,12 @@
           "policyEquivalence": {
             "status": "unknown",
             "evidence": [
-              "tasks-claim-guard's equivalence is owned by tasks-e67608 and harness-state-refresh's by hq-a83688; the live composition above shows both ran without failure, which is not an owner replay"
+              "per role: guard tasks-claim-guard: owner tasks-d41ccb (the owner shown); observer familiar (unchanged from the deployed relay line) and harness-state-refresh: owner hq-a83688",
+              "tasks-e67608 (closed 2026-11-15) replayed 194 claim-guard and halt-notice fixture cases through relay's decoder at an earlier relay commit (records tasks docs/notes/2026-11-15-task-hook-replay-results.md; component evidence with declared old/new outcome changes); whether it stands for these rows is open with tasks-d41ccb",
+              "hq's owner replay (hq 23e546e9, isolated interactive fixtures) passed its 19 per-policy rows (capture, index repair, profile, stale and harness-state-refresh; no halt or claim-guard rows); hq-ab3121 closed 2026-11-24 ruling that Task 7's full-composition requirement is met for the Claude bindings by the live composition above and that per-policy equivalence stays those 19 rows; hq-a83688 has not recorded them as this row's policyEquivalence; it records no noninteractive (-p) assurance",
+              "the live composition above shows every Stop subscriber ran without failure, which is not an owner replay"
             ],
-            "owner": "tasks-e67608"
+            "owner": "tasks-d41ccb"
           }
         }
       ]
