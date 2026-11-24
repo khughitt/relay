@@ -3,11 +3,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 import { tempState } from './helpers/fixture.js';
 import { spawnLines } from './helpers/spawn-lines.js';
-import { HANDLE, OTHER_HANDLE, uuid } from './helpers/interaction.js';
+import { HANDLE, OTHER_HANDLE, uuid, questionMessage } from './helpers/interaction.js';
 import { connectSocket } from '../src/serve/client.js';
-import { runPeer } from '../src/cli/peer.js';
+import { runPeer, WAIT_MS } from '../src/cli/peer.js';
 import { peerNotice, runFor, RUN_MS } from '../src/peer/index.js';
 
 const worker = new URL('./fixtures/serve-worker.js', import.meta.url).pathname;
@@ -216,7 +217,7 @@ test('no run, and a run past its lifetime', { timeout: 30000 }, async (t) => {
   for (const action of ['join', 'send', 'wait', 'close']) await assert.rejects(h.lead(action, { text: 'x', timeoutMs: 20 }), { code: 'NO_RUN' }, action);
   assert.equal((await h.lead('show')).json.run, null);
   const now = 1_800_000_000_000, id = uuid();
-  const entries = [{ seq: 1, kind: 'notice', seen: false, notice: peerNotice({ kind: 'open', run: id, expiresAt: now + RUN_MS, from: LEAD.id, to: LEAD.id, taskId: TASK, project: null, cwd: null, text: JSON.stringify({ process: HANDLE }), id: uuid(), now }) }];
+  const entries = [{ seq: 9, log: [{ seq: 1 }], kind: 'notice', seen: false, notice: peerNotice({ kind: 'open', run: id, expiresAt: now + RUN_MS, from: LEAD.id, to: LEAD.id, taskId: TASK, project: null, cwd: null, text: JSON.stringify({ process: HANDLE }), id: uuid(), now }) }];
   assert.equal(runFor(entries, TASK, now).state, 'open');
   assert.equal(runFor(entries, TASK, now + RUN_MS).state, 'expired');
 });
@@ -224,6 +225,9 @@ test('no run, and a run past its lifetime', { timeout: 30000 }, async (t) => {
 test('only a notice can be marked seen over the socket', { timeout: 30000 }, async (t) => {
   const h = await host(t), conn = await connectSocket(h.socketPath);
   try {
+    const q = questionMessage({ createdAt: Date.now(), body: { native: null, expiresAt: Date.now() + 3_600_000 } });
+    assert.equal((await conn.request('ask', { message: q, waiter: null, handback: false })).ok, true);
+    assert.equal((await conn.request('seen', { id: q.id })).error.code, 'NOT_A_NOTICE');
     assert.equal((await conn.request('seen', { id: 'nope' })).error.code, 'INVALID_MESSAGE');
     assert.equal((await conn.request('seen', { id: uuid() })).error.code, 'NOT_FOUND');
   } finally { conn.close(); }
@@ -236,3 +240,61 @@ test('text comes from a file', { timeout: 30000 }, async (t) => {
   assert.equal((await h.reviewer('wait', { timeoutMs: 2000 })).json.text, 'from a file');
   await assert.rejects(h.lead('send', { file: join(h.p.stateDir, 'absent') }), { code: 'ENOENT' });
 });
+
+// Marking a notice seen gives its entry a new sequence, so only the creation sequence orders a run.
+test('reading the join loses nothing said before it was read', { timeout: 30000 }, async (t) => {
+  const h = await host(t), id = uuid();
+  await h.lead('open'); await h.reviewer('join');
+  const first = await h.lead('send', { text: 'from the lead', id });
+  await h.reviewer('send', { text: 'from the reviewer' });
+  assert.equal((await h.lead('wait', { timeoutMs: 2000 })).json.event, 'join');
+  assert.equal((await h.lead('wait', { timeoutMs: 2000 })).json.text, 'from the reviewer');
+  const got = await h.reviewer('wait', { timeoutMs: 2000 });
+  assert.deepEqual([got.json.text, got.json.seq], ['from the lead', first.json.seq]);
+  assert.equal((await h.lead('send', { text: 'from the lead', id })).json.seq, first.json.seq, 'a repeat after reading names the same message');
+  assert.equal((await h.lead('show')).json.run.messages, 2);
+});
+test('a close before the join is read still delivers what came first', { timeout: 30000 }, async (t) => {
+  const h = await host(t);
+  await h.lead('open'); await h.reviewer('join'); await h.reviewer('send', { text: 'one thing' }); await h.reviewer('close', { text: 'bye' });
+  const heard = [];
+  for (let i = 0; i < 3; i++) heard.push((await h.lead('wait', { timeoutMs: 2000 })).json.event);
+  assert.deepEqual(heard, ['join', 'message', 'closed']);
+  assert.equal((await h.reviewer('wait', { timeoutMs: 2000 })).exitCode, 3);
+});
+test('the role stays with the first to join after the join is read', { timeout: 30000 }, async (t) => {
+  const h = await host(t); await h.lead('open');
+  const joins = await Promise.allSettled([h.reviewer('join'), h.third('join')]);
+  const holder = joins[0].status === 'fulfilled' ? REVIEWER.id : THIRD.id;
+  await h.lead('wait', { timeoutMs: 2000 });
+  assert.equal((await h.outside('show')).json.run.reviewer, holder);
+});
+test("a wait left by a session's old process takes nothing from the resumed session", { timeout: 30000 }, async (t) => {
+  const h = await paired(t), orphan = assert.rejects(h.reviewer('wait', { timeoutMs: 5000 }), { code: 'SESSION_GONE' });
+  h.agents[REVIEWER.id] = { ...REVIEWER, process: { ...OTHER_HANDLE, pid: 4666 } };
+  h.dead.add(OTHER_HANDLE.pid);
+  await orphan;
+  await h.lead('send', { text: 'for the resumed one' });
+  assert.equal((await h.as({ ...REVIEWER, process: { ...OTHER_HANDLE, pid: 4666 } })('wait', { timeoutMs: 2000 })).json.text, 'for the resumed one');
+});
+test('a registry row with no process is unknown, not dead', { timeout: 30000 }, async (t) => {
+  const h = await paired(t);
+  h.dead.add(HANDLE.pid); h.agents[LEAD.id] = { ...LEAD, process: null };
+  assert.equal((await h.reviewer('wait', { timeoutMs: 80 })).exitCode, 5);
+  await assert.rejects(h.third('open'), { code: 'RUN_EXISTS' });
+});
+test("an agent's detached command is not the user", { timeout: 30000 }, async (t) => {
+  const h = await paired(t), detached = h.as(async () => ({ status: 'outside', nativeSession: true }));
+  await assert.rejects(detached('close', { text: 'the user says stop' }), { code: 'NO_SESSION' });
+  assert.equal((await detached('show')).json.run.state, 'open');
+});
+test('anyone may look at a run', { timeout: 30000 }, async (t) => {
+  const h = await paired(t);
+  for (const a of [agent('codex:w', THIRD_HANDLE, { scope: 'worker' }), agent('agy:a', THIRD_HANDLE)]) assert.equal((await h.as(a)('show')).json.run.lead, LEAD.id);
+});
+test('a character split across standard input chunks is kept whole', { timeout: 30000 }, async (t) => {
+  const h = await paired(t), bytes = Buffer.from('caf\u00e9');
+  await h.lead('send', { file: '-', stdin: Readable.from([bytes.subarray(0, 4), bytes.subarray(4)]) });
+  assert.equal((await h.reviewer('wait', { timeoutMs: 2000 })).json.text, 'caf\u00e9');
+});
+test('the default wait ends before every harness stops a background command', () => assert.ok(WAIT_MS < 30 * 60 * 1000));

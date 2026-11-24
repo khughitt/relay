@@ -227,9 +227,9 @@ Interaction commands (backed by `relay serve` over `$STATE/serve.sock`; see [que
 | `relay peer open TASK` | Open a run on a task, with this session as lead. Repeating it returns the same run; another live session's run is refused with `RUN_EXISTS`. |
 | `relay peer join TASK` | Join the task's run as its reviewer. The first other session to join holds the role for the life of the run (`ROLE_TAKEN`). |
 | `relay peer send TASK --file PATH [--id UUID]` | Send the peer up to 2,000 characters from a file, or `-` for standard input. The sender is the calling session. Repeating a send with the same `--id` and text saves it once. |
-| `relay peer wait TASK [--timeout-ms N]` | Block until the peer's next unread message (or, for the lead, the join), print it and exit 0. Other endings: 3 run closed or expired, 4 peer confirmed dead, 5 timeout. Default 50 minutes. Messages already saved are delivered before any ending. |
-| `relay peer show TASK` | The task's run and who holds each role. |
-| `relay peer close TASK [--reason TEXT]` | End the run for both sides. A member may, and so may the user from a terminal outside any agent session. |
+| `relay peer wait TASK [--timeout-ms N]` | Block until the peer's next unread message (or, for the lead, the join), print it and exit 0. Other endings: 3 run closed or expired, 4 peer confirmed dead, 5 timeout. Default 25 minutes, below the limit a harness puts on one background command by default. The current run's saved messages are delivered before any ending. Run one wait per session at a time. |
+| `relay peer show TASK` | The task's run and who holds each role. Any caller may look. |
+| `relay peer close TASK [--reason TEXT]` | End the run for both sides. A member may, and so may the user from a terminal outside any agent session (`NO_SESSION` for an agent's detached process). |
 | `relay presence [here\|away]` | Read/set durable presence; `here` is the initial default. |
 | `relay install --harness claude-code --subscribers FILE --target FILE --evidence FILE --with ask [--qualification FILE --session-mode MODE] [--apply --artifact FILE]` | Plan/apply the evidence-gated route. Without `--qualification` (and without `--event`) it writes the ask route alone and leaves every dispatch entry as it was; with it, beside the qualified dispatch routes. A full Claude install (no `--event`) reconciles the route: without `--with ask` it removes relay's own `ask` entries. An install of selected events leaves every `ask` entry as it was unless `--with ask` names the route. |
 

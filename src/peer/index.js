@@ -1,6 +1,6 @@
 // @ts-check
 // Peer runs (docs/questions.md, "Peer runs"): two sessions working on one task, derived from the
-// inbox's notices. A run has no state of its own; every reader folds the same log in sequence order.
+// inbox's notices. A run has no state of its own; every reader folds the same log in creation order.
 import { isDeepStrictEqual } from 'node:util';
 import { validateHandle } from '../handle.js';
 import { isUuid } from '../interaction/message.js';
@@ -29,8 +29,13 @@ function boundProcess(text) {
   } catch { return null; } // a notice this module did not write binds nothing
 }
 
+// An entry's seq moves whenever it changes (a notice marked seen, or expired); its first log row keeps
+// the sequence it was created at, the only order every reader agrees on.
+/** @param {import("../types.js").PeerEntry} entry */
+export const createdSeq = (entry) => /** @type {number} */ (entry.log[0].seq);
+
 /**
- * The task's latest run. A notice that does not fit the run as it stood at its sequence is ignored.
+ * The task's latest run. A notice that does not fit the run as it stood when it was created is ignored.
  * @param {import("../types.js").PeerEntry[]} entries @param {string} taskId @param {number} now
  * @returns {import("../types.js").PeerRun|null}
  */
@@ -39,7 +44,7 @@ export function runFor(entries, taskId, now) {
   let run = null;
   /** @param {import("../types.js").PeerRun} r @param {number} at */
   const over = (r, at) => r.closed !== null || at >= r.expiresAt;
-  for (const entry of [...entries].sort((a, b) => a.seq - b.seq)) {
+  for (const entry of [...entries].sort((a, b) => createdSeq(a) - createdSeq(b))) {
     if (entry.kind !== 'notice' || entry.notice.context.taskId !== taskId) continue;
     const { from, to, createdAt, body } = entry.notice, title = TITLE.exec(body.title);
     if (!title || !isUuid(title[1]) || to.kind !== 'agent') continue;
@@ -51,7 +56,7 @@ export function runFor(entries, taskId, now) {
       continue;
     }
     if (!run || run.id !== id || over(run, createdAt)) continue;
-    if (kind === 'close') { run.closed = { by: sender ?? 'user', reason: body.text, seq: entry.seq }; continue; }
+    if (kind === 'close') { run.closed = { by: sender ?? 'user', reason: body.text, seq: createdSeq(entry) }; continue; }
     if (sender === null) continue;
     if (kind === 'join') {
       const process = boundProcess(body.text);
@@ -59,7 +64,7 @@ export function runFor(entries, taskId, now) {
       run.reviewer = { agentId: sender, process };
     } else if (run.reviewer === null || ![run.lead.agentId, run.reviewer.agentId].includes(sender)
       || to.agentId !== peerOf(run, sender)?.agentId) continue;
-    run.notices.push({ seq: entry.seq, id: entry.id, kind: /** @type {'join'|'message'} */ (kind), from: sender, to: to.agentId, text: body.text, at: createdAt, seen: entry.seen });
+    run.notices.push({ seq: createdSeq(entry), id: entry.id, kind: /** @type {'join'|'message'} */ (kind), from: sender, to: to.agentId, text: body.text, at: createdAt, seen: entry.seen });
   }
   if (run) run.state = run.closed ? 'closed' : now >= run.expiresAt ? 'expired' : 'open';
   return run;

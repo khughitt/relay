@@ -4,12 +4,13 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { relayError } from '../protocol.js';
 import { connectSocket } from '../serve/client.js';
-import { peerNotice, runFor, roleOf, peerOf, RUN_MS, TEXT_LIMIT } from '../peer/index.js';
+import { peerNotice, runFor, createdSeq, roleOf, peerOf, RUN_MS, TEXT_LIMIT } from '../peer/index.js';
 
 // What a wait ends with, so a script can tell a message from an ending without parsing it.
 export const PEER_EXIT = Object.freeze({ message: 0, closed: 3, gone: 4, timeout: 5 });
-// Below every harness's own limit on one blocking command (Codex 1 h, Claude Code 2 h).
-export const WAIT_MS = 50 * 60 * 1000;
+// Below the shortest limit a harness puts on one blocking command by default (Claude Code's background
+// Bash, 30 min; hq idle-wait-kinds), so a wait ends with its own timeout rather than being killed.
+export const WAIT_MS = 25 * 60 * 1000;
 const PEER_HARNESSES = ['claude-code', 'codex'];
 /** @param {string} message */
 const usage = (message) => relayError('USAGE', message);
@@ -28,8 +29,9 @@ async function bodyText(text, file, stdin) {
   if ((text === undefined) === (file === undefined)) throw usage('peer send needs the text in --file PATH, or - for standard input');
   let raw = text;
   if (file === '-') {
-    raw = '';
-    for await (const chunk of /** @type {NodeJS.ReadableStream} */ (stdin)) raw += chunk;
+    const chunks = [];
+    for await (const chunk of /** @type {NodeJS.ReadableStream} */ (stdin)) chunks.push(Buffer.from(chunk));
+    raw = Buffer.concat(chunks).toString('utf8');
   } else if (file !== undefined) {
     try { raw = await readFile(file, 'utf8'); }
     catch (caught) { const error = /** @type {NodeJS.ErrnoException} */ (caught); throw relayError(error.code, `cannot read message file ${JSON.stringify(file)}`, error); }
@@ -56,11 +58,16 @@ export async function runPeer({ action, taskId, text, file, id, timeoutMs = WAIT
   if (action === 'close' && text !== undefined && Array.from(text).length > TEXT_LIMIT) throw relayError('MESSAGE_TOO_LONG', `a close reason is at most ${TEXT_LIMIT} characters`);
 
   const who = await whoami();
+  // Looking needs no identity. Everything else is done as someone.
   if (who.status === 'unresolved' && action !== 'show') throw relayError(who.code, `this session is not registered with relay: ${who.message}`);
-  if (who.status === 'resolved') {
+  if (who.status === 'resolved' && action !== 'show') {
     if (!PEER_HARNESSES.includes(who.harness)) throw relayError('UNSUPPORTED_HARNESS', `relay peer supports ${PEER_HARNESSES.join(' and ')} sessions, not ${who.harness}`);
     if (who.agent.scope === 'worker') throw relayError('WORKER_SESSION', 'a worker thread cannot hold a role; run relay peer from its root session');
-  } else if (who.status === 'outside' && !['close', 'show'].includes(action)) throw relayError('NO_SESSION', `peer ${action} must run inside an agent session`);
+  } else if (who.status === 'outside' && action !== 'show') {
+    if (action !== 'close') throw relayError('NO_SESSION', `peer ${action} must run inside an agent session`);
+    // A process detached from its harness still carries the session's variables: it is an agent's, not the user's.
+    if (who.nativeSession) throw relayError('NO_SESSION', 'this command was started by an agent session but no longer runs inside it; close from the session itself');
+  }
   /** @type {import("../types.js").Agent|null} */
   const agent = who.status === 'resolved' ? who.agent : null, me = agent?.id ?? '';
 
@@ -80,7 +87,7 @@ export async function runPeer({ action, taskId, text, file, id, timeoutMs = WAIT
   const gone = async (member) => {
     if (processOps.probe(member.process).status !== 'dead') return false;
     const row = (await readAgents())[member.agentId];
-    return !row?.process || processOps.probe(row.process).status === 'dead';
+    return !row || (row.process !== null && processOps.probe(row.process).status === 'dead');
   };
   /** @param {import("../types.js").PeerRun|null} run */
   const report = async (run) => { await write({ json: { run: view(run) }, text: line(run, taskId) }); return 0; };
@@ -99,7 +106,7 @@ export async function runPeer({ action, taskId, text, file, id, timeoutMs = WAIT
     if (action === 'open') {
       if (run?.state === 'open') {
         if (run.lead.agentId === me) return await report(run);
-        if (!await gone(run.lead)) throw relayError('RUN_EXISTS', `${run.lead.agentId} already leads a run on ${taskId}`);
+        if (!await gone(run.lead)) throw relayError('RUN_EXISTS', `${run.lead.agentId} already leads a run on ${taskId}; that session or the user, from a terminal outside any agent, ends it with relay peer close ${taskId}`);
         await post(run, 'close', run.lead.agentId, 'the lead session is gone');
       }
       const opened = { id: newId(), expiresAt: clock() + RUN_MS };
@@ -136,7 +143,7 @@ export async function runPeer({ action, taskId, text, file, id, timeoutMs = WAIT
     const entry = await post(joined, 'message', peer.agentId, body, id);
     const now = needRun(await refresh());
     if (now.id !== joined.id || !now.notices.some((n) => n.id === entry.id)) throw relayError('RUN_CLOSED', `the peer run on ${taskId} ended before the message was saved`);
-    return await sent(now, entry.id, /** @type {number} */ (entry.seq), peer.agentId);
+    return await sent(now, entry.id, createdSeq(/** @type {import("../types.js").PeerEntry} */ (entry)), peer.agentId);
   } finally { conn.close(); }
 
   /** @param {import("../types.js").PeerRun} run @param {string} messageId @param {number} seq @param {string} to */
@@ -160,7 +167,8 @@ export async function runPeer({ action, taskId, text, file, id, timeoutMs = WAIT
         // Armed before the checks, so a push that lands during them is not missed.
         const pushed = new Promise((resolve) => { wake = () => resolve(null); });
         const run = current();
-        if (agent && await gone({ agentId: me, process: /** @type {import("../types.js").Handle} */ (agent.process) })) throw relayError('SESSION_GONE', 'the session this wait belongs to is gone');
+        // This process's own session, not the session id: one resumed elsewhere reads its own mail.
+        if (agent && processOps.probe(agent.process).status === 'dead') throw relayError('SESSION_GONE', 'the session this wait belongs to is gone');
         if (!run || run.id !== started.id) return await ended('closed', 'another run replaced this one', PEER_EXIT.closed);
         const next = run.notices.find((n) => n.to === me && !n.seen);
         if (next) return await deliver(run, next);

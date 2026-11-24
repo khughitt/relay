@@ -142,22 +142,24 @@ Restart grants recorded waiters 10 s to reattach before confirmed-dead waiter sw
 
 ## Peer runs
 
-A peer run joins two agent sessions on one task. It is a fold of notices in sequence order (`src/peer/index.js`), with no store of its own. A run's notices carry `context.taskId` and the title `peer/1 <run uuid> <kind>`; all share the run's `expiresAt`, 7 days after it opens.
+A peer run joins two agent sessions on one task. It is a fold of notices in creation order, each entry's first log sequence (`src/peer/index.js`), with no store of its own. An entry's own `seq` moves when it is marked seen and orders nothing here. A run's notices carry `context.taskId` and the title `peer/1 <run uuid> <kind>`; all share the run's `expiresAt`, 7 days after it opens.
 
 | Kind | `from` -> `to` | Text | Effect |
 | --- | --- | --- | --- |
 | `open` | lead -> itself | `{"process": Handle}` | Starts a run, if the task has no open one. |
 | `join` | reviewer -> lead | `{"process": Handle}` | Binds the first other session to join as reviewer, for the life of the run. |
-| `message` | either member -> the other | the message, 1 to 2,000 characters | Delivered once to the other member. |
-| `close` | a member or the user -> a member | the reason | Ends the run. |
+| `message` | either member -> the other | the message, 1 to 2,000 characters | Delivered to the other member and then marked seen. |
+| `close` | a member, the user, or a session replacing a lead that is gone -> a member | the reason | Ends the run. |
 
-A notice that does not fit the run at its sequence is ignored: another run's, a third session's, one to the wrong party, or a message from the user. Readers therefore see only the bound peer.
+A notice that does not fit the run when it was created is ignored: another run's, a third session's join or message, one to the wrong party, or a message from the user. The fold cannot check that a lead was gone, so it takes any `close` of the current run; the command posts one only for the parties above.
 
-`from` is asserted by the client, under the same same-user trust as the rest of the socket. `relay peer` always sets it from `whoami`, and the fold refuses what the roles do not allow, so a mistake cannot pass one session's words off as the peer's or the user's. A process of the same user that writes the socket directly can still forge a member's notice.
+A delivery is written out before it is marked, so an interruption repeats a message with the same `seq` and `id`. Run one `wait` per session at a time: two at once can both print a message. Replacing a run leaves its unread messages undelivered. Readers therefore see only the bound peer.
 
-A peer is gone only when its bound process is confirmed dead and the registry shows its session in no live process. Unknown liveness never ends a run. When an open run's lead is gone, another session may open a new run, which first closes the old one.
+`from` is asserted by the client, under the same same-user trust as the rest of the socket. `relay peer` always sets it from `whoami`, and the fold refuses what the roles do not allow, so a mistake cannot pass one session's words off as the peer's or the user's. A process of the same user that writes the socket directly can still forge a member's notice. `close` from outside any agent session counts as the user's; a process detached from a Claude Code, Codex or agy session is refused because it still carries that session's variables. A pi session sets none, so its detached process is not recognized.
 
-Peer notices are ordinary inbox entries: `relay inbox list` and the phone adapter show them.
+A peer is gone only when its bound process is confirmed dead and the registry shows its session in no live process. Unknown liveness, including a row with no process, never ends a run. A session replaced inside a live process (Claude Code `/clear`, Codex `/new`) is not seen as gone: its peer times out, and the user ends the run with `relay peer close`. When an open run's lead is gone, another session may open a new run, which first closes the old one.
+
+Peer notices are ordinary inbox entries. `relay inbox list` shows them; the phone adapter receives notices and does not show them.
 
 ## HTTP protocol and guard
 
