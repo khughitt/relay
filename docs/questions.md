@@ -6,7 +6,7 @@ Type: protocol, data model; document types 1.
 
 ## Messages and entries
 
-Times are Unix milliseconds; message IDs and `answerId` are sender-generated lowercase UUIDs (uppercase UUID text fails with `INVALID_MESSAGE`). `Harness` in native question metadata is `'claude-code' | 'codex' | 'opencode'`. Relay has no native question route for `agy`.
+Times are Unix milliseconds; message IDs and `answerId` are sender-generated lowercase UUIDs (uppercase UUID text fails with `INVALID_MESSAGE`). `Harness` in native question metadata is `'claude-code' | 'codex' | 'opencode'`. An agent party's `agentId` is `<prefix>:<session id>`, where the prefix is one of those or `pi`. A pi agent can ask only detached questions. Relay has no native question route for `agy`.
 
 ```ts
 type Party = { kind: 'agent'; agentId: string } | { kind: 'user' };

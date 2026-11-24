@@ -68,6 +68,17 @@ test('ids, parties and context are checked', () => {
   assert.deepEqual(validateMessage(questionMessage({ context: { project: '', taskId: null, cwd: '' } })).context,
     { project: '', taskId: null, cwd: '' });
 });
+test('pi is a party but has no native question route', () => {
+  const schema = JSON.parse(readFileSync(new URL('../schemas/interaction/message.schema.json', import.meta.url), 'utf8'));
+  const agent = schema.$defs.party.oneOf.find((/** @type {any} */ p) => p.properties.agentId);
+  const from = { kind: 'agent', agentId: 'pi:01a204fd-fb1c-7677-8bcc-055679ddb104' };
+  assert.deepEqual(validateMessage(questionMessage({ from, body: { native: null } })).from, from);
+  for (const [id, valid] of [[from.agentId, true], ['codex:x', true], ['pi:', false], ['pi', false], ['xpi:1', false]]) {
+    assert.equal(new RegExp(agent.properties.agentId.pattern).test(id), valid, id);
+    if (!valid) invalid(questionMessage({ from: { kind: 'agent', agentId: id } }));
+  }
+  invalid(questionMessage({ from, body: { native: { harness: 'pi', sessionId: 's', callId: 'c' } } }));
+});
 test('schema string bounds count Unicode code points', () => {
   const item = questionMessage().body.items[0];
   const withHeader = (header) => questionMessage({ body: { items: [{ ...item, header }] } });
