@@ -61,6 +61,8 @@ test('package dry run and installed tarball expose only the documented runtime',
     'bin/relay.js',
     'src/index.js',
     'integrations/opencode/plugin.js',
+    'integrations/forward/index.js',
+    'integrations/pi/index.js',
     'test/fixtures/handles.json',
     'test/fixtures/ancestry.json',
     'test/fixtures/whoami.json',
@@ -84,7 +86,8 @@ test('package dry run and installed tarball expose only the documented runtime',
     'docs/runbooks/hook-install-rollback.md',
     'docs/runbooks/answer-route-probes.md',
     'docs/runbooks/codex-question-reproof.md',
-    'integrations/opencode/window.test.mjs'
+    'integrations/opencode/window.test.mjs',
+    'integrations/pi/binding.test.mjs'
   ])assert.ok(!names.includes(forbidden),`unexpected packaged file: ${forbidden}`);
   for(const name of names)assert.ok(!/\.test\.|lock-worker|^tasks\/|^\.superpowers\/|^docs\/(?:specs|plans|notes|reports)\/|agents\.json|subscribers\.json/.test(name),name);
   const pack=packEntry(JSON.parse((await run('npm',['pack','--json','--pack-destination',temp])).stdout));

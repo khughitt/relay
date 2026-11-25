@@ -1,22 +1,18 @@
-import { join, isAbsolute } from 'node:path';
-import { appendFile } from 'node:fs/promises';
-import { paths } from '../../src/bus/paths.js';
-import { ensurePrivateDir, checkPrivate } from '../../src/bus/store.js';
+import { isAbsolute } from 'node:path';
 import { relayError } from '../../src/protocol.js';
 import { createWindow } from './window.js';
-import { createQueue } from './queue.js';
-import { spawnHook } from './hook.js';
+import { createQueue, spawnHook, logError } from '../forward/index.js';
 
 export const LEVEL_EVENTS = new Set([
   'session.status', 'permission.updated', 'permission.replied',
 ]);
 
-export function createBinding({ directory, pid = process.pid, spawn = spawnHook, env = process.env, report = (message) => logError(message, env) } = {}) {
+export function createBinding({ directory, pid = process.pid, spawn = (event, payload) => spawnHook('opencode', event, payload), env = process.env, report = (message) => logError('opencode-plugin.log', message, env) } = {}) {
   if (typeof directory !== 'string' || !isAbsolute(directory)) throw relayError('INVALID_INPUT', 'opencode requires an absolute project directory');
 
   const payload = { session_id: `opencode:${pid}`, cwd: directory };
 
-  const queue = createQueue({ run: (event) => spawn(event, payload), report });
+  const queue = createQueue({ harness: 'opencode', run: (event) => spawn(event, payload), report });
 
   const guarded = (label, fn) => {
     try {
@@ -57,12 +53,4 @@ export function createBinding({ directory, pid = process.pid, spawn = spawnHook,
   }
 
   return { onEvent, onPermissionAsk, dispose };
-}
-
-// Diagnostics never inherit the TUI's stderr. Callers supply only sanitized codes.
-export async function logError(message, env = process.env) {
-  const { stateDir } = paths(env), path = join(stateDir, 'opencode-plugin.log');
-  await ensurePrivateDir(stateDir);
-  await checkPrivate(path, false);
-  await appendFile(path, `${new Date().toISOString()} ${message}\n`, { mode: 0o600 });
 }

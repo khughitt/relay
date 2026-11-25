@@ -23,6 +23,6 @@ test('the gating suite is relay\'s own tests, without the probe\'s', () => {
   const probeTests = readdirSync('test').filter((f) => /^darwin-probe-.*\.test\.js$/.test(f));
   assert.ok(probeTests.length > 0); assert.equal(excluded, probeTests.length);
   assert.equal(files.some((f) => f.includes('darwin-probe')), false);
-  assert.ok(files.includes('test/cli.test.js')); assert.ok(files.some((f) => /^integrations\/opencode\/.+\.test\.mjs$/.test(f)));
-  assert.equal(files.length + excluded, readdirSync('test').filter((f) => f.endsWith('.test.js')).length + readdirSync('integrations/opencode').filter((f) => f.endsWith('.test.mjs')).length);
+  assert.ok(files.includes('test/cli.test.js')); for (const dir of readdirSync('integrations')) assert.ok(files.some((f) => f.startsWith(`integrations/${dir}/`) && f.endsWith('.test.mjs')), dir);
+  assert.equal(files.length + excluded, readdirSync('test').filter((f) => f.endsWith('.test.js')).length + readdirSync('integrations', { recursive: true }).filter((f) => f.endsWith('.test.mjs')).length);
 });

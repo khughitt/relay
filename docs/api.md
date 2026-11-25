@@ -10,6 +10,7 @@ Package `"relay"` exports (`package.json`):
 
 - `.` (`./src/index.js`): named root exports documented below.
 - `./opencode` (`./integrations/opencode/plugin.js`): the async OpenCode plugin function (`Relay`).
+- `./pi` (`./integrations/pi/index.js`): the pi extension factory, as the default export.
 - `./fixtures/handles.json` (`./test/fixtures/handles.json`): portable process-handle schema fixtures.
 - `./fixtures/ancestry.json` (`./test/fixtures/ancestry.json`): portable process-ancestry fixtures.
 - `./fixtures/whoami.json` (`./test/fixtures/whoami.json`): portable calling-session conformance cases.
@@ -213,7 +214,7 @@ Registry, hook dispatch, installation, and model commands:
 - `relay list`
 - `relay whoami`
 - `relay reap [--outer-ms N]`
-- `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT` (`NAME` may be `agy`; both `install` and `ask` refuse `agy`)
+- `relay hook --harness NAME [--outer-ms N] [--subscribers FILE] EVENT` (`NAME` may be `agy` or `pi`; both `install` and `ask` refuse them)
 - `relay install --harness NAME --subscribers FILE (--target FILE | --config-dir DIR) [--qualification FILE --session-mode MODE] [--event NAME]... [--evidence FILE] [--retire familiar] [--with ask] [--node PATH] [--apply --artifact FILE]`
 - `relay pairs --harness claude-code|codex --target FILE`
 - `relay rollback --artifact FILE`
@@ -291,15 +292,16 @@ or `null`). Roles are `session`, `daemon` and `bg-pty-host`. Ancestry determines
 registered identity; native values only select or check a row of that harness.
 Nested harnesses never resolve using an outer harness's variables.
 
-`native` always reports all four keys separately: `CLAUDE_CODE_SESSION_ID`,
-`CODEX_THREAD_ID`, `CODEX_SESSION_ID` and `ANTIGRAVITY_CONVERSATION_ID`. Entries
+`native` always reports all five keys separately: `CLAUDE_CODE_SESSION_ID`,
+`CODEX_THREAD_ID`, `CODEX_SESSION_ID`, `ANTIGRAVITY_CONVERSATION_ID` and
+`PI_SESSION_ID`. Entries
 are `{"state":"absent"}`, `{"state":"empty"}`,
 `{"state":"present","value":"..."}`, or invalid with `reason` equal to
 `not-unicode` (no value) or `control-characters` (JSON-escaped value).
 For example, this is machine data, not human text:
 
 ```json
-{"CLAUDE_CODE_SESSION_ID":{"state":"absent"},"CODEX_THREAD_ID":{"state":"present","value":"t1"},"CODEX_SESSION_ID":{"state":"invalid","reason":"control-characters","value":"r1\u0009x"},"ANTIGRAVITY_CONVERSATION_ID":{"state":"empty"}}
+{"CLAUDE_CODE_SESSION_ID":{"state":"absent"},"CODEX_THREAD_ID":{"state":"present","value":"t1"},"CODEX_SESSION_ID":{"state":"invalid","reason":"control-characters","value":"r1\u0009x"},"ANTIGRAVITY_CONVERSATION_ID":{"state":"empty"},"PI_SESSION_ID":{"state":"absent"}}
 ```
 
 `nativeSource: "raw"` means Linux's raw `/proc/self/environ` bytes.
@@ -311,14 +313,19 @@ failure carrying the decoded evidence.
 
 `nativeSession` is true exactly when any eligible variable is `present`, `invalid`
 or `unverified`; absent and empty variables do not count. Eligible variables are
-Claude's session id, Codex's **thread** id and agy's conversation id.
+Claude's session id, Codex's **thread** id, agy's conversation id and pi's
+session id.
 `CODEX_SESSION_ID` is root metadata and never substitutes for a thread. This
 boolean is independent of `status`, including on failures.
 
 Claude uses a nonempty Unicode session id as `hint`, including control characters;
 invalid Unicode, unverified and empty values give no hint. Codex uses a present
 thread id, otherwise a present root id; either invalid or unverified value refuses
-resolution. agy requires its present conversation id. Other harnesses use no hint.
+resolution. agy requires its present conversation id. pi uses its present session
+id, and an invalid or unverified one refuses resolution; pi sets it for its
+shell tool only, so another command pi starts may carry none, which resolves when
+the process holds one row, or an outer pi session's, which is `HINT_MISMATCH`.
+Other harnesses use no hint.
 
 | Unresolved code | Meaning |
 | --- | --- |
@@ -329,7 +336,7 @@ resolution. agy requires its present conversation id. Other harnesses use no hin
 | `MISSING_HINT` | agy's conversation id is absent or empty. |
 | `HOSTING_PROCESS` | The nearest Claude process is a daemon or pty host. |
 | `HIDDEN_ANCESTRY` | A harness at pid 1 with ppid 0 hides the actual session. |
-| `INVALID_NATIVE_VALUE` | Codex or agy has an invalid or unverified native value; Claude never returns this code. |
+| `INVALID_NATIVE_VALUE` | Codex, agy or pi has an invalid or unverified native value; Claude never returns this code. |
 | `REGISTRY_UNREADABLE` | The registry cannot be read or validated; the message names the cause. |
 
 Failures use `ENVIRONMENT_UNREADABLE`, `PROCESS_UNREADABLE`, `BOOT_ID_UNREADABLE`
@@ -341,7 +348,7 @@ Linux and Darwin are supported; tasks retains its own Linux-only claim policy.
 failed result to stdout as well as the usual `whoami_failed` envelope to stderr:
 
 ```json
-{"schema":1,"status":"failed","code":"ENVIRONMENT_UNREADABLE","message":"cannot read raw process environment","native":{"CLAUDE_CODE_SESSION_ID":{"state":"absent"},"CODEX_THREAD_ID":{"state":"present","value":"t1"},"CODEX_SESSION_ID":{"state":"absent"},"ANTIGRAVITY_CONVERSATION_ID":{"state":"absent"}},"nativeSource":"decoded","nativeSession":true}
+{"schema":1,"status":"failed","code":"ENVIRONMENT_UNREADABLE","message":"cannot read raw process environment","native":{"CLAUDE_CODE_SESSION_ID":{"state":"absent"},"CODEX_THREAD_ID":{"state":"present","value":"t1"},"CODEX_SESSION_ID":{"state":"absent"},"ANTIGRAVITY_CONVERSATION_ID":{"state":"absent"},"PI_SESSION_ID":{"state":"absent"}},"nativeSource":"decoded","nativeSession":true}
 ```
 
 Pretty success is one line: `resolved <agent.id> (<harness>, <agent.project>)`,
@@ -360,9 +367,11 @@ message, and treat unknown statuses or schemas as failures.
 | kit hooks | Uses only `nativeSession` on every status, including `failed`, to decide whether this is an agent session; the kit decides the action. |
 | transponder | Needs no identity call: `ask` already supplies `session_id`, looked up through `readSnapshot`. |
 
+The pi extension (`relay/pi`) is not installed by `relay install`: pi loads it from a directory in its agent directory's `extensions/`, such as a link to `integrations/pi` ([adapters.md](adapters.md#pi-translation-rules)). Its hook child has the same bounds as OpenCode's.
+
 The extracted OpenCode plugin (`relay/opencode`) is installed by `relay install --harness opencode --config-dir DIR`; it has no direct-store bypass or fallback. Its child path is relay's own CLI with `shell: false`, inherited environment, 64 KiB stderr cap, and 5 s lifetime, preserving permission output and awaiting `dispose` last.
 
-Local tarball smoke tests cover package exports, portable JSON fixtures, the sole OpenCode plugin export, the installed CLI, the packaged interaction schema (`schemas/interaction/message.schema.json`), and the shipped operator runbooks ([`inbox-service.md`](runbooks/inbox-service.md) and [`registry-lock-repair.md`](runbooks/registry-lock-repair.md)). Contributor release and probe procedures live in the repository at `docs/runbooks/release.md` and `docs/runbooks/answer-route-probes.md`.
+Local tarball smoke tests cover package exports, portable JSON fixtures, the sole OpenCode plugin export, the pi extension's default export, the installed CLI, the packaged interaction schema (`schemas/interaction/message.schema.json`), and the shipped operator runbooks ([`inbox-service.md`](runbooks/inbox-service.md) and [`registry-lock-repair.md`](runbooks/registry-lock-repair.md)). Contributor release and probe procedures live in the repository at `docs/runbooks/release.md` and `docs/runbooks/answer-route-probes.md`.
 
 ## Error codes
 

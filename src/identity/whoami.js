@@ -85,7 +85,7 @@ export async function whoami({ startPid, processOps, paths, readRegistry, platfo
     if (candidates.length === 0) return unresolved('NOT_REGISTERED', noMatch(agents, process, harness, hint));
     let agent;
     if (candidates.length === 1) agent = candidates[0];
-    else if ((harness === 'codex' || harness === 'agy') && hint !== null) {
+    else if ((harness === 'codex' || harness === 'agy' || harness === 'pi') && hint !== null) {
       agent = candidates.find(candidate => candidate.sessionId === hint);
       if (!agent) return unresolved('HINT_MISMATCH', hintMismatch(harness, root, candidates));
     } else return unresolved('AMBIGUOUS', `several relay agents match pid ${walk.pid}: ${candidates.map(candidate => printable(candidate.id)).join(', ')}`);

@@ -12,7 +12,7 @@ const PROBE_TEST = /^darwin-probe-.*\.test\.js$/;
 export function suiteFiles(clone) {
   const list = (dir, suffix) => readdirSync(join(clone, dir)).filter((f) => f.endsWith(suffix)).sort();
   const tests = list('test', '.test.js');
-  const files = [...tests.filter((f) => !PROBE_TEST.test(f)).map((f) => `test/${f}`), ...list('integrations/opencode', '.test.mjs').map((f) => `integrations/opencode/${f}`)];
+  const files = [...tests.filter((f) => !PROBE_TEST.test(f)).map((f) => `test/${f}`), ...['forward', 'opencode', 'pi'].flatMap((dir) => list(`integrations/${dir}`, '.test.mjs').map((f) => `integrations/${dir}/${f}`))];
   return { files, excluded: tests.filter((f) => PROBE_TEST.test(f)).length };
 }
 export async function run(ctx) {

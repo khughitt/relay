@@ -2,7 +2,7 @@
 // The declared surface. bin/relay.js keeps its strict, order-sensitive hook parser (the
 // harness protocol depends on it) but takes option names, value sets, and help from here.
 export const HARNESSES = ['claude-code', 'codex', 'opencode'];
-export const HOOK_HARNESSES = [...HARNESSES, 'agy'];
+export const HOOK_HARNESSES = [...HARNESSES, 'agy', 'pi'];
 /** @type {import("./types.js").Command[]} */
 export const COMMANDS = [
   { path: ['list'], summary: 'The live-agent registry' },

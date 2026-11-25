@@ -2,7 +2,7 @@
 
 Type: data model, protocol; document types 1.
 
-`relay` normalizes native hook payloads from Claude Code, Codex, OpenCode, and `agy` into a schema-1 transient `Event` for the registry and a schema-2 `HookEvent` for subscribers, resolves the owning session process handle from the OS process tree, dispatches guards and observers within a bounded budget (`relay hook`), and resolves verified Codex and agy call models and effort from harness records (`relay model --harness codex|agy`). See [api.md](api.md) for package exports and [registry.md](registry.md) for `$STATE/agents.json` publication rules.
+`relay` normalizes native hook payloads from Claude Code, Codex, OpenCode, `agy`, and pi into a schema-1 transient `Event` for the registry and a schema-2 `HookEvent` for subscribers, resolves the owning session process handle from the OS process tree, dispatches guards and observers within a bounded budget (`relay hook`), and resolves verified Codex and agy call models and effort from harness records (`relay model --harness codex|agy`). See [api.md](api.md) for package exports and [registry.md](registry.md) for `$STATE/agents.json` publication rules.
 
 ## Transient event contract
 
@@ -68,6 +68,7 @@ type ReconcileEnvelope = { schema: 2; type: 'reconcile'; subscriber: string; reg
 | `PostModelSwitch` | Claude | `model-change` | none |
 | `PreCompact` / `PostCompact` | Claude | `compact-start` / `compact-end` | none |
 | OpenCode events | OpenCode | the registry kind above | the registry mapping above |
+| pi events | pi | the registry kind above | the registry mapping above |
 
 `agy` `PreInvocation` has no decoder until a native field fixture exists, and other Codex or `agy` equivalents have none until native evidence names their fields. Each adapter's `hookEvents` table holds this mapping; `events`, `stateForEvent` and `validateEvent` keep their registry meaning.
 
@@ -112,8 +113,8 @@ Process inspection (`src/bus/proc.js` and `src/adapters/ancestry.js`) separates 
 
 - `recordOf(pid)` returns `null` only for confirmed process absence and throws coded errors (`PROCESS_UNREADABLE`, `PROCESS_UNAVAILABLE`) for unreadable or malformed evidence.
 - `ancestors(pid)` reads a fresh nearest-first chain including `pid` at index `0`, stopping before PID `1`, on process absence, or with a cycle error. Darwin takes one fresh `ps` table per walk; target probes read only the requested PID.
-- `resolveSessionPid` takes the nearest ancestor after index `0` that is a process of the harness (`codex`, `opencode`, `agy`, or for Claude Code `comm === 'claude'` or a version-shaped `comm` whose executable ends in `/claude/versions/<comm>`), with no terminal requirement. It returns `null` when there is none or when the nearest Claude Code process has `argv[1]` equal to `'daemon'` or `'bg-pty-host'`.
-- `resolveTerminalPid` takes the nearest ancestor after index `0` that owns a terminal (`tty !== null`) and whose `comm` is the harness name; for Claude Code, a version-binary process that owns a terminal also qualifies unless its parent has `argv[1]` equal to `'daemon'` or `'bg-pty-host'` (a background session whose terminal belongs to its host).
+- `resolveSessionPid` takes the nearest ancestor after index `0` that is a process of the harness (`codex`, `opencode`, `agy`, `pi` or its RPC entry point `pi-rpc`, or for Claude Code `comm === 'claude'` or a version-shaped `comm` whose executable ends in `/claude/versions/<comm>`), with no terminal requirement. It returns `null` when there is none or when the nearest Claude Code process has `argv[1]` equal to `'daemon'` or `'bg-pty-host'`.
+- `resolveTerminalPid` takes the nearest ancestor after index `0` that owns a terminal (`tty !== null`) and whose `comm` is the harness name (`pi-rpc` too for pi); for Claude Code, a version-binary process that owns a terminal also qualifies unless its parent has `argv[1]` equal to `'daemon'` or `'bg-pty-host'` (a background session whose terminal belongs to its host).
 - `executableOf` is read only for a version-shaped `comm`, and `argvOf` only for the nearest Claude Code process and, in the terminal walk, the parent of a version-binary process that owns a terminal; an unreadable one throws `PROCESS_UNREADABLE`.
 - A hook PID or shell session ID is never substituted for a missing harness process. The shared cross-harness ancestry test corpus is exported at `relay/fixtures/ancestry.json`.
 
@@ -151,12 +152,32 @@ consumer rules, failure stdout and Darwin's decoded-environment qualification.
 | OpenCode | `session.error` | `turn-error` | `error` | no | no |
 | OpenCode | `session.idle` | `idle` | reduce against prior | no | no |
 | OpenCode | `dispose` | `session-end` | remove | no | no |
+| pi | `session_start` | `session-start` | `idle` | no | no |
+| pi | `agent_start` | `activity` | `working` | no | no |
+| pi | `agent_settled` | `turn-end` | `done` | no | no |
+| pi | `agent_settled:aborted` | `idle` | `idle` | no | no |
+| pi | `agent_settled:error` | `turn-error` | `error` | no | no |
+| pi | `session_shutdown` | `session-end` | remove | no | no |
 
 Unlisted events fail with `UNSUPPORTED_EVENT`; `kind` and `level` derive from each adapter's immutable table (`src/adapters/*.js`), and `Refuse` / `Context` come from each adapter's `replies` export.
 
 ### `agy` translation rules
 
 `agy` (`src/adapters/agy.js`) refuses on `PreToolUse` only, with exit `0` and stdout `{"decision":"deny","reason":R}`; an allow reply is always empty stdout, never `{"decision":"allow"}` (which `agy` treats as auto-approval). `agy` hooks run with working directory `~/.gemini/config`, so `Event.cwd` comes from `workspacePaths[0]`. `sessionId` is `agy`'s `conversationId` (`agentId: "agy:<conversationId>"`), and `stopHookActive` is `executionNum > 0`. `agy`'s `run_command` reaches guards as tool `Bash` with `tool.input = { command: <CommandLine> }` and `tool.command` set; every other `agy` tool keeps `agy`'s own tool name and arguments (for example `view_file`), so `tools: ["Bash"]` covers shell commands only. `agy`'s default handler timeout is 30 s; raising it requires raising both the handler `timeout` and `--outer-ms`.
+
+### pi translation rules
+
+pi has no hook commands. Its extension (`integrations/pi`, package subpath `relay/pi`) runs inside pi and starts `relay hook --harness pi EVENT` for each event below, one at a time and in order, with `{"session_id", "cwd"}` as input. It observes only: it returns nothing to pi, writes no output, and appends a failed hook's code to `$STATE/pi-extension.log`. A hook has the same fixed 5 s lifetime as OpenCode's.
+
+`sessionId` is pi's session id (`agentId: "pi:<session id>"`), which pi also gives its shell tool as `PI_SESSION_ID`. pi 1.1.0 was probed interactively on Linux, with an event log beside the registry (2026-11-25):
+
+- `agent_start` opens each run, a retry included, and `agent_settled` always closes it. `before_agent_start` is not forwarded: it can precede a run that never starts.
+- `agent_settled` says only whether the run was aborted. The extension adds `:aborted` from that and `:error` when the last assistant message of the run's final `agent_end` has `stopReason: "error"`.
+- `/new`, `/resume` and `/fork` (and `/clone`) emit `session_shutdown` for the old session, await it, and then emit `session_start` with the new id in the same process. The old row is gone before the new one appears.
+- `/reload` emits `session_shutdown` and `session_start` with reason `reload` and the same id. The extension ends nothing on that shutdown and waits for its queue, so the row stays; the start sets it `idle`.
+- Quitting mid-turn emits `session_shutdown` with no `agent_settled`. Nothing is forwarded after a shutdown.
+
+A pi started by another pi is its own process and row; `comm` is `pi` in interactive, print and `--mode rpc` runs, and `pi-rpc` in runs of pi's RPC entry point (source read). A session embedded through pi's SDK in another program has no process of its own to name and publishes `process: null`. Extension prompts (`ui_prompt_start`) have no mapping, so a session waiting on one shows its previous state. Darwin process naming is unverified for pi.
 
 ### Claude Code `Stop` `background_tasks` reduction
 
@@ -266,7 +287,7 @@ The stamp includes `@<effort>` when `turn_context.payload.effort` is a nonempty 
 {"verified":true,"agent":"codex/gpt-6.1-sol@high","harness":"codex","model":"gpt-6.1-sol","effort":"high","effortReason":null,"reason":null,"source":{"thread":"<id>","nearest":"codex","rollout":"<path>"}}
 ```
 
-`source.nearest` names the caller's nearest harness ancestor as relay's process classifier names it: one of `codex`, `claude-code`, `agy` or `opencode`, or `null` when there is none. Every answer that reached the ancestry check carries it, verified or not; `no-thread` answers do not. The set is closed: adding a classifier name is a change to this contract. A caller such as `tasks` uses it to tell another harness started from a Codex shell (`not-under-codex` with that harness) from a process outside every harness (`not-under-codex` with `null`).
+`source.nearest` names the caller's nearest harness ancestor as relay's process classifier names it: one of `codex`, `claude-code`, `agy`, `opencode` or `pi`, or `null` when there is none. Every answer that reached the ancestry check carries it, verified or not; `no-thread` answers do not. The set is closed: adding a classifier name is a change to this contract. A caller such as `tasks` uses it to tell another harness started from a Codex shell (`not-under-codex` with that harness) from a process outside every harness (`not-under-codex` with `null`).
 
 **Call binding.** A verified answer needs a binding process that started no later than the original tool call the caller descends from; a later-born descendant alone never establishes a model. Inside Codex's sandbox (Linux; observed at Codex 0.169.0, qualified again at 0.171.0) every tool call runs under its own `codex-linux-sandbox` helper: a `codex` process that is its pid namespace's init (pid 1, parent 0 as the caller sees it) and starts just before the command. That helper adopts the namespace's orphans, so the process directly below it may have been born after the call. The binding process is therefore:
 
@@ -390,7 +411,7 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 | `total` (relay deadline) | `H - margin` | 900 | 1350 | 27000 | 55000 |
 | `subscribers` (sum of matching timeouts) | `total - input - registry - reserve` | 267 | 400 | 11000 | 37000 |
 
-A dispatch admitting any subscriber needs `250` (supervisor startup) `+ Σ (timeoutMs + 500)` (each subscriber's cleanup reserve) to fit `subscribers`, ignoring tool filters; a dispatch admitting none reserves nothing. At run time an observer starts only with its timeout and cleanup reserve still left, plus startup if it would be the first subscriber; otherwise it is `SUBSCRIBER_SKIPPED`, never deferred. Consequences at native caps: Claude Code `SessionEnd` at its 1.5 s default admits no subscriber, Codex `SessionEnd` at its 3 s maximum admits one observer of up to 50 ms, and OpenCode at its fixed 5 s lifetime one of up to 584 ms; their registry-only bindings still publish.
+A dispatch admitting any subscriber needs `250` (supervisor startup) `+ Σ (timeoutMs + 500)` (each subscriber's cleanup reserve) to fit `subscribers`, ignoring tool filters; a dispatch admitting none reserves nothing. At run time an observer starts only with its timeout and cleanup reserve still left, plus startup if it would be the first subscriber; otherwise it is `SUBSCRIBER_SKIPPED`, never deferred. Consequences at native caps: Claude Code `SessionEnd` at its 1.5 s default admits no subscriber, Codex `SessionEnd` at its 3 s maximum admits one observer of up to 50 ms, and OpenCode and pi at their fixed 5 s lifetime one of up to 584 ms; their registry-only bindings still publish.
 
 ### Notice protocol
 
@@ -464,7 +485,7 @@ Claude Code `PostToolUse` and `PostToolUseFailure` and Codex `PostToolUse` stay 
 | --- | --- |
 | `0` | An `allow` reply (with or without `context`, including context returned when publication failed), a Claude Code or Codex `Stop`/`SubagentStop` infrastructure failure on a validated `stop_hook_active: true` retry (empty stdout, diagnostic on stderr), or on `agy` any refusal (`{"decision":"deny"}` on `PreToolUse`, `{"decision":"continue"}` on `Stop`) or non-refusal failure (empty stdout, diagnostic on stderr). |
 | `2` | A refusal on Claude Code or Codex (JSON refusal on stdout and reason on stderr), or a CLI usage error on an event other than `Stop`/`SubagentStop`. |
-| `1` | (Claude Code, Codex, OpenCode) An error on an event without a refusal channel, an `allow` reply without context whose registry publication failed, or a published Claude Code `Stop` event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`). The guard result stands; exit `1` does not imply the registry is unchanged. |
+| `1` | (Claude Code, Codex, OpenCode, pi) An error on an event without a refusal channel, an `allow` reply without context whose registry publication failed, or a published Claude Code `Stop` event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`). The guard result stands; exit `1` does not imply the registry is unchanged. |
 
 Infrastructure failures (configuration load or schema, budget, input, normalization, command resolution, spawn, nonzero exit, invalid reply, overflow, timeout, containment) follow one rule per event (`failureReply`, `src/dispatch-failure.js`):
 

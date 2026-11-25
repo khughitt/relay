@@ -32,7 +32,7 @@ grammar = "<n>d | <n>w"
 meaning = "a duration; 0d disables an age check"
 
 [vocabulary.values.harness]
-set = ["claude-code", "codex", "opencode", "agy"]
+set = ["claude-code", "codex", "opencode", "agy", "pi"]
 
 [vocabulary.values.color]
 set = ["auto", "always", "never"]
@@ -1949,6 +1949,48 @@ options = [
 ]
 
 [[cli.science.commands]]
+path = ["exposure-event"]
+summary = "Record one look at data, or one piece of prior knowledge, as an exposure event"
+options = [
+  { shared = "config", value = "path" },
+  { names = ["--invocation-id"], value = "string" },
+  { names = ["--continue"], value = "string" },
+  { names = ["--payload"], value = "string", required = true },
+]
+
+[[cli.science.commands]]
+path = ["reservation-assignment"]
+summary = "Freeze a reservation assignment as a chain root or as its head's successor"
+options = [
+  { shared = "config", value = "path" },
+  { names = ["--invocation-id"], value = "string" },
+  { names = ["--continue"], value = "string" },
+  { names = ["--payload"], value = "string", required = true },
+]
+
+[[cli.science.commands]]
+path = ["exposure-log"]
+summary = "List recorded exposure events, narrowed by subject or proposition"
+options = [
+  { shared = "config", value = "path" },
+  { names = ["--invocation-id"], value = "string" },
+  { names = ["--continue"], value = "string" },
+  { names = ["--subject"], value = "string" },
+  { names = ["--proposition"], value = "string" },
+]
+
+[[cli.science.commands]]
+path = ["reservation-head"]
+summary = "Show a reservation chain's head, its changes and the events it did not consider"
+options = [
+  { shared = "config", value = "path" },
+  { names = ["--invocation-id"], value = "string" },
+  { names = ["--continue"], value = "string" },
+  { names = ["--chain"], value = "string", required = true },
+  { names = ["--scope"], value = "string" },
+]
+
+[[cli.science.commands]]
 path = ["spec"]
 summary = "Freeze an analysis spec against the kernel's reference rules and mint its record"
 options = [
@@ -3497,7 +3539,7 @@ protocol = "harness hook: stdout is the reply, exit code is the guard's"
 summary = "Dispatch one harness hook event to the subscribers and guards"
 args = [{ name = "event", value = "string", required = true }]
 options = [
-  { shared = "harness", role = "select", value = "enum", values = ["claude-code", "codex", "opencode", "agy"], required = true, repeatable = false },
+  { shared = "harness", role = "select", value = "enum", values = ["claude-code", "codex", "opencode", "agy", "pi"], required = true, repeatable = false },
   { names = ["--outer-ms"], value = "int" },
   { names = ["--subscribers"], value = "path" },
 ]

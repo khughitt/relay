@@ -4,7 +4,7 @@ import { ROLES } from '../adapters/claude-code.js';
 import { relayError } from '../protocol.js';
 
 /** @type {readonly import('../types.js').Harness[]} */
-const HARNESSES = ['claude-code', 'codex', 'opencode', 'agy'];
+const HARNESSES = ['claude-code', 'codex', 'opencode', 'agy', 'pi'];
 /** @typedef {{kind: 'outside'} | {kind: 'boundary', harness: import('../types.js').Harness, pid: number, ppid: number, start: string, role: 'session'|'daemon'|'bg-pty-host'}} WalkResult */
 
 /**

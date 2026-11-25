@@ -10,6 +10,7 @@
   "exports": {
     ".": "./src/index.js",
     "./opencode": "./integrations/opencode/plugin.js",
+    "./pi": "./integrations/pi/index.js",
     "./fixtures/handles.json": "./test/fixtures/handles.json",
     "./fixtures/ancestry.json": "./test/fixtures/ancestry.json",
     "./fixtures/whoami.json": "./test/fixtures/whoami.json",
@@ -17,12 +18,14 @@
     "./fixtures/hook-qualification.json": "./test/fixtures/hook-qualification.json"
   },
   "scripts": {
-    "test": "node --test test/*.test.js integrations/opencode/*.test.mjs"
+    "test": "node --test test/*.test.js integrations/*/*.test.mjs"
   },
   "files": [
     "bin/",
     "src/",
+    "integrations/forward/*.js",
     "integrations/opencode/*.js",
+    "integrations/pi/*.js",
     "test/fixtures/handles.json",
     "test/fixtures/ancestry.json",
     "test/fixtures/whoami.json",

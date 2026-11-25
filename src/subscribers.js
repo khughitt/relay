@@ -9,7 +9,7 @@ import { checkPrivate } from './bus/store.js';
 
 export const RECONCILE = 'reconcile';
 export const SCHEMA = 3;
-const HARNESSES = ['agy', 'claude-code', 'codex', 'opencode'];
+const HARNESSES = ['agy', 'claude-code', 'codex', 'opencode', 'pi'];
 const FIELDS = ['name', 'role', 'kinds', 'harnesses', 'tools', 'nativeEvents', 'argv', 'timeoutMs', 'registry', 'privateFields'];
 const CONFIG_FIELDS = ['schema', 'searchPath', 'subscribers'];
 const ROLES = ['guard', 'notice', 'observer'];
