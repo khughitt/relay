@@ -3,7 +3,6 @@ import * as fs from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { relayError } from './protocol.js';
 import { CLEANUP_MS, SUPERVISOR_STARTUP_MS } from './child.js';
-import { DISCOVERY_MS } from './executable.js';
 import { adapterFor, hookEventOf } from './adapters/index.js';
 import { HOOK_KINDS, TOOL_KINDS, privateFieldsFor } from './adapters/hook-event.js';
 import { checkPrivate } from './bus/store.js';
@@ -23,7 +22,7 @@ const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const text = (v) => typeof v === 'string' && v.trim().length > 0;
 /** @param {unknown} v @param {(v: any) => boolean} ok */
 const list = (v, ok) => Array.isArray(v) && v.length > 0 && new Set(v).size === v.length && v.every(ok);
-/** A PATH basename: no slash or NUL, not "." or "..". @param {unknown} v */
+/** A command basename, found through searchPath: no slash or NUL, not "." or "..". @param {unknown} v */
 const commandName = (v) => typeof v === 'string' && v !== '' && v !== '.' && v !== '..' && !v.includes('/') && !v.includes('\0');
 /** @param {number} v @param {number} lo @param {number} hi */
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -83,7 +82,7 @@ function validateSubscriber(v, index) {
     && admitted(harnesses).some((harness) => hookKinds.some((kind) => nativeEventsFor(harness, kind, null).includes(native))))) {
     fail(`${where}: nativeEvents must be a nonempty unique list of native events its kinds and harnesses select`);
   }
-  if (!Array.isArray(v.argv) || !v.argv.length || !v.argv.every((arg) => typeof arg === 'string') || !commandName(v.argv[0])) fail(`${where}: argv must be strings starting with a command basename resolved on PATH (no slash)`);
+  if (!Array.isArray(v.argv) || !v.argv.length || !v.argv.every((arg) => typeof arg === 'string') || !commandName(v.argv[0])) fail(`${where}: argv must be strings starting with a command basename found through searchPath (no slash)`);
   if (!Number.isInteger(v.timeoutMs) || v.timeoutMs < 1 || v.timeoutMs > MAX_TIMEOUT_MS) fail(`${where}: timeoutMs must be an integer from 1 to ${MAX_TIMEOUT_MS}`);
   const selector = { harnesses: admitted(harnesses), kinds: hookKinds, nativeEvents };
   const base = { name: v.name, role: v.role, kinds: [...v.kinds], harnesses: harnesses && [...harnesses], tools: tools && [...tools],
@@ -187,9 +186,9 @@ export function budgetFor({ harness = null, nativeEvent = null, outerMs } = {}) 
 /** @param {import("./types.js").Subscribers} config @param {import("./types.js").Budget} budget @param {{harness?: string|null, kind: string, nativeEvent?: string|null}} event */
 export function checkBudget(config, budget, { harness = null, kind, nativeEvent = null }) {
   const matching = config.subscribers.filter((subscriber) => (/** @type {string[]} */ (subscriber.kinds)).includes(kind) && admits(subscriber, harness) && selects(subscriber, nativeEvent));
-  // Worst case for a dispatch that admits anything: one supervisor startup, one repository
-  // discovery, and each subscriber's timeout plus its cleanup reserve. Nothing admitted costs nothing.
-  const need = matching.length === 0 ? 0 : SUPERVISOR_STARTUP_MS + DISCOVERY_MS + matching.reduce((sum, subscriber) => sum + subscriber.timeoutMs + CLEANUP_MS, 0);
+  // Worst case for a dispatch that admits anything: one supervisor startup, and each subscriber's
+  // timeout plus its cleanup reserve. Nothing admitted costs nothing.
+  const need = matching.length === 0 ? 0 : SUPERVISOR_STARTUP_MS + matching.reduce((sum, subscriber) => sum + subscriber.timeoutMs + CLEANUP_MS, 0);
   const fit = Math.max(0, budget.subscribersMs);
   if (need > fit) fail(`subscribers for ${harness ?? 'reconcile'} ${kind} need ${need} ms but ${fit} ms fit inside ${budget.outerMs} ms`);
   return matching;

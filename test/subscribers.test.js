@@ -133,11 +133,16 @@ test('the documented example configuration fits every mapped harness/event and r
     { name: 'familiar', role: 'observer', harnesses: ['claude-code', 'codex'], registry: 'snapshot', kinds: ['session-start', 'prompt', 'before-tool', 'idle', 'needs-input', 'needs-approval', 'turn-end', 'turn-error', 'child-start', 'child-stop', RECONCILE], argv: familiar, timeoutMs: 2000 },
     { name: 'familiar-opencode', role: 'observer', registry: 'snapshot', harnesses: ['opencode'], kinds: ['session-start', 'activity', 'idle', 'needs-approval', 'turn-error', 'session-end'], argv: familiar, timeoutMs: 80 },
     { name: 'familiar-teardown', role: 'observer', registry: 'snapshot', harnesses: ['claude-code', 'codex'], kinds: ['session-end'], argv: familiar, timeoutMs: 200 } ]));
-  // OpenCode's fixed 5 s lifetime admits at most 84 ms of subscriber timeout once startup, discovery and cleanup are reserved.
+  // OpenCode's fixed 5 s lifetime admits at most 584 ms of subscriber timeout once startup and cleanup are reserved.
   const opencode = (timeoutMs) => validateSubscribers(subscriberConfig([{ name: 'o', role: 'observer', registry: 'snapshot', harnesses: ['opencode'], kinds: ['session-start'], argv: ['familiar'], timeoutMs }]));
-  assert.equal(checkBudget(opencode(84), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }).length, 1);
-  assert.throws(() => checkBudget(opencode(85), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }), { code: 'INVALID_CONFIG' });
-  // SessionEnd's native caps leave less than one subscriber's startup, discovery and cleanup reserves.
+  assert.equal(checkBudget(opencode(584), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }).length, 1);
+  assert.throws(() => checkBudget(opencode(585), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }), { code: 'INVALID_CONFIG' });
+  // SessionEnd's native caps: Claude Code's 1.5 s default admits nothing, Codex's 3 s one observer of up to 50 ms.
+  const ending = (harness, timeoutMs) => validateSubscribers(subscriberConfig([{ name: 'e', role: 'observer', registry: 'snapshot', harnesses: [harness], kinds: ['session-end'], argv: ['familiar'], timeoutMs }]));
+  const atEnd = (harness, outerMs, timeoutMs) => checkBudget(ending(harness, timeoutMs), budgetFor({ harness, nativeEvent: 'SessionEnd', outerMs }), { harness, kind: 'session-end', nativeEvent: 'SessionEnd' });
+  assert.equal(atEnd('codex', 3000, 50).length, 1);
+  assert.throws(() => atEnd('codex', 3000, 51), { code: 'INVALID_CONFIG' });
+  assert.throws(() => atEnd('claude-code', 1500, 1), { code: 'INVALID_CONFIG' });
   for (const [harness, outerMs] of [['claude-code', 1500], ['codex', 3000]]) {
     assert.throws(() => checkBudget(example, budgetFor({ harness, nativeEvent: 'SessionEnd', outerMs }), { harness, kind: 'session-end', nativeEvent: 'SessionEnd' }), { code: 'INVALID_CONFIG' });
   }
@@ -173,7 +178,7 @@ test('Codex Stop and SubagentStop guards bind separately through hook kinds', ()
   assert.throws(() => validateSubscribers(subscriberConfig([guard({ kinds: ['child-stop'], harnesses: ['claude-code'], tools: null })])), { code: 'INVALID_CONFIG', message: /claude-code child-stop has no refusal channel/ });
 });
 
-test('schema 2 roles: notices need a context channel, observers declare registry use, and only observers select private fields', () => {
+test('roles: notices need a context channel, observers declare registry use, and only observers select private fields', () => {
   const notice = (over = {}) => ({ name: 'notice', role: 'notice', kinds: ['prompt'], harnesses: ['claude-code'], argv: ['true'], timeoutMs: 100, ...over });
   const counter = (over = {}) => observer({ name: 'counter', registry: 'occurrence', kinds: ['after-tool', 'tool-error'], harnesses: ['claude-code'], tools: ['Bash'],
     privateFields: [{ nativeEvent: 'PostToolUse', fields: ['command', 'durationMs'] }], ...over });

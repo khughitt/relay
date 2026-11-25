@@ -344,11 +344,12 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 
 ### Subscriber configuration
 
-`$XDG_CONFIG_HOME/relay/subscribers.json` (mode `0700` dir, `0600` file, owned by the current user; an absent default file means no subscribers, while an absent `--subscribers FILE` argument is `INVALID_CONFIG`). The schema is 2; a schema-1 file is `INVALID_CONFIG` (migration: [api.md](api.md#public-interfaces)).
+`$XDG_CONFIG_HOME/relay/subscribers.json` (mode `0700` dir, `0600` file, owned by the current user; an absent default file means no subscribers, while an absent `--subscribers FILE` argument is `INVALID_CONFIG`). The schema is 3; a schema-1 or schema-2 file is `INVALID_CONFIG` (migration: [api.md](api.md#public-interfaces)).
 
 ```json
 {
-  "schema": 2,
+  "schema": 3,
+  "searchPath": ["/home/user/.local/bin", "/usr/local/bin", "/usr/bin", "/bin"],
   "subscribers": [
     { "name": "ops-guard", "role": "guard", "kinds": ["before-tool"],
       "harnesses": ["claude-code", "codex"], "tools": ["Bash"],
@@ -366,6 +367,7 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 }
 ```
 
+- `searchPath` lists the host's command directories in search order: unique, absolute and already normalized (no trailing slash, `.` or `..`), without `:` or NUL, and nonempty whenever `subscribers` is. Nothing in an entry is expanded (`~`, variables, globs), and there is no per-subscriber list. It is both where relay finds each `argv[0]` and the subscriber's own `PATH` ([api.md](api.md#subscriber-commands)).
 - `name` matches `^[a-z0-9][a-z0-9-]{0,63}$` and is unique.
 - `role` is `guard`, `notice` or `observer`. Guards and notices must name `harnesses`. Every guard `(harness, kind)` pair must select native events that all have a refusal channel; every notice pair, events that all have a context channel. A static channel is not proof of live delivery on an installed harness version; route qualification is separate.
 - `kinds` is a nonempty unique subset of the hook kinds; observers may add `reconcile`.
@@ -373,7 +375,7 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 - `tools` is allowed only when every kind is a tool kind (`before-tool`, `after-tool`, `tool-error`).
 - Observers must declare `registry`: `snapshot` for one that reads `$STATE/agents.json` (it runs only after a successful publication or authoritative read, and alone may select `reconcile`), `occurrence` for one that counts events (it runs whatever happened to the registry). The field is rejected on other roles ([registry.md](registry.md#publication-order-and-snapshot-consumption)).
 - `privateFields` (observers only) lists `{ nativeEvent, fields }` entries: each native event at most once and one this subscriber selects, each field an exact private key applicable to that event. There is no wildcard. An ordinary observer receives `private: {}`.
-- `argv[0]` is a command basename (no `/`, not `.` or `..`) resolved on `PATH` outside the event's repository ([api.md](api.md#subscriber-commands)); later arguments are passed literally, without a shell. `timeoutMs` is an integer in `1..60000`. There is no detach option.
+- `argv[0]` is a command basename (no `/`, not `.` or `..`) found through `searchPath` ([api.md](api.md#subscriber-commands)); later arguments are passed literally, without a shell. `timeoutMs` is an integer in `1..60000`. There is no detach option.
 
 ### Budget
 
@@ -388,7 +390,7 @@ relay keeps Node `>=22`. Only the agy path dynamically imports `node:sqlite`; Co
 | `total` (relay deadline) | `H - margin` | 900 | 1350 | 27000 | 55000 |
 | `subscribers` (sum of matching timeouts) | `total - input - registry - reserve` | 267 | 400 | 11000 | 37000 |
 
-A dispatch admitting any subscriber needs `250` (supervisor startup) `+ 500` (repository discovery) `+ Σ (timeoutMs + 500)` (each subscriber's cleanup reserve) to fit `subscribers`, ignoring tool filters; a dispatch admitting none reserves nothing. At run time an observer starts only with its timeout and cleanup reserve still left, plus startup if it would be the first subscriber; otherwise it is `SUBSCRIBER_SKIPPED`, never deferred. Consequences at native caps: Claude Code `SessionEnd` at its 1.5 s default, Codex `SessionEnd` at any allowed `--outer-ms` (3 s maximum) and OpenCode at its fixed 5 s lifetime above 84 ms of subscriber timeout admit no subscriber; their registry-only bindings still publish.
+A dispatch admitting any subscriber needs `250` (supervisor startup) `+ Σ (timeoutMs + 500)` (each subscriber's cleanup reserve) to fit `subscribers`, ignoring tool filters; a dispatch admitting none reserves nothing. At run time an observer starts only with its timeout and cleanup reserve still left, plus startup if it would be the first subscriber; otherwise it is `SUBSCRIBER_SKIPPED`, never deferred. Consequences at native caps: Claude Code `SessionEnd` at its 1.5 s default admits no subscriber, Codex `SessionEnd` at its 3 s maximum admits one observer of up to 50 ms, and OpenCode at its fixed 5 s lifetime one of up to 584 ms; their registry-only bindings still publish.
 
 ### Notice protocol
 
@@ -464,7 +466,7 @@ Claude Code `PostToolUse` and `PostToolUseFailure` and Codex `PostToolUse` stay 
 | `2` | A refusal on Claude Code or Codex (JSON refusal on stdout and reason on stderr), or a CLI usage error on an event other than `Stop`/`SubagentStop`. |
 | `1` | (Claude Code, Codex, OpenCode) An error on an event without a refusal channel, an `allow` reply without context whose registry publication failed, or a published Claude Code `Stop` event whose `background_tasks` was unreadable (`BACKGROUND_UNREADABLE`). The guard result stands; exit `1` does not imply the registry is unchanged. |
 
-Infrastructure failures (configuration load or schema, budget, input, normalization, repository discovery, command resolution, spawn, nonzero exit, invalid reply, overflow, timeout, containment) follow one rule per event (`failureReply`, `src/dispatch-failure.js`):
+Infrastructure failures (configuration load or schema, budget, input, normalization, command resolution, spawn, nonzero exit, invalid reply, overflow, timeout, containment) follow one rule per event (`failureReply`, `src/dispatch-failure.js`):
 
 | Event | Infrastructure failure | Explicit policy denial |
 | --- | --- | --- |

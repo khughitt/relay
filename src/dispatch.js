@@ -10,7 +10,7 @@ import { relayError } from './protocol.js';
 import { describe, refusalReason, retryEscapes, readRecoveryInput, failureReply, parseNoticeReply, combineContext } from './dispatch-failure.js';
 import { loadSubscribers, loadSubscribersFrom, matchSubscribers, checkBudget, budgetFor, RECONCILE } from './subscribers.js';
 import { CLEANUP_MS, SUPERVISOR_STARTUP_MS as STARTUP_MS } from './child.js';
-import { discoverBoundaries, resolveExecutable, DISCOVERY_MS } from './executable.js';
+import { resolveExecutable } from './executable.js';
 import { createProcessOps } from './bus/proc.js';
 import { prepareClaudeProvenance, PROVENANCE_MS } from './provenance.js';
 import { join } from 'node:path';
@@ -65,22 +65,18 @@ const NOT_REQUESTED = Object.freeze({ status: /** @type {'not-requested'} */ ('n
 /** @param {Partial<Selected>|null|undefined} selected */
 const where = (selected) => selected?.candidate === undefined ? '' : ` (candidate ${selected.candidate}, real ${selected.realPath ?? 'unresolved'})`;
 
-// Resolves a subscriber's command on PATH outside the event's repository, then runs it through the
-// dispatch's one supervisor with its literal arguments in the event cwd and a PATH holding only the
-// trusted directories. Discovery and the supervisor both start before the first subscriber, once
-// per dispatch; a dispatch with no admitted subscriber starts neither. close() is awaited by every
-// path that started a supervisor.
-/** @param {{cwd: string, invokingCwd: string, env: NodeJS.ProcessEnv, clock: () => number, workDeadline: number, supervise: Supervise,
+// Resolves a subscriber's command through the configured search path, then runs it through the
+// dispatch's one supervisor with its literal arguments in the event cwd and that list as its PATH.
+// The supervisor starts before the first subscriber, once per dispatch; a dispatch with no admitted
+// subscriber starts none. close() is awaited by every path that started a supervisor.
+/** @param {{cwd: string, searchPath: string[], env: NodeJS.ProcessEnv, clock: () => number, workDeadline: number, supervise: Supervise,
  *   sessionHandle: () => import("./types.js").Handle|null, recordDir: () => string|null, diagnostics: string[]}} options */
-function launcher({ cwd, invokingCwd, env, clock, workDeadline, supervise, sessionHandle, recordDir, diagnostics }) {
-  /** @type {Promise<{directories: string[]}>|null} */
-  let boundaries = null;
+function launcher({ cwd, searchPath, env, clock, workDeadline, supervise, sessionHandle, recordDir, diagnostics }) {
   /** @type {Promise<Pick<Supervisor, 'runChild'|'close'|'recording'>>|null} */
   let supervisor = null;
   /** @type {Launch} */
   const launch = async (subscriber, input) => {
-    boundaries ??= discoverBoundaries({ cwd, invokingCwd, deadline: Math.min(workDeadline, clock() + DISCOVERY_MS), clock });
-    // Start the supervisor while discovery runs; a failed start is reported when it is awaited.
+    // Start the supervisor while the command is found; a failed start is reported when it is awaited.
     if (supervisor === null) {
       supervisor = Promise.resolve().then(async () => {
         const started = await supervise({ deadline: workDeadline, sessionHandle: sessionHandle(), recordDir: recordDir(), clock });
@@ -89,9 +85,9 @@ function launcher({ cwd, invokingCwd, env, clock, workDeadline, supervise, sessi
       });
       supervisor.catch(() => {});
     }
-    const resolved = await resolveExecutable(subscriber.argv[0], { path: env.PATH, boundaries: await boundaries, deadline: workDeadline, clock });
+    const resolved = await resolveExecutable(subscriber.argv[0], { searchPath, deadline: workDeadline, clock });
     const result = await (await supervisor).runChild([resolved.candidate, ...subscriber.argv.slice(1)], input,
-      { deadline: workDeadline, timeoutMs: subscriber.timeoutMs, env: { ...env, PATH: resolved.childPath }, cwd });
+      { deadline: workDeadline, timeoutMs: subscriber.timeoutMs, env: { ...env, PATH: searchPath.join(':') }, cwd });
     return { result, selected: resolved };
   };
   return {
@@ -236,6 +232,8 @@ async function dispatchOnce({ harness, nativeEvent, input, outerMs, subscribersP
   let paths = /** @type {import("./types.js").Paths|null} */ (null), agyAppDataDir = /** @type {string|null|undefined} */ (undefined);
   /** @type {import("./types.js").HookEvent} */
   let event;
+  /** @type {string[]} */
+  let searchPath = [];
   /** @type {import("./types.js").Subscriber[]} */
   let guards = [];
   /** @type {import("./types.js").Subscriber[]} */
@@ -251,6 +249,7 @@ async function dispatchOnce({ harness, nativeEvent, input, outerMs, subscribersP
     if (subscribersPath === null) paths = statePaths();
     const load = subscribersPath === null ? () => loadConfig(/** @type {import("./types.js").Paths} */ (paths)) : () => loadConfigFrom(subscribersPath);
     const config = await bounded(load, { clock, deadline: workDeadline }, 'subscriber configuration did not load before the deadline');
+    searchPath = config.searchPath;
     checkBudget(config, budget, { harness, kind: hookEvent.kind, nativeEvent });
     let raw;
     if (recovery === null) raw = await readInput(input, { clock, deadline: Math.min(workDeadline, start + budget.inputMs) });
@@ -296,7 +295,7 @@ async function dispatchOnce({ harness, nativeEvent, input, outerMs, subscribersP
     if (handle === null) diagnostics.push('SESSION_HANDLE_UNAVAILABLE: native session ancestry is unavailable; parent-pipe loss and the absolute deadline bound subscriber lifetime');
     return handle;
   };
-  const { launch, close, started } = launcher({ cwd: event.cwd, invokingCwd, env: launchEnv, clock, workDeadline, supervise, sessionHandle, diagnostics,
+  const { launch, close, started } = launcher({ cwd: event.cwd, searchPath, env: launchEnv, clock, workDeadline, supervise, sessionHandle, diagnostics,
     recordDir: () => { try { return join((paths ??= statePaths()).stateDir, 'children'); } catch { return null; } } });
   /** @type {import("./types.js").Output} */
   let outcome;
@@ -415,7 +414,7 @@ export async function reconcile({ outerMs = 30000 } = {}, deps = {}) {
     const deadline = Math.min(workDeadline, clock() + budget.registryMs);
     const result = await bounded(() => reap({ paths, clock, deadline }), { clock, deadline }, 'registry reap did not finish before the deadline');
     const cwd = deps.cwd ?? process.cwd();
-    launching = launcher({ cwd, invokingCwd: cwd, env: deps.env ?? process.env, clock, workDeadline, supervise, sessionHandle: () => null, recordDir: () => recordDir, diagnostics });
+    launching = launcher({ cwd, searchPath: config.searchPath, env: deps.env ?? process.env, clock, workDeadline, supervise, sessionHandle: () => null, recordDir: () => recordDir, diagnostics });
     await runObservers(observers, (observer) => reconcileEnvelope(observer, result), { clock, workDeadline, launch: launching.launch, started: launching.started, nativeEvent: RECONCILE }, diagnostics);
     return { result, diagnostics };
   } catch (error) {

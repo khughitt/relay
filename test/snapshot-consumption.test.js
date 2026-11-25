@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
-import { readFile, writeFile, rm, access } from 'node:fs/promises';
+import { readFile, writeFile, rm, access, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dispatchHook, reconcile } from '../src/dispatch.js';
@@ -12,7 +12,7 @@ import { withLock } from '../src/bus/lock.js';
 import { normalizeEvent } from '../src/adapters/index.js';
 import { validateSubscribers } from '../src/subscribers.js';
 import { relayError } from '../src/protocol.js';
-import { subscriberConfig, tempPaths, writeSubscribers } from './helpers/fixture.js';
+import { subscriberConfig, TEST_SEARCH_PATH, tempPaths, writeSubscribers } from './helpers/fixture.js';
 import { createConsumer } from './fixtures/snapshot-consumer.js';
 
 const fixture = new URL('./fixtures/subscriber.js', import.meta.url).pathname;
@@ -116,6 +116,21 @@ test('reconcile reaches snapshot observers only; occurrence observers cannot sel
   await writeSubscribers(p, [{ name: 'familiar', role: 'observer', registry: 'snapshot', kinds: ['reconcile'], argv: ['node', fixture, 'record', file], timeoutMs: 1000 }]);
   await reconcile({}, { paths: p, env });
   assert.equal(JSON.parse(await readFile(file, 'utf8')).type, 'reconcile');
+});
+
+test('reconcile finds its observer through the list, without PATH and past a decoy on it', async (t) => {
+  for (const onPath of [undefined, 'decoy']) {
+    const p = await tempPaths(t), root = join(CWD, `reconcile-${onPath ?? 'unset'}`);
+    for (const name of ['listed', 'decoy']) {
+      await mkdir(join(root, name), { recursive: true });
+      await writeFile(join(root, name, 'relay-test-observer'), `#!/bin/sh\ncat >/dev/null\n: > ${join(root, `${name}-ran`)}\n`, { mode: 0o755 });
+    }
+    await writeSubscribers(p, [{ name: 'o', role: 'observer', registry: 'snapshot', kinds: ['reconcile'], argv: ['relay-test-observer'], timeoutMs: 1000 }], { searchPath: [join(root, 'listed'), ...TEST_SEARCH_PATH] });
+    const { diagnostics } = await reconcile({}, { paths: p, env: { HOME: CWD, ...(onPath === undefined ? {} : { PATH: `${join(root, onPath)}:/usr/bin:/bin` }) } });
+    assert.deepEqual(diagnostics, []);
+    assert.equal(await exists(join(root, 'listed-ran')), true);
+    assert.equal(await exists(join(root, 'decoy-ran')), false);
+  }
 });
 
 test('a SessionStart notice sees the registry before this event publishes', async (t) => {
