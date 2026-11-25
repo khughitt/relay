@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { subscriberConfig } from './helpers/fixture.js';
 
 const cli = new URL('../bin/relay.js', import.meta.url).pathname;
 const recorder = new URL('./fixtures/module-recorder.mjs', import.meta.url).href;
@@ -16,7 +17,7 @@ test('relay hook loads only the dispatch path', async (t) => {
   t.after(() => rm(root, { recursive: true, force: true }));
   const config = join(root, 'config'), log = join(root, 'modules.log');
   await mkdir(config, { mode: 0o700 });
-  await writeFile(join(config, 'subscribers.json'), '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
+  await writeFile(join(config, 'subscribers.json'), '{"schema":3,"searchPath":[],"subscribers":[]}\n', { mode: 0o600 });
   const env = { PATH: process.env.PATH, HOME: root, RELAY_STATE_DIR: join(root, 'state'), RELAY_MODULE_LOG: log };
   const r = spawnSync(process.execPath, ['--import', recorder, cli, 'hook', '--harness', 'claude-code', '--subscribers', join(config, 'subscribers.json'), 'Notification:idle_prompt'],
     { encoding: 'utf8', env, input: JSON.stringify({ session_id: 's', cwd: root }) });
@@ -35,7 +36,7 @@ async function hookRun(t, subscribers, event = 'PreToolUse') {
   t.after(() => rm(root, { recursive: true, force: true }));
   const config = join(root, 'config'), log = join(root, 'modules.log');
   await mkdir(config, { mode: 0o700 });
-  await writeFile(join(config, 'subscribers.json'), JSON.stringify({ schema: 2, subscribers }), { mode: 0o600 });
+  await writeFile(join(config, 'subscribers.json'), JSON.stringify(subscriberConfig(subscribers)), { mode: 0o600 });
   const env = { PATH: process.env.PATH, HOME: root, RELAY_STATE_DIR: join(root, 'state'), RELAY_MODULE_LOG: log };
   const spawnRecorder = new URL('./fixtures/spawn-recorder.cjs', import.meta.url).pathname;
   const r = spawnSync(process.execPath, ['--require', spawnRecorder, '--import', recorder, cli, 'hook', '--harness', 'claude-code', '--outer-ms', '20000', '--subscribers', join(config, 'subscribers.json'), event],

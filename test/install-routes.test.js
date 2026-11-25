@@ -5,6 +5,7 @@ import { validateSubscribers } from '../src/subscribers.js';
 import { parseEvidence } from '../src/install/capabilities.js';
 import { routeBindings, planRouteHooks } from '../src/install/hooks.js';
 import { planClaudeCode } from '../src/install/claude-code.js';
+import { subscriberConfig } from './helpers/fixture.js';
 import { qualifiedInstall } from './helpers/qualification.js';
 
 const record = (routes) => JSON.stringify({ schema: 1, harness: 'claude-code', version: '2.1.296', probes: [], ...(routes ? { routes } : {}) });
@@ -77,7 +78,7 @@ test('planRouteHooks writes and replaces only relay ask entries, idempotently', 
 });
 test('planClaudeCode adds the route only with withAsk', () => {
   const base = { target: '/t/settings.json', text: '{}', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
-    subscribers: validateSubscribers({ schema: 2, subscribers: [] }), evidence: parseEvidence(record(all)), ...qualifiedInstall('claude-code', { subscribers: [] }) };
+    subscribers: validateSubscribers(subscriberConfig([])), evidence: parseEvidence(record(all)), ...qualifiedInstall('claude-code', { subscribers: [] }) };
   assert.doesNotMatch(planClaudeCode(base).changes[0].after, / ask --harness/);
   assert.match(planClaudeCode({ ...base, withAsk: true, installedVersion: '2.1.296' }).changes[0].after, / ask --harness claude-code --handback PreToolUse/);
   assert.throws(() => planClaudeCode({ ...base, withAsk: true, installedVersion: '2.2.0' }), { code: 'UNSUPPORTED_BINDING' });
@@ -97,7 +98,7 @@ test('planClaudeCode adds the route only with withAsk', () => {
 test('an ask-only install needs no route qualification and leaves dispatch entries as they were', () => {
   const prior = '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"\'/old/node\' \'/old/bin/relay.js\' hook --harness claude-code --outer-ms 600000 --subscribers \'/old/subscribers.json\' Stop","timeout":600}]}]}}';
   const base = { target: '/t/settings.json', text: prior, relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
-    subscribers: validateSubscribers({ schema: 2, subscribers: [] }), evidence: parseEvidence(record(all)), withAsk: true, installedVersion: '2.1.296' };
+    subscribers: validateSubscribers(subscriberConfig([])), evidence: parseEvidence(record(all)), withAsk: true, installedVersion: '2.1.296' };
   const hooks = JSON.parse(planClaudeCode(base).changes[0].after).hooks;
   assert.deepEqual(hooks.Stop, JSON.parse(prior).hooks.Stop, 'dispatch entries untouched');
   assert.deepEqual(Object.keys(hooks).sort(), ['PostToolUse', 'PreToolUse', 'Stop']);
@@ -108,7 +109,7 @@ test('an ask-only install needs no route qualification and leaves dispatch entri
 
 test('after a harness upgrade the stale route refuses with --with ask and goes without it', () => {
   const base = { target: '/t/settings.json', text: '{}', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
-    subscribers: validateSubscribers({ schema: 2, subscribers: [] }), evidence: parseEvidence(record(all)), ...qualifiedInstall('claude-code', { subscribers: [] }) };
+    subscribers: validateSubscribers(subscriberConfig([])), evidence: parseEvidence(record(all)), ...qualifiedInstall('claude-code', { subscribers: [] }) };
   const installed = planClaudeCode({ ...base, withAsk: true, installedVersion: '2.1.296' }).changes[0].after;
   assert.throws(() => planClaudeCode({ ...base, text: installed, withAsk: true, installedVersion: '2.1.300' }), { code: 'UNSUPPORTED_BINDING', message: /2\.1\.296.*2\.1\.300/ });
   const plain = planClaudeCode({ ...base, text: installed, installedVersion: '2.1.300' }).changes[0].after;
@@ -120,8 +121,8 @@ test('a guard subscriber needs one evidence record holding both the dispatch pro
   const guard = { name: 'g', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['true'], timeoutMs: 1000 };
   const probes = ['refuse', 'context'].map((reply) => ({ event: 'PreToolUse', reply, outerMs: 600000, passed: true }));
   const base = { target: '/t/settings.json', text: '{}', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
-    subscribers: validateSubscribers({ schema: 2, subscribers: [guard] }), withAsk: true, installedVersion: '2.1.296',
-    ...qualifiedInstall('claude-code', validateSubscribers({ schema: 2, subscribers: [guard] })) };
+    subscribers: validateSubscribers(subscriberConfig([guard])), withAsk: true, installedVersion: '2.1.296',
+    ...qualifiedInstall('claude-code', validateSubscribers(subscriberConfig([guard]))) };
   const routesOnly = parseEvidence(await readFile(new URL('../docs/evidence/claude-code-answer-routes.json', import.meta.url), 'utf8'));
   assert.throws(() => planClaudeCode({ ...base, evidence: routesOnly }),
     { code: 'UNSUPPORTED_BINDING', message: /claude-code,PreToolUse,refuse.*dispatch probes.*inbox-service/s });

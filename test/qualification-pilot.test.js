@@ -105,11 +105,11 @@ test('retained subscriber work must be accounted exactly once on both sides', ()
 
 test('retained work lists come from the configurations and native branches actually run', () => {
   const deployed = { schema: 1, subscribers: [{ name: 'ops-guard' }, { name: 'familiar' }] };
-  const candidate = { schema: 2, subscribers: [{ name: 'ops-guard' }, { name: 'turn-pause' }, { name: 'familiar' }] };
+  const candidate = { schema: 3, searchPath: ['/usr/bin'], subscribers: [{ name: 'ops-guard' }, { name: 'turn-pause' }, { name: 'familiar' }] };
   const lists = workLists({ deployed, candidate, native: ['turn-pause'] });
   assert.deepEqual(lists, { baseline: ['deployed-relay:ops-guard', 'deployed-relay:familiar', 'turn-pause'], candidate: ['candidate:ops-guard', 'candidate:turn-pause', 'candidate:familiar'] });
   checkRetainedWork(manifest(), lists);
-  const dropped = workLists({ deployed, candidate: { schema: 2, subscribers: [{ name: 'turn-pause' }] }, native: ['turn-pause'] });
+  const dropped = workLists({ deployed, candidate: { schema: 3, searchPath: ['/usr/bin'], subscribers: [{ name: 'turn-pause' }] }, native: ['turn-pause'] });
   assert.throws(() => checkRetainedWork(manifest(), dropped), { code: 'BASELINE_INVALID' });
 });
 

@@ -5,7 +5,7 @@ import * as fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tempState } from './helpers/fixture.js';
+import { subscriberConfig, tempState } from './helpers/fixture.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -15,7 +15,7 @@ test('opencode install plans the plugin by its real path when the checkout path 
   for (const entry of ['bin', 'src', 'integrations', 'node_modules', 'package.json'])
     await fs.cp(join(ROOT, entry), join(root, entry), { recursive: true });
   const subscribers = join(base.stateDir, 'subscribers.json');
-  await fs.writeFile(subscribers, JSON.stringify({ schema: 2, subscribers: [] }), { mode: 0o600 });
+  await fs.writeFile(subscribers, JSON.stringify(subscriberConfig([])), { mode: 0o600 });
   const r = spawnSync(process.execPath, [join(root, 'bin', 'relay.js'), 'install', '--json',
     '--harness', 'opencode', '--config-dir', base.stateDir, '--subscribers', subscribers], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);

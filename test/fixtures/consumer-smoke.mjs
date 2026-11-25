@@ -55,7 +55,7 @@ assert.match(cli(['--help']), /^Usage: relay /);
 const scratch = mkdtempSync(join(tmpdir(), 'relay-smoke-'));
 try {
   const subscribers = join(scratch, 'subscribers.json'), hooks = join(scratch, 'hooks.json');
-  writeFileSync(subscribers, '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
+  writeFileSync(subscribers, '{"schema":3,"searchPath":[],"subscribers":[]}\n', { mode: 0o600 });
   writeFileSync(hooks, '{"hooks":{}}\n');
   // Without route qualification the planner refuses; a tarball install records no commit to bind one to.
   assert.throws(() => cli(['install', '--harness', 'codex', '--subscribers', subscribers, '--target', hooks]), (error) => /UNQUALIFIED_ROUTE: .*--qualification/.test(error.stderr));

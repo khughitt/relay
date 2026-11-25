@@ -25,7 +25,7 @@ async function scratch(t) {
   const root = await mkdtemp(join(tmpdir(), 'relay-install-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const dir = join(root, 'relay'); await mkdir(dir, { mode: 0o700 });
-  const file = join(dir, 'subscribers.json'); await writeFile(file, '{"schema":2,"subscribers":[]}\n', { mode: 0o600 });
+  const file = join(dir, 'subscribers.json'); await writeFile(file, '{"schema":3,"searchPath":[],"subscribers":[]}\n', { mode: 0o600 });
   const target = join(root, 'hooks.json'); await writeFile(target, '{"hooks":{}}\n');
   const s = { root, dir, file, target };
   // Qualification for every default binding of a harness, bound to the subscriber file's bytes now.

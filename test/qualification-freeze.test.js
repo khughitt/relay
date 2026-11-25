@@ -51,6 +51,7 @@ export const matchSubscribers = (config, { kind }) => config.subscribers.filter(
 
   const subscriber = (name) => ({ name, role: 'observer', registry: 'snapshot', kinds: [kind], argv: ['relay-fixture-observer'], timeoutMs: 1000 });
   const config = (names) => ({ schema: 2, subscribers: names.map(subscriber) });
+  const candidateConfig = (names) => ({ schema: 3, searchPath: ['/usr/bin', '/bin'], subscribers: names.map(subscriber) });
   const liveConfig = join(root, 'installed subscribers.json');
   const configSha = write(liveConfig, config(['familiar']));
   const relay = { command: `'/usr/bin/node' '${entry}' hook --harness claude-code --outer-ms 60000 --subscribers '${liveConfig}' ${event}`, timeout: 60 };
@@ -76,11 +77,11 @@ export const matchSubscribers = (config, { kind }) => config.subscribers.filter(
     fixture: 'relay-fixture-native', argv: ['@FIXTURE@/bin/relay-fixture-native'] }));
   const invocations = [['deployed-relay:familiar', 'familiar'], ...nativeBranches.filter((b) => b.migrates)
     .map(({ name }, i) => [name, `fixture-${i}`])];
-  const candidate = { config: 'candidate.json', configSha256: write(join(root, 'candidate.json'), config(invocations.map(([, name]) => name))) };
+  const candidate = { config: 'candidate.json', configSha256: write(join(root, 'candidate.json'), candidateConfig(invocations.map(([, name]) => name))) };
   const deployedName = `deployed-${event.toLowerCase()}.json`;
   write(join(root, deployedName), config(['familiar']));
   write(join(root, 'empty-deployed.json'), config([]));
-  write(join(root, 'empty-candidate.json'), config([]));
+  write(join(root, 'empty-candidate.json'), candidateConfig([]));
   const template = join(root, 'template.json');
   write(template, { schema: 1, manifests: [{ schema: 1, event, harness: 'claude-code', mode: 'interactive',
     baselineKind: 'deployed-relay-plus-native', fixture: 'fixture', payload: { hook_event_name: event },

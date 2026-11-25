@@ -12,7 +12,7 @@ import { withLock } from '../src/bus/lock.js';
 import { normalizeEvent } from '../src/adapters/index.js';
 import { validateSubscribers } from '../src/subscribers.js';
 import { relayError } from '../src/protocol.js';
-import { tempPaths, writeSubscribers } from './helpers/fixture.js';
+import { subscriberConfig, tempPaths, writeSubscribers } from './helpers/fixture.js';
 import { createConsumer } from './fixtures/snapshot-consumer.js';
 
 const fixture = new URL('./fixtures/subscriber.js', import.meta.url).pathname;
@@ -112,7 +112,7 @@ test('a sample consumer discards delayed old updates and adopts a replacement ge
 
 test('reconcile reaches snapshot observers only; occurrence observers cannot select it', async (t) => {
   const p = await tempPaths(t), file = join(CWD, 'reconcile-snap.json');
-  assert.throws(() => validateSubscribers({ schema: 2, subscribers: [{ name: 'c', role: 'observer', registry: 'occurrence', kinds: ['reconcile'], argv: ['true'], timeoutMs: 100 }] }), { code: 'INVALID_CONFIG', message: /occurrence/ });
+  assert.throws(() => validateSubscribers(subscriberConfig([{ name: 'c', role: 'observer', registry: 'occurrence', kinds: ['reconcile'], argv: ['true'], timeoutMs: 100 }])), { code: 'INVALID_CONFIG', message: /occurrence/ });
   await writeSubscribers(p, [{ name: 'familiar', role: 'observer', registry: 'snapshot', kinds: ['reconcile'], argv: ['node', fixture, 'record', file], timeoutMs: 1000 }]);
   await reconcile({}, { paths: p, env });
   assert.equal(JSON.parse(await readFile(file, 'utf8')).type, 'reconcile');

@@ -17,7 +17,7 @@ import { normalizeEvent } from '../src/adapters/index.js';
 import { relayError } from '../src/protocol.js';
 import { CONTEXT_LIMIT } from '../src/adapters/reply.js';
 import { RECONCILE } from '../src/subscribers.js';
-import { tempPaths, writeSubscribers } from './helpers/fixture.js';
+import { subscriberConfig, tempPaths, writeSubscribers } from './helpers/fixture.js';
 import { agyStore, encodeTrajectoryMetadata } from './helpers/agy-store.js';
 import { processMarker, noneMarked, reapMarked } from './helpers/survivors.js';
 
@@ -281,7 +281,7 @@ test('an unusable environment cannot reach the policy phase when the path is exp
 });
 
 test('slow configuration loading and publication end at the deadline', async (t) => {
-  const p = await tempPaths(t), empty = { schema: 2, subscribers: [] };
+  const p = await tempPaths(t), empty = subscriberConfig([]);
   let started = performance.now();
   let r = await hook(p, { outerMs: 500, deps: { loadConfig: slow(empty, 650) } });
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /relay refused: DEADLINE_EXCEEDED: subscriber configuration did not load before the deadline/);
@@ -308,6 +308,16 @@ test('configuration errors refuse on guard-capable events and report on the rest
   r = await hook(p, { harness: 'codex', nativeEvent: 'Interrupt', body: '{}' }); assert.deepEqual(r, { stdout: '', stderr: 'UNSUPPORTED_EVENT: unsupported harness event\n', exitCode: 1 });
   r = await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', outerMs: 4000, body: '{}' }); assert.match(r.stderr, /^USAGE: codex SessionEnd allows at most 3000/); assert.equal(r.exitCode, 1);
   r = await hook(p, { harness: 'vim', body: '{}' }); assert.match(r.stderr, /^UNSUPPORTED_HARNESS/);
+});
+
+test('a guard dispatch refuses a file of an earlier schema and one whose search path is malformed', async (t) => {
+  const p = await tempPaths(t);
+  for (const [config, message] of [[{ schema: 2, subscribers: [guard('g', 'allow')] }, /relay refused: INVALID_CONFIG: subscriber config schema 2 is no longer read/],
+    [subscriberConfig([guard('g', 'allow')], ['bin']), /relay refused: INVALID_CONFIG: searchPath\[0\]/]]) {
+    await writeSubscribers(p, [], { text: JSON.stringify(config) });
+    const r = await hook(p);
+    assert.equal(r.exitCode, 2); assert.match(r.stdout, message);
+  }
 });
 
 test('tool filters select guards and the tool input never leaks into stderr or stdout', async (t) => {
@@ -423,7 +433,7 @@ test('reconcile prunes, then notifies reconcile observers even when nothing chan
   await writeSubscribers(p, [], { text: 'nope' });
   await assert.rejects(reconcile({}, { paths: p }), { code: 'INVALID_CONFIG' });
   await writeSubscribers(p, []); // valid again, so the injected slow reap is actually reached
-  await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, loadConfig: slow({ schema: 2, subscribers: [] }, 650) }), { code: 'DEADLINE_EXCEEDED' });
+  await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, loadConfig: slow(subscriberConfig([]), 650) }), { code: 'DEADLINE_EXCEEDED' });
   await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, reap: slow(published, 650) }), { code: 'DEADLINE_EXCEEDED' });
   await new Promise((resolve) => setTimeout(resolve, 700));
 });

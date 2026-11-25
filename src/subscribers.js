@@ -1,6 +1,6 @@
 // @ts-check
 import * as fs from 'node:fs/promises';
-import { dirname, isAbsolute } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { relayError } from './protocol.js';
 import { CLEANUP_MS, SUPERVISOR_STARTUP_MS } from './child.js';
 import { DISCOVERY_MS } from './executable.js';
@@ -9,10 +9,10 @@ import { HOOK_KINDS, TOOL_KINDS, privateFieldsFor } from './adapters/hook-event.
 import { checkPrivate } from './bus/store.js';
 
 export const RECONCILE = 'reconcile';
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 const HARNESSES = ['agy', 'claude-code', 'codex', 'opencode'];
 const FIELDS = ['name', 'role', 'kinds', 'harnesses', 'tools', 'nativeEvents', 'argv', 'timeoutMs', 'registry', 'privateFields'];
-const CONFIG_FIELDS = ['schema', 'subscribers'];
+const CONFIG_FIELDS = ['schema', 'searchPath', 'subscribers'];
 const ROLES = ['guard', 'notice', 'observer'];
 const MAX_TIMEOUT_MS = 60000, MAX_PLANNED_MS = 60000, MIN_OUTER_MS = 500, INPUT_MS = 5000, REGISTRY_MS = 12000;
 /** @type {(message: string, cause?: unknown) => never} */
@@ -99,15 +99,28 @@ function validateSubscriber(v, index) {
   return { ...base, registry: v.registry, privateFields: validatePrivateFields(where, v.privateFields, selector) };
 }
 
+// The host's command directories, in search order: the same strings become the subscriber's PATH.
+/** @param {unknown} v @returns {string[]} */
+function validateSearchPath(v) {
+  if (!Array.isArray(v)) fail('searchPath must be a list of directories');
+  for (const [index, entry] of v.entries()) {
+    if (typeof entry !== 'string' || !isAbsolute(entry) || resolve(entry) !== entry || /[:\0]/.test(entry)) fail(`searchPath[${index}] must be an absolute, normalized directory without ":"`);
+  }
+  if (new Set(v).size !== v.length) fail('searchPath must not repeat a directory');
+  return [...v];
+}
+
 /** @param {unknown} v @returns {import("./types.js").Subscribers} */
 export function validateSubscribers(v) {
-  if (object(v) && v.schema === 1) fail('subscriber config schema 1 is no longer read; migrate it to schema 2 (docs/api.md, "Subscriber configuration")');
-  if (!object(v) || v.schema !== SCHEMA || !Array.isArray(v.subscribers)) fail('subscriber config must be {"schema":2,"subscribers":[...]}');
+  if (object(v) && (v.schema === 1 || v.schema === 2)) fail(`subscriber config schema ${v.schema} is no longer read; migrate it to schema ${SCHEMA} (docs/api.md, "Subscriber configuration")`);
+  if (!object(v) || v.schema !== SCHEMA || !Array.isArray(v.subscribers)) fail(`subscriber config must be {"schema":${SCHEMA},"searchPath":[...],"subscribers":[...]}`);
   const extra = Object.keys(v).find((key) => !CONFIG_FIELDS.includes(key));
   if (extra !== undefined) fail(`subscriber config: unexpected field ${extra}`);
+  const searchPath = validateSearchPath(v.searchPath);
   const subscribers = v.subscribers.map(validateSubscriber);
+  if (subscribers.length > 0 && searchPath.length === 0) fail('searchPath must list the directories that hold the subscriber commands');
   if (new Set(subscribers.map((subscriber) => subscriber.name)).size !== subscribers.length) fail('subscriber names must be unique');
-  return { schema: SCHEMA, subscribers };
+  return { schema: SCHEMA, searchPath, subscribers };
 }
 
 // One reader for both loaders. The default location may be absent, which means no
@@ -119,7 +132,7 @@ async function readSubscribers(paths, { io, required }) {
   catch (cause) { fail(`subscriber config ${paths.subscribersPath} must be a privately owned 0600 regular file in a 0700 directory`, cause); }
   if (!present) {
     if (required) fail(`subscriber config ${paths.subscribersPath} does not exist`);
-    return { schema: SCHEMA, subscribers: [] };
+    return { schema: SCHEMA, searchPath: [], subscribers: [] };
   }
   let value;
   try { value = JSON.parse(await io.readFile(paths.subscribersPath, 'utf8')); }
