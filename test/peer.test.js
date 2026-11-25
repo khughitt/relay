@@ -107,7 +107,40 @@ test('send derives the sender, bounds the text and is safe to repeat', { timeout
     await assert.rejects(h.as(who)('send', { text: 'x' }), (e) => ['NO_SESSION', 'NOT_REGISTERED'].includes(e.code));
   }
   await assert.rejects(h.as(agent('codex:w', THIRD_HANDLE, { scope: 'worker' }))('join'), { code: 'WORKER_SESSION' });
-  await assert.rejects(h.as(agent('agy:a', THIRD_HANDLE))('join'), { code: 'UNSUPPORTED_HARNESS' });
+  await assert.rejects(h.as(agent('opencode:a', THIRD_HANDLE, { scope: 'process' }))('join'), { code: 'UNSUPPORTED_HARNESS' });
+});
+
+for (const harness of ['agy', 'pi']) {
+  test(`${harness} holds either role, through a restart and to its end`, { timeout: 30000 }, async (t) => {
+    const h = await host(t), member = agent(`${harness}:member`, THIRD_HANDLE);
+    h.agents[member.id] = member;
+    for (const [lead, reviewer] of [[member, REVIEWER], [LEAD, member]]) {
+      const [leads, reviews] = [h.as(lead), h.as(reviewer)];
+      assert.equal((await leads('open')).json.run.lead, lead.id);
+      assert.equal((await reviews('join')).json.run.reviewer, reviewer.id);
+      assert.deepEqual((await leads('wait', { timeoutMs: 2000 })).json.from, { agentId: reviewer.id, role: 'reviewer' });
+      await leads('send', { text: 'read it' });
+      assert.deepEqual((await reviews('wait', { timeoutMs: 2000 })).json.from, { agentId: lead.id, role: 'lead' });
+      await reviews('send', { text: 'read' });
+      h.w.child.kill('SIGTERM'); await h.w.next((m) => m.type === 'stopped');
+      h.w = spawnLines(t, worker, [], { env: { RELAY_STATE_DIR: h.p.stateDir } });
+      await h.w.next((m) => m.type === 'ready');
+      assert.equal((await leads('wait', { timeoutMs: 2000 })).json.text, 'read', 'the stored entries load again');
+      assert.equal((await leads('close')).json.run.state, 'closed');
+    }
+    await h.as(LEAD)('open'); await h.as(member)('join');
+    h.dead.add(THIRD_HANDLE.pid);
+    assert.equal((await h.lead('wait', { timeoutMs: 2000 })).json.event, 'join');
+    assert.equal((await h.lead('wait', { timeoutMs: 2000 })).exitCode, 4);
+  });
+}
+
+test("an agy lead's own process holds no reviewer, subagent or replaced conversation", { timeout: 30000 }, async (t) => {
+  const h = await host(t), root = agent('agy:root', THIRD_HANDLE);
+  await h.as(root)('open');
+  await assert.rejects(h.as(agent('agy:sub', { ...THIRD_HANDLE }))('join'), { code: 'SAME_SESSION' });
+  assert.equal((await h.as(root)('show')).json.run.reviewer, null);
+  assert.equal((await h.as(agent('agy:other', OTHER_HANDLE))('join')).json.run.reviewer, 'agy:other');
 });
 
 test('a message saved while no one waits survives a service restart', { timeout: 30000 }, async (t) => {
