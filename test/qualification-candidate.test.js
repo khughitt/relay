@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -79,25 +80,65 @@ test("the candidate hook's own PATH holds no prepared program", (t) => {
   for (const dir of CANDIDATE_HOOK_PATH.split(':')) for (const name of Object.keys(f.programs)) assert.equal(existsSync(join(dir, name)), false, join(dir, name));
 });
 
-// One whole runner invocation refuses before it measures anything.
-test('the runner refuses a candidate whose list selects another program, and measures nothing', { skip: process.platform !== 'linux' }, (t) => {
-  const f = prepared(t), config = join(f.root, 'fixture', 'config'), decoys = join(f.root, 'decoys');
-  mkdirSync(decoys); writeFileSync(join(decoys, 'relay-fixture-notice'), '#!/bin/sh\ncat >/dev/null\n', { mode: 0o755 });
+// One whole native-only route: its frozen set beside the prepared fixture, and a pilot of it.
+function route(f, { searchPath, candidate = fileURLToPath(new URL('..', import.meta.url)), speculative = false }) {
+  const config = join(f.root, 'fixture', 'config'), out = join(f.root, 'out');
   const write = (file, value) => writeFileSync(file, `${JSON.stringify(value)}\n`, { mode: 0o600 });
-  write(join(config, 'candidate.json'), template({ searchPath: [decoys, '@WORK@/bin', '@FIXTURE@/bin', '/usr/bin', '/bin'], subscribers: [{ name: 'notice', role: 'notice', harnesses: ['claude-code'], kinds: ['session-start'], argv: ['relay-fixture-notice'], timeoutMs: 1000 }] }));
+  write(join(config, 'candidate.json'), template({ searchPath, subscribers: [subscriber('notice', 'relay-fixture-notice', { role: 'notice', registry: undefined, harnesses: ['claude-code'] })] }));
   write(join(config, 'candidate-empty.json'), { schema: 3, searchPath: [], subscribers: [] });
-  const env = { PATH: '/usr/bin:/bin', HOME: f.root, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
-  const configSha256 = spawnSync('sha256sum', [join(config, 'candidate.json')], { encoding: 'utf8', env }).stdout.split(' ')[0];
+  write(join(config, 'candidate-speculative.json'), template({ subscribers: [subscriber('prompt', 'relay-fixture-observer', { kinds: ['prompt'], harnesses: ['claude-code'] })] }));
+  const configSha256 = createHash('sha256').update(readFileSync(join(config, 'candidate.json'))).digest('hex');
   write(join(f.root, 'set.json'), { schema: 1, host: 'h', manifests: [{ schema: 1, host: 'h', harness: 'claude-code', version: '0.0.0', mode: 'interactive', event: 'SessionStart', baselineKind: 'native-only',
     settings: { commit: 'synthetic', path: 'synthetic', blob: 'synthetic' }, inventory: { relayedEvents: [] }, schedule: { kind: 'parallel', evidence: 'synthetic' }, fixture: 'fixture',
-    payload: { session_id: 's', hook_event_name: 'SessionStart', source: 'startup' }, candidate: { config: 'candidate.json', configSha256 }, noSubscriber: { candidate: 'candidate-empty.json' },
-    branches: [{ name: 'notice', role: 'native', fixture: 'relay-fixture-native', argv: ['@FIXTURE@/bin/relay-fixture-native'] }],
+    payload: { session_id: 's', hook_event_name: 'SessionStart', source: 'startup' }, candidate: { config: 'candidate.json', configSha256 },
+    noSubscriber: { candidate: 'candidate-empty.json', ...(speculative ? { speculative: 'candidate-speculative.json' } : {}) },
+    branches: [{ name: 'notice', role: 'native', fixture: 'relay-fixture-native', argv: ['@FIXTURE@/bin/relay-fixture-native'] },
+      { name: 'kept', role: 'native', migrates: false, argv: ['/bin/sh', '-c', 'cat >/dev/null; command -v relay-fixture-native >/dev/null'] }],
     replacementMap: [{ invocation: 'notice', baseline: 'notice', candidate: 'candidate:notice' }] }] });
-  const out = join(f.root, 'out'), candidate = fileURLToPath(new URL('..', import.meta.url));
-  const r = spawnSync(process.execPath, [runner, '--candidate', candidate, '--baseline-manifest', join(f.root, 'set.json'), '--workload', join(candidate, 'scripts/hook-qualification/workload.json'), '--output', out, '--pilot'], { encoding: 'utf8', env });
+  const r = spawnSync(process.execPath, [runner, '--candidate', candidate, '--baseline-manifest', join(f.root, 'set.json'), '--workload', fileURLToPath(new URL('../scripts/hook-qualification/workload.json', import.meta.url)), '--output', out, '--pilot'],
+    { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: f.root, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
+  return { r, result: join(out, 'claude-code-SessionStart', `${process.version}-pilot.json`), state: join(out, 'claude-code-SessionStart', `${process.version}-pilot`, 'state') };
+}
+const onLinux = { skip: process.platform !== 'linux' };
+
+test('the runner refuses a candidate whose list selects another program, and measures nothing', onLinux, (t) => {
+  const f = prepared(t), decoys = join(f.root, 'decoys');
+  mkdirSync(decoys); writeFileSync(join(decoys, 'relay-fixture-notice'), '#!/bin/sh\ncat >/dev/null\n', { mode: 0o755 });
+  const { r, result, state } = route(f, { searchPath: [decoys, '@WORK@/bin', '@FIXTURE@/bin', '/usr/bin', '/bin'] });
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stderr, new RegExp(`candidate subscriber notice selects ${join(decoys, 'relay-fixture-notice')}, not the prepared program`));
   assert.match(r.stdout, /no result written/);
-  assert.equal(existsSync(join(out, 'claude-code-SessionStart', `${process.version}-pilot.json`)), false);
-  assert.equal(existsSync(join(out, 'claude-code-SessionStart', `${process.version}-pilot`, 'state')), false, 'no condition ran');
+  assert.equal(existsSync(result), false);
+  assert.equal(existsSync(state), false, 'no condition ran');
+});
+
+// A candidate that notes the PATH each of its hooks was launched with, and is otherwise this relay.
+test('every candidate hook runs without a fixture program on its PATH, and a kept native branch with one', onLinux, (t) => {
+  const f = prepared(t), candidate = join(f.root, 'candidate'), log = join(f.root, 'hook-paths');
+  const relay = (path) => fileURLToPath(new URL(`../${path}`, import.meta.url));
+  mkdirSync(join(candidate, 'bin'), { recursive: true });
+  symlinkSync(relay('src'), join(candidate, 'src'));
+  writeFileSync(join(candidate, 'package.json'), '{"type":"module"}\n');
+  writeFileSync(join(candidate, 'bin', 'relay.js'), `import { appendFileSync } from 'node:fs';
+appendFileSync(${JSON.stringify(log)}, \`\${process.env.PATH}\\n\`);
+process.argv[1] = ${JSON.stringify(relay('bin/relay.js'))};
+await import(${JSON.stringify(new URL('../bin/relay.js', import.meta.url).href)});
+`);
+  const git = (...args) => spawnSync('git', ['-C', candidate, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: f.root, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } });
+  assert.equal(git('init', '--quiet').status, 0);
+  assert.equal(git('rev-parse', '--show-toplevel').stdout.trim(), candidate);
+  assert.equal(git('rev-parse', '--absolute-git-dir').stdout.trim(), join(candidate, '.git'));
+  git('add', '-A'); assert.equal(git('commit', '--quiet', '-m', 'candidate').status, 0);
+  const { r, result } = route(f, { searchPath: ['@WORK@/bin', '@FIXTURE@/bin', '/usr/bin', '/bin'], candidate, speculative: true });
+  assert.equal(existsSync(result), true, r.stdout + r.stderr);
+  const { conditions, candidate: recorded } = JSON.parse(readFileSync(result, 'utf8'));
+  assert.equal(recorded.selected.notice.path, join(f.fixtureBin, 'relay-fixture-notice'));
+  // The kept branch exits 0 only with a fixture program on its PATH; it runs on both sides.
+  for (const name of ['warm', 'cold', 'concurrent']) for (const side of ['baseline', 'candidate']) for (const sample of conditions[name][side]) {
+    assert.deepEqual([sample.ok, sample.statuses], [true, ['exited 0', 'exited 0']], `${name} ${side}`);
+  }
+  // Warm, cold, missing, timeout, the concurrent batch, empty, speculative and the two start probes.
+  const paths = readFileSync(log, 'utf8').trim().split('\n');
+  assert.equal(paths.length, 4 + conditions.concurrent.candidate.length + 4);
+  assert.deepEqual([...new Set(paths)], [CANDIDATE_HOOK_PATH]);
 });

@@ -159,7 +159,7 @@ test('the documented example configuration fits every mapped harness/event and r
 
 test('checkBudget sums the worst match ignoring tool filters', () => {
   const config = validateSubscribers(subscriberConfig([guard({ timeoutMs: 200 }), guard({ name: 'edit', tools: ['Edit'], timeoutMs: 150 }), observer({ timeoutMs: 100 })]));
-  // need: 250 startup + 500 discovery + (200 + 500) + (150 + 500) + (100 + 500) = 2700 ms
+  // need: 250 startup + (200 + 500) + (150 + 500) + (100 + 500) = 2200 ms
   const budget = budgetFor({ outerMs: 20000 });
   assert.deepEqual(checkBudget(config, budget, { harness: 'codex', kind: 'before-tool' }).map((s) => s.name), ['guard', 'edit', 'observer']);
   assert.throws(() => checkBudget(config, budgetFor({ harness: 'codex', nativeEvent: 'SessionEnd' }), { harness: 'codex', kind: 'before-tool' }), { code: 'INVALID_CONFIG' });

@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { statistics } from '../scripts/hook-qualification/statistics.mjs';
 import { validateManifest, checkRetainedWork, runBaseline, workLists } from '../scripts/hook-qualification/baseline.mjs';
 import { judgePilot } from '../scripts/hook-qualification/pilot.mjs';
@@ -113,11 +115,15 @@ test('retained work lists come from the configurations and native branches actua
   assert.throws(() => checkRetainedWork(manifest(), dropped), { code: 'BASELINE_INVALID' });
 });
 
-test('only a named branch runs in its own environment', async () => {
-  const report = (name) => ({ name, role: name === 'deployed-relay' ? name : 'native', argv: ['/bin/sh', '-c', 'cat >/dev/null; printf %s "$PATH"'] });
+test('only a named branch runs in its own environment', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'relay-branch-env-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // Each branch writes its own file: a branch counts as done at its exit, before its pipes close.
+  const report = (name) => ({ name, role: name === 'deployed-relay' ? name : 'native', argv: ['/bin/sh', '-c', `cat >/dev/null; printf %s "$PATH" > ${join(dir, name)}`] });
   const m = manifest({ branches: [report('deployed-relay'), report('turn-pause')] });
-  const r = await runBaseline(m, { event: 'PreToolUse', input: '{}', env: { PATH: '/usr/bin:/bin' }, branchEnv: { 'turn-pause': { PATH: '/bin:/usr/bin' } }, cwd: '/', capture: true });
-  assert.deepEqual(r.branches.map((b) => [b.name, b.stdout]), [['deployed-relay', '/usr/bin:/bin'], ['turn-pause', '/bin:/usr/bin']]);
+  const r = await runBaseline(m, { event: 'PreToolUse', input: '{}', env: { PATH: '/usr/bin:/bin' }, branchEnv: { 'turn-pause': { PATH: '/bin:/usr/bin' } }, cwd: '/' });
+  assert.deepEqual(r.statuses, ['exited 0', 'exited 0']);
+  assert.deepEqual(['deployed-relay', 'turn-pause'].map((name) => readFileSync(join(dir, name), 'utf8')), ['/usr/bin:/bin', '/bin:/usr/bin']);
 });
 
 test('a parallel baseline is timed on its critical path, never as a sum of branches', async () => {

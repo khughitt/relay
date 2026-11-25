@@ -30,7 +30,7 @@ const stages = {
   schema: { text: '{"schema":1,"subscribers":[]}' },
   budget: { guard: { timeoutMs: 60000 }, outerMs: 5000 },
   'input-other-field': { over: { session_id: 7 } },
-  'root-discovery': { over: { cwd: join(CWD, 'missing-dir') } },
+  'missing-cwd': { over: { cwd: join(CWD, 'missing-dir') } },
   resolution: { guard: { argv: ['relay-no-such-guard'] } },
   spawn: { run: fake({ status: 'spawn-failed', exitCode: null, stdout: '' }) },
   nonzero: { run: fake({ exitCode: 3, stdout: '' }) },

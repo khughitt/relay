@@ -84,7 +84,7 @@ test('survival limitation: the internal deadline refuses; an outer kill, missing
   const env={PATH:process.env.PATH??'',HOME:base.stateDir,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome};
   t.after(()=>reapMarked(marker));
   await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code'],argv:['node',fixture,'hang',marker],timeoutMs:80}]);
-  // 5000 ms is about the smallest outer budget that admits one subscriber with its supervisor, discovery and cleanup reserves.
+  // 5000 ms admits this one 80 ms subscriber with its supervisor and cleanup reserves.
   const started=performance.now(),r=hookRun(p,['--harness','claude-code','--outer-ms','5000','PreToolUse'],body,{env});
   assert.equal(r.status,2);assert.match(r.stdout,/relay refused: GUARD_FAILED: guard g timeout/);assert.ok(performance.now()-started<5000,'refused inside the outer timeout');
   await noneMarked(marker); // relay's own deadline kills the guard
