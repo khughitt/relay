@@ -12,13 +12,13 @@ test('RELAY_BIN resolves to the repo\'s own bin/relay, not to $PATH', () => {
 });
 
 test('a zero exit resolves', async () => {
-  await spawnHook('session.busy', { session_id: 'opencode:1', cwd: '/tmp' },
+  await spawnHook('opencode', 'session.busy', { session_id: 'opencode:1', cwd: '/tmp' },
     { bin: process.execPath, args: ['-e', ''] });
 });
 
 test('a nonzero exit rejects, and says which event and what the hook said', async () => {
   await assert.rejects(
-    () => spawnHook('session.idle', { session_id: 'opencode:1', cwd: '/tmp' },
+    () => spawnHook('opencode', 'session.idle', { session_id: 'opencode:1', cwd: '/tmp' },
       { bin: process.execPath, args: ['-e', 'process.exitCode = 1'] }),
     /exited 1/,
   );
@@ -29,14 +29,14 @@ test('the hook\'s stderr is CAPTURED and carried in the rejection — never inhe
   // relay's hook writes eviction diagnostics to its own stderr. Inheriting them would spray
   // them across opencode's screen.
   await assert.rejects(
-    () => spawnHook('session.busy', {}, { bin: '/bin/sh', args: ['-c', 'echo "pack has no member" >&2; exit 3'] }),
+    () => spawnHook('opencode', 'session.busy', {}, { bin: '/bin/sh', args: ['-c', 'echo "pack has no member" >&2; exit 3'] }),
     { code: 'PROCESS_UNAVAILABLE' },
   );
 });
 
 test('a binary that does not exist rejects rather than throwing out of band', async () => {
   await assert.rejects(
-    () => spawnHook('init', {}, { bin: '/nonexistent/relay' }),
+    () => spawnHook('opencode', 'init', {}, { bin: '/nonexistent/relay' }),
     { code: 'PROCESS_UNAVAILABLE' },
   );
 });
@@ -66,7 +66,7 @@ const ASSERT_PAYLOAD = `
 
 test('the payload reaches the child on stdin, as JSON, with the exact keys relay parses', async () => {
   await spawnHook(
-    'init',
+    'opencode', 'init',
     { session_id: 'opencode:42', cwd: '/proj' },
     { bin: process.execPath, args: ['-e', ASSERT_PAYLOAD] },
   );
@@ -76,7 +76,7 @@ test('...and the payload assertion is not vacuous — a wrong payload fails it',
   // Without this, the test above would pass even if spawnHook sent nothing at all.
   await assert.rejects(
     () => spawnHook(
-      'init',
+      'opencode', 'init',
       { session_id: 'wrong', cwd: '/proj' },
       { bin: process.execPath, args: ['-e', ASSERT_PAYLOAD] },
     ),
@@ -86,21 +86,21 @@ test('...and the payload assertion is not vacuous — a wrong payload fails it',
 import { spawn } from 'node:child_process';
 test('hook uses own CLI, exact argv, no shell and inherited environment',async()=>{
   let call;
-  await spawnHook('init',{}, {spawnFn:(...args)=>{call=args;return spawn(process.execPath,['-e','process.stdin.resume()'],args[2]);}});
+  await spawnHook('opencode', 'init',{}, {spawnFn:(...args)=>{call=args;return spawn(process.execPath,['-e','process.stdin.resume()'],args[2]);}});
   assert.equal(call[0],RELAY_BIN);assert.deepEqual(call[1],['hook','--harness','opencode','init']);assert.equal(call[2].shell,false);assert.equal(Object.hasOwn(call[2],'env'),false);
 });
 test('stderr is bounded, timeout kills child, and diagnostics do not leak payload',async()=>{
   // Only the timeout case wants a short budget; the others must outlast Node startup under load.
   for(const [args,expected,timeoutMs] of [[['-e',"process.stderr.write('PRIVATE');process.exitCode=3"],'PROCESS_UNAVAILABLE',5000],[['-e',"process.stderr.write('x'.repeat(65537));setInterval(()=>{},1000)"],'INPUT_TOO_LARGE',5000],[['-e','setInterval(()=>{},1000)'],'INPUT_TIMEOUT',200]]) {
     let child;
-    await assert.rejects(spawnHook('init',{}, {bin:process.execPath,args,timeoutMs,spawnFn:(...a)=>(child=spawn(...a))}),error=>{assert.equal(error.code,expected);assert.equal(error.message.includes('PRIVATE'),false);return true;});
+    await assert.rejects(spawnHook('opencode', 'init',{}, {bin:process.execPath,args,timeoutMs,spawnFn:(...a)=>(child=spawn(...a))}),error=>{assert.equal(error.code,expected);assert.equal(error.message.includes('PRIVATE'),false);return true;});
     if(child.exitCode===null&&child.signalCode===null)await new Promise(resolve=>child.once('exit',resolve));
     assert.ok(child.exitCode!==null||child.signalCode!==null);
   }
 });
 test('timeout settles even when a grandchild retains the stderr pipe',async()=>{
   const started=performance.now();
-  await assert.rejects(spawnHook('init',{}, {bin:process.execPath,timeoutMs:150,args:['-e',`
+  await assert.rejects(spawnHook('opencode', 'init',{}, {bin:process.execPath,timeoutMs:150,args:['-e',`
     const {spawn}=require('node:child_process');
     spawn(process.execPath,['-e','setTimeout(()=>{},900)'],{stdio:['ignore','ignore',2]});
     setInterval(()=>{},1000);

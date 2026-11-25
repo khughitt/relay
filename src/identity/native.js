@@ -4,11 +4,11 @@ import { readFileSync } from 'node:fs';
 /** @type {readonly string[]} */
 export const NATIVE_VARIABLES = Object.freeze([
   'CLAUDE_CODE_SESSION_ID', 'CODEX_THREAD_ID', 'CODEX_SESSION_ID',
-  'ANTIGRAVITY_CONVERSATION_ID',
+  'ANTIGRAVITY_CONVERSATION_ID', 'PI_SESSION_ID',
 ]);
 /** @type {readonly string[]} */
 export const ELIGIBLE = Object.freeze([
-  'CLAUDE_CODE_SESSION_ID', 'CODEX_THREAD_ID', 'ANTIGRAVITY_CONVERSATION_ID',
+  'CLAUDE_CODE_SESSION_ID', 'CODEX_THREAD_ID', 'ANTIGRAVITY_CONVERSATION_ID', 'PI_SESSION_ID',
 ]);
 
 /**
@@ -94,12 +94,12 @@ export function hintFor(harness, native) {
     return { hint, invalid: null, missing: false };
   }
   const keys = harness === 'codex' ? ['CODEX_THREAD_ID', 'CODEX_SESSION_ID']
-    : harness === 'agy' ? ['ANTIGRAVITY_CONVERSATION_ID'] : [];
+    : harness === 'agy' ? ['ANTIGRAVITY_CONVERSATION_ID'] : harness === 'pi' ? ['PI_SESSION_ID'] : [];
   const invalid = keys.find((key) => ['invalid', 'unverified'].includes(native[key].state));
   if (invalid) return { hint: null, invalid, missing: false };
   for (const key of keys) {
     const entry = native[key];
     if (entry.state === 'present') return { hint: entry.value, invalid: null, missing: false };
   }
-  return { hint: null, invalid: null, missing: harness === 'agy' };
+  return { hint: null, invalid: null, missing: harness === 'agy' || harness === 'pi' };
 }

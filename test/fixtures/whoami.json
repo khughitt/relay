@@ -78,6 +78,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -168,6 +171,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -220,6 +226,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -275,6 +284,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -360,6 +372,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -462,6 +477,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -562,6 +580,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -664,6 +685,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -764,6 +788,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -866,6 +893,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -946,6 +976,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -1020,6 +1053,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -1142,6 +1178,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -1262,6 +1301,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -1423,6 +1465,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -1540,6 +1585,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -1638,6 +1686,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -1708,6 +1759,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -1782,6 +1836,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -1854,6 +1911,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -1960,6 +2020,9 @@
           "value": "s1"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -2084,6 +2147,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -2187,6 +2253,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -2313,6 +2382,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -2418,6 +2490,9 @@
           "value": "root"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -2542,6 +2617,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -2663,6 +2741,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -2789,6 +2870,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -2910,6 +2994,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -3036,6 +3123,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -3139,6 +3229,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -3215,6 +3308,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -3290,6 +3386,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -3373,6 +3472,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -3436,6 +3538,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -3568,6 +3673,9 @@
           "value": "root"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -3738,6 +3846,9 @@
           "value": "root"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -3910,6 +4021,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -4081,6 +4195,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -4223,6 +4340,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -4370,6 +4490,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -4491,6 +4614,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -4596,6 +4722,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -4700,6 +4829,9 @@
           "value": "w1"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -4807,6 +4939,9 @@
           "value": "root"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -4952,6 +5087,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -5076,6 +5214,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -5199,6 +5340,9 @@
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "present",
           "value": "conv-9"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -5323,6 +5467,9 @@
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "present",
           "value": "conv-9"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -5447,6 +5594,9 @@
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "present",
           "value": "conv-2"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -5594,6 +5744,9 @@
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "present",
           "value": "conv-1"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -5688,6 +5841,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -5765,6 +5921,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "empty"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -5843,6 +6002,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -5923,6 +6085,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6001,6 +6166,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -6081,6 +6249,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -6163,6 +6334,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6244,6 +6418,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6324,6 +6501,9 @@
           "value": "private\u007fvalue"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -6407,6 +6587,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6486,6 +6669,9 @@
           "state": "invalid",
           "reason": "control-characters",
           "value": "private\nvalue"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6565,6 +6751,9 @@
           "state": "invalid",
           "reason": "control-characters",
           "value": "private\tvalue"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6644,6 +6833,9 @@
           "state": "invalid",
           "reason": "control-characters",
           "value": "private\u007fvalue"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6724,6 +6916,9 @@
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "invalid",
           "reason": "not-unicode"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6807,6 +7002,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6874,6 +7072,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -6939,6 +7140,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -7009,6 +7213,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -7082,6 +7289,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "decoded",
@@ -7140,6 +7350,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -7217,6 +7430,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -7277,6 +7493,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -7339,6 +7558,9 @@
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "present",
           "value": "native"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -7399,6 +7621,9 @@
           "value": "native"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -7463,6 +7688,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "empty"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -7548,6 +7776,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -7673,6 +7904,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -7800,6 +8034,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -7941,6 +8178,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -8018,6 +8258,9 @@
           "value": "worker"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -8107,6 +8350,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -8194,6 +8440,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -8288,6 +8537,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -8376,6 +8628,9 @@
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "present",
           "value": "conv-1"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -8461,6 +8716,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -8545,6 +8803,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -8634,6 +8895,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -8721,6 +8985,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -8812,6 +9079,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -8901,6 +9171,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "raw",
@@ -8989,6 +9262,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -9100,6 +9376,9 @@
           "state": "absent"
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
           "state": "absent"
         }
       },
@@ -9230,6 +9509,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "decoded",
@@ -9356,6 +9638,9 @@
         },
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "decoded",
@@ -9463,6 +9748,9 @@
         "ANTIGRAVITY_CONVERSATION_ID": {
           "state": "unverified",
           "value": "decoded\ufffd"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
         }
       },
       "nativeSource": "decoded",
@@ -9484,5 +9772,970 @@
       "message": "ANTIGRAVITY_CONVERSATION_ID is invalid or unverified"
     },
     "registryCalls": 0
+  },
+  {
+    "name": "pi session resolves by its own id",
+    "inputs": {
+      "rows": {
+        "1000": {
+          "ppid": 42,
+          "comm": "node",
+          "starttime": "10000",
+          "tty": null,
+          "state": "S"
+        },
+        "42": {
+          "ppid": 1,
+          "comm": "pi",
+          "starttime": "900",
+          "tty": null,
+          "state": "S"
+        },
+        "1": {
+          "ppid": 0,
+          "comm": "systemd",
+          "starttime": "1",
+          "tty": null,
+          "state": "S"
+        }
+      },
+      "argv": {},
+      "exe": {},
+      "environ": {
+        "PI_SESSION_ID": "s1"
+      },
+      "host": "testhost",
+      "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+      "platform": "linux",
+      "snapshot": {
+        "schema": 2,
+        "generation": "11111111-2222-4333-8444-555555555555",
+        "revision": 1,
+        "agents": {
+          "pi:s1": {
+            "id": "pi:s1",
+            "harness": "pi",
+            "sessionId": "s1",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          }
+        }
+      }
+    },
+    "expect": {
+      "schema": 1,
+      "status": "resolved",
+      "native": {
+        "CLAUDE_CODE_SESSION_ID": {
+          "state": "absent"
+        },
+        "CODEX_THREAD_ID": {
+          "state": "absent"
+        },
+        "CODEX_SESSION_ID": {
+          "state": "absent"
+        },
+        "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "present",
+          "value": "s1"
+        }
+      },
+      "nativeSource": "raw",
+      "nativeSession": true,
+      "harness": "pi",
+      "boundary": {
+        "harness": "pi",
+        "role": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        }
+      },
+      "hint": "s1",
+      "agent": {
+        "id": "pi:s1",
+        "harness": "pi",
+        "sessionId": "s1",
+        "scope": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        },
+        "cwd": "/project",
+        "repoRoot": "/project",
+        "remote": null,
+        "projectKey": "/project",
+        "project": "project",
+        "state": "idle",
+        "updatedAt": 1
+      },
+      "rootSession": null
+    },
+    "registryCalls": 1
+  },
+  {
+    "name": "pi without a session id refuses its one row",
+    "inputs": {
+      "rows": {
+        "1000": {
+          "ppid": 42,
+          "comm": "node",
+          "starttime": "10000",
+          "tty": null,
+          "state": "S"
+        },
+        "42": {
+          "ppid": 1,
+          "comm": "pi",
+          "starttime": "900",
+          "tty": null,
+          "state": "S"
+        },
+        "1": {
+          "ppid": 0,
+          "comm": "systemd",
+          "starttime": "1",
+          "tty": null,
+          "state": "S"
+        }
+      },
+      "argv": {},
+      "exe": {},
+      "environ": {},
+      "host": "testhost",
+      "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+      "platform": "linux",
+      "snapshot": {
+        "schema": 2,
+        "generation": "11111111-2222-4333-8444-555555555555",
+        "revision": 1,
+        "agents": {
+          "pi:s1": {
+            "id": "pi:s1",
+            "harness": "pi",
+            "sessionId": "s1",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          }
+        }
+      }
+    },
+    "expect": {
+      "schema": 1,
+      "status": "unresolved",
+      "native": {
+        "CLAUDE_CODE_SESSION_ID": {
+          "state": "absent"
+        },
+        "CODEX_THREAD_ID": {
+          "state": "absent"
+        },
+        "CODEX_SESSION_ID": {
+          "state": "absent"
+        },
+        "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
+        }
+      },
+      "nativeSource": "raw",
+      "nativeSession": false,
+      "harness": "pi",
+      "boundary": {
+        "harness": "pi",
+        "role": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        }
+      },
+      "hint": null,
+      "code": "MISSING_HINT",
+      "message": "PI_SESSION_ID is missing, and a session this pi process has replaced cannot be told from the current one without it"
+    },
+    "registryCalls": 0
+  },
+  {
+    "name": "pi with an empty session id refuses its one row",
+    "inputs": {
+      "rows": {
+        "1000": {
+          "ppid": 42,
+          "comm": "node",
+          "starttime": "10000",
+          "tty": null,
+          "state": "S"
+        },
+        "42": {
+          "ppid": 1,
+          "comm": "pi",
+          "starttime": "900",
+          "tty": null,
+          "state": "S"
+        },
+        "1": {
+          "ppid": 0,
+          "comm": "systemd",
+          "starttime": "1",
+          "tty": null,
+          "state": "S"
+        }
+      },
+      "argv": {},
+      "exe": {},
+      "environ": {
+        "PI_SESSION_ID": ""
+      },
+      "host": "testhost",
+      "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+      "platform": "linux",
+      "snapshot": {
+        "schema": 2,
+        "generation": "11111111-2222-4333-8444-555555555555",
+        "revision": 1,
+        "agents": {
+          "pi:s1": {
+            "id": "pi:s1",
+            "harness": "pi",
+            "sessionId": "s1",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          }
+        }
+      }
+    },
+    "expect": {
+      "schema": 1,
+      "status": "unresolved",
+      "native": {
+        "CLAUDE_CODE_SESSION_ID": {
+          "state": "absent"
+        },
+        "CODEX_THREAD_ID": {
+          "state": "absent"
+        },
+        "CODEX_SESSION_ID": {
+          "state": "absent"
+        },
+        "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "empty"
+        }
+      },
+      "nativeSource": "raw",
+      "nativeSession": false,
+      "harness": "pi",
+      "boundary": {
+        "harness": "pi",
+        "role": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        }
+      },
+      "hint": null,
+      "code": "MISSING_HINT",
+      "message": "PI_SESSION_ID is missing, and a session this pi process has replaced cannot be told from the current one without it"
+    },
+    "registryCalls": 0
+  },
+  {
+    "name": "pi selects among its process rows",
+    "inputs": {
+      "rows": {
+        "1000": {
+          "ppid": 42,
+          "comm": "node",
+          "starttime": "10000",
+          "tty": null,
+          "state": "S"
+        },
+        "42": {
+          "ppid": 1,
+          "comm": "pi",
+          "starttime": "900",
+          "tty": null,
+          "state": "S"
+        },
+        "1": {
+          "ppid": 0,
+          "comm": "systemd",
+          "starttime": "1",
+          "tty": null,
+          "state": "S"
+        }
+      },
+      "argv": {},
+      "exe": {},
+      "environ": {
+        "PI_SESSION_ID": "s2"
+      },
+      "host": "testhost",
+      "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+      "platform": "linux",
+      "snapshot": {
+        "schema": 2,
+        "generation": "11111111-2222-4333-8444-555555555555",
+        "revision": 1,
+        "agents": {
+          "pi:s1": {
+            "id": "pi:s1",
+            "harness": "pi",
+            "sessionId": "s1",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          },
+          "pi:s2": {
+            "id": "pi:s2",
+            "harness": "pi",
+            "sessionId": "s2",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          }
+        }
+      }
+    },
+    "expect": {
+      "schema": 1,
+      "status": "resolved",
+      "native": {
+        "CLAUDE_CODE_SESSION_ID": {
+          "state": "absent"
+        },
+        "CODEX_THREAD_ID": {
+          "state": "absent"
+        },
+        "CODEX_SESSION_ID": {
+          "state": "absent"
+        },
+        "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "present",
+          "value": "s2"
+        }
+      },
+      "nativeSource": "raw",
+      "nativeSession": true,
+      "harness": "pi",
+      "boundary": {
+        "harness": "pi",
+        "role": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        }
+      },
+      "hint": "s2",
+      "agent": {
+        "id": "pi:s2",
+        "harness": "pi",
+        "sessionId": "s2",
+        "scope": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        },
+        "cwd": "/project",
+        "repoRoot": "/project",
+        "remote": null,
+        "projectKey": "/project",
+        "project": "project",
+        "state": "idle",
+        "updatedAt": 1
+      },
+      "rootSession": null
+    },
+    "registryCalls": 1
+  },
+  {
+    "name": "pi without a session id cannot select among rows",
+    "inputs": {
+      "rows": {
+        "1000": {
+          "ppid": 42,
+          "comm": "node",
+          "starttime": "10000",
+          "tty": null,
+          "state": "S"
+        },
+        "42": {
+          "ppid": 1,
+          "comm": "pi",
+          "starttime": "900",
+          "tty": null,
+          "state": "S"
+        },
+        "1": {
+          "ppid": 0,
+          "comm": "systemd",
+          "starttime": "1",
+          "tty": null,
+          "state": "S"
+        }
+      },
+      "argv": {},
+      "exe": {},
+      "environ": {},
+      "host": "testhost",
+      "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+      "platform": "linux",
+      "snapshot": {
+        "schema": 2,
+        "generation": "11111111-2222-4333-8444-555555555555",
+        "revision": 1,
+        "agents": {
+          "pi:s1": {
+            "id": "pi:s1",
+            "harness": "pi",
+            "sessionId": "s1",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          },
+          "pi:s2": {
+            "id": "pi:s2",
+            "harness": "pi",
+            "sessionId": "s2",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          }
+        }
+      }
+    },
+    "expect": {
+      "schema": 1,
+      "status": "unresolved",
+      "native": {
+        "CLAUDE_CODE_SESSION_ID": {
+          "state": "absent"
+        },
+        "CODEX_THREAD_ID": {
+          "state": "absent"
+        },
+        "CODEX_SESSION_ID": {
+          "state": "absent"
+        },
+        "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "absent"
+        }
+      },
+      "nativeSource": "raw",
+      "nativeSession": false,
+      "harness": "pi",
+      "boundary": {
+        "harness": "pi",
+        "role": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        }
+      },
+      "hint": null,
+      "code": "MISSING_HINT",
+      "message": "PI_SESSION_ID is missing, and a session this pi process has replaced cannot be told from the current one without it"
+    },
+    "registryCalls": 0
+  },
+  {
+    "name": "pi with an inherited session id refuses",
+    "inputs": {
+      "rows": {
+        "1000": {
+          "ppid": 42,
+          "comm": "node",
+          "starttime": "10000",
+          "tty": null,
+          "state": "S"
+        },
+        "42": {
+          "ppid": 1,
+          "comm": "pi",
+          "starttime": "900",
+          "tty": null,
+          "state": "S"
+        },
+        "1": {
+          "ppid": 0,
+          "comm": "systemd",
+          "starttime": "1",
+          "tty": null,
+          "state": "S"
+        }
+      },
+      "argv": {},
+      "exe": {},
+      "environ": {
+        "PI_SESSION_ID": "outer"
+      },
+      "host": "testhost",
+      "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+      "platform": "linux",
+      "snapshot": {
+        "schema": 2,
+        "generation": "11111111-2222-4333-8444-555555555555",
+        "revision": 1,
+        "agents": {
+          "pi:s1": {
+            "id": "pi:s1",
+            "harness": "pi",
+            "sessionId": "s1",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          }
+        }
+      }
+    },
+    "expect": {
+      "schema": 1,
+      "status": "unresolved",
+      "native": {
+        "CLAUDE_CODE_SESSION_ID": {
+          "state": "absent"
+        },
+        "CODEX_THREAD_ID": {
+          "state": "absent"
+        },
+        "CODEX_SESSION_ID": {
+          "state": "absent"
+        },
+        "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "absent"
+        },
+        "PI_SESSION_ID": {
+          "state": "present",
+          "value": "outer"
+        }
+      },
+      "nativeSource": "raw",
+      "nativeSession": true,
+      "harness": "pi",
+      "boundary": {
+        "harness": "pi",
+        "role": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        }
+      },
+      "hint": "outer",
+      "code": "HINT_MISMATCH",
+      "message": "the native actor hint does not match any qualifying relay row"
+    },
+    "registryCalls": 1
+  },
+  {
+    "name": "pi ignores other harness variables",
+    "inputs": {
+      "rows": {
+        "1000": {
+          "ppid": 42,
+          "comm": "node",
+          "starttime": "10000",
+          "tty": null,
+          "state": "S"
+        },
+        "42": {
+          "ppid": 1,
+          "comm": "pi",
+          "starttime": "900",
+          "tty": null,
+          "state": "S"
+        },
+        "1": {
+          "ppid": 0,
+          "comm": "systemd",
+          "starttime": "1",
+          "tty": null,
+          "state": "S"
+        }
+      },
+      "argv": {},
+      "exe": {},
+      "environ": {
+        "CLAUDE_CODE_SESSION_ID": "c1",
+        "CODEX_THREAD_ID": "t1",
+        "ANTIGRAVITY_CONVERSATION_ID": "a1",
+        "PI_SESSION_ID": "s1"
+      },
+      "host": "testhost",
+      "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+      "platform": "linux",
+      "snapshot": {
+        "schema": 2,
+        "generation": "11111111-2222-4333-8444-555555555555",
+        "revision": 1,
+        "agents": {
+          "pi:s1": {
+            "id": "pi:s1",
+            "harness": "pi",
+            "sessionId": "s1",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          }
+        }
+      }
+    },
+    "expect": {
+      "schema": 1,
+      "status": "resolved",
+      "native": {
+        "CLAUDE_CODE_SESSION_ID": {
+          "state": "present",
+          "value": "c1"
+        },
+        "CODEX_THREAD_ID": {
+          "state": "present",
+          "value": "t1"
+        },
+        "CODEX_SESSION_ID": {
+          "state": "absent"
+        },
+        "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "present",
+          "value": "a1"
+        },
+        "PI_SESSION_ID": {
+          "state": "present",
+          "value": "s1"
+        }
+      },
+      "nativeSource": "raw",
+      "nativeSession": true,
+      "harness": "pi",
+      "boundary": {
+        "harness": "pi",
+        "role": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        }
+      },
+      "hint": "s1",
+      "agent": {
+        "id": "pi:s1",
+        "harness": "pi",
+        "sessionId": "s1",
+        "scope": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        },
+        "cwd": "/project",
+        "repoRoot": "/project",
+        "remote": null,
+        "projectKey": "/project",
+        "project": "project",
+        "state": "idle",
+        "updatedAt": 1
+      },
+      "rootSession": null
+    },
+    "registryCalls": 1
+  },
+  {
+    "name": "agy ignores an inherited pi session id",
+    "inputs": {
+      "rows": {
+        "1000": {
+          "ppid": 42,
+          "comm": "node",
+          "starttime": "10000",
+          "tty": null,
+          "state": "S"
+        },
+        "42": {
+          "ppid": 1,
+          "comm": "agy",
+          "starttime": "900",
+          "tty": null,
+          "state": "S"
+        },
+        "1": {
+          "ppid": 0,
+          "comm": "systemd",
+          "starttime": "1",
+          "tty": null,
+          "state": "S"
+        }
+      },
+      "argv": {
+        "42": [
+          "claude"
+        ]
+      },
+      "exe": {},
+      "environ": {
+        "ANTIGRAVITY_CONVERSATION_ID": "conv-2",
+        "PI_SESSION_ID": "s1"
+      },
+      "host": "testhost",
+      "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+      "platform": "linux",
+      "snapshot": {
+        "schema": 2,
+        "generation": "11111111-2222-4333-8444-555555555555",
+        "revision": 1,
+        "agents": {
+          "agy:conv-1": {
+            "id": "agy:conv-1",
+            "harness": "agy",
+            "sessionId": "conv-1",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          },
+          "agy:conv-2": {
+            "id": "agy:conv-2",
+            "harness": "agy",
+            "sessionId": "conv-2",
+            "scope": "session",
+            "process": {
+              "platform": "linux",
+              "host": "testhost",
+              "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+              "pid": 42,
+              "start": "900"
+            },
+            "cwd": "/project",
+            "repoRoot": "/project",
+            "remote": null,
+            "projectKey": "/project",
+            "project": "project",
+            "state": "idle",
+            "updatedAt": 1
+          }
+        }
+      }
+    },
+    "expect": {
+      "schema": 1,
+      "status": "resolved",
+      "native": {
+        "CLAUDE_CODE_SESSION_ID": {
+          "state": "absent"
+        },
+        "CODEX_THREAD_ID": {
+          "state": "absent"
+        },
+        "CODEX_SESSION_ID": {
+          "state": "absent"
+        },
+        "ANTIGRAVITY_CONVERSATION_ID": {
+          "state": "present",
+          "value": "conv-2"
+        },
+        "PI_SESSION_ID": {
+          "state": "present",
+          "value": "s1"
+        }
+      },
+      "nativeSource": "raw",
+      "nativeSession": true,
+      "harness": "agy",
+      "boundary": {
+        "harness": "agy",
+        "role": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        }
+      },
+      "hint": "conv-2",
+      "agent": {
+        "id": "agy:conv-2",
+        "harness": "agy",
+        "sessionId": "conv-2",
+        "scope": "session",
+        "process": {
+          "platform": "linux",
+          "host": "testhost",
+          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
+          "pid": 42,
+          "start": "900"
+        },
+        "cwd": "/project",
+        "repoRoot": "/project",
+        "remote": null,
+        "projectKey": "/project",
+        "project": "project",
+        "state": "idle",
+        "updatedAt": 1
+      },
+      "rootSession": null
+    },
+    "registryCalls": 1
   }
 ]

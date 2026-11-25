@@ -8,7 +8,7 @@ purpose = "Harness adapters, hook dispatch, and a host-local live-agent registry
 # One to three sentences, at most 400 characters: what it does and for whom.
 abstract = """
 Relay normalizes lifecycle and tool-hook events from Claude Code, Codex, OpenCode,
-and Antigravity into a host-local live-agent registry, dispatches synchronous guards
+Antigravity, and pi into a host-local live-agent registry, dispatches synchronous guards
 and asynchronous observers, and serves a durable question inbox for away-from-desk
 decisions.
 """

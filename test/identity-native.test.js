@@ -24,7 +24,7 @@ test('raw native evidence classifies every state without inventing a Unicode val
     assert.equal(result.nativeSource, 'raw');
     assert.equal(result.rawError, null);
     assert.deepEqual(Object.keys(result.native), [
-      'CLAUDE_CODE_SESSION_ID', 'CODEX_THREAD_ID', 'CODEX_SESSION_ID', 'ANTIGRAVITY_CONVERSATION_ID',
+      'CLAUDE_CODE_SESSION_ID', 'CODEX_THREAD_ID', 'CODEX_SESSION_ID', 'ANTIGRAVITY_CONVERSATION_ID', 'PI_SESSION_ID',
     ]);
   }
 });
@@ -60,7 +60,7 @@ test('Linux raw read failure retains decoded evidence and the error code', () =>
 });
 
 test('nativeSession counts only nonempty eligible evidence, including malformed values', () => {
-  for (const variable of ['CLAUDE_CODE_SESSION_ID', 'CODEX_THREAD_ID', 'ANTIGRAVITY_CONVERSATION_ID']) {
+  for (const variable of ['CLAUDE_CODE_SESSION_ID', 'CODEX_THREAD_ID', 'ANTIGRAVITY_CONVERSATION_ID', 'PI_SESSION_ID']) {
     for (const value of ['session', '\t', '\uFFFD']) {
       assert.equal(decoded({ [variable]: value }).nativeSession, true);
     }
@@ -110,6 +110,13 @@ test('agy requires a present hint and rejects malformed or unverified evidence',
     assert.deepEqual(hint('agy', { ANTIGRAVITY_CONVERSATION_ID: value }),
       { hint: null, invalid: 'ANTIGRAVITY_CONVERSATION_ID', missing: false });
   }
+});
+
+test('pi requires its own session id and rejects malformed or unverified evidence', () => {
+  assert.deepEqual(hint('pi', { PI_SESSION_ID: 's1', CODEX_THREAD_ID: 'thread' }), { hint: 's1', invalid: null, missing: false });
+  for (const env of [{}, { PI_SESSION_ID: '' }]) assert.deepEqual(hint('pi', env), { hint: null, invalid: null, missing: true });
+  for (const value of ['\t', '\uFFFD']) assert.deepEqual(hint('pi', { PI_SESSION_ID: value }), { hint: null, invalid: 'PI_SESSION_ID', missing: false });
+  for (const harness of ['claude-code', 'codex', 'opencode']) assert.equal(hint(harness, { PI_SESSION_ID: 's1' }).hint, null);
 });
 
 test('OpenCode does not derive a native hint', () => {

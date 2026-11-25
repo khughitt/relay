@@ -95,7 +95,7 @@ test('ancestry.rs: only_the_nearest_claude_code_process_has_its_arguments_read',
   assert.deepEqual(fake.reads.record, [10, 9]);
 });
 test('ancestry.rs: an_ancestry_walk_matches_every_recognized_comm', () => {
-  for (const [comm, harness] of [['claude', 'claude-code'], ['codex', 'codex'], ['opencode', 'opencode'], ['agy', 'agy']]) {
+  for (const [comm, harness] of [['claude', 'claude-code'], ['codex', 'codex'], ['opencode', 'opencode'], ['agy', 'agy'], ['pi', 'pi'], ['pi-rpc', 'pi']]) {
     assert.deepEqual(walk([row(9, comm)], { argv: { 9: [comm] } }), boundary(harness, 9));
   }
 });

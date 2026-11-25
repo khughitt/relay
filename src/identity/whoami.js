@@ -72,7 +72,9 @@ export async function whoami({ startPid, processOps, paths, readRegistry, platfo
     const effective = hintFor(harness, native);
     hint = effective.hint;
     if (effective.invalid !== null) return unresolved('INVALID_NATIVE_VALUE', `${effective.invalid} is invalid or unverified`);
-    if (effective.missing) return unresolved('MISSING_HINT', 'ANTIGRAVITY_CONVERSATION_ID is missing, and conversations sharing the agy process cannot be told apart without it');
+    if (effective.missing) return unresolved('MISSING_HINT', harness === 'pi'
+      ? 'PI_SESSION_ID is missing, and a session this pi process has replaced cannot be told from the current one without it'
+      : 'ANTIGRAVITY_CONVERSATION_ID is missing, and conversations sharing the agy process cannot be told apart without it');
     let snapshot;
     try { snapshot = await (readRegistry ?? (() => readSnapshot({ paths, processOps: ops, clock, deadline })))(); }
     catch (cause) {
@@ -85,7 +87,7 @@ export async function whoami({ startPid, processOps, paths, readRegistry, platfo
     if (candidates.length === 0) return unresolved('NOT_REGISTERED', noMatch(agents, process, harness, hint));
     let agent;
     if (candidates.length === 1) agent = candidates[0];
-    else if ((harness === 'codex' || harness === 'agy') && hint !== null) {
+    else if ((harness === 'codex' || harness === 'agy' || harness === 'pi') && hint !== null) {
       agent = candidates.find(candidate => candidate.sessionId === hint);
       if (!agent) return unresolved('HINT_MISMATCH', hintMismatch(harness, root, candidates));
     } else return unresolved('AMBIGUOUS', `several relay agents match pid ${walk.pid}: ${candidates.map(candidate => printable(candidate.id)).join(', ')}`);

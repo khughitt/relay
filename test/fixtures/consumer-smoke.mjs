@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as relay from 'relay';
 import * as plugin from 'relay/opencode';
+import * as piExtension from 'relay/pi';
 import * as qualification from 'relay/qualification';
 
 const EXPORTS = ['STATES', 'paths', 'adapterFor', 'normalizeEvent', 'normalizeHookEvent', 'registryEventFor', 'projectEnvelope', 'readNativeInput', 'createProcessOps', 'readSnapshot', 'readSnapshotFor', 'listAgents',
@@ -30,6 +31,7 @@ for (const docPath of [
 ]) {
   assert.ok((await readFile(new URL(docPath, packageRoot), 'utf8')).length > 0, docPath);
 }
+assert.deepEqual(Object.keys(piExtension), ['default']); assert.equal(typeof piExtension.default, 'function');
 assert.deepEqual(Object.keys(plugin), ['Relay']); assert.equal(plugin.Relay.constructor.name, 'AsyncFunction');
 const corpus = JSON.parse(await readFile(new URL(import.meta.resolve('relay/fixtures/handles.json')), 'utf8'));
 assert.equal(corpus.schema, 1); assert.ok(corpus.starts.some(c => c.expected === '9007199254740993'));

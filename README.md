@@ -4,7 +4,7 @@
 *Harness adapters, hook dispatch, and a host-local live-agent registry*
 
 Relay normalizes lifecycle and tool-hook events from Claude Code, Codex, OpenCode,
-and Antigravity into a host-local live-agent registry, dispatches synchronous guards
+Antigravity, and pi into a host-local live-agent registry, dispatches synchronous guards
 and asynchronous observers, and serves a durable question inbox for away-from-desk
 decisions.
 
@@ -55,6 +55,7 @@ Each hook entry written by `relay install` invokes `relay.js` through the instal
 - `bin/relay.js` — CLI entrypoint (`list`, `reap`, `hook`, `install`, `rollback`, `model`, `serve`, `ask`, `inbox`, `presence`).
 - `src/` — Core library, process/lock/registry bus (`src/bus/`), harness adapters (`src/adapters/`), hook dispatcher (`src/dispatch.js`), installer (`src/install/`), interaction store (`src/interaction/`), and inbox service (`src/serve/`, `src/routes/`).
 - `integrations/opencode/plugin.js` — Extracted OpenCode plugin (exported as package subpath relay/opencode).
+- `integrations/pi/index.js` — pi extension (exported as package subpath relay/pi); `integrations/forward/` is the hook queue it shares with the OpenCode plugin.
 - `schemas/interaction/message.schema.json` — Packaged JSON Schema for interaction envelopes.
 - `docs/` — Shipped public reference contracts and operator runbooks, plus contributor guides in the repository.
 - `test/` — Runtime test suite, portable fixtures (`test/fixtures/handles.json`, `test/fixtures/ancestry.json`), and compile-time contract checks (`test/types/`).

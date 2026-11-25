@@ -6,7 +6,7 @@ The host-local registry stores active coding-agent sessions, OpenCode processes,
 
 ## State layout and agents.json
 
-`Harness` is the closed union `'claude-code' | 'codex' | 'opencode' | 'agy'`. Agent IDs split at the first colon, preserving all remaining colons in `sessionId`. OpenCode records have `process` scope and raw `sessionId` `opencode:PID`, yielding `id` `opencode:opencode:PID`. This projection preserves existing consumer keys.
+`Harness` is the closed union `'claude-code' | 'codex' | 'opencode' | 'agy' | 'pi'`. Agent IDs split at the first colon, preserving all remaining colons in `sessionId`. OpenCode records have `process` scope and raw `sessionId` `opencode:PID`, yielding `id` `opencode:opencode:PID`. This projection preserves existing consumer keys.
 
 ```ts
 type State = 'idle' | 'working' | 'needs-input' | 'needs-approval' | 'done' | 'error';
@@ -19,7 +19,7 @@ type Handle = {
 };
 type Agent = {
   id: string;
-  harness: 'claude-code' | 'codex' | 'opencode' | 'agy';
+  harness: 'claude-code' | 'codex' | 'opencode' | 'agy' | 'pi';
   sessionId: string;
   scope: 'session' | 'process' | 'worker';
   root?: string;         // Codex workers only: the root session's agent id
@@ -41,7 +41,7 @@ type Snapshot = {
 };
 ```
 
-All fields on `Agent` are required except `root` (present only on Codex `worker` rows) and `background` (present only on Claude Code rows after a `Stop` report with readable `background_tasks`). `scope` is `'process'` for OpenCode, `'session'` for Claude Code and `agy`, and for Codex `'session'` without `root` or `'worker'` with `root: 'codex:<session_id>'`; any other combination is `INVALID_SCHEMA`. Counts in `background` are nonnegative safe integers. Validators construct known fields and ignore unknown optional fields; unknown schema versions fail. Objects must be non-null and non-array. `pid` is a positive u32, timestamps and `revision` are nonnegative safe integers, `generation` is a UUID, and paths are absolute. Agent `id`, map key, `harness`, `sessionId`, and `scope` must agree. Raw payloads, tool inputs, prompts, transcripts, commands, and environment values never enter `Snapshot` records.
+All fields on `Agent` are required except `root` (present only on Codex `worker` rows) and `background` (present only on Claude Code rows after a `Stop` report with readable `background_tasks`). `scope` is `'process'` for OpenCode, `'session'` for Claude Code, `agy` and pi, and for Codex `'session'` without `root` or `'worker'` with `root: 'codex:<session_id>'`; any other combination is `INVALID_SCHEMA`. Counts in `background` are nonnegative safe integers. Validators construct known fields and ignore unknown optional fields; unknown schema versions fail. Objects must be non-null and non-array. `pid` is a positive u32, timestamps and `revision` are nonnegative safe integers, `generation` is a UUID, and paths are absolute. Agent `id`, map key, `harness`, `sessionId`, and `scope` must agree. Raw payloads, tool inputs, prompts, transcripts, commands, and environment values never enter `Snapshot` records.
 
 State directory resolution (`paths(env)` in `src/config/paths.js`):
 
@@ -127,6 +127,8 @@ Upsert and removal publication rules (`applyEvent` in `src/bus/transaction.js`):
 - An upsert publishes `revision: 1` with a fresh `generation` UUID if no snapshot exists, and increments `revision` on every observed upsert even when `state` is unchanged.
 - `SessionEnd` (`kind: 'session-end'`) skips Git and process enrichment and removes its exact `agentId` and, for a Codex root, every row whose `root` is that `agentId`, in the same publication.
 - On a shared proven process `Handle`, a Codex root `SessionStart` retires other Codex session rows and `done` foreign workers, and an `agy` root event retires finished (`'done'` / `'error'`) `agy` peers (plus proven `'root'` peers on `SessionStart`).
+- A pi session start retires no other row: pi ends each session before its successor starts in the same process. A row whose `session_shutdown` was lost stays until that process dies or the session is resumed and ended.
+- A pi event whose hook finds no pi process changes no row (its hook may outlive pi), so every pi row has a `process` and can be reaped.
 - Removal (`session-end`, a Codex worker `SubagentStop` whose root is absent on a process proven by another Codex root, or an `agy` subagent `Stop` on a process shared with another live `agy` row) and `reapRegistry` publish only when keys change (except schema-1 supersession); when `agents.json` is absent and no keys exist, the result remains `{ snapshot: null, changed: false, reaped: [], diagnostics: [] }`.
 
 ## Failure modes
