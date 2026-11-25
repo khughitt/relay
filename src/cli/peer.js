@@ -2,6 +2,7 @@
 // relay peer (docs/api.md): the sender is always the calling session, never an argument.
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { isDeepStrictEqual } from 'node:util';
 import { relayError } from '../protocol.js';
 import { connectSocket } from '../serve/client.js';
 import { peerNotice, runFor, createdSeq, roleOf, peerOf, RUN_MS, TEXT_LIMIT } from '../peer/index.js';
@@ -119,6 +120,8 @@ export async function runPeer({ action, taskId, text, file, id, timeoutMs = WAIT
     if (action === 'join') {
       needOpen(joined);
       if (joined.lead.agentId === me) throw relayError('SAME_SESSION', 'the lead cannot also review; join from another session');
+      // An agy process runs one root conversation, so another session on the lead's is its subagent or replaces it.
+      if (agent?.harness === 'agy' && isDeepStrictEqual(agent.process, joined.lead.process)) throw relayError('SAME_SESSION', "this agy conversation runs in the lead's own process, as its subagent or its replacement; join from another session");
       if (joined.reviewer === null) await post(joined, 'join', joined.lead.agentId, binding());
       const now = needRun(await refresh());
       if (now.id !== joined.id || now.reviewer?.agentId !== me) throw relayError('ROLE_TAKEN', `${now.reviewer?.agentId ?? now.lead.agentId} holds the run on ${taskId}`);

@@ -135,6 +135,14 @@ for (const harness of ['agy', 'pi']) {
   });
 }
 
+test("an agy lead's own process holds no reviewer, subagent or replaced conversation", { timeout: 30000 }, async (t) => {
+  const h = await host(t), root = agent('agy:root', THIRD_HANDLE);
+  await h.as(root)('open');
+  await assert.rejects(h.as(agent('agy:sub', { ...THIRD_HANDLE }))('join'), { code: 'SAME_SESSION' });
+  assert.equal((await h.as(root)('show')).json.run.reviewer, null);
+  assert.equal((await h.as(agent('agy:other', OTHER_HANDLE))('join')).json.run.reviewer, 'agy:other');
+});
+
 test('a message saved while no one waits survives a service restart', { timeout: 30000 }, async (t) => {
   const h = await paired(t);
   await h.lead('send', { text: 'while away' });
