@@ -42,7 +42,7 @@ const unique = (ids, what) => { if (new Set(ids).size !== ids.length) fail(`dupl
 /** @param {unknown} v @returns {import("../types.js").Party} */
 function party(v) {
   if (object(v) && v.kind === 'user') return { kind: 'user' };
-  if (object(v) && v.kind === 'agent' && typeof v.agentId === 'string' && /^(claude-code|codex|opencode|pi):.+$/.test(v.agentId)) {
+  if (object(v) && v.kind === 'agent' && typeof v.agentId === 'string' && /^(claude-code|codex|opencode|agy|pi):.+$/.test(v.agentId)) {
     return { kind: 'agent', agentId: v.agentId };
   }
   return fail('invalid party');

@@ -194,7 +194,7 @@
             },
             "agentId": {
               "type": "string",
-              "pattern": "^(claude-code|codex|opencode|pi):.+$"
+              "pattern": "^(claude-code|codex|opencode|agy|pi):.+$"
             }
           }
         },

@@ -6,7 +6,7 @@ Type: protocol, data model; document types 1.
 
 ## Messages and entries
 
-Times are Unix milliseconds; message IDs and `answerId` are sender-generated lowercase UUIDs (uppercase UUID text fails with `INVALID_MESSAGE`). `Harness` in native question metadata is `'claude-code' | 'codex' | 'opencode'`. An agent party's `agentId` is `<prefix>:<session id>`, where the prefix is one of those or `pi`. A pi agent can ask only detached questions. Relay has no native question route for `agy`.
+Times are Unix milliseconds; message IDs and `answerId` are sender-generated lowercase UUIDs (uppercase UUID text fails with `INVALID_MESSAGE`). `Harness` in native question metadata is `'claude-code' | 'codex' | 'opencode'`. An agent party's `agentId` is `<prefix>:<session id>`, where the prefix is one of those, `agy` or `pi`. An agy or pi agent can ask only detached questions; relay has no native question route for either.
 
 ```ts
 type Party = { kind: 'agent'; agentId: string } | { kind: 'user' };
@@ -156,6 +156,8 @@ A notice that does not fit the run when it was created is ignored: another run's
 A delivery is written out before it is marked, so an interruption repeats a message with the same `seq` and `id`. Run one `wait` per session at a time: two at once can both print a message. Replacing a run leaves its unread messages undelivered. Readers therefore see only the bound peer.
 
 `from` is asserted by the client, under the same same-user trust as the rest of the socket. `relay peer` always sets it from `whoami`, and the fold refuses what the roles do not allow, so a mistake cannot pass one session's words off as the peer's or the user's. A process of the same user that writes the socket directly can still forge a member's notice. `close` from outside any agent session counts as the user's; a process detached from a Claude Code, Codex, agy or pi session is refused because it still carries that session's variables (for pi, `PI_SESSION_ID`, set for its shell tool only).
+
+Claude Code, Codex, agy and pi sessions can hold a role (`UNSUPPORTED_HARNESS` for the others). Run the commands from the harness's own shell tool; a `!` command in pi resolves no session (`MISSING_HINT`). A `wait` runs as a background command in Claude Code and agy, whose exit wakes the session, and as one blocking foreground command in Codex and pi. An agy subagent has a session row of its own, so relay cannot refuse it a role as it refuses a Codex worker (`WORKER_SESSION`); run the commands from the root conversation. Inbox readers at v0.7.0 and earlier quarantine an entry with an agy party, and those at v0.6.0 and earlier one with a pi party; a quarantined notice drops out of its run.
 
 A peer is gone only when its bound process is confirmed dead and the registry shows its session in no live process. Unknown liveness, including a row with no process, never ends a run. A session replaced inside a live process (Claude Code `/clear`, Codex `/new`) is not seen as gone: its peer times out, and the user ends the run with `relay peer close`. When an open run's lead is gone, another session may open a new run, which first closes the old one.
 

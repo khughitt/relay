@@ -11,7 +11,7 @@ export const PEER_EXIT = Object.freeze({ message: 0, closed: 3, gone: 4, timeout
 // Below the shortest limit a harness puts on one blocking command by default (Claude Code's background
 // Bash, 30 min; hq idle-wait-kinds), so a wait ends with its own timeout rather than being killed.
 export const WAIT_MS = 25 * 60 * 1000;
-const PEER_HARNESSES = ['claude-code', 'codex'];
+const PEER_HARNESSES = ['claude-code', 'codex', 'agy', 'pi'];
 /** @param {string} message */
 const usage = (message) => relayError('USAGE', message);
 /** @template T @param {import("../types.js").SocketReply<T>} r @returns {{ok: true} & T} */
@@ -61,7 +61,7 @@ export async function runPeer({ action, taskId, text, file, id, timeoutMs = WAIT
   // Looking needs no identity. Everything else is done as someone.
   if (who.status === 'unresolved' && action !== 'show') throw relayError(who.code, `this session is not registered with relay: ${who.message}`);
   if (who.status === 'resolved' && action !== 'show') {
-    if (!PEER_HARNESSES.includes(who.harness)) throw relayError('UNSUPPORTED_HARNESS', `relay peer supports ${PEER_HARNESSES.join(' and ')} sessions, not ${who.harness}`);
+    if (!PEER_HARNESSES.includes(who.harness)) throw relayError('UNSUPPORTED_HARNESS', `relay peer supports ${PEER_HARNESSES.join(', ')} sessions, not ${who.harness}`);
     if (who.agent.scope === 'worker') throw relayError('WORKER_SESSION', 'a worker thread cannot hold a role; run relay peer from its root session');
   } else if (who.status === 'outside' && action !== 'show') {
     if (action !== 'close') throw relayError('NO_SESSION', `peer ${action} must run inside an agent session`);
