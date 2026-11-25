@@ -113,6 +113,13 @@ test('retained work lists come from the configurations and native branches actua
   assert.throws(() => checkRetainedWork(manifest(), dropped), { code: 'BASELINE_INVALID' });
 });
 
+test('only a named branch runs in its own environment', async () => {
+  const report = (name) => ({ name, role: name === 'deployed-relay' ? name : 'native', argv: ['/bin/sh', '-c', 'cat >/dev/null; printf %s "$PATH"'] });
+  const m = manifest({ branches: [report('deployed-relay'), report('turn-pause')] });
+  const r = await runBaseline(m, { event: 'PreToolUse', input: '{}', env: { PATH: '/usr/bin:/bin' }, branchEnv: { 'turn-pause': { PATH: '/bin:/usr/bin' } }, cwd: '/', capture: true });
+  assert.deepEqual(r.branches.map((b) => [b.name, b.stdout]), [['deployed-relay', '/usr/bin:/bin'], ['turn-pause', '/bin:/usr/bin']]);
+});
+
 test('a parallel baseline is timed on its critical path, never as a sum of branches', async () => {
   const m = manifest({ branches: [
     { name: 'deployed-relay', role: 'deployed-relay', argv: ['/bin/sh', '-c', 'cat >/dev/null; sleep 0.3'] },

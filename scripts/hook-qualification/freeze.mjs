@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 import { matchSubscribers, validateSubscribers } from '../../src/subscribers.js';
 import { checkRetainedWork, validateManifest, workLists } from './baseline.mjs';
+import { renderCandidate } from './candidate-config.mjs';
 import { packageFiles, packageListing } from './deployment.mjs';
 import { commandWords } from './hook-settings.mjs';
 
@@ -128,7 +129,10 @@ async function freeze(options) {
   mkdirSync(output, { mode: 0o700 });
   try {
     const packageList = capturePackage(dirname(dirname(deployed.entry)), artifact);
-    const sides = { deployed: await deployedValidators(artifact), candidate: { validate: validateSubscribers, match: matchSubscribers } };
+    // The candidate files are templates: their own bytes are frozen, and a rendering of them, with
+    // stand-in directories, is what their relay validates.
+    const sides = { deployed: { ...await deployedValidators(artifact), read: JSON.parse },
+      candidate: { validate: validateSubscribers, match: matchSubscribers, read: (bytes) => JSON.parse(renderCandidate(bytes, { work: '/work', fixture: '/fixture' })) } };
     const selection = { kind: route.kind, nativeEvent: event, harness };
     const liveSubscribers = sides.deployed.match(sides.deployed.validate(JSON.parse(rawConfig)), selection);
     const slug = event.toLowerCase(), deployedName = `deployed-${slug}.json`;
@@ -136,7 +140,7 @@ async function freeze(options) {
     const config = (name, side) => {
       requireThat(typeof name === 'string' && /^[\w.-]+\.json$/.test(name), 'fixture config needs a JSON basename');
       if (!configs.has(name)) configs.set(name, readFileSync(join(dirname(options.template), name)));
-      return sides[side].validate(JSON.parse(configs.get(name)));
+      return sides[side].validate(sides[side].read(configs.get(name)));
     };
     const deployedFixture = config(deployedName, 'deployed');
     const candidateFixture = config(manifest.candidate.config, 'candidate');

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { validateManifest } from '../scripts/hook-qualification/baseline.mjs';
+import { renderCandidate } from '../scripts/hook-qualification/candidate-config.mjs';
 import { loadSubscribersFrom } from '../src/subscribers.js';
 
 const freezer = fileURLToPath(new URL('../scripts/hook-qualification/freeze.mjs', import.meta.url));
@@ -51,7 +52,7 @@ export const matchSubscribers = (config, { kind }) => config.subscribers.filter(
 
   const subscriber = (name) => ({ name, role: 'observer', registry: 'snapshot', kinds: [kind], argv: ['relay-fixture-observer'], timeoutMs: 1000 });
   const config = (names) => ({ schema: 2, subscribers: names.map(subscriber) });
-  const candidateConfig = (names) => ({ schema: 3, searchPath: ['/usr/bin', '/bin'], subscribers: names.map(subscriber) });
+  const candidateConfig = (names) => ({ schema: 3, searchPath: ['@WORK@/bin', '@FIXTURE@/bin', '/usr/bin', '/bin'], subscribers: names.map(subscriber) });
   const liveConfig = join(root, 'installed subscribers.json');
   const configSha = write(liveConfig, config(['familiar']));
   const relay = { command: `'/usr/bin/node' '${entry}' hook --harness claude-code --outer-ms 60000 --subscribers '${liveConfig}' ${event}`, timeout: 60 };
@@ -93,7 +94,7 @@ export const matchSubscribers = (config, { kind }) => config.subscribers.filter(
   const freeze = (identityOption = '--settings-identity', identityPath = identityFile) => run(process.execPath, [freezer,
     '--snapshot', snapshot, '--template', template, '--hq', repo, '--version', '2.1.331',
     '--fixture', join(fixtureOutput, 'fixture'), '--output', output, identityOption, identityPath]);
-  return { output, settings, snapshot, sourceFile, identity, freeze, write, snapshotOf, hooks, configSha, deployedName, installed, entry, git };
+  return { root, output, settings, snapshot, sourceFile, identity, freeze, write, snapshotOf, hooks, configSha, deployedName, installed, entry, git };
 }
 
 const stop = [['~/ops/claim-guard --harness claude-code', ['claim-guard']],
@@ -124,7 +125,17 @@ for (const [event, kind, matcher, nativeHooks] of [['Stop', 'turn-end', undefine
     const configs = join(f.output, 'fixture', 'config');
     assert.equal(statSync(configs).mode & 0o7777, 0o700);
     for (const config of ['candidate.json', 'empty-candidate.json', f.deployedName, 'empty-deployed.json']) assert.equal(statSync(join(configs, config)).mode & 0o7777, 0o600);
-    for (const config of ['candidate.json', 'empty-candidate.json']) await loadSubscribersFrom(join(configs, config));
+    // The frozen candidate files are the templates themselves, which no relay loads; a rendered copy loads.
+    for (const config of ['candidate.json', 'empty-candidate.json']) {
+      const text = readFileSync(join(configs, config), 'utf8');
+      assert.equal(text, readFileSync(join(f.root, config), 'utf8'));
+      await assert.rejects(loadSubscribersFrom(join(configs, config)), { code: 'INVALID_CONFIG', message: /searchPath\[0\]/ });
+      const rendered = join(f.root, 'rendered', config);
+      mkdirSync(join(f.root, 'rendered'), { recursive: true, mode: 0o700 });
+      writeFileSync(rendered, renderCandidate(text, { work: '/work', fixture: '/fixture' }), { mode: 0o600 });
+      assert.equal((await loadSubscribersFrom(rendered)).searchPath[0], '/work/bin');
+    }
+    assert.equal(manifest.candidate.configSha256, sha(readFileSync(join(configs, 'candidate.json'))));
     assert.notEqual(f.freeze().status, 0, 'a second freeze cannot overwrite the bundle');
     assert.deepEqual(readFileSync(file), bytes);
   });
