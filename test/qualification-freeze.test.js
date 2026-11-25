@@ -42,7 +42,12 @@ function setup(t, event, kind, matcher, nativeHooks) {
   const entry = join(installed, 'bin', 'relay.js');
   writeFileSync(entry, '/* deployed CLI */');
   writeFileSync(join(installed, 'src', 'fixture', 'index.js'), '/* deployed module */');
-  write(join(installed, 'package.json'), { version: '0.5.0' });
+  // The deployed relay judges its own side: this stub reads schema 2 whatever the checkout reads.
+  writeFileSync(join(installed, 'src', 'index.js'), `
+export function validateSubscribers(v) { if (v.schema !== 2) throw new Error('deployed relay reads schema 2'); return v; }
+export const matchSubscribers = (config, { kind }) => config.subscribers.filter((s) => s.kinds.includes(kind));
+`);
+  write(join(installed, 'package.json'), { version: '0.5.0', type: 'module' });
 
   const subscriber = (name) => ({ name, role: 'observer', registry: 'snapshot', kinds: [kind], argv: ['relay-fixture-observer'], timeoutMs: 1000 });
   const config = (names) => ({ schema: 2, subscribers: names.map(subscriber) });
@@ -74,11 +79,12 @@ function setup(t, event, kind, matcher, nativeHooks) {
   const candidate = { config: 'candidate.json', configSha256: write(join(root, 'candidate.json'), config(invocations.map(([, name]) => name))) };
   const deployedName = `deployed-${event.toLowerCase()}.json`;
   write(join(root, deployedName), config(['familiar']));
-  write(join(root, 'empty.json'), config([]));
+  write(join(root, 'empty-deployed.json'), config([]));
+  write(join(root, 'empty-candidate.json'), config([]));
   const template = join(root, 'template.json');
   write(template, { schema: 1, manifests: [{ schema: 1, event, harness: 'claude-code', mode: 'interactive',
     baselineKind: 'deployed-relay-plus-native', fixture: 'fixture', payload: { hook_event_name: event },
-    schedule: { kind: 'parallel', evidence: 'fixture' }, noSubscriber: { candidate: 'empty.json', deployed: 'empty.json' }, candidate,
+    schedule: { kind: 'parallel', evidence: 'fixture' }, noSubscriber: { candidate: 'empty-candidate.json', deployed: 'empty-deployed.json' }, candidate,
     branches: [{ name: 'deployed-relay', role: 'deployed-relay', argv: [] }, ...nativeBranches.reverse()],
     replacementMap: invocations.map(([baseline, invocation]) => ({ baseline, invocation, candidate: `candidate:${invocation}` })) }] });
 
@@ -86,7 +92,7 @@ function setup(t, event, kind, matcher, nativeHooks) {
   const freeze = (identityOption = '--settings-identity', identityPath = identityFile) => run(process.execPath, [freezer,
     '--snapshot', snapshot, '--template', template, '--hq', repo, '--version', '2.1.331',
     '--fixture', join(fixtureOutput, 'fixture'), '--output', output, identityOption, identityPath]);
-  return { output, settings, snapshot, sourceFile, identity, freeze, write, snapshotOf, hooks, configSha, deployedName, entry, git };
+  return { output, settings, snapshot, sourceFile, identity, freeze, write, snapshotOf, hooks, configSha, deployedName, installed, entry, git };
 }
 
 const stop = [['~/ops/claim-guard --harness claude-code', ['claim-guard']],
@@ -116,11 +122,8 @@ for (const [event, kind, matcher, nativeHooks] of [['Stop', 'turn-end', undefine
     assert.equal(result.stdout.trim(), `${sha(bytes)}  ${file}`);
     const configs = join(f.output, 'fixture', 'config');
     assert.equal(statSync(configs).mode & 0o7777, 0o700);
-    for (const config of ['candidate.json', f.deployedName, 'empty.json']) {
-      const path = join(configs, config);
-      assert.equal(statSync(path).mode & 0o7777, 0o600);
-      await loadSubscribersFrom(path);
-    }
+    for (const config of ['candidate.json', 'empty-candidate.json', f.deployedName, 'empty-deployed.json']) assert.equal(statSync(join(configs, config)).mode & 0o7777, 0o600);
+    for (const config of ['candidate.json', 'empty-candidate.json']) await loadSubscribersFrom(join(configs, config));
     assert.notEqual(f.freeze().status, 0, 'a second freeze cannot overwrite the bundle');
     assert.deepEqual(readFileSync(file), bytes);
   });
@@ -143,5 +146,24 @@ test('refuses a capture whose deployed package lacks the relay entry', (t) => {
   const result = f.freeze();
   assert.equal(result.status, 1);
   assert.match(result.stderr, /deployed package is missing bin\/relay\.js/);
+  assert.equal(existsSync(f.output), false);
+});
+
+test('the deployed side is judged by the captured deployed relay', (t) => {
+  const f = setup(t, 'Stop', 'turn-end', undefined, stop);
+  const index = join(f.installed, 'src', 'index.js');
+  writeFileSync(index, readFileSync(index, 'utf8').replace("if (v.schema !== 2) throw new Error('deployed relay reads schema 2')", "throw new Error('deployed validator')"));
+  const result = f.freeze();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /deployed validator/);
+  assert.equal(existsSync(f.output), false);
+});
+
+test('a deployed package without the validators is refused', (t) => {
+  const f = setup(t, 'Stop', 'turn-end', undefined, stop);
+  writeFileSync(join(f.installed, 'src', 'index.js'), 'export const other = 1;\n');
+  const result = f.freeze();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /the deployed relay exports no subscriber validator/);
   assert.equal(existsSync(f.output), false);
 });

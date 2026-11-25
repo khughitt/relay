@@ -33,7 +33,7 @@ node scripts/hook-qualification/freeze.mjs \
   --fixture PREPARED/fixture --output NEW_BUNDLE
 ```
 
-Use `stop-manifest.json` or `sessionstart-manifest.json` in the new bundle as the pilot's manifest set. The freezer prints its SHA-256 and keeps the deployed package, raw config and package hash list beside it. The bundle is local to the capture host, with fixture configs written as 0600 in a 0700 directory. Use a new bundle directory for each capture.
+Use `stop-manifest.json` or `sessionstart-manifest.json` in the new bundle as the pilot's manifest set. The freezer prints its SHA-256 and keeps the deployed package, raw config and package hash list beside it. The deployed configuration and the deployed fixture configs are validated and matched by that captured package's own exports, the candidate's by this checkout's, so the two sides may read different subscriber schemas. The bundle is local to the capture host, with fixture configs written as 0600 in a 0700 directory. Use a new bundle directory for each capture.
 
 The route map uses the observed handler order and refuses a changed matcher, command shape or composition. For SessionStart, one `claude-sessionstart` handler maps to the halt, stale-lore and index-repair fixture branches in that order. They run in parallel under the existing qualification schedule, preserving the conservative baseline from the SessionStart timing proof. Extend the map and supply a matching template and configs when adding a route or changing its native composition. The manual manifest format above also supports routes outside this map.
 
