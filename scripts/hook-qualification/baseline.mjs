@@ -72,11 +72,19 @@ export function workLists({ deployed, candidate, native }) {
 /** @param {number} pgid */
 const groupExists = (pgid) => { try { process.kill(-pgid, 0); return true; } catch (error) { return /** @type {any} */ (error).code === 'EPERM'; } };
 
+/** @param {Promise<unknown>} promise @param {number} ms */
+const within = (promise, ms) => {
+  /** @type {NodeJS.Timeout|undefined} */
+  let timer;
+  return Promise.race([promise, new Promise((r) => { timer = setTimeout(r, ms); })]).finally(() => clearTimeout(timer));
+};
+
 const CAPTURE_LIMIT = 65536;
 /**
  * Runs one event sample of the frozen composition. Each branch reports when it started relative to
  * the event and, with `capture`, its stdout and stderr (each capped at 64 KiB; both sides of a
- * comparison capture alike). A branch named in `branchEnv` runs in that environment, every other
+ * comparison capture alike), read until its pipes close, at most `drainMs` after its group drained,
+ * and not counted in its time. A branch named in `branchEnv` runs in that environment, every other
  * one in `env`.
  * @param {any} manifest @param {{event: string, input: string, env: NodeJS.ProcessEnv, branchEnv?: Record<string, NodeJS.ProcessEnv>, cwd: string, drainMs?: number, capture?: boolean}} options
  * @returns {Promise<{elapsedMs: number, branches: {name: string, startedMs: number, elapsedMs: number, status: string, pid: number|null, stdout?: string, stderr?: string}[], statuses: string[], survivors: string[]}>}
@@ -90,23 +98,29 @@ export async function runBaseline(manifest, { event, input, env, branchEnv = {},
     const child = spawn(branch.argv[0], branch.argv.slice(1), { stdio: ['pipe', capture ? 'pipe' : 'ignore', capture ? 'pipe' : 'ignore'], env: branchEnv[branch.name] ?? env, cwd, detached: true });
     const out = { stdout: '', stderr: '' };
     if (capture) for (const name of /** @type {const} */ (['stdout', 'stderr'])) child[name]?.on('data', (chunk) => { if (out[name].length < CAPTURE_LIMIT) out[name] = (out[name] + chunk).slice(0, CAPTURE_LIMIT); });
+    // 'close' follows both the exit and the end of the captured pipes.
+    const closed = new Promise((r) => child.once('close', r));
     child.stdin.on('error', () => {}); child.stdin.end(input);
     const base = { name: branch.name, startedMs: t0 - started };
-    child.once('error', () => resolve({ ...base, elapsedMs: performance.now() - t0, status: 'spawn-failed', pgid: null, ...(capture ? out : {}) }));
+    child.once('error', () => { const now = performance.now(); resolve({ ...base, elapsedMs: now - t0, endedAt: now, status: 'spawn-failed', pgid: null, ...(capture ? out : {}) }); });
     child.once('exit', async (code, signal) => {
       // The branch counts as done when its whole group has drained; survivors are reported, not hidden.
       const until = performance.now() + drainMs;
       while (child.pid !== undefined && groupExists(child.pid) && performance.now() < until) await new Promise((r) => setTimeout(r, 2));
-      resolve({ ...base, elapsedMs: performance.now() - t0, status: signal ? `signal ${signal}` : `exited ${code}`, pgid: child.pid ?? null, ...(capture ? out : {}) });
+      const endedAt = performance.now();
+      // Output can still be in the pipes at the drain. Reading it is not branch time, and it is
+      // bounded: a process outside the group can hold the pipes open.
+      if (capture) await within(closed, drainMs);
+      resolve({ ...base, elapsedMs: endedAt - t0, endedAt, status: signal ? `signal ${signal}` : `exited ${code}`, pgid: child.pid ?? null, ...(capture ? out : {}) });
     });
   });
   /** @type {any[]} */
   const results = [];
   if (manifest.schedule.kind === 'parallel') results.push(...await Promise.all(manifest.branches.map(launch)));
   else for (const branch of manifest.branches) results.push(await launch(branch));
-  const elapsedMs = performance.now() - started;
+  const elapsedMs = Math.max(...results.map((r) => r.endedAt)) - started;
   // Survivors are recorded before the rescue kill, which is itself a baseline failure.
   const survivors = results.filter((r) => r.pgid !== null && groupExists(r.pgid)).map((r) => r.name);
   for (const r of results) if (r.pgid !== null && groupExists(r.pgid)) { try { process.kill(-r.pgid, 'SIGKILL'); } catch {} }
-  return { elapsedMs, branches: results.map(({ pgid, ...rest }) => ({ ...rest, pid: pgid })), statuses: results.map((r) => r.status), survivors };
+  return { elapsedMs, branches: results.map(({ pgid, endedAt, ...rest }) => ({ ...rest, pid: pgid })), statuses: results.map((r) => r.status), survivors };
 }
