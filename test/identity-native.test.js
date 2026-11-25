@@ -112,9 +112,9 @@ test('agy requires a present hint and rejects malformed or unverified evidence',
   }
 });
 
-test('pi reads its own session id, may lack one, and rejects malformed or unverified evidence', () => {
+test('pi requires its own session id and rejects malformed or unverified evidence', () => {
   assert.deepEqual(hint('pi', { PI_SESSION_ID: 's1', CODEX_THREAD_ID: 'thread' }), { hint: 's1', invalid: null, missing: false });
-  for (const env of [{}, { PI_SESSION_ID: '' }]) assert.deepEqual(hint('pi', env), { hint: null, invalid: null, missing: false });
+  for (const env of [{}, { PI_SESSION_ID: '' }]) assert.deepEqual(hint('pi', env), { hint: null, invalid: null, missing: true });
   for (const value of ['\t', '\uFFFD']) assert.deepEqual(hint('pi', { PI_SESSION_ID: value }), { hint: null, invalid: 'PI_SESSION_ID', missing: false });
   for (const harness of ['claude-code', 'codex', 'opencode']) assert.equal(hint(harness, { PI_SESSION_ID: 's1' }).hint, null);
 });

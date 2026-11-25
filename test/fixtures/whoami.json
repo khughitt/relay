@@ -9896,7 +9896,7 @@
     "registryCalls": 1
   },
   {
-    "name": "pi without a session id resolves its one row",
+    "name": "pi without a session id refuses its one row",
     "inputs": {
       "rows": {
         "1000": {
@@ -9957,7 +9957,7 @@
     },
     "expect": {
       "schema": 1,
-      "status": "resolved",
+      "status": "unresolved",
       "native": {
         "CLAUDE_CODE_SESSION_ID": {
           "state": "absent"
@@ -9990,32 +9990,13 @@
         }
       },
       "hint": null,
-      "agent": {
-        "id": "pi:s1",
-        "harness": "pi",
-        "sessionId": "s1",
-        "scope": "session",
-        "process": {
-          "platform": "linux",
-          "host": "testhost",
-          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
-          "pid": 42,
-          "start": "900"
-        },
-        "cwd": "/project",
-        "repoRoot": "/project",
-        "remote": null,
-        "projectKey": "/project",
-        "project": "project",
-        "state": "idle",
-        "updatedAt": 1
-      },
-      "rootSession": null
+      "code": "MISSING_HINT",
+      "message": "PI_SESSION_ID is missing, and a session this pi process has replaced cannot be told from the current one without it"
     },
-    "registryCalls": 1
+    "registryCalls": 0
   },
   {
-    "name": "pi with an empty session id resolves its one row",
+    "name": "pi with an empty session id refuses its one row",
     "inputs": {
       "rows": {
         "1000": {
@@ -10078,7 +10059,7 @@
     },
     "expect": {
       "schema": 1,
-      "status": "resolved",
+      "status": "unresolved",
       "native": {
         "CLAUDE_CODE_SESSION_ID": {
           "state": "absent"
@@ -10111,29 +10092,10 @@
         }
       },
       "hint": null,
-      "agent": {
-        "id": "pi:s1",
-        "harness": "pi",
-        "sessionId": "s1",
-        "scope": "session",
-        "process": {
-          "platform": "linux",
-          "host": "testhost",
-          "bootId": "0f9d5a1e-1c2b-4d3e-8f4a-5b6c7d8e9f01",
-          "pid": 42,
-          "start": "900"
-        },
-        "cwd": "/project",
-        "repoRoot": "/project",
-        "remote": null,
-        "projectKey": "/project",
-        "project": "project",
-        "state": "idle",
-        "updatedAt": 1
-      },
-      "rootSession": null
+      "code": "MISSING_HINT",
+      "message": "PI_SESSION_ID is missing, and a session this pi process has replaced cannot be told from the current one without it"
     },
-    "registryCalls": 1
+    "registryCalls": 0
   },
   {
     "name": "pi selects among its process rows",
@@ -10392,10 +10354,10 @@
         }
       },
       "hint": null,
-      "code": "AMBIGUOUS",
-      "message": "several relay agents match pid 42: pi:s1, pi:s2"
+      "code": "MISSING_HINT",
+      "message": "PI_SESSION_ID is missing, and a session this pi process has replaced cannot be told from the current one without it"
     },
-    "registryCalls": 1
+    "registryCalls": 0
   },
   {
     "name": "pi with an inherited session id refuses",

@@ -174,10 +174,12 @@ pi has no hook commands. Its extension (`integrations/pi`, package subpath `rela
 - `agent_start` opens each run, a retry included, and `agent_settled` always closes it. `before_agent_start` is not forwarded: it can precede a run that never starts.
 - `agent_settled` says only whether the run was aborted. The extension adds `:aborted` from that and `:error` when the last assistant message of the run's final `agent_end` has `stopReason: "error"`.
 - `/new`, `/resume` and `/fork` (and `/clone`) emit `session_shutdown` for the old session, await it, and then emit `session_start` with the new id in the same process. The old row is gone before the new one appears.
-- `/reload` emits `session_shutdown` and `session_start` with reason `reload` and the same id. The extension ends nothing on that shutdown and waits for its queue, so the row stays; the start sets it `idle`.
+- `/reload` emits `session_shutdown` and `session_start` with reason `reload` and the same id. The extension ends nothing on that shutdown and waits for its queue, so the row stays; the start sets it `idle`, or `working` when the reload interrupts a run (possible outside the interactive `/reload`).
 - Quitting mid-turn emits `session_shutdown` with no `agent_settled`. Nothing is forwarded after a shutdown.
 
-A pi started by another pi is its own process and row; `comm` is `pi` in interactive, print and `--mode rpc` runs, and `pi-rpc` in runs of pi's RPC entry point (source read). A session embedded through pi's SDK in another program has no process of its own to name and publishes `process: null`. Extension prompts (`ui_prompt_start`) have no mapping, so a session waiting on one shows its previous state. Darwin process naming is unverified for pi.
+A shutdown waits up to 1 s for queued hooks, then drops those not yet started. The one running and the `session_shutdown` hook still finish, so pi waits at most about 11 s when relay is stuck.
+
+A pi started by another pi is its own process and row; `comm` is `pi` in interactive, print and `--mode rpc` runs, and `pi-rpc` in runs of pi's RPC entry point (source read). The extension does nothing in a process pi has not named so, such as a program embedding pi's SDK, and forwards nothing for a session that never emitted `session_start`. A pi that is killed leaves its row to the reaper. Removing the extension and reloading leaves the row until pi exits. Extension prompts (`ui_prompt_start`) have no mapping, so a session waiting on one shows its previous state. Darwin process naming is unverified for pi.
 
 ### Claude Code `Stop` `background_tasks` reduction
 

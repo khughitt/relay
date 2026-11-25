@@ -8,13 +8,14 @@ function fakePi() {
   return { on: (name, handler) => { assert.ok(!handlers.has(name), name); handlers.set(name, handler); }, handlers,
     emit: (event, ctx) => handlers.get(event.type)?.(event, ctx) };
 }
-const ctx = (id = 's1', cwd = '/proj') => ({ cwd, sessionManager: { getSessionId: () => id } });
+const ctx = (id = 's1', cwd = '/proj', idle = true) => ({ cwd, sessionManager: { getSessionId: () => id }, isIdle: () => idle });
 function bound(options = {}) {
   const pi = fakePi(), calls = [], reported = [];
   bind(pi, { spawn: async (event, payload) => { calls.push([event, payload.session_id, payload.cwd]); }, report: (m) => reported.push(m), ...options });
   return { pi, calls, reported, events: () => calls.map(([event]) => event) };
 }
 const assistant = (stopReason) => ({ role: 'assistant', stopReason });
+const started = (options) => { const b = bound(options); b.pi.emit({ type: 'session_start', reason: 'startup' }, ctx()); return b; };
 const settle = async (pi, messages, aborted = false) => {
   pi.emit({ type: 'agent_start' }, ctx());
   pi.emit({ type: 'agent_end', messages }, ctx());
@@ -46,15 +47,15 @@ test('an abort and a failed run are told apart from a finished one', async () =>
     [[assistant('error'), { role: 'user' }, assistant('stop')], false, 'agent_settled'],
     [[], false, 'agent_settled'],
   ]) {
-    const b = bound();
+    const b = started();
     await settle(b.pi, messages, aborted);
     await b.pi.emit({ type: 'session_shutdown', reason: 'quit' }, ctx());
-    assert.equal(b.events()[1], expected);
+    assert.equal(b.events()[2], expected);
   }
 });
 
 test('an error pi retried, or one from an earlier run, does not mark the next settle', async () => {
-  const b = bound();
+  const b = started();
   b.pi.emit({ type: 'agent_start' }, ctx());
   b.pi.emit({ type: 'agent_end', messages: [assistant('error')] }, ctx());
   b.pi.emit({ type: 'agent_start' }, ctx());
@@ -63,7 +64,38 @@ test('an error pi retried, or one from an earlier run, does not mark the next se
   await settle(b.pi, [assistant('error')]);
   await settle(b.pi, [assistant('stop')]);
   await b.pi.emit({ type: 'session_shutdown', reason: 'quit' }, ctx());
-  assert.deepEqual(b.events(), ['agent_start', 'agent_start', 'agent_settled', 'agent_start', 'agent_settled:error', 'agent_start', 'agent_settled', 'session_shutdown']);
+  assert.deepEqual(b.events(), ['session_start', 'agent_start', 'agent_start', 'agent_settled', 'agent_start', 'agent_settled:error', 'agent_start', 'agent_settled', 'session_shutdown']);
+});
+
+// pi's SDK loads extensions for a session it never starts or shuts down; its runs are not a live session.
+test('nothing is forwarded before the session starts', async () => {
+  const b = bound();
+  await settle(b.pi, [assistant('stop')]);
+  await b.pi.emit({ type: 'session_shutdown', reason: 'quit' }, ctx());
+  assert.deepEqual(b.calls, []);
+});
+
+test('a reload during a run keeps the session working', async () => {
+  for (const [idle, expected] of [[false, 'agent_start'], [true, 'session_start']]) {
+    const b = bound();
+    b.pi.emit({ type: 'session_start', reason: 'reload' }, ctx('s1', '/p', idle));
+    await b.pi.emit({ type: 'session_shutdown', reason: 'quit' }, ctx());
+    assert.deepEqual(b.events(), [expected, 'session_shutdown']);
+  }
+});
+
+// Each hook may take five seconds: a stuck registry must not hold pi for the whole backlog.
+test('a shutdown waits briefly for queued events, then keeps only the one running and the end', async () => {
+  for (const [reason, expected] of [['quit', ['session_start', 'session_shutdown']], ['reload', ['session_start']]]) {
+    const gates = []; const seen = [];
+    const b = bound({ patienceMs: 20, spawn: (event) => { seen.push(event); return event === 'session_shutdown' ? Promise.resolve() : new Promise((resolve) => gates.push(resolve)); } });
+    b.pi.emit({ type: 'session_start', reason: 'startup' }, ctx());
+    for (let i = 0; i < 4; i++) await settle(b.pi, [assistant('stop')]);
+    const done = b.pi.emit({ type: 'session_shutdown', reason }, ctx());
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    gates.shift()(); await done;
+    assert.deepEqual(seen, expected, reason);
+  }
 });
 
 test('new, resume and fork end the session; a reload does not, and waits for what is queued', async () => {
@@ -116,9 +148,14 @@ test('a failing hook or a broken context is reported by code and never reaches p
   assert.deepEqual([...b.reported].sort(), ['relay: pi agent_start INVALID_INPUT', 'relay: pi session_shutdown INPUT_TIMEOUT', 'relay: pi session_start INPUT_TIMEOUT']);
 });
 
-test('the extension pi loads is a factory', async () => {
+test('the extension binds only in a process pi has named its own', async () => {
   const { default: factory } = await import('./index.js');
-  assert.equal(typeof factory, 'function');
-  const pi = fakePi(); assert.equal(factory(pi), undefined);
-  assert.deepEqual([...pi.handlers.keys()].sort(), ['agent_end', 'agent_settled', 'agent_start', 'session_shutdown', 'session_start']);
+  const title = process.title;
+  try {
+    for (const [name, handlers] of [['node', []], ['pi', ['agent_end', 'agent_settled', 'agent_start', 'session_shutdown', 'session_start']], ['pi-rpc', ['agent_end', 'agent_settled', 'agent_start', 'session_shutdown', 'session_start']]]) {
+      process.title = name;
+      const pi = fakePi(); assert.equal(factory(pi), undefined);
+      assert.deepEqual([...pi.handlers.keys()].sort(), handlers, name);
+    }
+  } finally { process.title = title; }
 });

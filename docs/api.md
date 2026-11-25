@@ -321,11 +321,10 @@ boolean is independent of `status`, including on failures.
 Claude uses a nonempty Unicode session id as `hint`, including control characters;
 invalid Unicode, unverified and empty values give no hint. Codex uses a present
 thread id, otherwise a present root id; either invalid or unverified value refuses
-resolution. agy requires its present conversation id. pi uses its present session
-id, and an invalid or unverified one refuses resolution; pi sets it for its
-shell tool only, so another command pi starts may carry none, which resolves when
-the process holds one row, or an outer pi session's, which is `HINT_MISMATCH`.
-Other harnesses use no hint.
+resolution. agy requires its present conversation id, and pi its present session
+id. pi sets that for its shell tool only, so another command pi starts carries none
+(`MISSING_HINT`) or an outer pi session's (`HINT_MISMATCH`). Other harnesses use
+no hint.
 
 | Unresolved code | Meaning |
 | --- | --- |
@@ -333,7 +332,7 @@ Other harnesses use no hint.
 | `AMBIGUOUS` | Several rows qualify without a selecting hint. |
 | `HINT_MISMATCH` | The hint names a different session. |
 | `WORKER_NEEDS_THREAD` | A Codex worker cannot be selected without its own thread id. |
-| `MISSING_HINT` | agy's conversation id is absent or empty. |
+| `MISSING_HINT` | agy's conversation id or pi's session id is absent or empty. |
 | `HOSTING_PROCESS` | The nearest Claude process is a daemon or pty host. |
 | `HIDDEN_ANCESTRY` | A harness at pid 1 with ppid 0 hides the actual session. |
 | `INVALID_NATIVE_VALUE` | Codex, agy or pi has an invalid or unverified native value; Claude never returns this code. |

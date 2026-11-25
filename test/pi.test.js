@@ -18,7 +18,7 @@ async function registry(t) {
   const paths = await tempState(t);
   // Every process is alive, so only an event can remove a row.
   const processOps = { ...createProcessOps({ platform: 'linux' }), ancestors: () => [], handleOf: (pid) => handle(pid, `${pid}0`), probe: () => ({ status: 'alive', reason: 'match' }) };
-  const send = async (nativeEvent, sessionId, pid = 42, cwd = '/project') => {
+  const send = async (nativeEvent, sessionId, pid = /** @type {number|null} */ (42), cwd = '/project') => {
     const event = registryEventFor(normalizeHookEvent('pi', nativeEvent, JSON.stringify({ session_id: sessionId, cwd }), { invokingCwd: '/' }));
     return applyEvent(event, { paths, processOps, gitContext: async () => ({ remote: null, repoRoot: cwd }), resolveSessionPid: () => pid });
   };
@@ -119,13 +119,29 @@ test('two rows on one pi process are told apart by PI_SESSION_ID alone', async (
   const r = await registry(t);
   await r.send('session_start', OUTER); await r.send('session_start', NEXT);
   assert.equal((await identify(r, inside(42), { PI_SESSION_ID: NEXT })).agent.id, `pi:${NEXT}`);
-  assert.equal((await identify(r, inside(42), {})).code, 'AMBIGUOUS');
+  assert.equal((await identify(r, inside(42), {})).code, 'MISSING_HINT');
   assert.equal((await identify(r, inside(42), { PI_SESSION_ID: INNER })).code, 'HINT_MISMATCH');
 });
 
-test('a command pi runs without a session id resolves when its process holds one row', async (t) => {
+// The one row may be a session this process has already replaced, so it is never taken on trust.
+test('a command pi runs without a session id is not identified by its process alone', async (t) => {
   const r = await registry(t);
   await r.send('session_start', OUTER);
-  const result = await identify(r, inside(42), {});
-  assert.equal(result.status, 'resolved'); assert.equal(result.hint, null); assert.equal(result.nativeSession, false);
+  for (const env of [{}, { PI_SESSION_ID: '' }]) {
+    const result = await identify(r, inside(42), env);
+    assert.equal(result.status, 'unresolved'); assert.equal(result.code, 'MISSING_HINT'); assert.match(result.message, /PI_SESSION_ID/); assert.equal(result.nativeSession, false);
+  }
+});
+
+// A hook that outlives pi, or runs under no pi, finds no process: the row could never be reaped.
+test('a pi event without a process changes no row and creates none', async (t) => {
+  const r = await registry(t);
+  const result = await r.send('session_start', OUTER, null);
+  assert.deepEqual(result.diagnostics.map((d) => d.code), ['PROCESS_UNAVAILABLE']);
+  assert.deepEqual(await r.states(), {});
+  await r.send('session_start', OUTER); await r.send('agent_start', OUTER); await r.send('agent_settled', OUTER, null);
+  const row = (await readSnapshot({ paths: r.paths })).agents[`pi:${OUTER}`];
+  assert.equal(row.state, 'working'); assert.equal(row.process.pid, 42);
+  await r.send('session_shutdown', OUTER, null);
+  assert.deepEqual(await r.states(), {});
 });

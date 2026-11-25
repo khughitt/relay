@@ -127,7 +127,8 @@ Upsert and removal publication rules (`applyEvent` in `src/bus/transaction.js`):
 - An upsert publishes `revision: 1` with a fresh `generation` UUID if no snapshot exists, and increments `revision` on every observed upsert even when `state` is unchanged.
 - `SessionEnd` (`kind: 'session-end'`) skips Git and process enrichment and removes its exact `agentId` and, for a Codex root, every row whose `root` is that `agentId`, in the same publication.
 - On a shared proven process `Handle`, a Codex root `SessionStart` retires other Codex session rows and `done` foreign workers, and an `agy` root event retires finished (`'done'` / `'error'`) `agy` peers (plus proven `'root'` peers on `SessionStart`).
-- A pi session start retires no other row. pi ends each session before its successor starts in the same process, so a second pi row on one live process means a lost `session_shutdown`, and it stays until that process dies.
+- A pi session start retires no other row: pi ends each session before its successor starts in the same process. A row whose `session_shutdown` was lost stays until that process dies or the session is resumed and ended.
+- A pi event whose hook finds no pi process changes no row (its hook may outlive pi), so every pi row has a `process` and can be reaped.
 - Removal (`session-end`, a Codex worker `SubagentStop` whose root is absent on a process proven by another Codex root, or an `agy` subagent `Stop` on a process shared with another live `agy` row) and `reapRegistry` publish only when keys change (except schema-1 supersession); when `agents.json` is absent and no keys exist, the result remains `{ snapshot: null, changed: false, reaped: [], diagnostics: [] }`.
 
 ## Failure modes

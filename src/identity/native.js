@@ -101,5 +101,5 @@ export function hintFor(harness, native) {
     const entry = native[key];
     if (entry.state === 'present') return { hint: entry.value, invalid: null, missing: false };
   }
-  return { hint: null, invalid: null, missing: harness === 'agy' };
+  return { hint: null, invalid: null, missing: harness === 'agy' || harness === 'pi' };
 }

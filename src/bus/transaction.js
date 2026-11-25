@@ -114,7 +114,8 @@ async function mutate(opts, event, context, handle, diagnostics) {
         delete agents[event.agentId];
       }
       else {
-        let upsert = true;
+        // pi's hook runs unawaited, so it can outlive pi: a row without a process could never be reaped.
+        let upsert = event.harness !== 'pi' || handle !== null;
         if (event.harness === 'codex' && event.nativeEvent === 'SessionStart' && event.root === undefined) {
           for (const [id,a] of Object.entries(agents)) {
             if (a.harness === 'codex' && sameProcess(a.process,handle)
