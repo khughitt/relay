@@ -31,7 +31,7 @@
  * @typedef {{kind: HookKind, registry: boolean}} HookEventEntry
  * @typedef {{nativeEvent: string, fields: string[]}} PrivateSelection
  * @typedef {{name: string, role: 'guard'|'notice'|'observer', kinds: (HookKind|'reconcile')[], harnesses: Harness[]|null, tools: string[]|null, nativeEvents: string[]|null, argv: string[], timeoutMs: number, registry?: 'occurrence'|'snapshot', privateFields?: PrivateSelection[]}} Subscriber
- * @typedef {{schema: 2, subscribers: Subscriber[]}} Subscribers
+ * @typedef {{schema: 3, searchPath: string[], subscribers: Subscriber[]}} Subscribers
  * @typedef {{agentId: string, sessionId: string, root?: string}} HookIdentity
  * @typedef {{schema: 2, kind: HookKind, harness: Harness, nativeEvent: string, cwd: string, identity: Fact<HookIdentity>, facts: Record<string, Fact<any>>, tool: null|{name: Fact<string>, id: Fact<string>}, private: Record<string, Fact<any>>}} HookEvent
  * @typedef {{status: 'ready', generation: string, revision: number}|{status: 'unavailable', code: string}|{status: 'not-requested'}} RegistryAccess

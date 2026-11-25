@@ -76,17 +76,18 @@ const CAPTURE_LIMIT = 65536;
 /**
  * Runs one event sample of the frozen composition. Each branch reports when it started relative to
  * the event and, with `capture`, its stdout and stderr (each capped at 64 KiB; both sides of a
- * comparison capture alike).
- * @param {any} manifest @param {{event: string, input: string, env: NodeJS.ProcessEnv, cwd: string, drainMs?: number, capture?: boolean}} options
+ * comparison capture alike). A branch named in `branchEnv` runs in that environment, every other
+ * one in `env`.
+ * @param {any} manifest @param {{event: string, input: string, env: NodeJS.ProcessEnv, branchEnv?: Record<string, NodeJS.ProcessEnv>, cwd: string, drainMs?: number, capture?: boolean}} options
  * @returns {Promise<{elapsedMs: number, branches: {name: string, startedMs: number, elapsedMs: number, status: string, pid: number|null, stdout?: string, stderr?: string}[], statuses: string[], survivors: string[]}>}
  */
-export async function runBaseline(manifest, { event, input, env, cwd, drainMs = 1000, capture = false }) {
+export async function runBaseline(manifest, { event, input, env, branchEnv = {}, cwd, drainMs = 1000, capture = false }) {
   validateManifest(manifest, { harness: manifest.harness, event });
   const started = performance.now();
   /** @param {any} branch */
   const launch = (branch) => new Promise((resolve) => {
     const t0 = performance.now();
-    const child = spawn(branch.argv[0], branch.argv.slice(1), { stdio: ['pipe', capture ? 'pipe' : 'ignore', capture ? 'pipe' : 'ignore'], env, cwd, detached: true });
+    const child = spawn(branch.argv[0], branch.argv.slice(1), { stdio: ['pipe', capture ? 'pipe' : 'ignore', capture ? 'pipe' : 'ignore'], env: branchEnv[branch.name] ?? env, cwd, detached: true });
     const out = { stdout: '', stderr: '' };
     if (capture) for (const name of /** @type {const} */ (['stdout', 'stderr'])) child[name]?.on('data', (chunk) => { if (out[name].length < CAPTURE_LIMIT) out[name] = (out[name] + chunk).slice(0, CAPTURE_LIMIT); });
     child.stdin.on('error', () => {}); child.stdin.end(input);

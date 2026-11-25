@@ -8,7 +8,7 @@ import { COMMIT, DIGEST, qualificationFor } from './helpers/qualification.js';
 const workload = JSON.parse(readFileSync(new URL('../scripts/hook-qualification/workload.json', import.meta.url), 'utf8'));
 const q = workload.qualification;
 const range = (n, f) => Array.from({ length: n }, (_, i) => f(i));
-const PACKAGE = 'e'.repeat(64), SCRIPT = 'f'.repeat(64);
+const PACKAGE = 'e'.repeat(64), SCRIPT = 'f'.repeat(64), MEASURED = 'a'.repeat(64);
 
 test('the qualification workload is the frozen table, and the pilot bounds are unchanged', () => {
   assert.deepEqual(workload.pilot.migrated.bounds, { p95DeltaMs: 100, p99DeltaMs: 150, maxDeltaMs: 250, absoluteMaxMs: 1000 });
@@ -49,7 +49,7 @@ function result(host, runtime) {
     candidate: range(n, (i) => candidateSample(cand, dirs ? `/s/${host}/${runtime}/c${i}` : `/s/${host}/${runtime}/warm-c`)) });
   return {
     schema: 1, mode: 'measure', route: { harness: 'claude-code', event: 'PreToolUse', outerMs: 20000 }, host, runtime, harnessAncestor: { pid: 4100, resolved: 4100 },
-    candidate: { commit: COMMIT, dirty: false, configSha256: 'c'.repeat(64) }, manifest: manifest(host), deployedDigest: PACKAGE,
+    candidate: { commit: COMMIT, dirty: false, configSha256: 'c'.repeat(64), measuredConfigSha256: MEASURED }, manifest: manifest(host), deployedDigest: PACKAGE,
     workLists: { baseline: ['deployed-relay:ops-guard', 'deployed-relay:familiar', 'turn-pause'], candidate: ['candidate:ops-guard', 'candidate:turn-pause', 'candidate:familiar'] },
     fixtures: { baseline: { 'deployed-relay:ops-guard': SCRIPT, 'deployed-relay:familiar': SCRIPT, 'turn-pause': SCRIPT },
       candidate: { 'candidate:ops-guard': SCRIPT, 'candidate:familiar': SCRIPT, 'candidate:turn-pause': SCRIPT } },
@@ -74,6 +74,7 @@ test('a complete pair of hosts, each on Node 22 and the development runtime, pas
   assert.ok(verdict.rows.some((r) => r.host === 'host-b' && r.runtime === 'v26.5.0' && r.case === 'warm candidate'));
   assert.deepEqual(verdict.evidence.map((e) => e.split(' ', 1)[0]).sort(), ['host=host-a', 'host=host-a', 'host=host-b', 'host=host-b']);
   assert.ok(verdict.evidence.every((e) => e.includes(COMMIT) && e.includes('claude-code PreToolUse') && / outerMs=20000 /.test(e)), 'each line names the budget it was measured at');
+  assert.ok(verdict.evidence.every((e) => e.includes(` template=${'c'.repeat(64)} measured=${MEASURED} `)), 'each line names the frozen template and the config measured from it');
 });
 
 test('the judge refuses incomplete, mismatched or unsound evidence', () => {
@@ -85,6 +86,7 @@ test('the judge refuses incomplete, mismatched or unsound evidence', () => {
     ['one runtime per host', /Node 22 and a development runtime/, (s) => s.splice(1, 1)],
     ['different commits', /one candidate commit/, (s) => { s[2].candidate.commit = 'd'.repeat(40); }],
     ['dirty candidate', /uncommitted/, (s) => { s[0].candidate.dirty = true; }],
+    ['no measured candidate config', /names no measured candidate config/, (s) => { delete s[2].candidate.measuredConfigSha256; }],
     ['reused host manifest', /manifest is for host-a/, (s) => { s[2].manifest = manifest('host-a'); }],
     ['wrong baseline kind', /native-only.*relays PreToolUse|relays PreToolUse/, (s) => { Object.assign(s[0].manifest, { baselineKind: 'native-only', deployed: null, branches: [s[0].manifest.branches[1]] }); }],
     ['wrong deployed artifact', /deployed package/, (s) => { s[1].deployedDigest = 'a'.repeat(64); }],

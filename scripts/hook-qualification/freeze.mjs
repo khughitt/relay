@@ -4,9 +4,11 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, cpSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 import { matchSubscribers, validateSubscribers } from '../../src/subscribers.js';
 import { checkRetainedWork, validateManifest, workLists } from './baseline.mjs';
+import { renderCandidate } from './candidate-config.mjs';
 import { packageFiles, packageListing } from './deployment.mjs';
 import { commandWords } from './hook-settings.mjs';
 
@@ -101,7 +103,15 @@ function capturePackage(source, target) {
   return listing;
 }
 
-function freeze(options) {
+// Each side of the comparison is judged by the relay that reads it: the deployed side by the bytes
+// just captured (whose schema may be older than this checkout's), the candidate by this checkout.
+async function deployedValidators(artifact) {
+  const { validateSubscribers: validate, matchSubscribers: match } = await import(pathToFileURL(join(artifact, 'src', 'index.js')).href);
+  requireThat(typeof validate === 'function' && typeof match === 'function', 'the deployed relay exports no subscriber validator');
+  return { validate, match };
+}
+
+async function freeze(options) {
   const template = readJson(options.template);
   requireThat(template.schema === 1 && Array.isArray(template.manifests) && template.manifests.length === 1, 'expected a schema-1 set with one route template');
   const [manifest] = template.manifests;
@@ -112,44 +122,49 @@ function freeze(options) {
   const snapshot = readFileSync(options.snapshot);
   const settings = settingsIdentity(options, snapshot);
   const { deployed, ordered } = composition(JSON.parse(snapshot), event, route);
-  const selection = { kind: route.kind, nativeEvent: event, harness };
-  const rawConfig = readFileSync(deployed.config);
-  const liveSubscribers = matchSubscribers(validateSubscribers(JSON.parse(rawConfig)), selection);
   const { outerMs } = deployed;
-  const slug = event.toLowerCase(), deployedName = `deployed-${slug}.json`;
-  const configs = new Map();
-  function config(name) {
-    requireThat(typeof name === 'string' && /^[\w.-]+\.json$/.test(name), 'fixture config needs a JSON basename');
-    if (!configs.has(name)) configs.set(name, readFileSync(join(dirname(options.template), name)));
-    return validateSubscribers(JSON.parse(configs.get(name)));
-  }
-  const deployedFixture = config(deployedName);
-  const candidateFixture = config(manifest.candidate.config);
-  requireThat(sha(configs.get(manifest.candidate.config)) === manifest.candidate.configSha256, 'candidate config does not match the template digest');
-  requireThat(config(manifest.noSubscriber.deployed).subscribers.length === 0
-    && config(manifest.noSubscriber.candidate).subscribers.length === 0, 'no-subscriber configs must be empty');
-  requireThat(!manifest.noSubscriber.speculative, `the ${event} route has no speculative no-subscriber condition`);
-  const signature = (list) => list.map(({ name, role, registry }) => [name, role, registry]);
-  requireThat(isDeepStrictEqual(signature(liveSubscribers), signature(deployedFixture.subscribers)), `${event} deployed subscriber composition differs from the fixture`);
-  for (const fixture of [deployedFixture, candidateFixture]) {
-    requireThat(matchSubscribers(fixture, selection).length === fixture.subscribers.length, `fixture subscribers must all select ${event}`);
-  }
+  const rawConfig = readFileSync(deployed.config);
 
   const output = resolve(options.output), artifact = join(output, 'deployed-relay');
-  const configArg = `@CONFIG@/${deployedName}`;
-  // Positional arguments preserve quoted paths after the runner substitutes its placeholders.
-  const relayArgv = ['/bin/sh', '-c', '"$@"', 'relay', '@NODE@', '@DEPLOYED@', 'hook', '--harness', harness,
-    '--outer-ms', String(outerMs), '--subscribers', configArg, event];
-  const branches = new Map(manifest.branches.map((b) => [b.name, b]));
-  requireThat(manifest.branches.length === ordered.length && branches.size === ordered.length
-    && ordered.every((name) => branches.get(name)?.role === (name === 'deployed-relay' ? name : 'native')), 'template branches do not match the route map');
-  manifest.branches = ordered.map((name) => name === 'deployed-relay' ? { ...branches.get(name), argv: relayArgv } : branches.get(name));
-  const native = manifest.branches.filter((b) => b.role === 'native' && b.migrates !== false).map((b) => b.name);
-  checkRetainedWork(manifest, workLists({ deployed: deployedFixture, candidate: candidateFixture, native }));
-
   mkdirSync(output, { mode: 0o700 });
   try {
     const packageList = capturePackage(dirname(dirname(deployed.entry)), artifact);
+    // The candidate files are templates: their own bytes are frozen, and a rendering of them, with
+    // stand-in directories, is what their relay validates.
+    const sides = { deployed: { ...await deployedValidators(artifact), read: JSON.parse },
+      candidate: { validate: validateSubscribers, match: matchSubscribers, read: (bytes) => JSON.parse(renderCandidate(bytes, { work: '/work', fixture: '/fixture' })) } };
+    const selection = { kind: route.kind, nativeEvent: event, harness };
+    const liveSubscribers = sides.deployed.match(sides.deployed.validate(JSON.parse(rawConfig)), selection);
+    const slug = event.toLowerCase(), deployedName = `deployed-${slug}.json`;
+    const configs = new Map();
+    const config = (name, side) => {
+      requireThat(typeof name === 'string' && /^[\w.-]+\.json$/.test(name), 'fixture config needs a JSON basename');
+      if (!configs.has(name)) configs.set(name, readFileSync(join(dirname(options.template), name)));
+      return sides[side].validate(sides[side].read(configs.get(name)));
+    };
+    const deployedFixture = config(deployedName, 'deployed');
+    const candidateFixture = config(manifest.candidate.config, 'candidate');
+    requireThat(sha(configs.get(manifest.candidate.config)) === manifest.candidate.configSha256, 'candidate config does not match the template digest');
+    requireThat(config(manifest.noSubscriber.deployed, 'deployed').subscribers.length === 0
+      && config(manifest.noSubscriber.candidate, 'candidate').subscribers.length === 0, 'no-subscriber configs must be empty');
+    requireThat(!manifest.noSubscriber.speculative, `the ${event} route has no speculative no-subscriber condition`);
+    const signature = (list) => list.map(({ name, role, registry }) => [name, role, registry]);
+    requireThat(isDeepStrictEqual(signature(liveSubscribers), signature(deployedFixture.subscribers)), `${event} deployed subscriber composition differs from the fixture`);
+    for (const [side, fixture] of [['deployed', deployedFixture], ['candidate', candidateFixture]]) {
+      requireThat(sides[side].match(fixture, selection).length === fixture.subscribers.length, `fixture subscribers must all select ${event}`);
+    }
+
+    const configArg = `@CONFIG@/${deployedName}`;
+    // Positional arguments preserve quoted paths after the runner substitutes its placeholders.
+    const relayArgv = ['/bin/sh', '-c', '"$@"', 'relay', '@NODE@', '@DEPLOYED@', 'hook', '--harness', harness,
+      '--outer-ms', String(outerMs), '--subscribers', configArg, event];
+    const branches = new Map(manifest.branches.map((b) => [b.name, b]));
+    requireThat(manifest.branches.length === ordered.length && branches.size === ordered.length
+      && ordered.every((name) => branches.get(name)?.role === (name === 'deployed-relay' ? name : 'native')), 'template branches do not match the route map');
+    manifest.branches = ordered.map((name) => name === 'deployed-relay' ? { ...branches.get(name), argv: relayArgv } : branches.get(name));
+    const native = manifest.branches.filter((b) => b.role === 'native' && b.migrates !== false).map((b) => b.name);
+    checkRetainedWork(manifest, workLists({ deployed: deployedFixture, candidate: candidateFixture, native }));
+
     const configSha256 = sha(rawConfig);
     requireThat(sha(readFileSync(deployed.config)) === configSha256, 'the deployed configuration changed during capture');
     mkdirSync(join(output, 'fixture', 'config'), { recursive: true, mode: 0o700 });
@@ -182,7 +197,7 @@ try {
   requireThat(required.every((key) => values[key]) && identityOptions.filter((key) => values[key]).length === 1,
     'usage: node freeze.mjs --snapshot FILE --template FILE --hq CHECKOUT --version VERSION --fixture DIR --output NEW_DIR (--settings-identity FILE | --settings-source FILE)');
   process.umask(0o077);
-  console.log(freeze(values));
+  console.log(await freeze(values));
 } catch (error) {
   console.error(`freeze: ${error.message}`);
   process.exitCode = 1;

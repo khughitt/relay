@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { validateSubscribers, loadSubscribers, loadSubscribersFrom, matchSubscribers, matchReconcile, budgetFor, checkBudget, RECONCILE } from '../src/subscribers.js';
 import { adapterFor } from '../src/adapters/index.js';
 import { normalizeHookEvent } from '../src/adapters/hook-event.js';
-import { tempPaths, writeSubscribers } from './helpers/fixture.js';
+import { subscriberConfig, tempPaths, writeSubscribers } from './helpers/fixture.js';
 
 const guard = (over = {}) => ({ name: 'guard', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], tools: ['Bash'], argv: ['true'], timeoutMs: 100, ...over });
 const observer = (over = {}) => ({ name: 'observer', role: 'observer', registry: 'snapshot', kinds: ['before-tool', RECONCILE], argv: ['true'], timeoutMs: 100, ...over });
@@ -13,37 +13,53 @@ const event = (harness = 'claude-code', native = 'PreToolUse', tool = { tool_nam
   normalizeHookEvent(harness, native, JSON.stringify({ session_id: 's', cwd: '/repo', ...tool }), { invokingCwd: '/invoking' });
 
 test('validateSubscribers normalizes entries and rejects every malformed field', () => {
-  const config = validateSubscribers({ schema: 2, subscribers: [guard(), observer()] });
+  const config = validateSubscribers(subscriberConfig([guard(), observer()]));
   assert.deepEqual(config.subscribers[1], { ...observer(), harnesses: null, tools: null, nativeEvents: null, privateFields: [] });
   assert.deepEqual(config.subscribers[0], { ...guard(), nativeEvents: null });
-  assert.deepEqual(validateSubscribers({ schema: 2, subscribers: [] }), { schema: 2, subscribers: [] });
-  assert.throws(() => validateSubscribers({ schema: 1, subscribers: [] }), { code: 'INVALID_CONFIG', message: /schema 1 .*schema 2/ });
+  assert.deepEqual(validateSubscribers(subscriberConfig([])), subscriberConfig([]));
   const bad = [
-    null, [], { schema: 3, subscribers: [] }, { schema: 2 }, { schema: 2, subscribers: {} }, { schema: 2, subscribers: [], typo: true },
-    { schema: 2, subscribers: [guard(), guard()] },
-    { schema: 2, subscribers: [guard({ name: 'Guard' })] }, { schema: 2, subscribers: [guard({ name: '-x' })] }, { schema: 2, subscribers: [guard({ name: 'a'.repeat(65) })] },
-    { schema: 2, subscribers: [guard({ role: 'watcher' })] },
-    { schema: 2, subscribers: [guard({ kinds: [] })] }, { schema: 2, subscribers: [guard({ kinds: ['before-tool', 'before-tool'] })] }, { schema: 2, subscribers: [guard({ kinds: ['tool'] })] },
-    { schema: 2, subscribers: [guard({ kinds: [RECONCILE], tools: null })] },
-    { schema: 2, subscribers: [guard({ harnesses: null })] }, { schema: 2, subscribers: [guard({ harnesses: [] })] }, { schema: 2, subscribers: [guard({ harnesses: ['vim'] })] },
-    { schema: 2, subscribers: [guard({ harnesses: ['opencode'] })] },
-    { schema: 2, subscribers: [guard({ kinds: ['session-start'], tools: null })] },
-    { schema: 2, subscribers: [guard({ kinds: ['needs-approval'], tools: null })] },
-    { schema: 2, subscribers: [guard({ kinds: ['prompt', 'before-tool'] })] },
-    { schema: 2, subscribers: [guard({ tools: [] })] }, { schema: 2, subscribers: [guard({ tools: [''] })] }, { schema: 2, subscribers: [guard({ tools: ['Bash', 'Bash'] })] },
-    { schema: 2, subscribers: [guard({ argv: [] })] }, { schema: 2, subscribers: [guard({ argv: ['/usr/bin/python3'] })] }, { schema: 2, subscribers: [guard({ argv: ['bin/guard'] })] }, { schema: 2, subscribers: [guard({ argv: ['.'] })] }, { schema: 2, subscribers: [guard({ argv: ['..'] })] }, { schema: 2, subscribers: [guard({ argv: [''] })] }, { schema: 2, subscribers: [guard({ argv: ['a\0b'] })] }, { schema: 2, subscribers: [guard({ argv: ['true', 1] })] },
-    { schema: 2, subscribers: [guard({ timeoutMs: 0 })] }, { schema: 2, subscribers: [guard({ timeoutMs: 1.5 })] }, { schema: 2, subscribers: [guard({ timeoutMs: 60001 })] },
-    { schema: 2, subscribers: [guard({ shell: true })] },
+    null, [], { schema: 4, searchPath: [], subscribers: [] }, { schema: 3, searchPath: [] }, subscriberConfig({}), { ...subscriberConfig([]), typo: true },
+    subscriberConfig([guard(), guard()]),
+    subscriberConfig([guard({ name: 'Guard' })]), subscriberConfig([guard({ name: '-x' })]), subscriberConfig([guard({ name: 'a'.repeat(65) })]),
+    subscriberConfig([guard({ role: 'watcher' })]),
+    subscriberConfig([guard({ kinds: [] })]), subscriberConfig([guard({ kinds: ['before-tool', 'before-tool'] })]), subscriberConfig([guard({ kinds: ['tool'] })]),
+    subscriberConfig([guard({ kinds: [RECONCILE], tools: null })]),
+    subscriberConfig([guard({ harnesses: null })]), subscriberConfig([guard({ harnesses: [] })]), subscriberConfig([guard({ harnesses: ['vim'] })]),
+    subscriberConfig([guard({ harnesses: ['opencode'] })]),
+    subscriberConfig([guard({ kinds: ['session-start'], tools: null })]),
+    subscriberConfig([guard({ kinds: ['needs-approval'], tools: null })]),
+    subscriberConfig([guard({ kinds: ['prompt', 'before-tool'] })]),
+    subscriberConfig([guard({ tools: [] })]), subscriberConfig([guard({ tools: [''] })]), subscriberConfig([guard({ tools: ['Bash', 'Bash'] })]),
+    subscriberConfig([guard({ argv: [] })]), subscriberConfig([guard({ argv: ['/usr/bin/python3'] })]), subscriberConfig([guard({ argv: ['bin/guard'] })]), subscriberConfig([guard({ argv: ['.'] })]), subscriberConfig([guard({ argv: ['..'] })]), subscriberConfig([guard({ argv: [''] })]), subscriberConfig([guard({ argv: ['a\0b'] })]), subscriberConfig([guard({ argv: ['true', 1] })]),
+    subscriberConfig([guard({ timeoutMs: 0 })]), subscriberConfig([guard({ timeoutMs: 1.5 })]), subscriberConfig([guard({ timeoutMs: 60001 })]),
+    subscriberConfig([guard({ shell: true })]),
   ];
   for (const value of bad) assert.throws(() => validateSubscribers(value), { code: 'INVALID_CONFIG' }, JSON.stringify(value));
-  validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['prompt', 'before-tool', 'turn-end'], tools: null })] });
-  assert.deepEqual(validateSubscribers({ schema: 2, subscribers: [guard({ argv: ['python3', '/abs/hooks/relay-guard', '; $(x)'] })] }).subscribers[0].argv, ['python3', '/abs/hooks/relay-guard', '; $(x)'], 'later arguments stay literal');
-  validateSubscribers({ schema: 2, subscribers: [observer({ kinds: ['needs-approval', 'idle', RECONCILE], harnesses: ['opencode'] })] });
+  validateSubscribers(subscriberConfig([guard({ kinds: ['prompt', 'before-tool', 'turn-end'], tools: null })]));
+  assert.deepEqual(validateSubscribers(subscriberConfig([guard({ argv: ['python3', '/abs/hooks/relay-guard', '; $(x)'] })])).subscribers[0].argv, ['python3', '/abs/hooks/relay-guard', '; $(x)'], 'later arguments stay literal');
+  validateSubscribers(subscriberConfig([observer({ kinds: ['needs-approval', 'idle', RECONCILE], harnesses: ['opencode'] })]));
+});
+
+test('searchPath is a nonempty list of distinct absolute normalized directories', () => {
+  const ok = { schema: 3, searchPath: ['/usr/bin', '/opt/a'], subscribers: [guard()] };
+  assert.deepEqual(validateSubscribers(ok).searchPath, ['/usr/bin', '/opt/a']);
+  assert.notEqual(validateSubscribers(ok).searchPath, ok.searchPath, 'the returned list is a copy');
+  assert.deepEqual(validateSubscribers({ schema: 3, searchPath: [], subscribers: [] }), { schema: 3, searchPath: [], subscribers: [] });
+  for (const bad of ['', 'bin', './bin', '~/bin', '$HOME/bin', '/usr/bin/', '/usr//bin', '/usr/../bin', '/a:b', '/a\0b', 7, null]) {
+    assert.throws(() => validateSubscribers({ ...ok, searchPath: ['/usr/bin', bad] }), { code: 'INVALID_CONFIG', message: /searchPath\[1\]/ }, JSON.stringify(bad));
+  }
+  for (const searchPath of [undefined, null, '/usr/bin', {}, [], ['/usr/bin', '/usr/bin']]) {
+    assert.throws(() => validateSubscribers({ ...ok, searchPath }), { code: 'INVALID_CONFIG', message: /searchPath/ }, JSON.stringify(searchPath));
+  }
+});
+
+test('schemas 1 and 2 are refused with the migration named', () => {
+  for (const schema of [1, 2]) assert.throws(() => validateSubscribers({ schema, subscribers: [] }), { code: 'INVALID_CONFIG', message: new RegExp(`schema ${schema} is no longer read; migrate it to schema 3`) });
 });
 
 test('loadSubscribers: absent is empty, unsafe or corrupt is INVALID_CONFIG', async (t) => {
   const p = await tempPaths(t);
-  assert.deepEqual(await loadSubscribers(p), { schema: 2, subscribers: [] });
+  assert.deepEqual(await loadSubscribers(p), { schema: 3, searchPath: [], subscribers: [] });
   await writeSubscribers(p, [guard()]);
   assert.equal((await loadSubscribers(p)).subscribers[0].name, 'guard');
   await chmod(p.subscribersPath, 0o644);
@@ -53,14 +69,14 @@ test('loadSubscribers: absent is empty, unsafe or corrupt is INVALID_CONFIG', as
   await chmod(p.configDir, 0o700);
   await writeSubscribers(p, [], { text: '{ broken' });
   await assert.rejects(loadSubscribers(p), { code: 'INVALID_CONFIG' });
-  await writeSubscribers(p, [], { text: '{"schema":2,"subscribers":[{"name":"x"}]}' });
+  await writeSubscribers(p, [], { text: '{"schema":3,"searchPath":["/usr/bin"],"subscribers":[{"name":"x"}]}' });
   await assert.rejects(loadSubscribers(p), { code: 'INVALID_CONFIG' });
 });
 
 test('loadSubscribersFrom reads an explicit file and treats absence as INVALID_CONFIG', async (t) => {
   const p = await tempPaths(t);
   await assert.rejects(loadSubscribersFrom(p.subscribersPath), { code: 'INVALID_CONFIG', message: /does not exist/ });
-  assert.deepEqual(await loadSubscribers(p), { schema: 2, subscribers: [] });
+  assert.deepEqual(await loadSubscribers(p), { schema: 3, searchPath: [], subscribers: [] });
   await writeSubscribers(p, [guard()]);
   const config = await loadSubscribersFrom(p.subscribersPath);
   assert.equal(config.subscribers[0].name, 'guard');
@@ -82,9 +98,9 @@ test('loadSubscribersFrom applies the runtime privacy checks and names them', as
 });
 
 test('matching honors kind, harness and tool filters in configuration order', () => {
-  const config = validateSubscribers({ schema: 2, subscribers: [
+  const config = validateSubscribers(subscriberConfig([
     observer({ name: 'all' }), guard({ name: 'bash' }), guard({ name: 'codex-only', harnesses: ['codex'] }),
-    guard({ name: 'edit', tools: ['Edit'] }), observer({ name: 'prompts', kinds: ['prompt'] }), observer({ name: 'reap', kinds: [RECONCILE] }) ] });
+    guard({ name: 'edit', tools: ['Edit'] }), observer({ name: 'prompts', kinds: ['prompt'] }), observer({ name: 'reap', kinds: [RECONCILE] }) ]));
   const names = (e) => matchSubscribers(config, e).map((s) => s.name);
   assert.deepEqual(names(event()), ['all', 'bash']);
   assert.deepEqual(names(event('codex')), ['all', 'bash', 'codex-only']);
@@ -112,16 +128,21 @@ test('budgetFor derives the profile from the outer timeout and enforces document
 
 test('the documented example configuration fits every mapped harness/event and reconciliation', () => {
   const familiar = ['familiar', 'observe'];
-  const example = validateSubscribers({ schema: 2, subscribers: [
+  const example = validateSubscribers(subscriberConfig([
     { name: 'ops-guard', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code', 'codex'], tools: ['Bash'], argv: ['relay-guard'], timeoutMs: 4000 },
     { name: 'familiar', role: 'observer', harnesses: ['claude-code', 'codex'], registry: 'snapshot', kinds: ['session-start', 'prompt', 'before-tool', 'idle', 'needs-input', 'needs-approval', 'turn-end', 'turn-error', 'child-start', 'child-stop', RECONCILE], argv: familiar, timeoutMs: 2000 },
     { name: 'familiar-opencode', role: 'observer', registry: 'snapshot', harnesses: ['opencode'], kinds: ['session-start', 'activity', 'idle', 'needs-approval', 'turn-error', 'session-end'], argv: familiar, timeoutMs: 80 },
-    { name: 'familiar-teardown', role: 'observer', registry: 'snapshot', harnesses: ['claude-code', 'codex'], kinds: ['session-end'], argv: familiar, timeoutMs: 200 } ] });
-  // OpenCode's fixed 5 s lifetime admits at most 84 ms of subscriber timeout once startup, discovery and cleanup are reserved.
-  const opencode = (timeoutMs) => validateSubscribers({ schema: 2, subscribers: [{ name: 'o', role: 'observer', registry: 'snapshot', harnesses: ['opencode'], kinds: ['session-start'], argv: ['familiar'], timeoutMs }] });
-  assert.equal(checkBudget(opencode(84), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }).length, 1);
-  assert.throws(() => checkBudget(opencode(85), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }), { code: 'INVALID_CONFIG' });
-  // SessionEnd's native caps leave less than one subscriber's startup, discovery and cleanup reserves.
+    { name: 'familiar-teardown', role: 'observer', registry: 'snapshot', harnesses: ['claude-code', 'codex'], kinds: ['session-end'], argv: familiar, timeoutMs: 200 } ]));
+  // OpenCode's fixed 5 s lifetime admits at most 584 ms of subscriber timeout once startup and cleanup are reserved.
+  const opencode = (timeoutMs) => validateSubscribers(subscriberConfig([{ name: 'o', role: 'observer', registry: 'snapshot', harnesses: ['opencode'], kinds: ['session-start'], argv: ['familiar'], timeoutMs }]));
+  assert.equal(checkBudget(opencode(584), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }).length, 1);
+  assert.throws(() => checkBudget(opencode(585), budgetFor({ harness: 'opencode', nativeEvent: 'init' }), { harness: 'opencode', kind: 'session-start' }), { code: 'INVALID_CONFIG' });
+  // SessionEnd's native caps: Claude Code's 1.5 s default admits nothing, Codex's 3 s one observer of up to 50 ms.
+  const ending = (harness, timeoutMs) => validateSubscribers(subscriberConfig([{ name: 'e', role: 'observer', registry: 'snapshot', harnesses: [harness], kinds: ['session-end'], argv: ['familiar'], timeoutMs }]));
+  const atEnd = (harness, outerMs, timeoutMs) => checkBudget(ending(harness, timeoutMs), budgetFor({ harness, nativeEvent: 'SessionEnd', outerMs }), { harness, kind: 'session-end', nativeEvent: 'SessionEnd' });
+  assert.equal(atEnd('codex', 3000, 50).length, 1);
+  assert.throws(() => atEnd('codex', 3000, 51), { code: 'INVALID_CONFIG' });
+  assert.throws(() => atEnd('claude-code', 1500, 1), { code: 'INVALID_CONFIG' });
   for (const [harness, outerMs] of [['claude-code', 1500], ['codex', 3000]]) {
     assert.throws(() => checkBudget(example, budgetFor({ harness, nativeEvent: 'SessionEnd', outerMs }), { harness, kind: 'session-end', nativeEvent: 'SessionEnd' }), { code: 'INVALID_CONFIG' });
   }
@@ -137,8 +158,8 @@ test('the documented example configuration fits every mapped harness/event and r
 });
 
 test('checkBudget sums the worst match ignoring tool filters', () => {
-  const config = validateSubscribers({ schema: 2, subscribers: [guard({ timeoutMs: 200 }), guard({ name: 'edit', tools: ['Edit'], timeoutMs: 150 }), observer({ timeoutMs: 100 })] });
-  // need: 250 startup + 500 discovery + (200 + 500) + (150 + 500) + (100 + 500) = 2700 ms
+  const config = validateSubscribers(subscriberConfig([guard({ timeoutMs: 200 }), guard({ name: 'edit', tools: ['Edit'], timeoutMs: 150 }), observer({ timeoutMs: 100 })]));
+  // need: 250 startup + (200 + 500) + (150 + 500) + (100 + 500) = 2200 ms
   const budget = budgetFor({ outerMs: 20000 });
   assert.deepEqual(checkBudget(config, budget, { harness: 'codex', kind: 'before-tool' }).map((s) => s.name), ['guard', 'edit', 'observer']);
   assert.throws(() => checkBudget(config, budgetFor({ harness: 'codex', nativeEvent: 'SessionEnd' }), { harness: 'codex', kind: 'before-tool' }), { code: 'INVALID_CONFIG' });
@@ -148,20 +169,20 @@ test('checkBudget sums the worst match ignoring tool filters', () => {
   assert.throws(() => checkBudget(config, budgetFor({ outerMs: 500 }), { kind: RECONCILE }), { code: 'INVALID_CONFIG' });
 });
 test('Codex Stop and SubagentStop guards bind separately through hook kinds', () => {
-  const config = validateSubscribers({ schema: 2, subscribers: [guard({ name: 'stop', kinds: ['turn-end'], harnesses: ['codex'], tools: null }),
-    guard({ name: 'child', kinds: ['child-stop'], harnesses: ['codex'], tools: null })] });
+  const config = validateSubscribers(subscriberConfig([guard({ name: 'stop', kinds: ['turn-end'], harnesses: ['codex'], tools: null }),
+    guard({ name: 'child', kinds: ['child-stop'], harnesses: ['codex'], tools: null })]));
   const stop = normalizeHookEvent('codex', 'Stop', JSON.stringify({ session_id: 's', cwd: '/repo' }), { invokingCwd: '/invoking' });
   const child = normalizeHookEvent('codex', 'SubagentStop', JSON.stringify({ session_id: 's', agent_id: 'w', cwd: '/repo' }), { invokingCwd: '/invoking' });
   assert.deepEqual(matchSubscribers(config, stop).map((s) => s.name), ['stop']);
   assert.deepEqual(matchSubscribers(config, child).map((s) => s.name), ['child']);
-  assert.throws(() => validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['child-stop'], harnesses: ['claude-code'], tools: null })] }), { code: 'INVALID_CONFIG', message: /claude-code child-stop has no refusal channel/ });
+  assert.throws(() => validateSubscribers(subscriberConfig([guard({ kinds: ['child-stop'], harnesses: ['claude-code'], tools: null })])), { code: 'INVALID_CONFIG', message: /claude-code child-stop has no refusal channel/ });
 });
 
-test('schema 2 roles: notices need a context channel, observers declare registry use, and only observers select private fields', () => {
+test('roles: notices need a context channel, observers declare registry use, and only observers select private fields', () => {
   const notice = (over = {}) => ({ name: 'notice', role: 'notice', kinds: ['prompt'], harnesses: ['claude-code'], argv: ['true'], timeoutMs: 100, ...over });
   const counter = (over = {}) => observer({ name: 'counter', registry: 'occurrence', kinds: ['after-tool', 'tool-error'], harnesses: ['claude-code'], tools: ['Bash'],
     privateFields: [{ nativeEvent: 'PostToolUse', fields: ['command', 'durationMs'] }], ...over });
-  const config = validateSubscribers({ schema: 2, subscribers: [notice(), counter()] });
+  const config = validateSubscribers(subscriberConfig([notice(), counter()]));
   assert.deepEqual(config.subscribers[0], { ...notice(), tools: null, nativeEvents: null });
   assert.deepEqual(config.subscribers[1].privateFields, [{ nativeEvent: 'PostToolUse', fields: ['command', 'durationMs'] }]);
   const bad = [
@@ -181,14 +202,14 @@ test('schema 2 roles: notices need a context channel, observers declare registry
     observer({ kinds: ['session-start'], tools: ['Bash'] }),
     guard({ nativeEvents: ['PostToolUse'] }), guard({ nativeEvents: [] }), guard({ nativeEvents: ['PreToolUse', 'PreToolUse'] }),
   ];
-  for (const value of bad) assert.throws(() => validateSubscribers({ schema: 2, subscribers: [value] }), { code: 'INVALID_CONFIG' }, JSON.stringify(value));
-  validateSubscribers({ schema: 2, subscribers: [observer({ kinds: ['before-tool', 'after-tool', 'tool-error'], tools: ['Bash'] })] });
+  for (const value of bad) assert.throws(() => validateSubscribers(subscriberConfig([value])), { code: 'INVALID_CONFIG' }, JSON.stringify(value));
+  validateSubscribers(subscriberConfig([observer({ kinds: ['before-tool', 'after-tool', 'tool-error'], tools: ['Bash'] })]));
 });
 
 test('nativeEvents intersects kind and harness selection', () => {
-  const config = validateSubscribers({ schema: 2, subscribers: [
+  const config = validateSubscribers(subscriberConfig([
     observer({ name: 'idle-only', kinds: ['needs-input', 'needs-approval'], harnesses: ['claude-code'], nativeEvents: ['Notification:idle_prompt'] }),
-    observer({ name: 'all-notifications', kinds: ['needs-input', 'needs-approval'], harnesses: ['claude-code'] }) ] });
+    observer({ name: 'all-notifications', kinds: ['needs-input', 'needs-approval'], harnesses: ['claude-code'] }) ]));
   const idle = event('claude-code', 'Notification:idle_prompt', {});
   const permission = event('claude-code', 'Notification:permission_prompt', {});
   assert.deepEqual(matchSubscribers(config, idle).map((s) => s.name), ['idle-only', 'all-notifications']);
@@ -203,9 +224,9 @@ test('budgetFor admits hook-only events and keeps unknown events unsupported', (
 });
 
 test('agy turn-end guards now load (Stop holds with continue); a session-start guard is rejected', () => {
-  validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['turn-end'], harnesses: ['agy'], tools: null })] });
-  assert.throws(() => validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['session-start'], harnesses: ['agy'], tools: null })] }), (e) => e.code === 'INVALID_CONFIG' && e.message.includes('agy session-start has no refusal channel'));
-  validateSubscribers({ schema: 2, subscribers: [guard({ kinds: ['before-tool'], harnesses: ['agy'] })] });
+  validateSubscribers(subscriberConfig([guard({ kinds: ['turn-end'], harnesses: ['agy'], tools: null })]));
+  assert.throws(() => validateSubscribers(subscriberConfig([guard({ kinds: ['session-start'], harnesses: ['agy'], tools: null })])), (e) => e.code === 'INVALID_CONFIG' && e.message.includes('agy session-start has no refusal channel'));
+  validateSubscribers(subscriberConfig([guard({ kinds: ['before-tool'], harnesses: ['agy'] })]));
 });
 test('agy budget follows the 30 s outer timeout and an explicit outer timeout', () => {
   const b = budgetFor({ harness: 'agy', nativeEvent: 'PreToolUse' });

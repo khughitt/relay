@@ -12,10 +12,11 @@ import { parseQualification, qualificationRows, qualifyBinding, qualifyInstall }
 import { planClaudeCode } from '../src/install/claude-code.js';
 import { planCodex } from '../src/install/codex.js';
 import { pairDigests, relayPairs } from '../src/install/pair.js';
+import { subscriberConfig } from './helpers/fixture.js';
 import { COMMIT, DIGEST, passedChecks, qualificationFor, registryRoutes } from './helpers/qualification.js';
 import { relayCopy } from './helpers/relay-copy.js';
 
-const subscribers = (...entries) => validateSubscribers({ schema: 2, subscribers: entries });
+const subscribers = (...entries) => validateSubscribers(subscriberConfig(entries));
 const subscriber = (over) => ({ name: 'g', role: 'guard', kinds: null, harnesses: ['claude-code', 'codex'], tools: null, nativeEvents: null, argv: ['ops-guard'], timeoutMs: 1000, ...over });
 const target = (over = {}) => ({ harness: 'claude-code', version: '2.1.322', mode: 'interactive', platform: process.platform, relayCommit: COMMIT, configDigest: DIGEST, ...over });
 const doc = (routes, over = {}) => qualificationFor({ harness: 'claude-code', version: '2.1.322', routes, ...over });
@@ -152,7 +153,7 @@ test('the shipped qualification fixture is a valid contract with owned gaps', ()
 
 // Two separately versioned relay installations, laid out as npm installs one: the prior pair
 // stays runnable and restorable while the new pair is cut over, partially, beside it.
-async function configAt(dir, value = { schema: 2, subscribers: [] }) {
+async function configAt(dir, value = subscriberConfig([])) {
   await mkdir(dir, { recursive: true, mode: 0o700 });
   const file = join(dir, 'subscribers.json'); await writeFile(file, `${JSON.stringify(value)}\n`, { mode: 0o600 });
   return file;

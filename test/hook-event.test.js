@@ -6,6 +6,7 @@ import { adapterFor, normalizeEvent } from '../src/adapters/index.js';
 import { validateEvent } from '../src/protocol.js';
 import { validateSubscribers } from '../src/subscribers.js';
 import * as relay from '../src/index.js';
+import { subscriberConfig } from './helpers/fixture.js';
 
 const fixtureDir = new URL('./fixtures/hook-events/', import.meta.url);
 const read = (name) => JSON.parse(readFileSync(new URL(name, fixtureDir), 'utf8'));
@@ -210,12 +211,12 @@ test('agy preserves every own-termination string across absent and invalid retry
 });
 
 test('envelopes carry private fields only to guards and explicitly selecting observers', () => {
-  const config = validateSubscribers({ schema: 2, subscribers: [
+  const config = validateSubscribers(subscriberConfig([
     { name: 'guard', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['true'], timeoutMs: 100 },
     { name: 'ordinary', role: 'observer', registry: 'occurrence', kinds: ['after-tool'], argv: ['true'], timeoutMs: 100 },
     { name: 'counter', role: 'observer', registry: 'occurrence', kinds: ['after-tool', 'tool-error'], harnesses: ['claude-code'], tools: ['Bash'],
       privateFields: [{ nativeEvent: 'PostToolUse', fields: ['command', 'durationMs'] }, { nativeEvent: 'PostToolUseFailure', fields: ['command', 'durationMs'] }], argv: ['true'], timeoutMs: 100 },
-  ] });
+  ]));
   const [guard, ordinary, counterSub] = config.subscribers;
   const { input } = fixture('claude-code', 'PostToolUse', 'bash-counter');
   const post = normalizeHookEvent('claude-code', 'PostToolUse', JSON.stringify(input), opts);

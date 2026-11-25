@@ -17,6 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cpus } from 'node:os';
 import { statistics } from './statistics.mjs';
 import { validateManifest, checkRetainedWork, runBaseline, workLists } from './baseline.mjs';
+import { CANDIDATE_HOOK_PATH } from './candidate-config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -85,27 +86,27 @@ function prepare(out) {
   for (const dir of [bin, cwd]) mkdirSync(dir, { recursive: true });
   mkdirSync(config, { recursive: true, mode: 0o700 });
   for (const [name, body] of Object.entries(fixtureScripts)) writeFileSync(join(bin, name), body, { mode: 0o755 });
-  const timeoutMs = 1000;
+  const timeoutMs = 1000, searchPath = [bin, '/usr/bin', '/bin'];
   const write = (/** @type {string} */ name, /** @type {unknown} */ value) => writeFileSync(join(config, name), `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   // Deployed composition fixture: the subscribers the deployed config matches for Claude PreToolUse
   // (ops-guard with tools Bash, familiar), same order, timeouts normalized to the workload.
   write('deployed.json', { schema: 1, subscribers: [
     { name: 'ops-guard', role: 'guard', harnesses: ['claude-code'], kinds: ['before-tool'], tools: ['Bash'], argv: [join(bin, 'relay-fixture-guard')], timeoutMs },
     { name: 'familiar', role: 'observer', harnesses: ['claude-code'], kinds: ['before-tool'], argv: [join(bin, 'relay-fixture-observer')], timeoutMs } ] });
-  write('candidate.json', { schema: 2, subscribers: [
+  write('candidate.json', { schema: 3, searchPath, subscribers: [
     { name: 'ops-guard', role: 'guard', harnesses: ['claude-code'], kinds: ['before-tool'], tools: ['Bash'], argv: ['relay-fixture-guard'], timeoutMs },
     { name: 'turn-pause', role: 'guard', harnesses: ['claude-code'], kinds: ['before-tool'], argv: ['relay-fixture-guard'], timeoutMs },
     { name: 'familiar', role: 'observer', registry: 'snapshot', harnesses: ['claude-code'], kinds: ['before-tool'], argv: ['relay-fixture-observer'], timeoutMs } ] });
   // PostToolUse is not relayed today: the native-only diagnostic's candidate migrates the test counter as an occurrence observer.
-  write('candidate-posttool.json', { schema: 2, subscribers: [
+  write('candidate-posttool.json', { schema: 3, searchPath, subscribers: [
     { name: 'test-counter', role: 'observer', registry: 'occurrence', harnesses: ['claude-code'], kinds: ['after-tool'], tools: ['Bash'],
       privateFields: [{ nativeEvent: 'PostToolUse', fields: ['command', 'durationMs'] }], argv: ['relay-fixture-observer'], timeoutMs } ] });
   // Amendment 1 diagnostic: a subscriber for this harness whose tool filter admits nothing on a Bash
   // PreToolUse, so the supervisor starts speculatively and is released unused.
-  write('candidate-speculative.json', { schema: 2, subscribers: [
+  write('candidate-speculative.json', { schema: 3, searchPath, subscribers: [
     { name: 'edit-guard', role: 'guard', harnesses: ['claude-code'], kinds: ['before-tool'], tools: ['Edit'], argv: ['relay-fixture-guard'], timeoutMs } ] });
   write('deployed-empty.json', { schema: 1, subscribers: [] });
-  write('candidate-empty.json', { schema: 2, subscribers: [] });
+  write('candidate-empty.json', { schema: 3, searchPath, subscribers: [] });
   const digests = Object.fromEntries([...readdirSync(bin).map((n) => [`bin/${n}`, sha(join(bin, n))]), ...readdirSync(config).map((n) => [`config/${n}`, sha(join(config, n))])]);
   writeFileSync(join(fixture, 'digests.json'), `${JSON.stringify(digests, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify({ fixture, digests }, null, 2)}\n`);
@@ -149,6 +150,9 @@ async function measure(options) {
   let sample = 0;
   const env = (/** @type {string} */ state) => ({ PATH: `${bin}:/usr/bin:/bin`, HOME: home, RELAY_STATE_DIR: state, XDG_CONFIG_HOME: join(home, '.config'), XDG_STATE_HOME: join(home, '.local/state'),
     RELAY_PILOT_PPID_FILE: join(ppid, String(++sample)) });
+  // The branches that run the candidate relay, launched without the fixture on PATH.
+  const candidateBranches = ['candidate-relay', 'candidate-empty', 'candidate-speculative'];
+  const withCandidate = (/** @type {NodeJS.ProcessEnv} */ e) => ({ env: e, branchEnv: Object.fromEntries(candidateBranches.map((name) => [name, { ...e, PATH: CANDIDATE_HOOK_PATH }])) });
   // Each fixture body appends its parent pid: the lines count invocations, the distinct parents count supervisors.
   const parentLines = (/** @type {string} */ file) => existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
   const deployedEntry = manifest.deployed.relayEntry;
@@ -162,7 +166,7 @@ async function measure(options) {
   checkRetainedWork(manifest, workLists({ deployed: configOf('deployed.json'), candidate: configOf('candidate.json'), native: ['turn-pause'] }));
   /** @param {any} m @param {string} state */
   const event = async (m, state) => {
-    const e = env(state), r = await runBaseline(m, { event: w.event, input: payload, env: e, cwd });
+    const e = env(state), r = await runBaseline(m, { event: w.event, input: payload, ...withCandidate(e), cwd });
     const seen = parentLines(e.RELAY_PILOT_PPID_FILE);
     // Supervised subscribers have the supervisor process as parent, never the relay hook process itself.
     return { elapsedMs: r.elapsedMs, ok: r.statuses.every((s) => s === 'exited 0') && r.survivors.length === 0, statuses: r.statuses, survivors: r.survivors,
@@ -214,7 +218,7 @@ async function measure(options) {
     const postState = stateFor('posttool');
     const nativeOnly = single('claude-posttooluse', join(bin, 'relay-fixture-native'));
     const relayed = single('candidate-relay', `'${node}' '${join(candidate, 'bin/relay.js')}' hook --harness claude-code --outer-ms ${w.outerMs} --subscribers '${join(config, 'candidate-posttool.json')}' PostToolUse`);
-    const sample = async (/** @type {any} */ m) => { const e = env(postState), r = await runBaseline({ ...m, event: 'PostToolUse' }, { event: 'PostToolUse', input: postPayload, env: e, cwd });
+    const sample = async (/** @type {any} */ m) => { const e = env(postState), r = await runBaseline({ ...m, event: 'PostToolUse' }, { event: 'PostToolUse', input: postPayload, ...withCandidate(e), cwd });
       return { elapsedMs: r.elapsedMs, ok: r.statuses.every((x) => x === 'exited 0') && r.survivors.length === 0, statuses: r.statuses, supervisors: new Set(parentLines(e.RELAY_PILOT_PPID_FILE).map((line) => line.split(' ', 1)[0])).size }; };
     for (let i = 0; i < warm + measured; i++) {
       const b = await sample(nativeOnly), c = await sample(relayed);

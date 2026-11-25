@@ -111,7 +111,7 @@ test('a SessionStart whose event cwd is missing or a file runs no notice and ret
   const p = await tempPaths(t), file = join(CWD, 'cwd-is-a-file');
   await writeFile(file, '');
   await writeSubscribers(p, [strip(notice('n', 'notice', { extra: ['n'] }))]);
-  for (const [cwd, code] of [[join(CWD, 'gone'), 'REPOSITORY_UNREADABLE'], [file, 'SPAWN-FAILED']]) {
+  for (const [cwd, code] of [[join(CWD, 'gone'), 'SPAWN-FAILED'], [file, 'SPAWN-FAILED']]) {
     const r = await hook(p, { body: JSON.stringify({ session_id: 'sess', cwd, source: 'startup' }) });
     // gitContext is stubbed, so publication succeeds here; a real dispatch also fails registry identity (GIT_ERROR) and exits 1.
     assert.equal(r.exitCode, 0, r.stderr);

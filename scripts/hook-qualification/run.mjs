@@ -16,12 +16,13 @@
 import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cpus } from 'node:os';
 import { statistics } from './statistics.mjs';
 import { validateManifest, checkRetainedWork, runBaseline, workLists } from './baseline.mjs';
 import { judge } from './judge.mjs';
+import { CANDIDATE_HOOK_PATH, renderCandidate, selectPrograms } from './candidate-config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HARNESS_COMMANDS = /** @type {Record<string, string>} */ ({ 'claude-code': 'claude', codex: 'codex' });
@@ -192,8 +193,8 @@ async function runRoute(options) {
   const { adapterFor } = await import(pathToFileURL(join(candidate, 'src/adapters/index.js')).href);
   const adapter = adapterFor(harness);
   const outerMs = Math.min(q.outerMs, adapter.outerTimeouts.max?.[nativeEvent] ?? q.outerMs);
-  const candidateConfig = join(fixtureConfig, manifest.candidate.config);
-  if (sha(candidateConfig) !== manifest.candidate.configSha256) refuse(`${options.one}: the candidate config changed since the manifest was frozen`);
+  const candidateTemplate = join(fixtureConfig, manifest.candidate.config);
+  if (sha(candidateTemplate) !== manifest.candidate.configSha256) refuse(`${options.one}: the candidate config changed since the manifest was frozen`);
   const relayed = manifest.baselineKind === 'deployed-relay-plus-native';
   const deployedConfig = relayed ? join(fixtureConfig, manifest.deployed.config) : null;
   const deployedDigest = relayed ? deployedDigestOf(manifest, setDir) : null;
@@ -206,6 +207,10 @@ async function runRoute(options) {
   const stateDir = (/** @type {string} */ name) => { const dir = join(work, 'state', name); mkdirSync(dir, { recursive: true, mode: 0o700 }); return dir; };
   const env = (/** @type {string} */ state) => { const n = ++counter; return { PATH: `${workBin}:${fixtureBin}:/usr/bin:/bin`, HOME: home, RELAY_STATE_DIR: state,
     XDG_CONFIG_HOME: join(home, '.config'), XDG_STATE_HOME: join(home, '.local/state'), RELAY_PILOT_PPID_FILE: join(notes, `${n}.ppid`), RELAY_QUAL_GRANDCHILD_FILE: join(notes, `${n}.grandchild`) }; };
+  // The branches that run the candidate relay. They alone are launched without the fixture on PATH:
+  // the candidate finds its subscribers through its config or not at all.
+  const candidateBranches = ['candidate-relay', 'candidate-empty', 'candidate-speculative', 'candidate-start-probe', 'speculative-start-probe'];
+  const withCandidate = (/** @type {NodeJS.ProcessEnv} */ e) => ({ env: e, branchEnv: Object.fromEntries(candidateBranches.map((name) => [name, { ...e, PATH: CANDIDATE_HOOK_PATH }])) });
   const lines = (/** @type {string} */ file) => existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
   const vars = { '@NODE@': node, '@FIXTURE@': fixture, '@DEPLOYED@': relayed ? manifest.deployed.relayEntry : '', '@CONFIG@': fixtureConfig, '@CANDIDATE@': candidate };
   const substitute = (/** @type {string} */ value) => Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(k, v), value);
@@ -219,7 +224,7 @@ async function runRoute(options) {
   const supervisorStarted = async (config, name) => {
     const log = join(notes, `${name}.spawns`), state = stateDir(name);
     const e = { ...env(state), RELAY_SPAWN_LOG: log };
-    const r = await runBaseline(single(name, hook(join(candidate, 'bin/relay.js'), config, outerMs, recorder)), { event, input: payload, env: e, cwd, capture: true });
+    const r = await runBaseline(single(name, hook(join(candidate, 'bin/relay.js'), config, outerMs, recorder)), { event, input: payload, ...withCandidate(e), cwd, capture: true });
     return { ok: r.statuses.every((x) => x === 'exited 0') && r.survivors.length === 0, statuses: r.statuses, started: lines(log).some((line) => line.includes('supervisor-process.js')) };
   };
   /** A composition of the candidate relay with the native branches the cutover keeps. @param {string} config */
@@ -230,26 +235,54 @@ async function runRoute(options) {
   const baselineEvent = { ...manifest, branches: baselineBranches };
   // Work each side runs, from the configurations themselves, and the fixture body each invocation runs.
   const configOf = (/** @type {string} */ file) => JSON.parse(readFileSync(file, 'utf8'));
+  const { loadSubscribersFrom } = await import(pathToFileURL(join(candidate, 'src/subscribers.js')).href);
+  const { resolveExecutable } = await import(pathToFileURL(join(candidate, 'src/executable.js')).href);
+  /** This host's copy of a frozen candidate config, which the candidate's own loader must accept. @param {string} template */
+  const measured = async (template) => {
+    const file = join(workConfig, `measured-${basename(template)}`);
+    writeFileSync(file, renderCandidate(readFileSync(template, 'utf8'), { work, fixture }), { mode: 0o600 });
+    await loadSubscribersFrom(file);
+    return file;
+  };
+  const candidateConfig = await measured(candidateTemplate);
+  const emptyCandidate = await measured(join(fixtureConfig, manifest.noSubscriber?.candidate ?? 'candidate-empty.json'));
+  const speculative = manifest.noSubscriber?.speculative ? await measured(join(fixtureConfig, manifest.noSubscriber.speculative)) : null;
   const deployedSubscribers = deployedConfig ? configOf(deployedConfig) : null, candidateSubscribers = configOf(candidateConfig);
   const migrating = baselineBranches.filter((/** @type {any} */ b) => b.role === 'native' && b.migrates !== false);
   const lists = workLists({ deployed: deployedSubscribers, candidate: candidateSubscribers, native: migrating.map((/** @type {any} */ b) => b.name) });
   checkRetainedWork(manifest, lists);
-  // Each invocation is identified by the work its fixture program does; a program that is not the
-  // prepared one, or changed since, identifies nothing.
+  // Each baseline invocation is identified by the work its fixture program does; a program that is
+  // not the prepared one, or changed since, identifies nothing.
   const programs = JSON.parse(readFileSync(join(fixture, 'programs.json'), 'utf8'));
   const programOf = (/** @type {string} */ argv0) => { const path = isAbsolute(argv0) ? argv0 : join(fixtureBin, argv0), known = programs[path.split('/').at(-1) ?? ''];
     return known && existsSync(path) && sha(path) === known.sha256 ? known.work : null; };
+  // The failure conditions' configs: the candidate's with its first subscriber's program replaced.
+  const first = candidateSubscribers.subscribers[0];
+  if (!first) refuse(`${options.one}: the candidate config has no subscriber for the failure conditions`);
+  const derived = (/** @type {string} */ name, /** @type {any} */ change) => {
+    const value = structuredClone(candidateSubscribers);
+    value.subscribers[0] = { ...value.subscribers[0], ...change };
+    const file = join(workConfig, name); writeFileSync(file, `${JSON.stringify(value)}\n`, { mode: 0o600 }); return file;
+  };
+  const missingConfig = derived('missing.json', { argv: ['relay-qualification-missing', ...first.argv.slice(1)] });
+  const hangConfig = derived('timeout.json', { argv: ['relay-fixture-hang'], timeoutMs: q.timeoutMs });
+  writeFileSync(join(workBin, 'relay-fixture-hang'), programText(fixturePrograms(q.contextChars)['relay-fixture-hang']), { mode: 0o755 });
+  // Before anything is measured, every candidate config selects the prepared programs or the run stops.
+  const select = (/** @type {string} */ file, /** @type {string[]} */ missing = []) => selectPrograms(configOf(file), { resolveExecutable, programs, fixtureBin, workBin, missing });
+  const selected = await select(candidateConfig);
+  for (const file of [emptyCandidate, hangConfig, ...(speculative ? [speculative] : [])]) await select(file);
+  await select(missingConfig, [first.name]);
   const fixtures = {
     baseline: Object.fromEntries([...(deployedSubscribers?.subscribers ?? []).map((/** @type {any} */ s) => [`deployed-relay:${s.name}`, programOf(s.argv[0])]),
       ...migrating.map((/** @type {any} */ b) => [b.name, b.fixture ? programOf(b.fixture) : null])]),
-    candidate: Object.fromEntries(candidateSubscribers.subscribers.map((/** @type {any} */ s) => [`candidate:${s.name}`, programOf(s.argv[0])])),
+    candidate: Object.fromEntries(Object.entries(selected).map(([name, program]) => [`candidate:${name}`, program.work])),
   };
   const expected = { baseline: lists.baseline.length, candidate: lists.candidate.length };
   // A native payload of the declared size for this event, built once for the runner and decoder replay.
   const { cwd, input: payload } = buildTimedInput(manifest, { fixture, payloadBytes: q.payloadBytes });
   /** @param {any} m @param {string} state @param {'baseline'|'candidate'} side */
   const sample = async (m, state, side) => {
-    const e = env(state), r = await runBaseline(m, { event, input: payload, env: e, cwd, capture: true });
+    const e = env(state), r = await runBaseline(m, { event, input: payload, ...withCandidate(e), cwd, capture: true });
     const seen = lines(e.RELAY_PILOT_PPID_FILE), relay = r.branches.find((b) => b.name === 'candidate-relay');
     return { elapsedMs: r.elapsedMs, ok: r.statuses.every((s) => s === 'exited 0') && r.survivors.length === 0 && seen.length === expected[side],
       statuses: r.statuses, survivors: r.survivors, invocations: seen.length, stderr: side === 'candidate' ? relay?.stderr ?? '' : '', stateDir: state,
@@ -296,14 +329,6 @@ async function runRoute(options) {
   }
   loadLog.cold = load();
 
-  // A derived candidate config with the first subscriber's program replaced.
-  const derived = (/** @type {string} */ name, /** @type {any} */ change) => {
-    const value = structuredClone(candidateSubscribers);
-    value.subscribers[0] = { ...value.subscribers[0], ...change };
-    const file = join(workConfig, name); writeFileSync(file, `${JSON.stringify(value)}\n`, { mode: 0o600 }); return file;
-  };
-  const first = candidateSubscribers.subscribers[0];
-  if (!first) refuse(`${options.one}: the candidate config has no subscriber for the failure conditions`);
   const refusable = adapter.replies[nativeEvent]?.refuse === true;
   const allowReply = adapter.encodeReply(nativeEvent, { decision: 'allow' }), denyReply = refusable ? adapter.encodeReply(nativeEvent, { decision: 'deny', reason: 'relay refused' }) : null;
   const keys = (/** @type {string} */ text) => { try { return JSON.stringify(Object.keys(JSON.parse(text)).sort()); } catch { return null; } };
@@ -315,11 +340,11 @@ async function runRoute(options) {
   const exitOf = (/** @type {string} */ status) => /^exited (\d+)$/.exec(status) ? Number(/^exited (\d+)$/.exec(status)?.[1]) : null;
 
   // Missing first command: the role's own failure, within the bound, with no fallback executable.
-  const missingConfig = derived('missing.json', { argv: ['relay-qualification-missing', ...first.argv.slice(1)] }), missingEvent = candidateOf(missingConfig);
+  const missingEvent = candidateOf(missingConfig);
   const expectedFailure = first.role === 'guard' && refusable ? 'refusal' : 'allow';
   conditions.missing = [];
   for (let i = 0; i < counts.missing; i++) {
-    const e = env(stateDir('missing')), r = await runBaseline(missingEvent, { event, input: payload, env: e, cwd, capture: true });
+    const e = env(stateDir('missing')), r = await runBaseline(missingEvent, { event, input: payload, ...withCandidate(e), cwd, capture: true });
     const relay = /** @type {any} */ (r.branches.find((b) => b.name === 'candidate-relay')), seen = lines(e.RELAY_PILOT_PPID_FILE).length;
     const observed = replyKind(relay.stdout ?? '', exitOf(relay.status));
     conditions.missing.push({ elapsedMs: r.elapsedMs, ok: exitOf(relay.status) !== null && r.survivors.length === 0 && /EXECUTABLE_NOT_FOUND/.test(`${relay.stdout}${relay.stderr}`),
@@ -328,12 +353,10 @@ async function runRoute(options) {
   loadLog.missing = load();
 
   // Timeout with a grandchild: the group is contained within the bound and nothing survives it.
-  const hangConfig = derived('timeout.json', { argv: ['relay-fixture-hang'], timeoutMs: q.timeoutMs }), hangEvent = candidateOf(hangConfig);
-  const hangProgram = join(workBin, 'relay-fixture-hang');
-  writeFileSync(hangProgram, programText(fixturePrograms(q.contextChars)['relay-fixture-hang']), { mode: 0o755 });
+  const hangEvent = candidateOf(hangConfig);
   conditions.timeout = [];
   for (let i = 0; i < counts.timeout; i++) {
-    const e = env(stateDir('timeout')), r = await runBaseline(hangEvent, { event, input: payload, env: e, cwd, capture: true });
+    const e = env(stateDir('timeout')), r = await runBaseline(hangEvent, { event, input: payload, ...withCandidate(e), cwd, capture: true });
     await new Promise((done) => setTimeout(done, 50));
     // Survivors are recorded before the rescue kill, which marks the sample failed.
     const alive = lines(e.RELAY_QUAL_GRANDCHILD_FILE).map(Number).filter((pid) => { try { return readFileSync(`/proc/${pid}/cmdline`, 'utf8').startsWith('sleep'); } catch { return false; } });
@@ -356,14 +379,12 @@ async function runRoute(options) {
   loadLog.concurrent = load();
 
   // No-subscriber relay paths and the direct native reader: required diagnostics, never gated.
-  const emptyCandidate = join(fixtureConfig, manifest.noSubscriber?.candidate ?? 'candidate-empty.json');
   const emptyDeployed = relayed ? join(fixtureConfig, manifest.noSubscriber?.deployed ?? 'deployed-empty.json') : null;
-  const speculative = manifest.noSubscriber?.speculative ? join(fixtureConfig, manifest.noSubscriber.speculative) : null;
   const none = /** @type {any} */ ({ candidate: [], native: [], failures: [], starts: {} });
   if (relayed) none.deployed = [];
   if (speculative) none.speculative = [];
   const noneState = { deployed: stateDir('none-deployed'), candidate: stateDir('none-candidate'), native: stateDir('none-native') };
-  const plain = async (/** @type {any} */ m, /** @type {string} */ state) => { const e = env(state), r = await runBaseline(m, { event, input: payload, env: e, cwd, capture: true });
+  const plain = async (/** @type {any} */ m, /** @type {string} */ state) => { const e = env(state), r = await runBaseline(m, { event, input: payload, ...withCandidate(e), cwd, capture: true });
     return { elapsedMs: r.elapsedMs, ok: r.statuses.every((s) => s === 'exited 0') && r.survivors.length === 0, statuses: r.statuses, survivors: r.survivors }; };
   const noneEvents = /** @type {[string, any, string][]} */ ([
     ...(relayed && emptyDeployed ? /** @type {[string, any, string][]} */ ([['deployed', single('deployed-empty', hook(manifest.deployed.relayEntry, emptyDeployed, manifest.deployed.outerMs ?? 600000)), noneState.deployed]]) : []),
@@ -393,7 +414,7 @@ async function runRoute(options) {
     schema: 1, mode: pilot ? 'pilot' : 'measure', route: { harness, event, outerMs }, host: execFileSync('uname', ['-n'], { encoding: 'utf8' }).trim(), runtime, node, timeoutMs: q.timeoutMs,
     cpus: cpus().length, load: loadLog, harnessAncestor,
     candidate: { path: candidate, commit: git(candidate, ['rev-parse', 'HEAD']), dirty: git(candidate, ['status', '--porcelain', '--untracked-files=no']).length > 0,
-      entry: join(candidate, 'bin/relay.js'), configSha256: manifest.candidate.configSha256 },
+      entry: join(candidate, 'bin/relay.js'), configSha256: manifest.candidate.configSha256, measuredConfigSha256: sha(candidateConfig), selected },
     manifest, manifestSetSha256: sha(setFile), workloadSha256: sha(workloadFile), deployedDigest, workLists: lists, fixtures,
     derivedConfigs: { missing: sha(missingConfig), timeout: sha(hangConfig) }, payloadBytes: Buffer.byteLength(payload), conditions,
     label: 'synthetic transport evidence: fixture bodies stand in for policy commands, whose own cost is replayed before each policy cutover',

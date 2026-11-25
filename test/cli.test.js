@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import { join } from 'node:path';
-import { tempState,localObservation } from './helpers/fixture.js';
+import { tempState,localObservation,subscriberConfig } from './helpers/fixture.js';
 import { processMarker,noneMarked,reapMarked } from './helpers/survivors.js';
 import { applyEvent } from '../src/bus/transaction.js';
 import { normalizeEvent } from '../src/adapters/index.js';
@@ -49,7 +49,7 @@ test('usage: help, list [--json], reap [--outer-ms N], hook --harness NAME [--ou
 });
 const fixture=new URL('./fixtures/subscriber.js',import.meta.url).pathname;
 const hookRun=(p,args,input,opts={})=>spawnSync(process.execPath,[cli.pathname,'hook',...args],{encoding:'utf8',input,env:{...process.env,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome},...opts});
-async function configure(p,subscribers){const dir=join(p.configHome,'relay');await fs.mkdir(dir,{recursive:true,mode:0o700});await fs.writeFile(join(dir,'subscribers.json'),JSON.stringify({schema: 2, subscribers}),{mode:0o600});}
+async function configure(p,subscribers){const dir=join(p.configHome,'relay');await fs.mkdir(dir,{recursive:true,mode:0o700});await fs.writeFile(join(dir,'subscribers.json'),JSON.stringify(subscriberConfig(subscribers)),{mode:0o600});}
 // State and config live beside each other under the temp root; relay creates the 0700 state directory itself.
 const layout=(base)=>({stateDir:join(base.stateDir,'state'),configHome:join(base.stateDir,'config')});
 const body=JSON.stringify({session_id:'sess',cwd:process.cwd(),tool_name:'Bash',tool_input:{command:'ls'}});
@@ -84,7 +84,7 @@ test('survival limitation: the internal deadline refuses; an outer kill, missing
   const env={PATH:process.env.PATH??'',HOME:base.stateDir,RELAY_STATE_DIR:p.stateDir,XDG_CONFIG_HOME:p.configHome};
   t.after(()=>reapMarked(marker));
   await configure(p,[{name:'g',role:'guard',kinds:['before-tool'],harnesses:['claude-code'],argv:['node',fixture,'hang',marker],timeoutMs:80}]);
-  // 5000 ms is about the smallest outer budget that admits one subscriber with its supervisor, discovery and cleanup reserves.
+  // 5000 ms admits this one 80 ms subscriber with its supervisor and cleanup reserves.
   const started=performance.now(),r=hookRun(p,['--harness','claude-code','--outer-ms','5000','PreToolUse'],body,{env});
   assert.equal(r.status,2);assert.match(r.stdout,/relay refused: GUARD_FAILED: guard g timeout/);assert.ok(performance.now()-started<5000,'refused inside the outer timeout');
   await noneMarked(marker); // relay's own deadline kills the guard

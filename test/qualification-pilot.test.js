@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { statistics } from '../scripts/hook-qualification/statistics.mjs';
 import { validateManifest, checkRetainedWork, runBaseline, workLists } from '../scripts/hook-qualification/baseline.mjs';
 import { judgePilot } from '../scripts/hook-qualification/pilot.mjs';
@@ -105,12 +107,23 @@ test('retained subscriber work must be accounted exactly once on both sides', ()
 
 test('retained work lists come from the configurations and native branches actually run', () => {
   const deployed = { schema: 1, subscribers: [{ name: 'ops-guard' }, { name: 'familiar' }] };
-  const candidate = { schema: 2, subscribers: [{ name: 'ops-guard' }, { name: 'turn-pause' }, { name: 'familiar' }] };
+  const candidate = { schema: 3, searchPath: ['/usr/bin'], subscribers: [{ name: 'ops-guard' }, { name: 'turn-pause' }, { name: 'familiar' }] };
   const lists = workLists({ deployed, candidate, native: ['turn-pause'] });
   assert.deepEqual(lists, { baseline: ['deployed-relay:ops-guard', 'deployed-relay:familiar', 'turn-pause'], candidate: ['candidate:ops-guard', 'candidate:turn-pause', 'candidate:familiar'] });
   checkRetainedWork(manifest(), lists);
-  const dropped = workLists({ deployed, candidate: { schema: 2, subscribers: [{ name: 'turn-pause' }] }, native: ['turn-pause'] });
+  const dropped = workLists({ deployed, candidate: { schema: 3, searchPath: ['/usr/bin'], subscribers: [{ name: 'turn-pause' }] }, native: ['turn-pause'] });
   assert.throws(() => checkRetainedWork(manifest(), dropped), { code: 'BASELINE_INVALID' });
+});
+
+test('only a named branch runs in its own environment', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'relay-branch-env-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // Each branch writes its own file: a branch counts as done at its exit, before its pipes close.
+  const report = (name) => ({ name, role: name === 'deployed-relay' ? name : 'native', argv: ['/bin/sh', '-c', `cat >/dev/null; printf %s "$PATH" > ${join(dir, name)}`] });
+  const m = manifest({ branches: [report('deployed-relay'), report('turn-pause')] });
+  const r = await runBaseline(m, { event: 'PreToolUse', input: '{}', env: { PATH: '/usr/bin:/bin' }, branchEnv: { 'turn-pause': { PATH: '/bin:/usr/bin' } }, cwd: '/' });
+  assert.deepEqual(r.statuses, ['exited 0', 'exited 0']);
+  assert.deepEqual(['deployed-relay', 'turn-pause'].map((name) => readFileSync(join(dir, name), 'utf8')), ['/usr/bin:/bin', '/bin:/usr/bin']);
 });
 
 test('a parallel baseline is timed on its critical path, never as a sum of branches', async () => {

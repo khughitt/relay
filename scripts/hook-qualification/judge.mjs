@@ -45,6 +45,8 @@ export function judge(samples, workload) {
   if (commits.size !== 1 || ![...commits].every((x) => typeof x === 'string' && /^[0-9a-f]{40}$/.test(x))) failures.push('results do not name one candidate commit');
   if (samples.some((r) => r.candidate?.dirty !== false)) failures.push('a candidate had uncommitted changes');
   if (new Set(samples.map((r) => r.candidate?.configSha256)).size !== 1) failures.push('results do not name one candidate config');
+  // Every host measures its own rendering of that one frozen template.
+  for (const r of samples) if (!/^[0-9a-f]{64}$/.test(r.candidate?.measuredConfigSha256)) failures.push(`${r.host} ${r.runtime}: the result names no measured candidate config`);
   const commit = [...commits][0];
   // Two hosts, each with the Node floor and a development runtime.
   const hosts = [...new Set(samples.map((r) => r.host))];
@@ -77,7 +79,7 @@ export function judge(samples, workload) {
     const warm = r.conditions?.warm;
     if (warm?.baseline?.length && warm?.candidate?.length) {
       const b = statistics(warm.baseline.map((/** @type {any} */ s) => s.elapsedMs)), x = statistics(warm.candidate.map((/** @type {any} */ s) => s.elapsedMs));
-      evidence.push(`host=${r.host} outerMs=${route.outerMs} runtime=${r.runtime} ${label} commit=${commit} baseline=${manifest.baselineKind} warm p95 delta ${ms(x.p95 - b.p95)} p99 delta ${ms(x.p99 - b.p99)} max delta ${ms(x.max - b.max)} ms`);
+      evidence.push(`host=${r.host} outerMs=${route.outerMs} runtime=${r.runtime} ${label} commit=${commit} baseline=${manifest.baselineKind} template=${r.candidate.configSha256} measured=${r.candidate.measuredConfigSha256} warm p95 delta ${ms(x.p95 - b.p95)} p99 delta ${ms(x.p99 - b.p99)} max delta ${ms(x.max - b.max)} ms`);
     }
   }
   return { passed: complete && failures.length === 0, complete, failures, rows, evidence };

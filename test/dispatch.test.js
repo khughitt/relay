@@ -17,7 +17,7 @@ import { normalizeEvent } from '../src/adapters/index.js';
 import { relayError } from '../src/protocol.js';
 import { CONTEXT_LIMIT } from '../src/adapters/reply.js';
 import { RECONCILE } from '../src/subscribers.js';
-import { tempPaths, writeSubscribers } from './helpers/fixture.js';
+import { subscriberConfig, TEST_SEARCH_PATH, tempPaths, writeSubscribers } from './helpers/fixture.js';
 import { agyStore, encodeTrajectoryMetadata } from './helpers/agy-store.js';
 import { processMarker, noneMarked, reapMarked } from './helpers/survivors.js';
 
@@ -281,7 +281,7 @@ test('an unusable environment cannot reach the policy phase when the path is exp
 });
 
 test('slow configuration loading and publication end at the deadline', async (t) => {
-  const p = await tempPaths(t), empty = { schema: 2, subscribers: [] };
+  const p = await tempPaths(t), empty = subscriberConfig([]);
   let started = performance.now();
   let r = await hook(p, { outerMs: 500, deps: { loadConfig: slow(empty, 650) } });
   assert.equal(r.exitCode, 2); assert.match(r.stdout, /relay refused: DEADLINE_EXCEEDED: subscriber configuration did not load before the deadline/);
@@ -302,12 +302,22 @@ test('configuration errors refuse on guard-capable events and report on the rest
   r = await hook(p, { nativeEvent: 'Notification:idle_prompt', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.equal(r.exitCode, 1); assert.equal(r.stdout, ''); assert.match(r.stderr, /^INVALID_CONFIG: /);
   await writeSubscribers(p, [strip(guard('g', 'allow', { timeoutMs: 5000 }))]);
-  r = await hook(p, { outerMs: 1000 }); assert.match(r.stdout, /relay refused: INVALID_CONFIG: subscribers for claude-code before-tool need 6250 ms/);
+  r = await hook(p, { outerMs: 1000 }); assert.match(r.stdout, /relay refused: INVALID_CONFIG: subscribers for claude-code before-tool need 5750 ms/);
   r = await hook(p, { body: '{"session_id":"sess"}' }); assert.match(r.stdout, /relay refused: INVALID_INPUT/);
   r = await hook(p, { body: 'x'.repeat(5 * 1024 * 1024) }); assert.match(r.stdout, /relay refused: INPUT_TOO_LARGE/);
   r = await hook(p, { harness: 'codex', nativeEvent: 'Interrupt', body: '{}' }); assert.deepEqual(r, { stdout: '', stderr: 'UNSUPPORTED_EVENT: unsupported harness event\n', exitCode: 1 });
   r = await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', outerMs: 4000, body: '{}' }); assert.match(r.stderr, /^USAGE: codex SessionEnd allows at most 3000/); assert.equal(r.exitCode, 1);
   r = await hook(p, { harness: 'vim', body: '{}' }); assert.match(r.stderr, /^UNSUPPORTED_HARNESS/);
+});
+
+test('a guard dispatch refuses a file of an earlier schema and one whose search path is malformed', async (t) => {
+  const p = await tempPaths(t);
+  for (const [config, message] of [[{ schema: 2, subscribers: [guard('g', 'allow')] }, /relay refused: INVALID_CONFIG: subscriber config schema 2 is no longer read/],
+    [subscriberConfig([guard('g', 'allow')], ['bin']), /relay refused: INVALID_CONFIG: searchPath\[0\]/]]) {
+    await writeSubscribers(p, [], { text: JSON.stringify(config) });
+    const r = await hook(p);
+    assert.equal(r.exitCode, 2); assert.match(r.stdout, message);
+  }
 });
 
 test('tool filters select guards and the tool input never leaks into stderr or stdout', async (t) => {
@@ -378,9 +388,9 @@ test('Codex SessionEnd publishes inside its one-second default but admits no sub
   const started = performance.now(), r = await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', body: JSON.stringify({ session_id: 'sess', cwd: CWD }) });
   assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 }); assert.ok(performance.now() - started < 1000);
   assert.equal((await readSnapshot({ paths: p })).agents['codex:sess'], undefined);
-  // Supervisor startup, discovery and cleanup reserves exceed what Codex's 3 s SessionEnd cap leaves.
-  await writeSubscribers(p, [strip(observer('end', 'allow', { kinds: ['session-end'], timeoutMs: 1 }))]);
-  assert.match((await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', outerMs: 3000, body: JSON.stringify({ session_id: 'sess', cwd: CWD }) })).stderr, /^INVALID_CONFIG: subscribers for codex session-end need 1251 ms but 800 ms fit inside 3000 ms/);
+  // Codex's 3 s SessionEnd cap leaves room for one observer of up to 50 ms.
+  await writeSubscribers(p, [strip(observer('end', 'allow', { kinds: ['session-end'], timeoutMs: 51 }))]);
+  assert.match((await hook(p, { harness: 'codex', nativeEvent: 'SessionEnd', outerMs: 3000, body: JSON.stringify({ session_id: 'sess', cwd: CWD }) })).stderr, /^INVALID_CONFIG: subscribers for codex session-end need 801 ms but 800 ms fit inside 3000 ms/);
   const oc = await hook(p, { harness: 'opencode', nativeEvent: 'session.busy', body: JSON.stringify({ session_id: 'opencode:42', cwd: CWD }) });
   assert.deepEqual(oc, { stdout: '', stderr: '', exitCode: 0 });
   assert.equal((await readSnapshot({ paths: p })).agents['opencode:opencode:42'].state, 'working');
@@ -423,7 +433,7 @@ test('reconcile prunes, then notifies reconcile observers even when nothing chan
   await writeSubscribers(p, [], { text: 'nope' });
   await assert.rejects(reconcile({}, { paths: p }), { code: 'INVALID_CONFIG' });
   await writeSubscribers(p, []); // valid again, so the injected slow reap is actually reached
-  await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, loadConfig: slow({ schema: 2, subscribers: [] }, 650) }), { code: 'DEADLINE_EXCEEDED' });
+  await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, loadConfig: slow(subscriberConfig([]), 650) }), { code: 'DEADLINE_EXCEEDED' });
   await assert.rejects(reconcile({ outerMs: 500 }, { paths: p, reap: slow(published, 650) }), { code: 'DEADLINE_EXCEEDED' });
   await new Promise((resolve) => setTimeout(resolve, 700));
 });
@@ -614,53 +624,124 @@ test('dispatchHook forwards agyAppDataDir from artifactDirectoryPath and falls b
   assert.deepEqual(Object.keys((await readSnapshot({ paths: p })).agents), [`agy:${r3}`]);
 });
 
-// Executable resolution: argv[0] is a PATH basename resolved outside the event's repository.
-async function repository(t) {
+// Executable resolution: argv[0] is a basename found in the configured search path alone. Each
+// tree holds a checkout, a linked worktree, a non-Git directory and the host's listed directory.
+const sh = (...lines) => ['#!/bin/sh', 'cat >/dev/null', ...lines, ''].join('\n');
+const ALLOW = `printf '{"decision":"allow"}'`, DENY = `printf '{"decision":"deny","reason":"the fake guard ran"}'`;
+async function script(path, text) { await mkdir(join(path, '..'), { recursive: true }); await writeFile(path, text, { mode: 0o755 }); }
+const guardNamed = (command, over = {}) => ({ name: 'resolved', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: [command], timeoutMs: 2000, ...over });
+async function host(t) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'relay-resolve-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const repo = join(root, 'repo'), hostbin = join(root, 'hostbin');
-  await mkdir(join(repo, '.git'), { recursive: true }); await mkdir(join(repo, 'bin')); await mkdir(hostbin);
-  await writeFile(join(repo, 'bin', 'relay-test-guard'), `#!/bin/sh\ncat >/dev/null\nprintf '{"decision":"allow"}'\n`, { mode: 0o755 });
-  return { root, repo, hostbin };
+  const repo = join(root, 'repo'), worktree = join(root, 'worktree'), plain = join(root, 'plain'), hostbin = join(root, 'hostbin'), other = join(root, 'other');
+  for (const dir of [join(repo, '.git', 'worktrees', 'w'), worktree, plain, hostbin, other]) await mkdir(dir, { recursive: true });
+  await writeFile(join(worktree, '.git'), `gitdir: ${join(repo, '.git', 'worktrees', 'w')}\n`);
+  return { root, repo, worktree, plain, hostbin, other, list: [hostbin, ...TEST_SEARCH_PATH] };
 }
 
-test('subscriber argv stays literal and runs in the event cwd with a trusted PATH', async (t) => {
-  const p = await tempPaths(t), file = join(p.stateDir, '..', 'argv.json');
-  const { root, repo } = await repository(t);
-  const env = { PATH: `${join(repo, 'bin')}:${process.env.PATH}`, HOME: root };
-  await writeSubscribers(p, [strip(guard('lit', 'argv', { argv: argv('argv', file, 'literal; $(never-run)', '*.md') }))]);
-  const r = await hook(p, { body: payload({ cwd: join(repo) }), deps: { env } });
-  assert.equal(r.exitCode, 0, r.stdout + r.stderr);
-  const seen = JSON.parse(await readFile(file, 'utf8'));
-  const recordedArgv = seen.argv;
-  assert.deepEqual(recordedArgv, ['literal; $(never-run)', '*.md']);
-  assert.equal(seen.cwd, repo);
-  assert.equal(seen.path.split(':').includes(join(repo, 'bin')), false, 'the repository bin never reaches the child PATH');
+test('a fake guard on the hook PATH is never selected', async (t) => {
+  for (const [where, cwdOf, binOf] of [['the event repository', (f) => f.repo, (f) => join(f.repo, 'bin')], ['a non-Git working directory', (f) => f.plain, (f) => join(f.plain, 'bin')], ['neither', (f) => f.plain, (f) => join(f.other, 'bin')]]) {
+    const p = await tempPaths(t), f = await host(t), fake = binOf(f);
+    await script(join(f.hostbin, 'relay-test-guard'), sh(`: > ${join(f.root, 'configured')}`, ALLOW));
+    await script(join(fake, 'relay-test-guard'), sh(`: > ${join(f.root, 'fake')}`, DENY));
+    await writeSubscribers(p, [guardNamed('relay-test-guard')], { searchPath: f.list });
+    const r = await hook(p, { body: payload({ cwd: cwdOf(f) }), deps: { env: { PATH: `${fake}:/usr/bin:/bin`, HOME: f.root } } });
+    assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 }, where);
+    assert.equal(await absent(join(f.root, 'configured')), false, where);
+    assert.ok(await absent(join(f.root, 'fake')), where);
+  }
 });
 
-test('a repository-local command refuses closed and diagnoses paths without argv or payload', async (t) => {
-  const p = await tempPaths(t);
-  const { root, repo } = await repository(t);
-  const env = { PATH: `${join(repo, 'bin')}:${process.env.PATH}`, HOME: root };
-  await writeSubscribers(p, [{ name: 'local', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['relay-test-guard', 'ARGV_SECRET'], timeoutMs: 1000 }]);
-  const r = await hook(p, { body: payload({ cwd: repo }), deps: { env } });
+test('the same configuration selects the same command from anywhere', async (t) => {
+  const f = await host(t), hostile = join(f.other, 'bin');
+  await script(join(f.hostbin, 'relay-test-guard'), sh(`printf '%s' "$0" > ${join(f.root, 'ran')}`, ALLOW));
+  await script(join(hostile, 'relay-test-guard'), sh(DENY));
+  for (const cwd of [f.repo, f.worktree, f.plain, '/']) for (const PATH of [`${hostile}:/usr/bin:/bin`, undefined]) {
+    const p = await tempPaths(t);
+    rmSync(join(f.root, 'ran'), { force: true });
+    await writeSubscribers(p, [guardNamed('relay-test-guard')], { searchPath: f.list });
+    const r = await hook(p, { body: payload({ cwd }), deps: { env: { HOME: f.root, ...(PATH === undefined ? {} : { PATH }) } } });
+    assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 }, `${cwd} ${PATH}`);
+    assert.equal(await readFile(join(f.root, 'ran'), 'utf8'), join(f.hostbin, 'relay-test-guard'), `${cwd} ${PATH}`);
+  }
+});
+
+test('subscriber argv stays literal and runs in the event cwd; it and its helpers see only the list', async (t) => {
+  const f = await host(t), decoys = join(f.repo, 'bin'), tools = join(f.root, 'tools');
+  const list = [f.hostbin, tools, ...TEST_SEARCH_PATH], env = { PATH: `${decoys}:/usr/bin:/bin`, HOME: f.root };
+  const run = async (subscriber) => { const p = await tempPaths(t); await writeSubscribers(p, [subscriber], { searchPath: list }); return hook(p, { body: payload({ cwd: f.repo }), deps: { env } }); };
+  const file = join(f.root, 'argv.json');
+  let r = await run(strip(guard('lit', 'argv', { argv: argv('argv', file, 'literal; $(never-run)', '*.md') })));
+  assert.equal(r.exitCode, 0, r.stdout + r.stderr);
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), { argv: ['literal; $(never-run)', '*.md'], cwd: f.repo, path: list.join(':') });
+  for (const name of ['relay-interp', 'relay-helper']) {
+    await script(join(tools, name), `#!/bin/sh\nprintf listed > ${join(f.root, name)}\n${name === 'relay-interp' ? `cat >/dev/null\n${ALLOW}\n` : ''}`);
+    await script(join(decoys, name), `#!/bin/sh\nprintf decoy > ${join(f.root, name)}\n${name === 'relay-interp' ? `cat >/dev/null\n${ALLOW}\n` : ''}`);
+  }
+  await script(join(f.hostbin, 'relay-env-guard'), '#!/usr/bin/env relay-interp\n');
+  await script(join(f.hostbin, 'relay-helper-guard'), sh('relay-helper', ALLOW));
+  for (const [command, name] of [['relay-env-guard', 'relay-interp'], ['relay-helper-guard', 'relay-helper']]) {
+    r = await run(guardNamed(command));
+    assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 }, command);
+    assert.equal(await readFile(join(f.root, name), 'utf8'), 'listed', command);
+  }
+});
+
+test('a missing env interpreter refuses and names the candidate without argv or payload', async (t) => {
+  const p = await tempPaths(t), f = await host(t);
+  await script(join(f.hostbin, 'relay-test-guard'), '#!/usr/bin/env relay-no-interp\n');
+  await script(join(f.other, 'relay-no-interp'), sh(ALLOW));
+  await writeSubscribers(p, [guardNamed('relay-test-guard', { argv: ['relay-test-guard', 'ARGV_SECRET'] })], { searchPath: f.list });
+  const r = await hook(p, { body: payload({ cwd: f.repo }), deps: { env: { PATH: `${f.other}:/usr/bin:/bin`, HOME: f.root } } });
   assert.equal(r.exitCode, 2);
-  assert.match(r.stdout, /relay refused: EXECUTABLE_FORBIDDEN: guard local PreToolUse/);
+  assert.match(r.stdout, /relay refused: GUARD_FAILED: guard resolved exited 127 \(candidate /);
   const all = r.stdout + r.stderr;
-  assert.ok(all.includes(join(repo, 'bin', 'relay-test-guard')), 'the checked candidate is named');
+  assert.ok(all.includes(join(f.hostbin, 'relay-test-guard')), 'the candidate is named');
   assert.equal(all.includes('ARGV_SECRET'), false);
   assert.equal(all.includes('PRIVATE_COMMAND'), false);
   assert.ok(await absent(p.agentsPath));
 });
 
-test('an installed host link into the event checkout resolves and runs', async (t) => {
-  const p = await tempPaths(t);
-  const { root, repo, hostbin } = await repository(t);
-  await symlink(join(repo, 'bin', 'relay-test-guard'), join(hostbin, 'relay-test-guard'));
-  const env = { PATH: `${hostbin}:${join(repo, 'bin')}:${process.env.PATH}`, HOME: root };
-  await writeSubscribers(p, [{ name: 'installed', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['relay-test-guard'], timeoutMs: 2000 }]);
-  const r = await hook(p, { body: payload({ cwd: repo }), deps: { env } });
-  assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 });
+test('an unusable listed candidate refuses the tool call even when a later entry holds a good one', async (t) => {
+  const p = await tempPaths(t), f = await host(t);
+  await writeFile(join(f.other, 'relay-test-guard'), sh(ALLOW), { mode: 0o644 });
+  await script(join(f.hostbin, 'relay-test-guard'), sh(ALLOW));
+  await writeSubscribers(p, [guardNamed('relay-test-guard')], { searchPath: [f.other, ...f.list] });
+  const r = await hook(p, { deps: { env: { HOME: f.root } } });
+  assert.equal(r.exitCode, 2);
+  assert.match(r.stdout, /relay refused: EXECUTABLE_UNUSABLE: guard resolved PreToolUse/);
+});
+
+test('a listed directory inside the event checkout is used there, and so is a listed link into it', async (t) => {
+  const f = await host(t), bin = join(f.repo, 'bin');
+  await script(join(bin, 'relay-test-guard'), sh(`printf '%s' "$0" > ${join(f.root, 'ran')}`, ALLOW));
+  await symlink(join(bin, 'relay-test-guard'), join(f.hostbin, 'relay-test-guard'));
+  for (const dir of [bin, f.hostbin]) {
+    const p = await tempPaths(t);
+    await writeSubscribers(p, [guardNamed('relay-test-guard')], { searchPath: [dir, ...TEST_SEARCH_PATH] });
+    const r = await hook(p, { body: payload({ cwd: f.repo }), deps: { env: { HOME: f.root } } });
+    assert.deepEqual(r, { stdout: '', stderr: '', exitCode: 0 }, dir);
+    assert.equal(await readFile(join(f.root, 'ran'), 'utf8'), join(dir, 'relay-test-guard'));
+  }
+});
+
+test('a guard whose event cwd is missing refuses through its failed spawn', async (t) => {
+  const p = await tempPaths(t), f = await host(t);
+  await script(join(f.hostbin, 'relay-test-guard'), sh(ALLOW));
+  await writeSubscribers(p, [guardNamed('relay-test-guard')], { searchPath: f.list });
+  const r = await hook(p, { body: payload({ cwd: join(f.root, 'gone') }), deps: { env: { HOME: f.root } } });
+  assert.equal(r.exitCode, 2);
+  assert.match(r.stdout, /relay refused: GUARD_FAILED: guard resolved spawn-failed/);
+});
+
+test('an occurrence observer whose event cwd is missing is a diagnostic', async (t) => {
+  const p = await tempPaths(t), f = await host(t), marker = join(f.root, 'observed');
+  await script(join(f.hostbin, 'relay-test-observer'), sh(`: > ${marker}`));
+  await writeSubscribers(p, [{ name: 'o', role: 'observer', registry: 'occurrence', kinds: ['before-tool'], argv: ['relay-test-observer'], timeoutMs: 1000 }], { searchPath: f.list });
+  const r = await hook(p, { body: payload({ cwd: join(f.root, 'gone') }), deps: { env: { HOME: f.root } } });
+  assert.equal(r.exitCode, 0, r.stderr);
+  assert.match(r.stderr, /^SUBSCRIBER_FAILED: o spawn-failed/m);
+  assert.ok(await absent(marker));
 });
 
 test('observer resolution failures are diagnostics; the reply and publication stand', async (t) => {
