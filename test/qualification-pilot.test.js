@@ -126,6 +126,17 @@ test('only a named branch runs in its own environment', async (t) => {
   assert.deepEqual(['deployed-relay', 'turn-pause'].map((name) => readFileSync(join(dir, name), 'utf8')), ['/usr/bin:/bin', '/bin:/usr/bin']);
 });
 
+test('a captured branch keeps what it wrote after its group drained, without counting the wait', async () => {
+  // The writer leaves the branch's group, so the group drains at once while the pipes stay open
+  // until it writes, 150 ms later.
+  const late = { name: 'deployed-relay', role: 'deployed-relay', argv: ['/bin/sh', '-c', 'cat >/dev/null; setsid /bin/sh -c "sleep 0.15; printf out; printf err >&2" &'] };
+  const m = manifest({ branches: [late, { name: 'turn-pause', role: 'native', argv: ['/bin/sh', '-c', 'cat >/dev/null'] }] });
+  const r = await runBaseline(m, { event: 'PreToolUse', input: '{}', env: { PATH: '/usr/bin:/bin' }, cwd: '/', capture: true });
+  assert.deepEqual(r.statuses, ['exited 0', 'exited 0']);
+  assert.deepEqual(r.branches.map(({ stdout, stderr }) => [stdout, stderr]), [['out', 'err'], ['', '']]);
+  assert.ok(r.branches[0].elapsedMs < 150 && r.elapsedMs < 150, `timed at the drain: branch ${r.branches[0].elapsedMs} ms, event ${r.elapsedMs} ms`);
+});
+
 test('a parallel baseline is timed on its critical path, never as a sum of branches', async () => {
   const m = manifest({ branches: [
     { name: 'deployed-relay', role: 'deployed-relay', argv: ['/bin/sh', '-c', 'cat >/dev/null; sleep 0.3'] },
