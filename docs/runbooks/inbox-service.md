@@ -4,7 +4,7 @@ Type: operator guide; document types 1.
 
 `relay serve` owns the durable inbox and private local socket. HTTP is optional and
 binds only `127.0.0.1`; relay ships no phone client. The Claude terminal route has
-passing capability and user-present tailnet acceptance evidence for 2.1.296. This runbook
+passing capability evidence for 2.1.332 and user-present tailnet acceptance evidence from 2.1.296. This runbook
 describes operation; the package installs no unit, tailnet service or live hook.
 
 ## User unit
@@ -76,7 +76,7 @@ the same `answerId` after reconnecting; expiry runs before a queued answer is ap
 ## Installing the question route
 
 Run `docs/runbooks/answer-route-probes.md` first, including after a Claude
-Code upgrade. The recorded five passing rows are for 2.1.296; an unknown/new version
+Code upgrade. The recorded five passing rows are for 2.1.332; an unknown/new version
 requires fresh evidence. Terminal-answer and deny-stops gate PreToolUse, receipt gates
 PostToolUse, release enables handback, and under-denial records behavior only.
 

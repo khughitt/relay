@@ -65,3 +65,56 @@ test('malformed paid-probe argv refuses before external tools or output creation
     assert.match(result.stderr, /tmux server already exists/);
   }
 });
+
+test('probe driver moves down past No, exit to trust the workspace and preserves pane output on early exit', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'answer-probe-trust-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  for (const [label, promptLines, expectedKeys] of [
+    ['cursor-on-no', [' ❯ No, exit', '   Yes, I trust this folder'], ['Down', 'Enter']],
+    ['cursor-on-yes', ['   No, exit', ' ❯ Yes, I trust this folder'], ['Enter']],
+  ]) {
+    const sub = join(dir, label), bin = join(sub, 'bin'), home = join(sub, 'home'), scratch = join(sub, 'scratch'), out = join(sub, 'out');
+    const calls = join(sub, 'tmux-calls.log'), state = join(sub, 'state');
+    mkdirSync(bin, { recursive: true }); mkdirSync(home, { mode: 0o700 }); mkdirSync(scratch, { mode: 0o700 });
+    writeFileSync(state, 'alive\n');
+    writeFileSync(join(bin, 'claude'), '#!/bin/sh\nprintf "%s\\n" "2.1.332 (Claude Code)"\n', { mode: 0o700 });
+    writeFileSync(join(bin, 'ps'), '#!/bin/sh\nprintf "1 0\\n"\n', { mode: 0o700 });
+    const paneBody = ` Accessing workspace:\\n\\n${promptLines.join('\\n')}\\n`;
+    writeFileSync(join(bin, 'tmux'), `#!/bin/sh
+printf '%s\\n' "$*" >> "${calls}"
+case "$*" in *remain-on-exit*) : > "${sub}/remain" ;; esac
+shift 2 # -L relay-probe
+case "$1" in
+  list-sessions) exit 1 ;;
+  new-session|list-panes|kill-session|kill-server|set-option) exit 0 ;;
+  capture-pane)
+    if [ "$(cat "${state}")" = "dead" ] && [ ! -f "${sub}/remain" ]; then
+      printf 'no server running on /tmp/tmux-relay-probe\\n' >&2
+      exit 1
+    fi
+    printf '${paneBody}'
+    exit 0 ;;
+  send-keys)
+    case "$*" in *Enter) printf 'dead\\n' > "${state}" ;; esac
+    exit 0 ;;
+  display-message)
+    if [ "$(cat "${state}")" = "dead" ]; then printf '1\\n'; else printf '0\\n'; fi
+    exit 0 ;;
+  *) exit 1 ;;
+esac
+`, { mode: 0o700 });
+    const result = spawnSync(process.execPath, ['tools/answer-probe/run.mjs', '--only', 'deny', '--out', out], {
+      encoding: 'utf8',
+      timeout: 15000,
+      env: { PATH: `${bin}:/usr/bin:/bin`, HOME: home, TMPDIR: scratch },
+    });
+    assert.equal(result.status, 1, label);
+    assert.match(result.stderr, /deny: hook never fired/, `${label}: ${result.stderr}`);
+    const logged = readFileSync(calls, 'utf8').trim().split('\n');
+    assert.ok(logged.some((line) => line.includes('new-session') && line.includes('remain-on-exit')), `${label}: ${logged.join('\n')}`);
+    const prefix = '-L relay-probe send-keys -t deny ';
+    const keys = logged.filter((line) => line.startsWith(prefix)).map((line) => line.slice(prefix.length));
+    assert.deepEqual(keys, expectedKeys, label);
+    assert.match(readFileSync(join(out, 'deny', 'pane.txt'), 'utf8'), /Yes, I trust this folder/, label);
+  }
+});

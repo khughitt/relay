@@ -26,8 +26,10 @@ const owned = new Set();
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { if (e.code === 'ESRCH') return false; throw e; } };
 const track = () => {
   const result = spawnSync('tmux', ['-L', SOCKET, 'list-panes', '-a', '-F', '#{pane_pid}'], { encoding: 'utf8' });
-  if (result.status === 0) for (const pid of result.stdout.trim().split('\n')) owned.add(Number(pid));
-  const rows = execFileSync('ps', ['-eo', 'pid=,ppid='], { encoding: 'utf8' }).trim().split('\n').map((line) => line.trim().split(/\s+/).map(Number));
+  if (result.status === 0) {
+    for (const raw of result.stdout.trim().split('\n')) { const pid = Number(raw); if (pid > 1) owned.add(pid); }
+  }
+  const rows = execFileSync('ps', ['-eo', 'pid=,ppid='], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map((line) => line.trim().split(/\s+/).map(Number));
   let changed;
   do { changed = false; for (const [pid, parent] of rows) if (owned.has(parent) && !owned.has(pid)) { owned.add(pid); changed = true; } } while (changed);
 };
@@ -53,6 +55,7 @@ const scenarios = {
   'under-denial': (log) => ({ PreToolUse: [{ matcher: 'AskUserQuestion', hooks: [entry('deny', 0, log), entry('answer', 120, log)] }], PostToolUse: [{ matcher: 'AskUserQuestion', hooks: [entry('post-log', 0, log, 10)] }] }),
 };
 const capture = (name) => tmux('capture-pane', '-p', '-t', name, '-S', '-200');
+const dead = (name) => tmux('display-message', '-p', '-t', name, '#{pane_dead}').trim() === '1';
 async function until(check, ms) {
   const end = performance.now() + ms;
   while (performance.now() < end) { track(); if (check()) return true; await sleep(1000); }
@@ -60,7 +63,13 @@ async function until(check, ms) {
 }
 async function waitFor(name, pattern, ms) {
   const end = performance.now() + ms;
-  while (performance.now() < end) { track(); const pane = capture(name); if (pattern.test(pane)) return pane; await sleep(1000); }
+  while (performance.now() < end) {
+    track();
+    const pane = capture(name);
+    if (pattern.test(pane)) return pane;
+    if (dead(name)) return null;
+    await sleep(1000);
+  }
   return null;
 }
 const events = (log) => existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
@@ -80,10 +89,18 @@ for (const [name, settingsFor] of Object.entries(scenarios)) {
   mkdirSync(ws, { mode: 0o700 });
   save(join(dir, 'settings.json'), JSON.stringify({ hooks: settingsFor(log) }, null, 2));
   const started = Date.now();
-  tmux('new-session', '-d', '-s', name, '-x', '200', '-y', '50', '-c', ws, `exec claude --settings ${quote(join(dir, 'settings.json'))} ${quote(PROMPT)}`);
-  if (await waitFor(name, /Yes, I trust|trust this folder/i, 15000)) tmux('send-keys', '-t', name, 'Enter');
+  tmux('new-session', '-d', '-s', name, '-x', '200', '-y', '50', '-c', ws, `exec claude --settings ${quote(join(dir, 'settings.json'))} ${quote(PROMPT)}`, ';', 'set-option', '-t', name, 'remain-on-exit', 'on');
+  const trust = await waitFor(name, /Yes, I trust|trust this folder/i, 15000);
+  if (trust) {
+    const lines = trust.split('\n');
+    const cursor = lines.findIndex((line) => /[❯>]/.test(line)), yes = lines.findIndex((line) => /Yes, I trust/i.test(line));
+    for (let step = cursor; cursor >= 0 && step < yes; step += 1) { tmux('send-keys', '-t', name, 'Down'); await sleep(200); }
+    tmux('send-keys', '-t', name, 'Enter');
+  }
   save(join(dir, 'startup-pane.txt'), capture(name));
-  if (!await until(() => events(log).some((e) => e.event === 'fired'), 60000)) {
+  const fired = () => events(log).some((e) => e.event === 'fired');
+  await until(() => fired() || dead(name), 60000);
+  if (!fired()) {
     save(join(dir, 'pane.txt'), capture(name));
     throw new Error(`${name}: hook never fired; inspect startup-pane.txt and pane.txt for readiness, trust or auth`);
   }

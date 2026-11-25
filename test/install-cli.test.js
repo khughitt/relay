@@ -103,11 +103,11 @@ async function askInstall(t) {
   const relay = await relayCopy(join(s.root, 'prefix'), COMMIT);
   await writeFile(evidence, await readFile(new URL('../docs/evidence/claude-code-answer-routes.json', import.meta.url)));
   const claude = join(bin, 'claude');
-  await writeFile(claude, '#!/bin/sh\nprintf "%s\\n" "2.1.296 (Claude Code)"\n', { mode: 0o700 });
+  await writeFile(claude, '#!/bin/sh\nprintf "%s\\n" "2.1.332 (Claude Code)"\n', { mode: 0o700 });
   // An explicit, unversioned node keeps the run's stderr free of the versioned-path warning
   // on a host whose own node lives under a version manager.
   const node = await fakeNode(join(s.root, 'stable'));
-  const args = ['install', '--harness', 'claude-code', '--subscribers', s.file, '--target', s.target, '--node', node, ...await s.q('claude-code'), '--evidence', evidence, '--with', 'ask'];
+  const args = ['install', '--harness', 'claude-code', '--subscribers', s.file, '--target', s.target, '--node', node, ...await s.q('claude-code', '2.1.332'), '--evidence', evidence, '--with', 'ask'];
   return { ...s, bin, evidence, claude, args, run: (argv = args) => spawnSync(process.execPath, [relay, ...argv], {
     encoding: 'utf8', env: cliEnv({ stateDir: s.dir }, { PATH: bin }), timeout: 10000, killSignal: 'SIGKILL' }) };
 }
@@ -139,10 +139,10 @@ test('install --with ask refuses missing Claude, mismatched version and insuffic
   await s.q('claude-code', '2.2.0'); // the dispatch routes qualify at 2.2.0, so the stale ask-route evidence is what refuses
   const mismatch = s.run();
   assert.equal(mismatch.status, 1, mismatch.stderr);
-  assert.match(JSON.parse(mismatch.stderr).error.detail, /^UNSUPPORTED_BINDING: .*2\.1\.296.*2\.2\.0/);
-  await writeFile(s.claude, '#!/bin/sh\nprintf "%s\\n" "2.1.296 (Claude Code)"\n', { mode: 0o700 });
-  await s.q('claude-code');
-  await writeFile(s.evidence, JSON.stringify({ schema: 1, harness: 'claude-code', version: '2.1.296', probes: [], routes: [] }));
+  assert.match(JSON.parse(mismatch.stderr).error.detail, /^UNSUPPORTED_BINDING: .*2\.1\.332.*2\.2\.0/);
+  await writeFile(s.claude, '#!/bin/sh\nprintf "%s\\n" "2.1.332 (Claude Code)"\n', { mode: 0o700 });
+  await s.q('claude-code', '2.1.332');
+  await writeFile(s.evidence, JSON.stringify({ schema: 1, harness: 'claude-code', version: '2.1.332', probes: [], routes: [] }));
   const unsupported = s.run();
   assert.equal(unsupported.status, 1, unsupported.stderr);
   assert.match(JSON.parse(unsupported.stderr).error.detail, /^UNSUPPORTED_BINDING/);
@@ -182,7 +182,7 @@ test('Claude version failures emit only the formatted install error', async (t) 
 
 test('successful Claude version checks do not leak subprocess stderr', async (t) => {
   const s = await askInstall(t), before = await readFile(s.target, 'utf8');
-  await writeFile(s.claude, '#!/bin/sh\nprintf "%s\\n" "raw version success" >&2\nprintf "%s\\n" "2.1.296 (Claude Code)"\n', { mode: 0o700 });
+  await writeFile(s.claude, '#!/bin/sh\nprintf "%s\\n" "raw version success" >&2\nprintf "%s\\n" "2.1.332 (Claude Code)"\n', { mode: 0o700 });
   const success = s.run();
   assert.equal(success.status, 0, success.stderr);
   assert.equal(success.stderr, '');

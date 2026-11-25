@@ -121,8 +121,8 @@ test('a guard subscriber needs one evidence record holding both the dispatch pro
   const guard = { name: 'g', role: 'guard', kinds: ['before-tool'], harnesses: ['claude-code'], argv: ['true'], timeoutMs: 1000 };
   const probes = ['refuse', 'context'].map((reply) => ({ event: 'PreToolUse', reply, outerMs: 600000, passed: true }));
   const base = { target: '/t/settings.json', text: '{}', relayBin: '/r/bin/relay.js', nodeBin: '/n/node', subscribersPath: '/c/subscribers.json',
-    subscribers: validateSubscribers(subscriberConfig([guard])), withAsk: true, installedVersion: '2.1.296',
-    ...qualifiedInstall('claude-code', validateSubscribers(subscriberConfig([guard]))) };
+    subscribers: validateSubscribers(subscriberConfig([guard])), withAsk: true, installedVersion: '2.1.332',
+    ...qualifiedInstall('claude-code', validateSubscribers(subscriberConfig([guard])), { version: '2.1.332' }) };
   const routesOnly = parseEvidence(await readFile(new URL('../docs/evidence/claude-code-answer-routes.json', import.meta.url), 'utf8'));
   assert.throws(() => planClaudeCode({ ...base, evidence: routesOnly }),
     { code: 'UNSUPPORTED_BINDING', message: /claude-code,PreToolUse,refuse.*dispatch probes.*inbox-service/s });
@@ -134,10 +134,10 @@ test('a guard subscriber needs one evidence record holding both the dispatch pro
 
 test('the committed Claude route evidence enables both bindings at its probed version', async () => {
   const evidence = parseEvidence(await readFile(new URL('../docs/evidence/claude-code-answer-routes.json', import.meta.url), 'utf8'));
-  assert.equal(evidence.version, '2.1.296');
+  assert.equal(evidence.version, '2.1.332');
   assert.equal(evidence.routes.length, 5);
   assert.ok(evidence.routes.every((r) => r.passed));
-  assert.deepEqual(routeBindings('claude-code', evidence, '2.1.296'), [
+  assert.deepEqual(routeBindings('claude-code', evidence, '2.1.332'), [
     { event: 'PreToolUse', matcher: 'AskUserQuestion', outerMs: 86400000, handback: true },
     { event: 'PostToolUse', matcher: 'AskUserQuestion', outerMs: 10000 }]);
 });
