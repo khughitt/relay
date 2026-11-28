@@ -4,7 +4,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const STUB = join(fileURLToPath(new URL('.', import.meta.url)), 'stub-model.mjs');
@@ -12,7 +12,7 @@ const delay = (ms) => new Promise((done) => setTimeout(done, ms));
 const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
 function requireThat(ok, message) { if (!ok) throw new Error(message); }
 
-export function liveEnvironment({ home, port, path = '/usr/bin:/bin', terminal = false }) {
+export function liveEnvironment({ home, port, path = [dirname(process.execPath), '/usr/bin', '/bin'].join(delimiter), terminal = false }) {
   return {
     PATH: path, HOME: home, ...(terminal ? { TERM: 'xterm-256color' } : {}), LANG: 'C.UTF-8',
     CLAUDE_CONFIG_DIR: join(home, '.claude'),
